@@ -11,6 +11,8 @@ const start = defineCommand({
   positionals: [{ name: "pkg", description: "Package", required: true }],
   flags: [{ name: "--fresh", type: "boolean", description: "Cold start" }],
   examples: ["adb-axi app start com.example"],
+  // Dispatch tests never reach a device; device resolution is tested against fake adb.
+  device: "none",
   shipped: true,
   run: (context) =>
     Promise.resolve({
@@ -24,17 +26,20 @@ const stop = defineCommand({
   summary: "Hidden stub in the test registry",
   positionals: [{ name: "pkg", description: "Package", required: true }],
   examples: ["adb-axi app stop com.example"],
+  device: "none",
 });
 const logsDump = defineCommand({
   path: ["logs"],
   summary: "Hidden default command of a hidden group",
   flags: [{ name: "--pkg", type: "string", valueName: "<pkg>", description: "App" }],
   examples: ["adb-axi logs"],
+  device: "none",
 });
 const logsMark = defineCommand({
   path: ["logs", "mark"],
   summary: "Hidden subcommand",
   examples: ["adb-axi logs mark"],
+  device: "none",
 });
 const home = defineCommand({
   path: [],

@@ -1,5 +1,8 @@
+import type { AdbClient } from "../adb/run.js";
 import type { FlagSpec, FlagValue, PositionalSpec } from "../core/args.js";
+import type { Deadline } from "../core/deadline.js";
 import type { Output, OutputMode } from "../core/output.js";
+import type { Target } from "../device/resolve.js";
 
 /** Everything a command handler receives once its arguments are validated. */
 export interface CommandContext {
@@ -10,6 +13,13 @@ export interface CommandContext {
   /** `--timeout` when given, otherwise the command's default. */
   timeoutMs: number;
   debug: boolean;
+  /** The command's single deadline; every device call takes what is left of it. */
+  deadline: Deadline;
+  /** The adb client, located on first use (`ADB_NOT_FOUND` when there is none). */
+  adb: () => AdbClient;
+  /** The resolved device for commands with `device: "target"`, checked online. */
+  target: Target | undefined;
+  env: NodeJS.ProcessEnv;
 }
 
 export type CommandRun = (context: CommandContext) => Promise<Output>;

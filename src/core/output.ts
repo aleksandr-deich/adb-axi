@@ -42,7 +42,12 @@ export function noop(state: string): string {
  * expand are single-quoted; `<placeholders>` are kept as written.
  */
 export function commandLine(args: readonly string[]): string {
-  return [BIN, ...args.map(quoteArg)].join(" ");
+  return [BIN, shellWords(args)].filter((part) => part !== "").join(" ");
+}
+
+/** Arguments joined for display, quoted where a shell would split or expand them. */
+export function shellWords(args: readonly string[]): string {
+  return args.map(quoteArg).join(" ");
 }
 
 /** A help entry: `Run \`adb-axi ...\`` plus an optional reason. */

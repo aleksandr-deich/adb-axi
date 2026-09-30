@@ -40,3 +40,15 @@ export function shippedEntryNames(registry: Registry): string[] {
     .filter(([, entry]) => isVisible(entry))
     .map(([name]) => name);
 }
+
+/** Whether `adb-axi <path>` ships in this build. `[]` is the home view. */
+export function isShippedPath(registry: Registry, path: readonly string[]): boolean {
+  if (path.length === 0) return registry.home.shipped;
+  const entry = registry.entries[path[0] ?? ""];
+  if (entry === undefined) return false;
+  if (entry.kind === "command") return path.length === 1 && entry.shipped;
+  if (path.length === 1) return entry.defaultCommand?.shipped === true;
+  return (
+    entry.subcommands.some((sub) => sub.path[1] === path[1] && sub.shipped) && path.length === 2
+  );
+}

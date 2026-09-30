@@ -1,5 +1,8 @@
 import { runAxiCli, type AxiCliCommand } from "axi-sdk-js";
+import { locateAdb } from "./adb/locate.js";
+import { AdbClient } from "./adb/run.js";
 import { editDistance, parseArgs } from "./core/args.js";
+import { Deadline } from "./core/deadline.js";
 import { AdbAxiError } from "./core/errors.js";
 import {
   commandLine,
@@ -12,8 +15,15 @@ import {
 } from "./core/output.js";
 import { notAvailable } from "./commands/define.js";
 import { commandHelp, groupHelp, topLevelHelp } from "./commands/help.js";
-import { isVisible, REGISTRY, shippedEntryNames, visibleSubcommands } from "./commands/registry.js";
+import {
+  isShippedPath,
+  isVisible,
+  REGISTRY,
+  shippedEntryNames,
+  visibleSubcommands,
+} from "./commands/registry.js";
 import type { CommandContext, CommandSpec, GroupSpec, Registry } from "./commands/types.js";
+import { resolveTarget } from "./device/resolve.js";
 import { VERSION } from "./version.js";
 
 export const DESCRIPTION =
@@ -23,6 +33,14 @@ export interface MainOptions {
   argv?: readonly string[];
   registry?: Registry;
   stdout?: { write: (chunk: string) => unknown };
+  env?: NodeJS.ProcessEnv;
+}
+
+/** Per-run inputs every resolution step needs. */
+interface Run {
+  registry: Registry;
+  mode: OutputMode;
+  env: NodeJS.ProcessEnv;
 }
 
 /** What `resolveContext` hands a handler: output to print as is, or a validated command to run. */
@@ -35,6 +53,7 @@ export async function main(options: MainOptions = {}): Promise<void> {
   const registry = options.registry ?? REGISTRY;
   const stdout = options.stdout ?? process.stdout;
   const { mode, argv } = extractJsonFlag(options.argv ?? process.argv.slice(2));
+  const run: Run = { registry, mode, env: options.env ?? process.env };
 
   // G1: a flag before the command is rejected with the corrected command line, before
   // anything touches adb. Bare --help and version flags stay with the SDK.
@@ -47,7 +66,7 @@ export async function main(options: MainOptions = {}): Promise<void> {
   // G2: the SDK always renders TOON, so JSON home and JSON top-level help render here.
   if (mode === "json" && argv.length === 0) {
     await runDirect(stdout, mode, async () => {
-      const invocation = resolveInvocation(registry, undefined, [], mode);
+      const invocation = await resolveInvocation(run, undefined, []);
       const output = await produce(invocation);
       return { ...homeHeader(DESCRIPTION), ...output };
     });
@@ -74,7 +93,7 @@ export async function main(options: MainOptions = {}): Promise<void> {
     home: async (_args, invocation) => produce(invocation),
     // G4: help is resolved per subcommand inside `resolveContext`, never by the SDK.
     getCommandHelp: () => null,
-    resolveContext: ({ command, args }) => resolveInvocation(registry, command, args, mode),
+    resolveContext: ({ command, args }) => resolveInvocation(run, command, args),
     renderUnknownCommand: (command) => render(unknownCommandError(command, registry), mode) + "\n",
     // G3: structured fields, the `error, code, <fields>, help` order, and exit codes.
     formatError: (error) => renderError(error, mode),
@@ -206,33 +225,36 @@ function closest(word: string, candidates: readonly string[]): string | undefine
 }
 
 /**
- * Walk from the top-level command to one leaf, validate its arguments, and decide
- * whether this is a help request. Device resolution will slot in here, after parsing.
+ * Walk from the top-level command to one leaf, validate its arguments, decide whether this
+ * is a help request, and resolve the target device before the handler runs.
  */
-function resolveInvocation(
-  registry: Registry,
+async function resolveInvocation(
+  run: Run,
   command: string | undefined,
   args: readonly string[],
-  mode: OutputMode,
-): Invocation {
+): Promise<Invocation> {
   if (command === undefined) {
-    return leafInvocation(registry.home, [], mode);
+    return leafInvocation(run, run.registry.home, []);
   }
-  const entry = registry.entries[command];
+  const entry = run.registry.entries[command];
   if (entry === undefined) {
     throw new Error(`No registry entry for dispatched command ${command}`);
   }
   if (entry.kind === "command") {
-    return leafInvocation(entry, args, mode);
+    return leafInvocation(run, entry, args);
   }
-  return groupInvocation(entry, args, mode);
+  return groupInvocation(run, entry, args);
 }
 
-function groupInvocation(group: GroupSpec, args: readonly string[], mode: OutputMode): Invocation {
+async function groupInvocation(
+  run: Run,
+  group: GroupSpec,
+  args: readonly string[],
+): Promise<Invocation> {
   const first = args[0];
   const sub = group.subcommands.find((command) => command.path[1] === first);
   if (sub) {
-    return leafInvocation(sub, args.slice(1), mode);
+    return leafInvocation(run, sub, args.slice(1));
   }
   const helpForGroup = (): Output => {
     if (!isVisible(group)) throw notAvailable([group.name]);
@@ -242,7 +264,7 @@ function groupInvocation(group: GroupSpec, args: readonly string[], mode: Output
   const flagOrNothing = first === undefined || first.startsWith("-");
   const defaultCommand = group.defaultCommand;
   if (defaultCommand && (flagOrNothing || defaultCommand.positionals.length > 0)) {
-    return leafInvocation(defaultCommand, args, mode, helpForGroup);
+    return leafInvocation(run, defaultCommand, args, helpForGroup);
   }
   if (first === undefined || args.includes("--help")) {
     return { kind: "output", output: helpForGroup() };
@@ -259,19 +281,16 @@ function groupInvocation(group: GroupSpec, args: readonly string[], mode: Output
   throw new AdbAxiError(
     "VALIDATION_ERROR",
     `\`${commandLine([group.name])}\` needs a subcommand before its flags`,
-    {
-      fields: { subcommands: subcommandNames(group) },
-      help: [runHint(corrected)],
-    },
+    { fields: { subcommands: subcommandNames(group) }, help: [runHint(corrected)] },
   );
 }
 
-function leafInvocation(
+async function leafInvocation(
+  run: Run,
   spec: CommandSpec,
   args: readonly string[],
-  mode: OutputMode,
   help: () => Output = () => commandHelp(spec),
-): Invocation {
+): Promise<Invocation> {
   const parsed = parseArgs(args, {
     path: spec.path,
     flags: spec.flags,
@@ -282,18 +301,62 @@ function leafInvocation(
     if (!spec.shipped) throw notAvailable(spec.path);
     return { kind: "output", output: help() };
   }
+
   const timeout = parsed.flags.timeout;
+  const timeoutMs = typeof timeout === "number" ? timeout : spec.defaultTimeoutMs;
+  const debug = parsed.flags.debug === true;
+  const deadline = new Deadline(timeoutMs);
+  let client: AdbClient | undefined;
+  const adb = (): AdbClient =>
+    (client ??= new AdbClient(locateAdb(run.env), { debug, env: run.env }));
+
+  const device = parsed.flags.device;
+  const target =
+    spec.device === "target"
+      ? await resolveTarget({
+          adb: adb(),
+          deadline,
+          env: run.env,
+          requested: typeof device === "string" ? device : undefined,
+          commandArgs: [...spec.path, ...withoutDeviceFlag(args)],
+          isShipped: (path) => isShippedPath(run.registry, path),
+        })
+      : undefined;
+
   return {
     kind: "run",
     context: {
       spec,
       flags: parsed.flags,
       positionals: parsed.positionals,
-      mode,
-      timeoutMs: typeof timeout === "number" ? timeout : spec.defaultTimeoutMs,
-      debug: parsed.flags.debug === true,
+      mode: run.mode,
+      timeoutMs,
+      debug,
+      deadline,
+      adb,
+      target,
+      env: run.env,
     },
   };
+}
+
+/** The typed arguments minus any device selection, for help lines that add their own. */
+function withoutDeviceFlag(args: readonly string[]): string[] {
+  const out: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    const token = args[i] ?? "";
+    if (token === "--") {
+      out.push(...args.slice(i));
+      break;
+    }
+    if (token === "-s" || token === "--device") {
+      i++;
+      continue;
+    }
+    if (token.startsWith("--device=")) continue;
+    out.push(token);
+  }
+  return out;
 }
 
 function subcommandNames(group: GroupSpec): string[] {

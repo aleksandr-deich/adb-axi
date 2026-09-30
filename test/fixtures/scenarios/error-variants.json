@@ -1,0 +1,76 @@
+{
+  "description": "The same failure in several shapes: exit 255 with `error: device ... not found` (exec-out), exit 1 with `adb: device ... not found` (shell, install), exit 1 with `adb: error: failed to get feature set: ...` (pull), and adb usage text with a runtime exit (devices with a bad flag). Each maps to one code.",
+  "evidence": ["H7", "H8", "H9"],
+  "synthetic": false,
+  "rules": [
+    {
+      "match": [
+        "-s",
+        "bogus-9999",
+        "exec-out",
+        {
+          "rest": true
+        }
+      ],
+      "respond": {
+        "stderr": "error: device 'bogus-9999' not found\n",
+        "exit": 255
+      }
+    },
+    {
+      "match": [
+        "-s",
+        "bogus-9999",
+        "shell",
+        {
+          "rest": true
+        }
+      ],
+      "respond": {
+        "stderr": "adb: device 'bogus-9999' not found\n",
+        "exit": 1
+      }
+    },
+    {
+      "match": [
+        "-s",
+        "bogus-9999",
+        "install",
+        {
+          "rest": true
+        }
+      ],
+      "respond": {
+        "stderr": "adb: device 'bogus-9999' not found\n",
+        "exit": 1
+      }
+    },
+    {
+      "match": [
+        "-s",
+        "bogus-9999",
+        "pull",
+        {
+          "rest": true
+        }
+      ],
+      "respond": {
+        "stderr": "adb: error: failed to get feature set: device 'bogus-9999' not found\n",
+        "exit": 1
+      }
+    },
+    {
+      "match": ["-s", "bogus-9999", "emu", "avd", "name"],
+      "respond": {
+        "exit": 1
+      }
+    },
+    {
+      "match": ["devices", "--bogus"],
+      "respond": {
+        "stdout": "adb: adb devices [-l]\n",
+        "exit": 1
+      }
+    }
+  ]
+}

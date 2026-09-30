@@ -26,13 +26,21 @@ describe("adb-axi bin", () => {
   });
 
   it("answers --version without loading the command graph", async () => {
-    // A resolve hook reports every module the version path loads.
-    const hook = `data:text/javascript,${encodeURIComponent(`
-      import { register } from "node:module";
-      register("data:text/javascript," + encodeURIComponent(
-        "export async function resolve(s, c, next) { const r = await next(s, c); process.stderr.write('LOADED ' + r.url + '\\\\n'); return r; }"
-      ));
-    `)}`;
+    // A resolve hook reports every module the version path loads. Hooks run off-thread and
+    // stderr is asynchronous for pipes on macOS, so the hook writes to fd 2 synchronously.
+    const resolveHook = [
+      'import { writeSync } from "node:fs";',
+      "export async function resolve(specifier, context, next) {",
+      "  const result = await next(specifier, context);",
+      '  writeSync(2, "LOADED " + result.url + "\\n");',
+      "  return result;",
+      "}",
+    ].join("\n");
+    const hook = `data:text/javascript,${encodeURIComponent(
+      `import { register } from "node:module"; register(${JSON.stringify(
+        `data:text/javascript,${encodeURIComponent(resolveHook)}`,
+      )});`,
+    )}`;
     const result = await exec({
       file: process.execPath,
       args: ["--import", hook, BIN_PATH, "--version"],
@@ -119,8 +127,8 @@ describe("adb-axi bin", () => {
     expect(f.calls()).toEqual([]);
   });
 
-  it("answers an unshipped command with NOT_IMPLEMENTED and never calls adb", async () => {
-    const f = withFake();
+  it("resolves the device, then answers an unshipped command with NOT_IMPLEMENTED", async () => {
+    const f = withFake("one-online.json");
     const { stdout, exitCode } = await runCli(["app", "kill", "com.example.notes"], f.env);
     expect(exitCode).toBe(1);
     expect(decode(stdout.trimEnd())).toEqual({
@@ -128,7 +136,8 @@ describe("adb-axi bin", () => {
       code: "NOT_IMPLEMENTED",
       help: ["Run `adb-axi --help` to see the commands this build ships"],
     });
-    expect(f.calls()).toEqual([]);
+    expect(f.calls().map((call) => call.argv)).toEqual([["devices", "-l"]]);
+    expect(f.unmatched()).toEqual([]);
   });
 
   it("keeps unshipped commands out of --help", async () => {
