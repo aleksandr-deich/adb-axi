@@ -1,0 +1,57 @@
+{
+  "name": "adb-axi",
+  "version": "0.0.1",
+  "description": "Truthful, token-efficient adb for agents: devices, app lifecycle, logs and app data",
+  "keywords": [
+    "adb",
+    "android",
+    "axi",
+    "agent",
+    "cli",
+    "toon"
+  ],
+  "license": "MIT",
+  "author": "Aleksandr Deich",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aleksandr-deich/adb-axi.git"
+  },
+  "type": "module",
+  "bin": {
+    "adb-axi": "dist/bin/adb-axi.js"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsx bin/adb-axi.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint . --max-warnings 0",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "npm run build && vitest run",
+    "test:device": "npm run build && vitest run --config vitest.device.config.ts",
+    "check": "npm run build && npm run typecheck && npm run lint && npm run format:check && vitest run",
+    "prepack": "npm run build"
+  },
+  "dependencies": {
+    "@toon-format/toon": "^2.3.1",
+    "axi-sdk-js": "^0.1.12"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^22.20.4",
+    "eslint": "^10.11.0",
+    "prettier": "^3.9.9",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.71.0",
+    "vitest": "^5.0.3"
+  }
+}

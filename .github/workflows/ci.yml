@@ -1,0 +1,49 @@
+# Written by hand: `no-mistakes ci-workflow` emits one ubuntu job with a Go toolchain step,
+# and cannot express the Node 22/24 matrix or the macOS job. Keep the gate commands in sync
+# with .no-mistakes.yaml.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: check (ubuntu, node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - name: Install sqlite3
+        run: sudo apt-get update && sudo apt-get install -y sqlite3
+      - run: npm ci
+      - run: npm run check
+      - run: npm pack --dry-run
+
+  check-macos:
+    name: check (macos, node 24)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: npm pack --dry-run

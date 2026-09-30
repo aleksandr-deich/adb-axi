@@ -1,0 +1,6 @@
+# Canonical checks for the no-mistakes pipeline. CI (.github/workflows/ci.yml) runs the
+# same gate: `npm ci` then `npm run check` (build, typecheck, lint, format check, tests).
+commands:
+  lint: "npm ci && npm run lint"
+  format: "npm run format"
+  test: "npm ci && npm run check"

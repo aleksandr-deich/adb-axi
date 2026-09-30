@@ -1,0 +1,6 @@
+{
+  "description": "A device flag placed before the command. adb-axi must reject it with the corrected command and never call adb, so any adb call fails the test as unmatched.",
+  "evidence": ["H5"],
+  "synthetic": false,
+  "rules": []
+}
