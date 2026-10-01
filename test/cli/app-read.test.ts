@@ -542,7 +542,7 @@ describe("wait app", () => {
         then: PROBE_RUNNING,
       },
     ]);
-    // The deadline outlasts a slow runner's process spawns; test/unit/poll.test.ts covers the final observation at the deadline.
+    // The deadline outlasts a slow runner's process spawns; test/unit/wait-app.test.ts covers the final observation at the deadline.
     const result = await once(
       ["wait", "app", "dev.probe", "--state", "running", "--timeout", "10s"],
       f,
