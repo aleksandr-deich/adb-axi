@@ -1,5 +1,6 @@
 import { decode } from "@toon-format/toon";
 import { afterEach, describe, expect, it } from "vitest";
+import { allCommands, REGISTRY } from "../../src/commands/registry.js";
 import { createFakeAdb, type FakeAdb } from "../fake-adb/harness.js";
 import type { Response, Rule } from "../fake-adb/scenario.js";
 import { runCli, type CliRun } from "../helpers/run.js";
@@ -640,15 +641,18 @@ describe("help for the shipped app read commands", () => {
     const app = decode((await runCli(["app", "--help"], f.env)).stdout.trimEnd()) as {
       subcommands: { command: string }[];
     };
-    expect(app.subcommands.map((s) => s.command)).toEqual([
-      "adb-axi app current",
-      "adb-axi app list",
-      "adb-axi app info",
-    ]);
+    expect(app.subcommands.map((s) => s.command)).toEqual(
+      expect.arrayContaining(["adb-axi app current", "adb-axi app list", "adb-axi app info"]),
+    );
     const wait = decode((await runCli(["wait", "--help"], f.env)).stdout.trimEnd()) as {
       subcommands: { command: string }[];
     };
-    expect(wait.subcommands.map((s) => s.command)).toEqual(["adb-axi wait app"]);
+    expect(wait.subcommands.map((s) => s.command)).toContain("adb-axi wait app");
+    const listed = [...app.subcommands, ...wait.subcommands].map((s) => s.command);
+    const unshipped = allCommands(REGISTRY)
+      .filter((command) => !command.shipped)
+      .map((command) => `adb-axi ${command.path.join(" ")}`);
+    expect(listed.filter((command) => unshipped.includes(command))).toEqual([]);
     expect(f.calls()).toEqual([]);
   });
 

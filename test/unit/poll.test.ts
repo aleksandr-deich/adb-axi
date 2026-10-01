@@ -65,7 +65,26 @@ describe("poll", () => {
         return Promise.resolve({ done: false, last: null });
       },
     });
-    expect(remaining).toEqual([1000, 650, 300, 0]);
+    expect(remaining).toEqual([1000, 750, 500, 250, 0]);
+  });
+
+  it("starts observations one interval apart, and at once after a slow one", async () => {
+    const clock = fakeClock();
+    const startedAt: number[] = [];
+    const durations = [150, 600, 0, 399, 100];
+    const result = await poll<never, null>({
+      timeoutMs: 2000,
+      intervalMs: 400,
+      clock,
+      check: () => {
+        startedAt.push(clock.now());
+        clock.advance(durations[startedAt.length - 1] ?? 0);
+        return Promise.resolve({ done: false, last: null });
+      },
+    });
+    expect(startedAt).toEqual([0, 400, 1000, 1400, 1800, 2000]);
+    expect(clock.sleeps).toEqual([250, 0, 400, 1, 100]);
+    expect(result).toMatchObject({ ok: false, waitedMs: 2000, attempts: 6 });
   });
 
   it("keeps its interval inside 250-500 ms", async () => {

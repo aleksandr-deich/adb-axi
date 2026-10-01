@@ -151,7 +151,6 @@ describe("adb-axi bin", () => {
       .filter((command) => command.shipped)
       .map((command) => `adb-axi ${command.path.join(" ")}`);
     expect(help.commands.map((c) => c.command).sort()).toEqual(shipped.sort());
-    expect(help.commands.map((c) => c.command)).not.toContain("adb-axi app kill");
     const json = await runCli(["--json", "--help"], f.env);
     expect(JSON.parse(json.stdout)).toEqual(help);
   });
