@@ -172,7 +172,9 @@ if (chosen === undefined) {
   const { index, response } = chosen;
   const answer = (): void => {
     if (response.hang === true) {
-      process.stderr.write("- waiting for device -\n");
+      // Output the command produced before it stalled stays visible to the caller.
+      if (response.stdout !== undefined) process.stdout.write(response.stdout);
+      process.stderr.write(response.stderr ?? "- waiting for device -\n");
       // Never exits on its own: only a kill ends it, like adb waiting for a missing device.
       setInterval(() => undefined, 60_000);
       return;

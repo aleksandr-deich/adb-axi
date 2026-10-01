@@ -1,0 +1,14 @@
+{
+  "description": "The adb server is up but nothing is attached: `devices` says so explicitly.",
+  "evidence": ["devices"],
+  "synthetic": true,
+  "source": "`adb devices -l` with no devices prints the header and a blank line",
+  "rules": [
+    {
+      "match": ["devices", "-l"],
+      "respond": {
+        "stdout": "List of devices attached\n\n"
+      }
+    }
+  ]
+}

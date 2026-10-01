@@ -6,34 +6,58 @@ import { AdbAxiError, type ErrorCode } from "../core/errors.js";
  * usage text with the same exit as a runtime failure. Each shape maps to exactly one code
  * here; the raw text only ever appears in `detail`.
  */
-const VARIANTS: readonly [RegExp, ErrorCode][] = [
+const MESSAGES: readonly [RegExp, ErrorCode][] = [
   [
-    line(/(cannot connect to daemon|failed to start daemon|failed to check server version)/),
+    /(cannot connect to daemon|failed to start daemon|failed to check server version)/,
     "ADB_SERVER_UNREACHABLE",
   ],
-  [line(/(device '[^']*' not found|no devices\/emulators found)/), "DEVICE_NOT_FOUND"],
+  [/(device '[^']*' not found|no devices\/emulators found)/, "DEVICE_NOT_FOUND"],
   [
-    line(/(device unauthorized|device still authorizing|insufficient permissions for device)/),
+    /(device unauthorized|device still authorizing|insufficient permissions for device)/,
     "DEVICE_UNAUTHORIZED",
   ],
-  [line(/(device offline|device still connecting)/), "DEVICE_OFFLINE"],
-  [line(/more than one (device|emulator)/), "DEVICE_AMBIGUOUS"],
-  // adb printing its own usage means adb-axi built a bad argv: a bug, not a device state.
-  [/^adb: (adb \S+|usage:|unknown command)/m, "INTERNAL_ERROR"],
+  [/(device offline|device still connecting)/, "DEVICE_OFFLINE"],
+  [/more than one (device|emulator)/, "DEVICE_AMBIGUOUS"],
 ];
 
+// adb printing its own usage means adb-axi built a bad argv: a bug, not a device state.
+const USAGE: [RegExp, ErrorCode] = [/^adb: (adb \S+|usage:|unknown command)/m, "INTERNAL_ERROR"];
+
+const VARIANTS = table(String.raw`(?:\* )?(?:adb: )?(?:error: )?`);
+
+/** For remote command output: only a line that carries one of adb's own prefixes is adb's. */
+const PREFIXED_VARIANTS = table(String.raw`(?:\* |adb: (?:error: )?|error: )`);
+
 /**
- * Anchor a pattern to the start of a line, after adb's own prefixes (`adb: `, `error: `,
- * `* `, `failed to get feature set: `). Output a remote command prints mid-line, such as
- * `ls` complaining about a path, never matches.
+ * Anchor every message to the start of a line, after adb's own prefixes (`adb: `,
+ * `error: `, `* `, `failed to get feature set: `). Output a remote command prints
+ * mid-line, such as `ls` complaining about a path, never matches.
  */
-function line(pattern: RegExp): RegExp {
-  const prefixes = String.raw`^(?:\* )?(?:adb: )?(?:error: )?(?:failed to get feature set: )?`;
-  return new RegExp(prefixes + pattern.source, "im");
+function table(prefixes: string): readonly [RegExp, ErrorCode][] {
+  return [
+    ...MESSAGES.map(([pattern, code]): [RegExp, ErrorCode] => [
+      new RegExp(`^${prefixes}(?:failed to get feature set: )?${pattern.source}`, "im"),
+      code,
+    ]),
+    USAGE,
+  ];
 }
 
 export function classifyAdbFailure(text: string): ErrorCode | undefined {
-  for (const [pattern, code] of VARIANTS) {
+  return classify(VARIANTS, text);
+}
+
+/**
+ * Classify the stderr of a failed `adb shell`. It mixes adb's own failure with whatever
+ * the remote command printed, so a line counts only with adb's own prefix, and stdout,
+ * which only the remote command writes, is never read.
+ */
+export function classifyShellFailure(stderr: string): ErrorCode | undefined {
+  return classify(PREFIXED_VARIANTS, stderr);
+}
+
+function classify(variants: readonly [RegExp, ErrorCode][], text: string): ErrorCode | undefined {
+  for (const [pattern, code] of variants) {
     if (pattern.test(text)) return code;
   }
   return undefined;

@@ -336,6 +336,7 @@ async function leafInvocation(
       adb,
       target,
       env: run.env,
+      isShipped: (path) => isShippedPath(run.registry, path),
     },
   };
 }

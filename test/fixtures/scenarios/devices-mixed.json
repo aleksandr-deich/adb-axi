@@ -1,0 +1,96 @@
+{
+  "description": "Three emulators as the PRD shows them (a phone, a tablet and an offline foldable), plus a recovery device that only --all lists and an unauthorized physical device.",
+  "evidence": ["devices"],
+  "synthetic": true,
+  "source": "Line formats of `adb devices -l`, `emu avd name`, the facts script, `df -k /data` (toybox) and /proc/uptime as captured in captured/host and captured/37; the values are made up",
+  "rules": [
+    {
+      "match": ["devices", "-l"],
+      "respond": {
+        "stdout": "List of devices attached\nemulator-5554          device product:sdk_gphone16k_arm64 model:sdk_gphone16k_arm64 device:emu64a16k transport_id:1\nemulator-5556          device product:sdk_gtablet_arm64 model:Pixel_Tablet device:emu64a transport_id:2\nemulator-5558          offline transport_id:3\n0123456789ABCDEF       recovery transport_id:4\nZY22ABCDEFG            unauthorized usb:1-1 transport_id:5\n\n"
+      }
+    },
+    {
+      "match": [
+        "-s",
+        "emulator-5554",
+        "shell",
+        {
+          "re": "echo @sdk; .*"
+        }
+      ],
+      "respond": {
+        "stdout": "@sdk\n37\n@boot_completed\n1\n@boot_id\n3f1c8a52-0d7e-4c1b-9b1e-5a3f2d6c7e81\n@size\nPhysical size: 1344x2992\n@density\nPhysical density: 480\n"
+      }
+    },
+    {
+      "match": ["-s", "emulator-5554", "emu", "avd", "name"],
+      "respond": {
+        "stdout": "Pixel_10_Pro_XL\r\nOK\r\n"
+      }
+    },
+    {
+      "match": [
+        "-s",
+        "emulator-5554",
+        "shell",
+        {
+          "re": "echo @data_free; .*"
+        }
+      ],
+      "respond": {
+        "stdout": "@data_free\nFilesystem 1K-blocks Used Available Use% Mounted on\n/dev/block/dm-47 56000000 30000000 3976328 55% /data\n@model\nsdk_gphone16k_arm64\n@abi\narm64-v8a\n@uptime\n33224.41 114569.60\n"
+      }
+    },
+    {
+      "match": ["-s", "emulator-5554", "shell", "echo @model; getprop ro.product.model"],
+      "respond": {
+        "stdout": "@model\nsdk_gphone16k_arm64\n"
+      }
+    },
+    {
+      "match": [
+        "-s",
+        "emulator-5556",
+        "shell",
+        {
+          "re": "echo @sdk; .*"
+        }
+      ],
+      "respond": {
+        "stdout": "@sdk\n36\n@boot_completed\n1\n@boot_id\n9b0e7d44-51a2-4c3e-8f6d-2c1b0a9e8d77\n@size\nPhysical size: 2560x1600\n@density\nPhysical density: 320\n"
+      }
+    },
+    {
+      "match": ["-s", "emulator-5556", "emu", "avd", "name"],
+      "respond": {
+        "stdout": "Pixel_Tablet\r\nOK\r\n"
+      }
+    },
+    {
+      "match": [
+        "-s",
+        "emulator-5556",
+        "shell",
+        {
+          "re": "echo @data_free; .*"
+        }
+      ],
+      "respond": {
+        "stdout": "@data_free\nFilesystem 1K-blocks Used Available Use% Mounted on\n/dev/block/dm-47 56000000 30000000 25165824 55% /data\n@model\nPixel Tablet\n@abi\narm64-v8a\n@uptime\n4021.88 15990.10\n"
+      }
+    },
+    {
+      "match": ["-s", "emulator-5556", "shell", "echo @model; getprop ro.product.model"],
+      "respond": {
+        "stdout": "@model\nPixel Tablet\n"
+      }
+    },
+    {
+      "match": ["-s", "emulator-5558", "emu", "avd", "name"],
+      "respond": {
+        "stdout": "Pixel_Fold\r\nOK\r\n"
+      }
+    }
+  ]
+}

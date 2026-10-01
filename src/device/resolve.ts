@@ -51,7 +51,7 @@ export async function resolveTarget(options: ResolveOptions): Promise<Target> {
       {
         fields: { devices: facts.map(candidateRow) },
         help: [
-          runHint([...options.commandArgs, "--device", "<serial or avd>"]),
+          runHint(withDevice(options.commandArgs, "<serial or avd>")),
           "Or export ANDROID_SERIAL=<serial> in this shell",
         ],
       },
@@ -109,7 +109,7 @@ async function byName(
       `${matches.length} running emulators use the AVD name ${wanted}`,
       {
         fields: { devices: rows.map((row) => candidateRow({ ...row, avd: wanted })) },
-        help: [runHint([...options.commandArgs, "--device", "<serial>"], "to pick one by serial")],
+        help: [runHint(withDevice(options.commandArgs, "<serial>"), "to pick one by serial")],
       },
     );
   }
@@ -131,12 +131,20 @@ async function byName(
           ? ["Start the emulator or connect the device, then run the command again"]
           : [
               runHint(
-                [...options.commandArgs, "--device", "<serial or avd>"],
+                withDevice(options.commandArgs, "<serial or avd>"),
                 "with one of the devices above",
               ),
             ],
     },
   );
+}
+
+/** The command line with `--device <value>` added before any `--`, which ends the flags. */
+function withDevice(commandArgs: readonly string[], value: string): string[] {
+  const end = commandArgs.indexOf("--");
+  const flags = end === -1 ? commandArgs : commandArgs.slice(0, end);
+  const rest = end === -1 ? [] : commandArgs.slice(end);
+  return [...flags, "--device", value, ...rest];
 }
 
 /** Fail unless the device accepts commands. Returns nothing: an online device passes. */

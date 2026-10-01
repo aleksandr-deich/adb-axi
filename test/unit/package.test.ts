@@ -5,7 +5,12 @@ import { exec } from "../../src/core/exec.js";
 import { VERSION } from "../../src/version.js";
 import { ROOT } from "../helpers/run.js";
 
+interface Tarball {
+  files: { path: string }[];
+}
+
 interface PackageJson {
+  name: string;
   version: string;
   license: string;
   engines: { node: string };
@@ -26,7 +31,10 @@ describe("npm package", () => {
     expect(result.kind).toBe("exited");
     if (result.kind !== "exited") return;
     expect(result.exitCode, result.stderr.toString("utf8")).toBe(0);
-    const [tarball] = JSON.parse(result.stdout.toString("utf8")) as { files: { path: string }[] }[];
+    // npm 10 and 11 print an array of tarballs; npm 12 prints an object keyed by package name.
+    type PackReport = Tarball[] | Record<string, Tarball>;
+    const report = JSON.parse(result.stdout.toString("utf8")) as PackReport;
+    const tarball = Array.isArray(report) ? report[0] : report[pkg.name];
     const files = (tarball?.files ?? []).map((file) => file.path);
     expect(files).toContain("dist/bin/adb-axi.js");
     const unexpected = files.filter(

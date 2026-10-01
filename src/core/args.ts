@@ -76,6 +76,12 @@ export function parseDuration(text: string): number | undefined {
   return Number.isSafeInteger(ms) && ms > 0 ? ms : undefined;
 }
 
+/** Format milliseconds as a duration `parseDuration` reads back: `30s` or `500ms`. */
+export function formatDuration(ms: number): string {
+  if (ms % 1000 === 0) return `${ms / 1000}s`;
+  return `${ms}ms`;
+}
+
 export function flagUsage(flag: FlagSpec): string {
   if (flag.type === "boolean") return flag.name;
   const value = flag.valueName ?? (flag.values ? `<${flag.values.join("|")}>` : "<value>");

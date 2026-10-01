@@ -58,6 +58,17 @@ export async function readFacts(
   device: AttachedDevice,
   options: FactsOptions,
 ): Promise<DeviceFacts> {
+  const facts = await readShellFacts(adb, device, options);
+  facts.avd = await avdName(adb, device.serial, facts.bootId, options);
+  return facts;
+}
+
+/** Every fact but the AVD name: what the device's own shell tells, when it is online. */
+export async function readShellFacts(
+  adb: AdbClient,
+  device: AttachedDevice,
+  options: FactsOptions,
+): Promise<DeviceFacts> {
   const facts: DeviceFacts = {
     serial: device.serial,
     state: device.state,
@@ -76,7 +87,6 @@ export async function readFacts(
     });
     Object.assign(facts, parseFacts(shell.stdout));
   }
-  facts.avd = await avdName(adb, device.serial, facts.bootId, options);
   return facts;
 }
 

@@ -44,7 +44,10 @@ export interface Response {
   exit?: number;
   /** Wait this long before answering. */
   delayMs?: number;
-  /** Print `- waiting for device -` on stderr and never exit, like adb on a missing device. */
+  /**
+   * Never exit, like adb on a missing device. Prints `- waiting for device -` on stderr
+   * unless `stderr` is given; `stdout` is written first, as output produced before the stall.
+   */
   hang?: boolean;
 }
 

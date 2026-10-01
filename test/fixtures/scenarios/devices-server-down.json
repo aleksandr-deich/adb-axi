@@ -1,0 +1,15 @@
+{
+  "description": "The adb server does not answer: `devices -l` fails the way adb does when it cannot reach or start the daemon.",
+  "evidence": ["devices"],
+  "synthetic": true,
+  "rules": [
+    {
+      "match": ["devices", "-l"],
+      "respond": {
+        "stderr": "* daemon not running; starting now at tcp:5037\n* failed to start daemon\nadb: error: failed to check server version: cannot connect to daemon\n",
+        "exit": 1
+      }
+    }
+  ],
+  "source": "Stderr text adb prints when the server cannot be started, as seen from adb 37.0.0"
+}

@@ -14,6 +14,8 @@ export interface LineWindow {
   /** Total number of lines before truncation. */
   total: number;
   truncated: boolean;
+  /** Set when a single line longer than the byte cap was cut: its bytes shown and in full. */
+  cut?: { shownBytes: number; totalBytes: number };
 }
 
 export interface LineCaps {
@@ -35,14 +37,20 @@ export function capLines(input: string | readonly string[], caps: LineCaps = {})
 
   const kept: string[] = [];
   let bytes = 0;
-  let cut = false;
+  let cut: LineWindow["cut"];
   for (const line of ordered) {
     const size = Buffer.byteLength(line, "utf8") + 1;
     if (kept.length >= maxLines) break;
     if (bytes + size > maxBytes) {
       if (kept.length === 0) {
-        kept.push(cutToBytes(line, maxBytes));
-        cut = true;
+        const shown = cutToBytes(line, maxBytes);
+        kept.push(shown);
+        if (shown !== line) {
+          cut = {
+            shownBytes: Buffer.byteLength(shown, "utf8"),
+            totalBytes: Buffer.byteLength(line, "utf8"),
+          };
+        }
       }
       break;
     }
@@ -50,12 +58,19 @@ export function capLines(input: string | readonly string[], caps: LineCaps = {})
     bytes += size;
   }
   const lines = caps.keep === "tail" ? kept.reverse() : kept;
-  return { lines, total: all.length, truncated: cut || lines.length < all.length };
+  const window: LineWindow = {
+    lines,
+    total: all.length,
+    truncated: cut !== undefined || lines.length < all.length,
+  };
+  return cut === undefined ? window : { ...window, cut };
 }
 
-/** `shown: 5 of 12 lines`. */
+/** `shown: 5 of 12 lines`, or `1 of 1 lines, cut at 4096 of 20480 bytes` for a cut line. */
 export function shownLine(window: LineWindow, unit = "lines"): string {
-  return `${window.lines.length} of ${window.total} ${unit}`;
+  const shown = `${window.lines.length} of ${window.total} ${unit}`;
+  if (window.cut === undefined) return shown;
+  return `${shown}, cut at ${window.cut.shownBytes} of ${window.cut.totalBytes} bytes`;
 }
 
 /** Split text into lines without inventing a trailing empty line. */

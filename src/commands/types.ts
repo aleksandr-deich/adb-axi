@@ -20,6 +20,8 @@ export interface CommandContext {
   /** The resolved device for commands with `device: "target"`, checked online. */
   target: Target | undefined;
   env: NodeJS.ProcessEnv;
+  /** Whether `adb-axi <path>` ships in this build, so help lines never name one that does not. */
+  isShipped: (path: readonly string[]) => boolean;
 }
 
 export type CommandRun = (context: CommandContext) => Promise<Output>;
