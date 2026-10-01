@@ -166,7 +166,7 @@ function helpFor(
     }
   }
   if (rows.some((row) => row.degraded)) {
-    help.push("A device that did not answer in time shows `-` for what it could not tell");
+    help.push("A device that could not be read shows `-` for what it could not tell");
   }
   return help.length > 0 ? { help } : {};
 }

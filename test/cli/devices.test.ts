@@ -187,7 +187,7 @@ describe("devices", () => {
       },
     ]);
     expect(json.help).toContain(
-      "A device that did not answer in time shows `-` for what it could not tell",
+      "A device that could not be read shows `-` for what it could not tell",
     );
     for (const call of f.calls()) expect(isProcessAlive(call.pid)).toBe(false);
   });
@@ -262,9 +262,34 @@ describe("devices", () => {
       { serial: "emulator-5556", avd: "-", state: "device", api: "-", form: "-" },
     ]);
     expect(json.help).toContain(
-      "A device that did not answer in time shows `-` for what it could not tell",
+      "A device that could not be read shows `-` for what it could not tell",
     );
     for (const call of f.calls()) expect(isProcessAlive(call.pid)).toBe(false);
+  });
+
+  it("keeps listing a device that goes offline before its facts are read", async () => {
+    const f = withFake({
+      rules: [
+        {
+          match: ["devices", "-l"],
+          respond: {
+            stdout: "List of devices attached\nemulator-5554          device transport_id:1\n\n",
+          },
+        },
+        {
+          match: ["-s", "emulator-5554", "shell", { re: "echo @sdk; .*" }],
+          respond: { stderr: "adb: device offline\n", exit: 1 },
+        },
+      ],
+    });
+    const { toon, json } = await both(f);
+    expect(toon.exitCode).toBe(0);
+    expect(json.devices).toEqual([
+      { serial: "emulator-5554", avd: "-", state: "device", api: "-", form: "-" },
+    ]);
+    expect(json.help).toEqual([
+      "A device that could not be read shows `-` for what it could not tell",
+    ]);
   });
 
   it("fails with ADB_SERVER_UNREACHABLE when the adb server does not answer", async () => {
