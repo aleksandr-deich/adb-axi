@@ -1,0 +1,6 @@
+Starting: Intent { cmp=dev.probe/.MainActivity }
+Status: timeout
+LaunchState: UNKNOWN (-1)
+Activity: dev.probe/.MainActivity
+WaitTime: 10019
+Complete

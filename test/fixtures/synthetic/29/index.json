@@ -99,6 +99,46 @@
       "synthetic": true,
       "source": "AOSP platform/external/toybox android-10.0.0_r1 toys/posix/date.c puts_time (%N)",
       "note": "device clock with its UTC offset"
+    },
+    {
+      "file": "am-start-cold.txt",
+      "argv": ["adb", "-s", "emulator-5560", "shell", "am start -W -n dev.probe/.MainActivity"],
+      "exitCode": 0,
+      "synthetic": true,
+      "source": "AOSP platform/frameworks/base android-10.0.0_r1 services/core/java/com/android/server/am/ActivityManagerShellCommand.java runStartActivity; core/java/android/app/WaitResult.java launchStateToString",
+      "note": "cold start: Status, LaunchState, Activity, TotalTime, WaitTime, Complete"
+    },
+    {
+      "file": "am-start-hot.txt",
+      "argv": ["adb", "-s", "emulator-5560", "shell", "am start -W -n dev.probe/.MainActivity"],
+      "exitCode": 0,
+      "synthetic": true,
+      "source": "AOSP platform/frameworks/base android-10.0.0_r1 services/core/java/com/android/server/am/ActivityManagerShellCommand.java runStartActivity; core/java/android/app/WaitResult.java launchStateToString",
+      "note": "task brought to the front: the warning line, then LaunchState: HOT"
+    },
+    {
+      "file": "am-start-delivered-to-top.txt",
+      "argv": ["adb", "-s", "emulator-5560", "shell", "am start -W -n dev.probe/.MainActivity"],
+      "exitCode": 0,
+      "synthetic": true,
+      "source": "AOSP platform/frameworks/base android-10.0.0_r1 services/core/java/com/android/server/am/ActivityManagerShellCommand.java runStartActivity; core/java/android/app/WaitResult.java launchStateToString",
+      "note": "intent delivered to the activity on top: the warning line and LaunchState: UNKNOWN (0)"
+    },
+    {
+      "file": "am-start-timeout.txt",
+      "argv": ["adb", "-s", "emulator-5560", "shell", "am start -W -n dev.probe/.MainActivity"],
+      "exitCode": 0,
+      "synthetic": true,
+      "source": "AOSP platform/frameworks/base android-10.0.0_r1 services/core/java/com/android/server/am/ActivityManagerShellCommand.java runStartActivity; core/java/android/app/WaitResult.java launchStateToString",
+      "note": "the launch wait timed out: Status: timeout, LaunchState: UNKNOWN (-1), no TotalTime, exit 0"
+    },
+    {
+      "file": "am-start-missing-activity.txt",
+      "argv": ["adb", "-s", "emulator-5560", "shell", "am start -W -n dev.probe/.Missing"],
+      "exitCode": 0,
+      "synthetic": true,
+      "source": "AOSP platform/frameworks/base android-10.0.0_r1 services/core/java/com/android/server/am/ActivityManagerShellCommand.java runStartActivity; core/java/android/app/WaitResult.java launchStateToString",
+      "note": "activity does not exist: Error type 3, and runStartActivity still returns 0"
     }
   ]
 }
