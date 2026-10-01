@@ -32,13 +32,14 @@ describe("devices", () => {
     const { toon, json } = await both(f);
     expect(toon.exitCode).toBe(0);
     expect(toon.stdout).toMatchInlineSnapshot(`
-      "count: "4 attached, 2 online"
+      "count: "4 attached, 2 online (1 in other states, use --all)"
+      other_states: 1
       devices[4]{serial,avd,state,api,form}:
         emulator-5554,Pixel_10_Pro_XL,device,37,phone
         emulator-5556,Pixel_Tablet,device,36,tablet
         emulator-5558,Pixel_Fold,offline,"-","-"
         ZY22ABCDEFG,"-",unauthorized,"-","-"
-      help[2]: Run \`adb-axi <command> --device Pixel_10_Pro_XL\` to target one by AVD name,Run \`adb-axi devices --all\` to list the 1 device in other states
+      help[1]: Run \`adb-axi <command> --device Pixel_10_Pro_XL\` to target one by AVD name
       "
     `);
     expect(json.devices).toEqual([
@@ -65,6 +66,7 @@ describe("devices", () => {
     const { toon, json } = await both(f, ["--all"]);
     expect(toon.stdout).toContain('0123456789ABCDEF,"-",recovery,"-","-"');
     expect(json.count).toBe("5 attached, 2 online");
+    expect(json).not.toHaveProperty("other_states");
     expect(json).not.toHaveProperty("help.1");
     expect(f.unmatched()).toEqual([]);
   });
@@ -137,9 +139,15 @@ describe("devices", () => {
         },
       ],
     });
-    const { json } = await both(f);
-    expect(json.count).toBe("0 attached, 0 online");
-    expect(json.help).toEqual(["Run `adb-axi devices --all` to list the 1 device in other states"]);
+    const { toon, json } = await both(f);
+    expect(toon.stdout).toBe(
+      'count: "0 attached, 0 online (1 in other states, use --all)"\nother_states: 1\ndevices: []\n',
+    );
+    expect(json).toEqual({
+      count: "0 attached, 0 online (1 in other states, use --all)",
+      other_states: 1,
+      devices: [],
+    });
   });
 
   it("keeps the facts it read when the AVD name or an extra column does not answer in time", async () => {

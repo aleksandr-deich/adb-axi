@@ -61,8 +61,12 @@ async function runDevices(context: CommandContext): Promise<Output> {
   const rows = await Promise.all(listed.map((device) => readRow(adb, device, fields, options)));
 
   const online = rows.filter((row) => row.device.state === ONLINE).length;
+  const hidden = attached.length - listed.length;
   return {
-    count: `${rows.length} attached, ${online} online`,
+    count: `${rows.length} attached, ${online} online${
+      hidden > 0 ? ` (${hidden} in other states, use --all)` : ""
+    }`,
+    ...(hidden > 0 ? { other_states: hidden } : {}),
     devices: rows.map((row) => deviceRow(row, fields)),
     ...helpFor(rows, attached.length, context),
   };
@@ -140,7 +144,6 @@ function helpFor(
   attached: number,
   context: CommandContext,
 ): { help?: string[] } {
-  const hidden = attached - rows.length;
   const help: string[] = [];
   if (attached === 0) {
     help.push("Start an emulator or connect a device, then run `adb-axi devices` again");
@@ -164,14 +167,6 @@ function helpFor(
   }
   if (rows.some((row) => row.degraded)) {
     help.push("A device that did not answer in time shows `-` for what it could not tell");
-  }
-  if (hidden > 0) {
-    help.push(
-      runHint(
-        ["devices", "--all"],
-        `to list the ${hidden} device${hidden === 1 ? "" : "s"} in other states`,
-      ),
-    );
   }
   return help.length > 0 ? { help } : {};
 }
