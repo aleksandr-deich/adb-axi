@@ -232,18 +232,33 @@ async function settle(
   userId: number,
   processName: string,
 ): Promise<Seen> {
+  let last: Seen | undefined;
   const result = await poll<Seen, Seen>({
     timeoutMs: Math.min(SETTLE_MS, context.deadline.remainingMs()),
     check: async () => {
-      const processes = await packageProcesses(context, activity.package, userId);
-      const front = await readForeground(adb, serial, { ...readOptions(context), userId });
-      const pid = processes.find((process) => process.process === processName)?.pid ?? UNKNOWN;
-      const inFront =
-        front?.package === activity.package &&
-        activityClassName(front) === activityClassName(activity);
-      const state = pid === UNKNOWN ? "stopped" : inFront ? "foreground" : "running";
-      const seen: Seen = { state, pid, front };
-      return state === "running" ? { done: false, last: seen } : { done: true, value: seen };
+      if (last !== undefined && context.deadline.remainingMs() === 0) {
+        return { done: true, value: last };
+      }
+      try {
+        const processes = await packageProcesses(context, activity.package, userId);
+        if (last !== undefined && context.deadline.remainingMs() === 0) {
+          return { done: true, value: last };
+        }
+        const front = await readForeground(adb, serial, { ...readOptions(context), userId });
+        const pid = processes.find((process) => process.process === processName)?.pid ?? UNKNOWN;
+        const inFront =
+          front?.package === activity.package &&
+          activityClassName(front) === activityClassName(activity);
+        const state = pid === UNKNOWN ? "stopped" : inFront ? "foreground" : "running";
+        const seen: Seen = { state, pid, front };
+        last = seen;
+        return state === "running" ? { done: false, last: seen } : { done: true, value: seen };
+      } catch (error) {
+        if (error instanceof AdbAxiError && error.code === "TIMEOUT" && last !== undefined) {
+          return { done: true, value: last };
+        }
+        throw error;
+      }
     },
   });
   // A poll always observes once, so a timed-out one has a last observation.
