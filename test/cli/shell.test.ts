@@ -195,6 +195,21 @@ describe("shell", () => {
     expect(data.shown).toBe(`${shown} of 30 lines`);
   });
 
+  it("says how much of a single line longer than 4 kB is shown", async () => {
+    const f = withFake();
+    const { data } = await both(f, ["--", "cat /data/local/tmp/config.json"]);
+    expect(Buffer.byteLength(data.stdout as string)).toBe(4096);
+    expect(data.shown).toBe("1 of 1 lines, cut at 4096 of 5011 bytes");
+  });
+
+  it("keeps the given --timeout in the --full hint", async () => {
+    const f = withFake();
+    const { data } = await both(f, ["--timeout", "60s", "--", "seq 1 120"]);
+    expect(data.help).toEqual([
+      "Run `adb-axi shell --device emulator-5554 --timeout 60s --full -- 'seq 1 120'` to write the complete output to a file",
+    ]);
+  });
+
   it("writes the complete output to a file with --full and prints its path", async () => {
     const f = withFake();
     const toon = await runCli(["shell", "--full", "--", "seq 1 120"], f.env);
@@ -256,7 +271,10 @@ describe("shell", () => {
     expect(data.code).toBe("TIMEOUT");
     expect((data.stdout as string).split("\n")).toHaveLength(50);
     expect(data.shown).toBe("50 of 80 lines");
-    expect(data.help).toHaveLength(2);
+    expect(data.help).toEqual([
+      "Run the same command with a longer `--timeout`, for example `--timeout 60s`",
+      "Run `adb-axi shell --device emulator-5554 --timeout 1s --full -- 'sleep 30; seq 1 80'` to write the complete output to a file",
+    ]);
   });
 
   it("does not point at --full on a timeout that already has it", async () => {

@@ -51,6 +51,15 @@ describe("capLines", () => {
     expect(window.truncated).toBe(true);
   });
 
+  it("says how many bytes of a cut line are shown", () => {
+    expect(shownLine(capLines(["x".repeat(10_000)]))).toBe(
+      "1 of 1 lines, cut at 4096 of 10000 bytes",
+    );
+    expect(shownLine(capLines(["é".repeat(10), "y"], { maxBytes: 5 }))).toBe(
+      "1 of 2 lines, cut at 4 of 20 bytes",
+    );
+  });
+
   it("does not split multi-byte characters", () => {
     const window = capLines(["é".repeat(10)], { maxBytes: 5 });
     expect(window.lines).toEqual(["éé"]);

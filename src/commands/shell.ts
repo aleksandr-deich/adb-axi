@@ -1,3 +1,4 @@
+import { formatDuration } from "../core/args.js";
 import { AdbAxiError } from "../core/errors.js";
 import { runHint, type Output } from "../core/output.js";
 import { capLines, shownLine, writeFullOutput } from "../core/truncate.js";
@@ -40,6 +41,8 @@ async function runShellCommand(context: CommandContext): Promise<Output> {
   const raw = context.positionals.cmd;
   const command = Array.isArray(raw) ? raw.join(" ") : (raw ?? "");
   const full = context.flags.full === true;
+  const timeout = context.flags.timeout;
+  const hint = fullHint(target.serial, command, typeof timeout === "number" ? timeout : undefined);
 
   let result;
   try {
@@ -56,10 +59,7 @@ async function runShellCommand(context: CommandContext): Promise<Output> {
       );
       throw new AdbAxiError("TIMEOUT", error.message, {
         fields: { step: error.fields.step, ...partial.fields },
-        help: [
-          ...error.help,
-          ...(partial.truncated && !full ? [fullHint(target.serial, command)] : []),
-        ],
+        help: [...error.help, ...(partial.truncated && !full ? [hint] : [])],
         cause: error,
       });
     }
@@ -72,7 +72,7 @@ async function runShellCommand(context: CommandContext): Promise<Output> {
     alwaysStdout: result.exitCode === 0,
     alwaysStderr: result.exitCode !== 0,
   });
-  const help = output.truncated && !full ? [fullHint(target.serial, command)] : [];
+  const help = output.truncated && !full ? [hint] : [];
   if (result.exitCode !== 0) {
     throw new AdbAxiError("REMOTE_EXIT", `remote command exited ${result.exitCode}`, {
       fields: { exit: result.exitCode, ...output.fields },
@@ -134,9 +134,10 @@ function key(base: string, stream: Stream): string {
   return stream === "stdout" ? base : `stderr_${base}`;
 }
 
-function fullHint(serial: string, command: string): string {
+function fullHint(serial: string, command: string, timeoutMs: number | undefined): string {
+  const timeout = timeoutMs === undefined ? [] : ["--timeout", formatDuration(timeoutMs)];
   return runHint(
-    ["shell", "--device", serial, "--full", "--", command],
+    ["shell", "--device", serial, ...timeout, "--full", "--", command],
     "to write the complete output to a file",
   );
 }
