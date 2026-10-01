@@ -1,0 +1,35 @@
+ACTIVITY MANAGER RUNNING PROCESSES (dumpsys activity processes)
+  All known processes:
+  *APP* UID 10123 ProcessRecord{7f2b9d4 5120:dev.probe/u0a123}
+    user #0 uid=10123 gids={50123, 20123, 9997}
+    mRequiredAbi=arm64-v8a instructionSet=null
+    dir=/data/app/dev.probe-Xq2v9pD1cWm3nR8sT0uYbA==/base.apk publicDir=/data/app/dev.probe-Xq2v9pD1cWm3nR8sT0uYbA==/base.apk data=/data/user/0/dev.probe
+    packageList={dev.probe}
+    compat={420dpi}
+    thread=android.app.IApplicationThread$Stub$Proxy@1c9a2f0
+    pid=5120 starting=false
+    lastActivityTime=-3s302ms lastPssTime=-12s40ms pssStatType=0 nextPssTime=+47s960ms
+    adjSeq=8811 lruSeq=2102 lastPss=48MB lastSwapPss=0.00 lastCachedPss=0.00 lastCachedSwapPss=0.00
+    procStateMemTracker: best=4 () / pending state=4 highest=4 1.0x
+    cached=false empty=false
+    oom: max=1001 curRaw=700 setRaw=700 cur=700 set=700
+    lastCompactTime=0 lastCompactAction=0    mCurSchedGroup=0 setSchedGroup=0 systemNoUi=false trimMemoryLevel=0
+    curProcState=15 mRepProcState=15 pssProcState=15 setProcState=15 lastStateTime=-580ms
+    hasShownUi=true pendingUiClean=false hasAboveClient=false treatLikeActivity=false
+    reportedInteraction=true time=-3s302ms
+    hasClientActivities=false foregroundActivities=false (rep=false)
+    lastTopTime=-580ms
+    startSeq=88
+    mountMode=DEFAULT
+    Activities:
+      - ActivityRecord{a43c7e1 u0 dev.probe/.MainActivity t12}
+    Recent Tasks:
+      - TaskRecord{5d1e8a2 #12 A=dev.probe U=0 StackId=12 sz=1}
+
+  Process LRU list (sorted by oom_adj, 31 total, non-act at 3, non-svc at 3):
+    Proc # 1: prev  b/ /LAST trm: 0 5120:dev.probe/u0a123 (previous)
+
+  PID mappings:
+    PID #5120: ProcessRecord{7f2b9d4 5120:dev.probe/u0a123}
+
+  mPreviousProcess: ProcessRecord{7f2b9d4 5120:dev.probe/u0a123}

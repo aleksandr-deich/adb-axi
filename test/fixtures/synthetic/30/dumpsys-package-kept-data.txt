@@ -1,0 +1,20 @@
+Packages:
+  Package [dev.probe] (4f2a9c1):
+    userId=10123
+    pkg=null
+    codePath=/data/app/~~d0Q2nM8xLr4pW1sV7bYe3A==/dev.probe-Xq2v9pD1cWm3nR8sT0uYbA==
+    resourcePath=/data/app/~~d0Q2nM8xLr4pW1sV7bYe3A==/dev.probe-Xq2v9pD1cWm3nR8sT0uYbA==
+    legacyNativeLibraryDir=/data/app/~~d0Q2nM8xLr4pW1sV7bYe3A==/dev.probe-Xq2v9pD1cWm3nR8sT0uYbA==/lib
+    primaryCpuAbi=null
+    secondaryCpuAbi=null
+    versionCode=1
+    timeStamp=2026-10-01 07:56:58
+    firstInstallTime=2026-10-01 07:55:10
+    lastUpdateTime=2026-10-01 07:56:59
+    installerPackageName=null
+    signatures=PackageSignatures{1e5b7f3 version:2, signatures:[9ad7e673], past signatures:[]}
+    installPermissionsFixed=true
+    pkgFlags=[ HAS_CODE ALLOW_CLEAR_USER_DATA ALLOW_BACKUP ]
+    User 0: ceDataInode=262144 installed=false hidden=false suspended=false stopped=true notLaunched=false enabled=0 instant=false virtual=false
+      gids=[3003]
+      runtime permissions:

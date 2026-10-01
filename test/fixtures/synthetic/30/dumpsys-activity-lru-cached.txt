@@ -1,0 +1,12 @@
+ACTIVITY MANAGER LRU PROCESSES (dumpsys activity lru)
+  Activities:
+  #33: fg     TOP  LCM 1311:com.google.android.apps.nexuslauncher/u0a96 act:activities|recents
+  #32: cch    CAC  --- 6011:dev.probe/u0a123 act:activities|recents
+  #31: prev   LAST --- 4470:com.example.notes/u0a124 act:activities|recents
+  Other:
+  #30: vis    BFGS --- 1288:com.google.android.gms.persistent/u0a72
+  #29: prcp   IMPB --- 1530:com.google.android.inputmethod.latin/u0a99 act:treated
+  #28: cch+ 5 CEM  --- 3101:com.android.chrome/u0a110
+  #27: cch+15 CEM  --- 2210:com.google.android.gms/u0a72
+  # 1: pers   PER  LCM 1019:com.android.systemui/u0a69
+  # 0: sys    PER  LCM 517:system/1000

@@ -1,0 +1,8 @@
+--------- beginning of crash
+         1790834185.610  6011  6011 E AndroidRuntime: FATAL EXCEPTION: main
+         1790834185.610  6011  6011 E AndroidRuntime: Process: dev.probe, PID: 6011
+         1790834185.610  6011  6011 E AndroidRuntime: java.lang.IllegalStateException: probe crash requested
+         1790834185.610  6011  6011 E AndroidRuntime: 	at dev.probe.MainActivity.dispatch(MainActivity.kt:67)
+         1790834185.610  6011  6011 E AndroidRuntime: 	at android.app.ActivityThread.main(ActivityThread.java:7656)
+--------- beginning of main
+         1790834185.702  6011  6011 I Process : Sending signal. PID: 6011 SIG: 9

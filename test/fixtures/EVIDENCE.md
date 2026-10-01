@@ -129,6 +129,46 @@ The run, per device: facts; the probe absent; the debug build installed; cold st
 
 **Other S/L rows seen for real.** Uninstall of a package that is not installed prints `Failure [DELETE_FAILED_INTERNAL_ERROR]` and exits 1 (L7, `uninstall-missing.txt`). `exec-out` exits 0 with error text as the bytes, both for a missing file and for `run-as` on the non-debuggable build (S1). `run-as` through `shell` exits 1 with `run-as: package not debuggable: dev.probe` on stderr. After `write`, `probe.db` is 4096 bytes (header page only) and the row is only in `probe.db-wal`.
 
+## Synthetic API 29/30 samples
+
+No API 29 or 30 image is installed, so output of those releases is written from the AOSP sources the PRD cites, at `android-10.0.0_r1` (API 29) and `android-11.0.0_r1` (API 30), not captured. `synthetic/<api>/index.json` marks every sample `"synthetic": true` and names its `source` (repository, tag, file and function); the layout follows the source's print statements and the values are illustrative. A scenario that replays a sample marks itself `"synthetic": true` as well.
+
+| File                                             | adb command (after `-s <serial>`)              | What it shows                                                                  | API    |
+| ------------------------------------------------ | ---------------------------------------------- | ------------------------------------------------------------------------------ | ------ |
+| `pidof-running.txt`                              | `shell pidof dev.probe`                        | one process                                                                    | 29     |
+| `pidof-two.txt`                                  | `shell pidof dev.probe`                        | two processes with the same name, space-separated                              | 29     |
+| `pidof-not-running.txt`                          | `shell pidof dev.probe`                        | no process: no output, exit 1                                                  | 29, 30 |
+| `pm-list-packages-versioncode-uid.txt`           | `shell pm list packages --show-versioncode -U` | `versionCode:` then `uid:` on one line                                         | 29     |
+| `dumpsys-package-debug.txt`                      | `shell dumpsys package dev.probe`              | debuggable build; the app id is printed as `userId=`                           | 29     |
+| `dumpsys-package-absent.txt`                     | `shell dumpsys package dev.probe.missing`      | not installed: no `Packages:` section                                          | 29     |
+| `dumpsys-package-release.txt`                    | `shell dumpsys package dev.probe`              | non-debuggable build, and a `Hidden system packages:` record that is not it    | 30     |
+| `dumpsys-package-kept-data.txt`                  | `shell dumpsys package dev.probe`              | after `pm uninstall -k`: the record stays, `installed=false`, `pkg=null`       | 30     |
+| `dumpsys-activity-activities-probe-front.txt`    | `shell dumpsys activity activities`            | probe resumed; the display-level ` ResumedActivity:` has no space after it     | 29     |
+| `dumpsys-activity-activities-launcher-front.txt` | `shell dumpsys activity activities`            | launcher resumed; `Resumed:` under the task display areas                      | 30     |
+| `dumpsys-activity-activities-asleep.txt`         | `shell dumpsys activity activities`            | screen off: nothing resumed                                                    | 30     |
+| `dumpsys-activity-lru-previous.txt`              | `shell dumpsys activity lru`                   | probe as the previous app; `fore`, no capability column, ` activity=`          | 29     |
+| `dumpsys-activity-lru-cached.txt`                | `shell dumpsys activity lru`                   | probe cached; padded index, three-letter capability column                     | 30     |
+| `dumpsys-activity-processes-probe-previous.txt`  | `shell dumpsys activity processes dev.probe`   | probe record, previous app; `oom: max=...`                                     | 29     |
+| `dumpsys-activity-processes-probe-cached.txt`    | `shell dumpsys activity processes dev.probe`   | probe main process and a second process, both cached; `oom adj: max=...`       | 30     |
+| `dumpsys-activity-recents-after-kill.txt`        | `shell dumpsys activity recents`               | probe task kept after the kill; `TaskRecord{...}` headers without `type=` (29) | 29, 30 |
+| `logcat-epoch.txt`                               | `shell logcat -d -v epoch`                     | two buffers, a `switch to` marker, empty messages                              | 29     |
+| `logcat-epoch-crash.txt`                         | `shell logcat -d -v epoch -b crash,main`       | a Java crash in the crash buffer; a seven-letter tag padded to eight           | 30     |
+| `date-epoch-zone.txt`                            | `shell date '+%s.%N %z'`                       | device clock with its UTC offset, east (29) and west (30) of UTC               | 29, 30 |
+
+## Shared parsers
+
+`src/android/` reads the output above; every parser is tested on the API 35 and 37 captures and on the synthetic API 29/30 samples in `test/unit/android.test.ts`, and each device read through the fake adb in `test/unit/android-device.test.ts`.
+
+| Module          | Reads                                                      | Facts it relies on                                                                                                      |
+| --------------- | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `pidof.ts`      | `pidof <pkg>`                                              | exit 1 with no output means not running; any other mismatch is `INVALID_OUTPUT`, never "not running"                    |
+| `packages.ts`   | `pm list packages`, `dumpsys package <pkg>`                | `userId=` (29, 30) or `appId=` (31+); `installed=` of user 0; only the `Packages:` section counts                       |
+| `foreground.ts` | `dumpsys activity activities`                              | the top-level ` ResumedActivity:` on every level; a launcher in front is an answer; nothing resumed is `null`           |
+| `processes.ts`  | `dumpsys activity processes <pkg>`, `dumpsys activity lru` | `am kill` kills only at oom adj 500 and up, so the previous app (700) qualifies without waiting for `cached` (E0 above) |
+| `recents.ts`    | `dumpsys activity recents`                                 | the root activity is `mActivityComponent=` on every level; the "Visible recent tasks" section is not the list           |
+| `logcat.ts`     | `logcat -v epoch`                                          | one layout from 29 to 37; buffer markers set each line's buffer; the ANR report is in the system buffer (E0 above)      |
+| `clock.ts`      | `date '+%s.%N %z'`                                         | device time in milliseconds, the `logcat -T` form, and the device's UTC offset for local times                          |
+
 ## Probe app APKs
 
 `apk/` holds the probe app (`test/device/probe-app`, see `test/device/README.md`) built in both variants. Both are package `dev.probe`, versionCode 1, versionName `1.0`, minSdk 29, targetSdk 36, signed with APK Signature Scheme v2 only, by the same debug certificate (SHA-256 `201dd47659cf511c7f2d5278e906d349ba0ed8cb2ce8ddb55caa10fb300133f2`).

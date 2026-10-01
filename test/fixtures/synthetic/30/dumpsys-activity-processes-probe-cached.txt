@@ -1,0 +1,43 @@
+ACTIVITY MANAGER RUNNING PROCESSES (dumpsys activity processes)
+  All known processes:
+  *APP* UID 10123 ProcessRecord{7f2b9d4 6011:dev.probe/u0a123}
+    user #0 uid=10123 gids={50123, 20123, 9997}
+    mRequiredAbi=arm64-v8a instructionSet=null
+    dir=/data/app/~~d0Q2nM8xLr4pW1sV7bYe3A==/dev.probe-Xq2v9pD1cWm3nR8sT0uYbA==/base.apk publicDir=/data/app/~~d0Q2nM8xLr4pW1sV7bYe3A==/dev.probe-Xq2v9pD1cWm3nR8sT0uYbA==/base.apk data=/data/user/0/dev.probe
+    packageList={dev.probe}
+    compat={420dpi}
+    thread=android.app.IApplicationThread$Stub$Proxy@1c9a2f0
+    pid=6011 starting=false
+    lastActivityTime=-1m2s840ms lastPssTime=-40s12ms pssStatType=0 nextPssTime=+19s988ms
+    lastPss=52MB lastSwapPss=0.00 lastCachedPss=52MB lastCachedSwapPss=0.00 lastRss=118MB
+    procStateMemTracker: best=4 (4=4 1.0x)
+    adjSeq=10442 lruSeq=3310
+    oom adj: max=1001 curRaw=900 setRaw=900 cur=900 set=900
+    lastCompactTime=0 lastCompactAction=0
+    mCurSchedGroup=0 setSchedGroup=0 systemNoUi=false trimMemoryLevel=0
+    curProcState=16 mRepProcState=16 pssProcState=16 setProcState=16 lastStateTime=-1m1s379ms
+    curCapability=--- setCapability=---
+    hasShownUi=true pendingUiClean=false hasAboveClient=false treatLikeActivity=false
+    cached=true empty=false
+    lastTopTime=-1m1s379ms
+    startSeq=140
+    mountMode=DEFAULT
+    Activities:
+      - ActivityRecord{a43c7e1 u0 dev.probe/.MainActivity t14}
+    Recent Tasks:
+      - Task{5d1e8a2 #14 visible=false type=standard mode=fullscreen translucent=true A=dev.probe U=0 StackId=14 sz=1}
+  *APP* UID 10123 ProcessRecord{1a2b3c4 6044:dev.probe:sync/u0a123}
+    user #0 uid=10123 gids={50123, 20123, 9997}
+    packageList={dev.probe}
+    pid=6044 starting=false
+    oom adj: max=1001 curRaw=905 setRaw=905 cur=905 set=905
+    curProcState=19 mRepProcState=19 pssProcState=19 setProcState=19 lastStateTime=-55s10ms
+    cached=true empty=true
+
+  Process LRU list (sorted by oom_adj, 33 total, non-act at 3, non-svc at 3):
+    Proc # 2: cch   b/ /CAC  ---  t: 0 6011:dev.probe/u0a123 (cch-act)
+    Proc # 1: cch+5 b/ /CEM  ---  t: 0 6044:dev.probe:sync/u0a123 (cch-empty)
+
+  PID mappings:
+    PID #6011: ProcessRecord{7f2b9d4 6011:dev.probe/u0a123}
+    PID #6044: ProcessRecord{1a2b3c4 6044:dev.probe:sync/u0a123}

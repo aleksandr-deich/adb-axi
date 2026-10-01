@@ -1,0 +1,49 @@
+Activity Resolver Table:
+  Non-Data Actions:
+      android.intent.action.MAIN:
+        6b3f2a1 dev.probe/.MainActivity filter 9c1d0e4
+          Action: "android.intent.action.MAIN"
+          Category: "android.intent.category.LAUNCHER"
+
+Key Set Manager:
+  [dev.probe]
+      Signing KeySets: 41
+
+Packages:
+  Package [dev.probe] (4f2a9c1):
+    userId=10123
+    pkg=Package{8d3e0b2 dev.probe}
+    codePath=/data/app/dev.probe-Xq2v9pD1cWm3nR8sT0uYbA==
+    resourcePath=/data/app/dev.probe-Xq2v9pD1cWm3nR8sT0uYbA==
+    legacyNativeLibraryDir=/data/app/dev.probe-Xq2v9pD1cWm3nR8sT0uYbA==/lib
+    primaryCpuAbi=null
+    secondaryCpuAbi=null
+    versionCode=1 minSdk=29 targetSdk=29
+    versionName=1.0
+    splits=[base]
+    apkSigningVersion=2
+    applicationInfo=ApplicationInfo{3a7c5d0 dev.probe}
+    flags=[ DEBUGGABLE HAS_CODE ALLOW_CLEAR_USER_DATA ALLOW_BACKUP ]
+    privateFlags=[ PRIVATE_FLAG_ACTIVITIES_RESIZE_MODE_RESIZEABLE_VIA_SDK_VERSION ALLOW_AUDIO_PLAYBACK_CAPTURE PRIVATE_FLAG_ALLOW_NATIVE_HEAP_POINTER_TAGGING ]
+    dataDir=/data/user/0/dev.probe
+    supportsScreens=[small, medium, large, xlarge, resizeable, anyDensity]
+    timeStamp=2026-10-01 07:55:10
+    firstInstallTime=2026-10-01 07:55:10
+    lastUpdateTime=2026-10-01 07:55:10
+    signatures=PackageSignatures{1e5b7f3 version:2, signatures:[9ad7e673], past signatures:[]}
+    installPermissionsFixed=true
+    pkgFlags=[ DEBUGGABLE HAS_CODE ALLOW_CLEAR_USER_DATA ALLOW_BACKUP ]
+    install permissions:
+      android.permission.INTERNET: granted=true
+    User 0: ceDataInode=262144 installed=true hidden=false suspended=false stopped=false notLaunched=false enabled=0 instant=false virtual=false
+      gids=[3003]
+      runtime permissions:
+
+Dexopt state:
+  [dev.probe]
+    path: /data/app/dev.probe-Xq2v9pD1cWm3nR8sT0uYbA==/base.apk
+      arm64: [status=quicken] [reason=install]
+
+Compiler stats:
+  [dev.probe]
+     base.apk - 312

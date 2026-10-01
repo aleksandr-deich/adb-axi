@@ -1,0 +1,48 @@
+import type { AdbClient } from "../adb/run.js";
+import { parseActivityRecord, type ActivityRecord } from "./component.js";
+import { readShell, type ReadOptions } from "./read.js";
+
+/**
+ * Where `dumpsys activity activities` names the resumed activity, first match wins:
+ * - `  ResumedActivity: `, the top resumed activity, printed by
+ *   `ActivityTaskManagerService.dumpActivitiesLocked` on every release from API 29 to 37
+ *   (API 29 also prints a display-level ` ResumedActivity:` with no space before the
+ *   record, naming the same activity);
+ * - `Resumed: ` under "Resumed activities in task display areas" (API 30);
+ * - the per-stack `mResumedActivity: `, top stack first (API 29 and 30);
+ * - the per-task `topResumedActivity=` (API 31+).
+ */
+const RESUMED_LINES: readonly RegExp[] = [
+  /^\s*ResumedActivity:\s*(ActivityRecord\{.*)$/m,
+  /^\s*Resumed:\s*(ActivityRecord\{.*)$/m,
+  /^\s*mResumedActivity:\s*(ActivityRecord\{.*)$/m,
+  /^\s*topResumedActivity=(ActivityRecord\{.*)$/m,
+];
+
+/**
+ * The resumed (foreground) activity. A launcher in front is an answer like any other app.
+ * `null` when nothing is resumed, for example while the screen is off.
+ */
+export function parseForeground(stdout: string): ActivityRecord | null {
+  for (const pattern of RESUMED_LINES) {
+    const line = pattern.exec(stdout)?.[1];
+    const record = line === undefined ? null : parseActivityRecord(line);
+    if (record !== null) return record;
+  }
+  return null;
+}
+
+export async function readForeground(
+  adb: AdbClient,
+  serial: string,
+  options: ReadOptions,
+): Promise<ActivityRecord | null> {
+  const result = await readShell(
+    adb,
+    serial,
+    "dumpsys activity activities",
+    "reading the foreground activity",
+    options,
+  );
+  return parseForeground(result.stdout);
+}

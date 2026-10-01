@@ -1,0 +1,104 @@
+{
+  "api": 29,
+  "release": "android-10.0.0_r1",
+  "synthetic": true,
+  "note": "Written from AOSP sources at android-10.0.0_r1, not captured from a device. Each sample follows the print statements its source names; values are illustrative.",
+  "samples": [
+    {
+      "file": "pidof-running.txt",
+      "argv": ["adb", "-s", "emulator-5560", "shell", "pidof dev.probe"],
+      "exitCode": 0,
+      "synthetic": true,
+      "source": "AOSP platform/external/toybox android-10.0.0_r1 toys/lsb/pidof.c print_pid, pidof_main",
+      "note": "one process"
+    },
+    {
+      "file": "pidof-two.txt",
+      "argv": ["adb", "-s", "emulator-5560", "shell", "pidof dev.probe"],
+      "exitCode": 0,
+      "synthetic": true,
+      "source": "AOSP platform/external/toybox android-10.0.0_r1 toys/lsb/pidof.c print_pid (\" %s\" after the first pid)",
+      "note": "two processes with the same name"
+    },
+    {
+      "file": "pidof-not-running.txt",
+      "argv": ["adb", "-s", "emulator-5560", "shell", "pidof dev.probe"],
+      "exitCode": 1,
+      "synthetic": true,
+      "source": "AOSP platform/external/toybox android-10.0.0_r1 toys/lsb/pidof.c pidof_main (exit 1, no output)",
+      "note": "no process"
+    },
+    {
+      "file": "pm-list-packages-versioncode-uid.txt",
+      "argv": ["adb", "-s", "emulator-5560", "shell", "pm list packages --show-versioncode -U"],
+      "exitCode": 0,
+      "synthetic": true,
+      "source": "AOSP platform/frameworks/base android-10.0.0_r1 services/core/java/com/android/server/pm/PackageManagerShellCommand.java runListPackages",
+      "note": "versionCode and uid tokens on one line"
+    },
+    {
+      "file": "dumpsys-package-debug.txt",
+      "argv": ["adb", "-s", "emulator-5560", "shell", "dumpsys package dev.probe"],
+      "exitCode": 0,
+      "synthetic": true,
+      "source": "AOSP platform/frameworks/base android-10.0.0_r1 services/core/java/com/android/server/pm/Settings.java dumpPackageLPr (userId=, flags=, User 0: line)",
+      "note": "debuggable build installed; the app id is printed as userId="
+    },
+    {
+      "file": "dumpsys-package-absent.txt",
+      "argv": ["adb", "-s", "emulator-5560", "shell", "dumpsys package dev.probe.missing"],
+      "exitCode": 0,
+      "synthetic": true,
+      "source": "AOSP platform/frameworks/base android-10.0.0_r1 services/core/java/com/android/server/pm/PackageManagerService.java dumpDexoptStateLPr, dumpCompilerStatsLPr",
+      "note": "package not installed: no Packages: section"
+    },
+    {
+      "file": "dumpsys-activity-activities-probe-front.txt",
+      "argv": ["adb", "-s", "emulator-5560", "shell", "dumpsys activity activities"],
+      "exitCode": 0,
+      "synthetic": true,
+      "source": "AOSP platform/frameworks/base android-10.0.0_r1 services/core/java/com/android/server/wm/RootActivityContainer.java dumpActivities; ActivityStack.java dump; ActivityTaskManagerService.java dumpActivitiesLocked; ActivityRecord.java toString",
+      "note": "probe resumed: mResumedActivity, the display-level \" ResumedActivity:\" with no space before the record, and the top-level \"  ResumedActivity: \""
+    },
+    {
+      "file": "dumpsys-activity-lru-previous.txt",
+      "argv": ["adb", "-s", "emulator-5560", "shell", "dumpsys activity lru"],
+      "exitCode": 0,
+      "synthetic": true,
+      "source": "AOSP platform/frameworks/base android-10.0.0_r1 services/core/java/com/android/server/am/ActivityManagerService.java dumpLruEntryLocked; ProcessList.java makeOomAdjString (fore), makeProcStateString",
+      "note": "probe as the previous app; no capability column, \" activity=\" suffix"
+    },
+    {
+      "file": "dumpsys-activity-processes-probe-previous.txt",
+      "argv": ["adb", "-s", "emulator-5560", "shell", "dumpsys activity processes dev.probe"],
+      "exitCode": 0,
+      "synthetic": true,
+      "source": "AOSP platform/frameworks/base android-10.0.0_r1 services/core/java/com/android/server/am/ProcessRecord.java dump (oom: max=..., cached=, curProcState=)",
+      "note": "probe process record, previous app (adj 700)"
+    },
+    {
+      "file": "dumpsys-activity-recents-after-kill.txt",
+      "argv": ["adb", "-s", "emulator-5560", "shell", "dumpsys activity recents"],
+      "exitCode": 0,
+      "synthetic": true,
+      "source": "AOSP platform/frameworks/base android-10.0.0_r1 services/core/java/com/android/server/wm/RecentTasks.java dump; TaskRecord.java toString and dump (mActivityComponent=, activityType=)",
+      "note": "probe task kept after the kill, no root process; TaskRecord headers without type="
+    },
+    {
+      "file": "logcat-epoch.txt",
+      "argv": ["adb", "-s", "emulator-5560", "shell", "logcat -d -v epoch"],
+      "exitCode": 0,
+      "synthetic": true,
+      "source": "AOSP platform/system/core android-10.0.0_r1 liblog/logprint.cpp android_log_formatLogLine (%19lld.%03ld, %5d %5d %c %-8.*s: ); logcat/logcat.cpp beginning of / switch to markers",
+      "note": "main and system buffers, a buffer switch, empty messages"
+    },
+    {
+      "file": "date-epoch-zone.txt",
+      "argv": ["adb", "-s", "emulator-5560", "shell", "date '+%s.%N %z'"],
+      "exitCode": 0,
+      "synthetic": true,
+      "source": "AOSP platform/external/toybox android-10.0.0_r1 toys/posix/date.c puts_time (%N)",
+      "note": "device clock with its UTC offset"
+    }
+  ]
+}

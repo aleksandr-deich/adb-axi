@@ -1,0 +1,40 @@
+ACTIVITY MANAGER RECENT TASKS (dumpsys activity recents)
+mRecentsUid=10096
+mRecentsComponent=ComponentInfo{com.google.android.apps.nexuslauncher/com.android.quickstep.RecentsActivity}
+mFreezeTaskListReordering=false
+mFreezeTaskListReorderingPendingTimeout=false
+  Recent tasks:
+  * Recent #0: TaskRecord{e6a90c7 #2 I=com.google.android.apps.nexuslauncher/.NexusLauncherActivity U=0 StackId=0 sz=1}
+    userId=0 effectiveUid=u0a96 mCallingUid=0 mUserSetupComplete=true mCallingPackage=null
+    intent={act=android.intent.action.MAIN cat=[android.intent.category.HOME] flg=0x10000100 cmp=com.google.android.apps.nexuslauncher/.NexusLauncherActivity}
+    mActivityComponent=com.google.android.apps.nexuslauncher/.NexusLauncherActivity
+    autoRemoveRecents=false isPersistable=false numFullscreen=1 activityType=2
+    rootWasReset=false mNeverRelinquishIdentity=true mReuseTask=false mLockTaskAuth=LOCK_TASK_AUTH_PINNABLE
+    Activities=[ActivityRecord{c81f05b u0 com.google.android.apps.nexuslauncher/.NexusLauncherActivity t2}]
+    askedCompatMode=false inRecents=true isAvailable=true
+    mRootProcess=ProcessRecord{2b40e18 1311:com.google.android.apps.nexuslauncher/u0a96}
+    stackId=0
+    hasBeenVisible=true mResizeMode=RESIZE_MODE_RESIZEABLE mSupportsPictureInPicture=false isResizeable=true lastActiveTime=1209875 (inactive for 3s)
+  * Recent #1: TaskRecord{5d1e8a2 #12 A=dev.probe U=0 StackId=12 sz=1}
+    userId=0 effectiveUid=u0a123 mCallingUid=2000 mUserSetupComplete=true mCallingPackage=null
+    affinity=dev.probe
+    intent={flg=0x10000000 cmp=dev.probe/.MainActivity}
+    mActivityComponent=dev.probe/.MainActivity
+    autoRemoveRecents=false isPersistable=true numFullscreen=1 activityType=1
+    rootWasReset=false mNeverRelinquishIdentity=true mReuseTask=false mLockTaskAuth=LOCK_TASK_AUTH_PINNABLE
+    Activities=[ActivityRecord{a43c7e1 u0 dev.probe/.MainActivity t12}]
+    askedCompatMode=false inRecents=true isAvailable=true
+    stackId=12
+    hasBeenVisible=true mResizeMode=RESIZE_MODE_RESIZEABLE_VIA_SDK_VERSION mSupportsPictureInPicture=false isResizeable=true lastActiveTime=1209871 (inactive for 3s)
+  * Recent #2: TaskRecord{91c2d3e #9 A=com.example.notes U=0 StackId=9 sz=1}
+    userId=0 effectiveUid=u0a124 mCallingUid=2000 mUserSetupComplete=true mCallingPackage=null
+    affinity=com.example.notes
+    intent={act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10000000 cmp=com.example.notes/.ui.NotesActivity}
+    mActivityComponent=com.example.notes/.ui.NotesActivity
+    autoRemoveRecents=false isPersistable=true numFullscreen=1 activityType=1
+    rootWasReset=false mNeverRelinquishIdentity=true mReuseTask=false mLockTaskAuth=LOCK_TASK_AUTH_PINNABLE
+    Activities=[ActivityRecord{6e0f4b9 u0 com.example.notes/.ui.NotesActivity t9}, ActivityRecord{f17a2c5 u0 com.example.notes/.ui.EditorActivity t9}]
+    askedCompatMode=false inRecents=true isAvailable=true
+    mRootProcess=ProcessRecord{3d9a6b1 4470:com.example.notes/u0a124}
+    stackId=9
+    hasBeenVisible=true mResizeMode=RESIZE_MODE_RESIZEABLE_VIA_SDK_VERSION mSupportsPictureInPicture=false isResizeable=true lastActiveTime=1102233 (inactive for 110s)

@@ -1,0 +1,14 @@
+ACTIVITY MANAGER ACTIVITIES (dumpsys activity activities)
+Display #0 (activities from top to bottom):
+  Stack #1: type=home mode=fullscreen
+  isSleeping=true
+  mBounds=Rect(0, 0 - 0, 0)
+    mLastPausedActivity: ActivityRecord{c81f05b u0 com.google.android.apps.nexuslauncher/.NexusLauncherActivity t3}
+    * Task{e6a90c7 #3 visible=false type=home mode=fullscreen translucent=true I=com.google.android.apps.nexuslauncher/.NexusLauncherActivity U=0 StackId=1 sz=1}
+      mBounds=Rect(0, 0 - 0, 0)
+      mMinWidth=-1 mMinHeight=-1
+      Activities=[ActivityRecord{c81f05b u0 com.google.android.apps.nexuslauncher/.NexusLauncherActivity t3}]
+      taskId=3 stackId=1
+      * Hist #0: ActivityRecord{c81f05b u0 com.google.android.apps.nexuslauncher/.NexusLauncherActivity t3}
+          packageName=com.google.android.apps.nexuslauncher processName=com.google.android.apps.nexuslauncher
+          state=STOPPED stopped=true delayedResume=false finishing=false

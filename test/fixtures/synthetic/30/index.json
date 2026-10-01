@@ -1,0 +1,88 @@
+{
+  "api": 30,
+  "release": "android-11.0.0_r1",
+  "synthetic": true,
+  "note": "Written from AOSP sources at android-11.0.0_r1, not captured from a device. Each sample follows the print statements its source names; values are illustrative.",
+  "samples": [
+    {
+      "file": "pidof-not-running.txt",
+      "argv": ["adb", "-s", "emulator-5562", "shell", "pidof dev.probe"],
+      "exitCode": 1,
+      "synthetic": true,
+      "source": "AOSP platform/external/toybox android-11.0.0_r1 toys/lsb/pidof.c pidof_main (exit 1, no output)",
+      "note": "no process"
+    },
+    {
+      "file": "dumpsys-package-release.txt",
+      "argv": ["adb", "-s", "emulator-5562", "shell", "dumpsys package dev.probe"],
+      "exitCode": 0,
+      "synthetic": true,
+      "source": "AOSP platform/frameworks/base android-11.0.0_r1 services/core/java/com/android/server/pm/Settings.java dumpPackageLPr, dumpPackagesLPr (Hidden system packages:)",
+      "note": "non-debuggable build installed, plus a hidden system package that is not installed"
+    },
+    {
+      "file": "dumpsys-package-kept-data.txt",
+      "argv": ["adb", "-s", "emulator-5562", "shell", "dumpsys package dev.probe"],
+      "exitCode": 0,
+      "synthetic": true,
+      "source": "AOSP platform/frameworks/base android-11.0.0_r1 services/core/java/com/android/server/pm/Settings.java dumpPackageLPr with no parsed package (pkg=null)",
+      "note": "uninstalled with pm uninstall -k: the record stays with installed=false"
+    },
+    {
+      "file": "dumpsys-activity-activities-launcher-front.txt",
+      "argv": ["adb", "-s", "emulator-5562", "shell", "dumpsys activity activities"],
+      "exitCode": 0,
+      "synthetic": true,
+      "source": "AOSP platform/frameworks/base android-11.0.0_r1 services/core/java/com/android/server/wm/RootWindowContainer.java dumpActivities (Resumed: ); ActivityStack.java dump; ActivityTaskManagerService.java dumpActivitiesLocked",
+      "note": "launcher resumed, probe stopped"
+    },
+    {
+      "file": "dumpsys-activity-activities-asleep.txt",
+      "argv": ["adb", "-s", "emulator-5562", "shell", "dumpsys activity activities"],
+      "exitCode": 0,
+      "synthetic": true,
+      "source": "AOSP platform/frameworks/base android-11.0.0_r1 services/core/java/com/android/server/wm/RootWindowContainer.java dumpActivities with no resumed activity",
+      "note": "screen off: nothing resumed"
+    },
+    {
+      "file": "dumpsys-activity-lru-cached.txt",
+      "argv": ["adb", "-s", "emulator-5562", "shell", "dumpsys activity lru"],
+      "exitCode": 0,
+      "synthetic": true,
+      "source": "AOSP platform/frameworks/base android-11.0.0_r1 services/core/java/com/android/server/am/ActivityManagerService.java dumpLruEntryLocked (padded index, capability column); ActivityManager.java printCapabilitiesSummary (LCM)",
+      "note": "probe cached"
+    },
+    {
+      "file": "dumpsys-activity-processes-probe-cached.txt",
+      "argv": ["adb", "-s", "emulator-5562", "shell", "dumpsys activity processes dev.probe"],
+      "exitCode": 0,
+      "synthetic": true,
+      "source": "AOSP platform/frameworks/base android-11.0.0_r1 services/core/java/com/android/server/am/ProcessRecord.java dump (oom adj: max=..., cached=)",
+      "note": "probe main process and a second process, both cached"
+    },
+    {
+      "file": "dumpsys-activity-recents-after-kill.txt",
+      "argv": ["adb", "-s", "emulator-5562", "shell", "dumpsys activity recents"],
+      "exitCode": 0,
+      "synthetic": true,
+      "source": "AOSP platform/frameworks/base android-11.0.0_r1 services/core/java/com/android/server/wm/RecentTasks.java dump; Task.java toString and dump",
+      "note": "probe task kept after the kill"
+    },
+    {
+      "file": "logcat-epoch-crash.txt",
+      "argv": ["adb", "-s", "emulator-5562", "shell", "logcat -d -v epoch -b crash,main"],
+      "exitCode": 0,
+      "synthetic": true,
+      "source": "AOSP platform/system/core android-11.0.0_r1 liblog/logprint.cpp android_log_formatLogLine",
+      "note": "a Java crash in the crash buffer; a seven-letter tag"
+    },
+    {
+      "file": "date-epoch-zone.txt",
+      "argv": ["adb", "-s", "emulator-5562", "shell", "date '+%s.%N %z'"],
+      "exitCode": 0,
+      "synthetic": true,
+      "source": "AOSP platform/external/toybox android-11.0.0_r1 toys/posix/date.c puts_time (%N)",
+      "note": "device clock west of UTC"
+    }
+  ]
+}

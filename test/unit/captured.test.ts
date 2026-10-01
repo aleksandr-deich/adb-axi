@@ -71,3 +71,45 @@ describe("probe app APKs", () => {
     },
   );
 });
+
+describe("synthetic API 29/30 samples", () => {
+  const SYNTHETIC_DIR = join(FIXTURES_DIR, "synthetic");
+  const levels = readdirSync(SYNTHETIC_DIR).sort();
+
+  interface SyntheticIndex {
+    synthetic: boolean;
+    samples: { file: string; argv: string[]; synthetic: boolean; source: string }[];
+  }
+  const index = (level: string): SyntheticIndex =>
+    JSON.parse(readFileSync(join(SYNTHETIC_DIR, level, "index.json"), "utf8")) as SyntheticIndex;
+
+  it("covers the two API levels without logcat --uid", () => {
+    expect(levels).toEqual(["29", "30"]);
+  });
+
+  it.each(levels)("indexes every file in synthetic/%s, and nothing more", (level) => {
+    const onDisk = readdirSync(join(SYNTHETIC_DIR, level))
+      .filter((name) => name !== "index.json")
+      .sort();
+    expect(
+      index(level)
+        .samples.map((s) => s.file)
+        .sort(),
+    ).toEqual(onDisk);
+  });
+
+  it.each(levels)("marks every sample of synthetic/%s synthetic, with its AOSP source", (level) => {
+    expect(index(level).synthetic).toBe(true);
+    for (const sample of index(level).samples) {
+      expect(sample.synthetic, sample.file).toBe(true);
+      expect(sample.source, sample.file).toMatch(/^AOSP platform\/\S+ android-1[01]\.0\.0_r1 \S+/);
+      expect(sample.argv.slice(0, 2), sample.file).toEqual(["adb", "-s"]);
+    }
+  });
+
+  it.each(levels)("names every file of synthetic/%s in EVIDENCE.md", (level) => {
+    const section = evidence.slice(evidence.indexOf("## Synthetic API 29/30 samples"));
+    const missing = index(level).samples.filter((s) => !section.includes(`\`${s.file}\``));
+    expect(missing).toEqual([]);
+  });
+});

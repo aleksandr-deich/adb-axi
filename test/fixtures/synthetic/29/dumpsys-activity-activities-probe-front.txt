@@ -1,0 +1,68 @@
+ACTIVITY MANAGER ACTIVITIES (dumpsys activity activities)
+Display #0 (activities from top to bottom):
+
+  Stack #12: type=standard mode=fullscreen
+  isSleeping=false
+  mBounds=Rect(0, 0 - 0, 0)
+    Task id #12
+    mBounds=Rect(0, 0 - 0, 0)
+    mMinWidth=-1
+    mMinHeight=-1
+    mLastNonFullscreenBounds=null
+    * TaskRecord{5d1e8a2 #12 A=dev.probe U=0 StackId=12 sz=1}
+      userId=0 effectiveUid=u0a123 mCallingUid=2000 mUserSetupComplete=true mCallingPackage=null
+      affinity=dev.probe
+      intent={flg=0x10000000 cmp=dev.probe/.MainActivity}
+      mActivityComponent=dev.probe/.MainActivity
+      autoRemoveRecents=false isPersistable=true numFullscreen=1 activityType=1
+      rootWasReset=false mNeverRelinquishIdentity=true mReuseTask=false mLockTaskAuth=LOCK_TASK_AUTH_PINNABLE
+      Activities=[ActivityRecord{a43c7e1 u0 dev.probe/.MainActivity t12}]
+      askedCompatMode=false inRecents=true isAvailable=true
+      mRootProcess=ProcessRecord{7f2b9d4 5120:dev.probe/u0a123}
+      stackId=12
+      hasBeenVisible=true mResizeMode=RESIZE_MODE_RESIZEABLE_VIA_SDK_VERSION mSupportsPictureInPicture=false isResizeable=true lastActiveTime=1203344 (inactive for 4s)
+      * Hist #0: ActivityRecord{a43c7e1 u0 dev.probe/.MainActivity t12}
+          packageName=dev.probe processName=dev.probe
+          launchedFromUid=2000 launchedFromPackage=null userId=0
+          app=ProcessRecord{7f2b9d4 5120:dev.probe/u0a123}
+          state=RESUMED stopped=false delayedResume=false finishing=false
+
+    Running activities (most recent first):
+      TaskRecord{5d1e8a2 #12 A=dev.probe U=0 StackId=12 sz=1}
+        Run #0: ActivityRecord{a43c7e1 u0 dev.probe/.MainActivity t12}
+
+    mResumedActivity: ActivityRecord{a43c7e1 u0 dev.probe/.MainActivity t12}
+    mLastPausedActivity: ActivityRecord{c81f05b u0 com.google.android.apps.nexuslauncher/.NexusLauncherActivity t2}
+
+  Stack #0: type=home mode=fullscreen
+  isSleeping=false
+  mBounds=Rect(0, 0 - 0, 0)
+    Task id #2
+    mBounds=Rect(0, 0 - 0, 0)
+    mMinWidth=-1
+    mMinHeight=-1
+    mLastNonFullscreenBounds=null
+    * TaskRecord{e6a90c7 #2 I=com.google.android.apps.nexuslauncher/.NexusLauncherActivity U=0 StackId=0 sz=1}
+      userId=0 effectiveUid=u0a96 mCallingUid=0 mUserSetupComplete=true mCallingPackage=null
+      intent={act=android.intent.action.MAIN cat=[android.intent.category.HOME] flg=0x10000100 cmp=com.google.android.apps.nexuslauncher/.NexusLauncherActivity}
+      mActivityComponent=com.google.android.apps.nexuslauncher/.NexusLauncherActivity
+      autoRemoveRecents=false isPersistable=false numFullscreen=1 activityType=2
+      rootWasReset=false mNeverRelinquishIdentity=true mReuseTask=false mLockTaskAuth=LOCK_TASK_AUTH_PINNABLE
+      Activities=[ActivityRecord{c81f05b u0 com.google.android.apps.nexuslauncher/.NexusLauncherActivity t2}]
+      askedCompatMode=false inRecents=true isAvailable=true
+      mRootProcess=ProcessRecord{2b40e18 1311:com.google.android.apps.nexuslauncher/u0a96}
+      stackId=0
+      hasBeenVisible=true mResizeMode=RESIZE_MODE_RESIZEABLE mSupportsPictureInPicture=false isResizeable=true lastActiveTime=1199020 (inactive for 8s)
+      * Hist #0: ActivityRecord{c81f05b u0 com.google.android.apps.nexuslauncher/.NexusLauncherActivity t2}
+          packageName=com.google.android.apps.nexuslauncher processName=com.google.android.apps.nexuslauncher
+          state=STOPPED stopped=true delayedResume=false finishing=false
+
+    Running activities (most recent first):
+      TaskRecord{e6a90c7 #2 I=com.google.android.apps.nexuslauncher/.NexusLauncherActivity U=0 StackId=0 sz=1}
+        Run #0: ActivityRecord{c81f05b u0 com.google.android.apps.nexuslauncher/.NexusLauncherActivity t2}
+
+    mLastPausedActivity: ActivityRecord{c81f05b u0 com.google.android.apps.nexuslauncher/.NexusLauncherActivity t2}
+
+ ResumedActivity:ActivityRecord{a43c7e1 u0 dev.probe/.MainActivity t12}
+
+  ResumedActivity: ActivityRecord{a43c7e1 u0 dev.probe/.MainActivity t12}

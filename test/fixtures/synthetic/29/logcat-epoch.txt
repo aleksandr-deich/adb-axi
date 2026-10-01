@@ -1,0 +1,10 @@
+--------- beginning of main
+         1790834222.617  5120  5120 I dev.probe: Not late-enabling -Xcheck:jni (already on)
+         1790834222.724  5120  5120 W dev.probe: Unexpected CPU variant for X86 using defaults: x86
+         1790834222.843  5120  5140 D OpenGLRenderer: Skia GL Pipeline
+         1790834223.001  5120  5120 I ProbeState: event=start saved=0 volatile=0 rows=0 restored=false pid=5120
+--------- beginning of system
+         1790834223.112   517   540 I ActivityManager: Displayed dev.probe/.MainActivity: +412ms
+         1790834223.115   517   540 V WindowManager: 
+--------- switch to main
+         1790834223.230  5120  5120 E ProbeState: 

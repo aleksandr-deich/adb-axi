@@ -1,5 +1,7 @@
-# Captured device output is kept byte for byte (CRLF included); APKs and dumps are binary.
+# Captured device output is kept byte for byte (CRLF included), and so are the synthetic
+# samples written in its image (trailing spaces included); APKs and dumps are binary.
 test/fixtures/captured/** -text
+test/fixtures/synthetic/** -text
 *.apk binary
 *.bin binary
 *.jar binary
