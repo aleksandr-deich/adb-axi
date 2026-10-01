@@ -1,0 +1,10 @@
+package:com.codelab.basiclayouts
+package:com.example.repcap
+package:com.example.composebasics.test
+package:dev.probe
+package:com.repcap
+package:com.android.cli.interact.instrumentation
+package:com.deych.notessa
+package:com.example.composebasics
+package:com.example.basicstatecodelab
+package:com.example.reply

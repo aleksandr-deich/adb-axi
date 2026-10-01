@@ -1,0 +1,8 @@
+Starting: Intent { cmp=dev.probe/.MainActivity }
+Warning: Activity not started, its current task has been brought to the front
+Status: ok
+LaunchState: COLD
+Activity: dev.probe/.MainActivity
+TotalTime: 927
+WaitTime: 928
+Complete

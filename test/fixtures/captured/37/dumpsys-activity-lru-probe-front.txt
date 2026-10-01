@@ -1,0 +1,73 @@
+ACTIVITY MANAGER LRU PROCESSES (dumpsys activity lru)
+  Activities:
+  #69: fg       TOP  LCMNFUATI 7882:dev.probe/u0a264 act:activities|recents
+  #68: vis      BFGS ---NFUATI 1079:com.google.android.apps.nexuslauncher/u0a197 act:activities|recents
+  #67: cch      CAC  --------- 3989:com.example.reply/u0a229 act:activities|recents
+  #66: prcp + 1 IMPB -------TI 1643:com.google.android.inputmethod.latin/u0a161 act:treated
+  Other:
+  #65: fg       BTOP LCMNFUATI 1236:com.google.android.gms.persistent/u0a210
+  #64: prcp + 1 BFGS ----F--TI 2217:com.google.android.apps.messaging/u0a154
+  #63: svcb     SVC  --------I 22811:com.google.android.gms/u0a210
+  #62: vis      BFGS LCMNFUATI 1671:com.google.android.googlequicksearchbox:interactor/u0a151
+  #61: vis      BFGS LCMNFUATI 1680:com.google.android.as/u0a158
+  #60: vis      BFGS LCMNFUATI 1100:com.google.android.ext.services/u0a215
+  #59: vis      BFGS ---NFUATI 2160:com.google.android.as.oss/u0a148
+  #58: psvc     PER  LCMNFUATI 1655:com.google.android.providers.media.module/u0a202
+  #57: psvc     PER  LCMNFUATI 5036:com.google.android.bluetooth/1002
+  #56: cch  + 5 CEM  --------- 3481:com.android.vending:background/u0a160
+  #55: cch  + 5 CEM  --------- 2574:com.android.vending/u0a160
+  #54: vis      IMPF -------TI 1307:com.google.android.permissioncontroller/u0a224
+  #53: cch  + 5 CEM  --------- 3394:com.google.android.packageinstaller/u0a121
+  #52: vis      BFGS ----F--TI 9076:com.google.android.apps.wellbeing/u0a145
+  #51: cch  + 5 CEM  --------- 1895:android.process.media/u0a108
+  #50: cch  + 5 CEM  --------- 3143:com.google.android.rkpdapp/u0a217
+  #49: cch  +15 CEM  --------- 4701:com.android.keychain/1000
+  #48: cch  +15 CEM  --------- 1838:com.android.chrome/u0a171
+  #47: cch  +15 CEM  --------- 5263:com.google.android.documentsui/u0a103
+  #46: prcp + 1 BFGS ---NFUATI 1706:com.google.android.apps.messaging:rcs/u0a154
+  #45: cch  +15 CEM  --------- 2658:com.google.android.googlequicksearchbox:search/u0a151
+  #44: cch  +15 CEM  --------- 4680:com.android.settings/1000
+  #43: cch  +25 CEM  --------- 3089:com.android.providers.calendar/u0a123
+  #42: cch  +25 CEM  --------- 20718:android.process.acore/u0a105
+  #41: cch  +25 CEM  --------- 28920:com.google.android.webview:webview_service/u0a163
+  #40: cch  +25 CEM  --------- 4723:com.google.android.googlequicksearchbox:googleapp/u0a151
+  #39: cch  +25 CEM  --------- 4824:com.google.android.webview:sandboxed_process0:org.chromium.content.app.SandboxedProcessService0:0/u0a151i1
+  #38: cch  +35 CEM  --------- 4746:com.google.android.cellbroadcastreceiver/u0a216
+  #37: cch  +35 CEM  --------- 2592:com.google.android.deskclock/u0a182
+  #36: cch  +35 CEM  --------- 3159:com.google.android.apps.safetyhub/u0a150
+  #35: cch  +35 CEM  --------- 3587:com.android.vending:quick_launch/u0a160
+  #34: cch  +35 CEM  --------- 2886:com.google.android.apps.pulse/u0a149
+  #33: cch  +45 CEM  --------- 1412:com.google.android.dialer/u0a156
+  #32: cch  +45 CEM  --------- 3414:com.google.android.partnersetup/u0a153
+  #31: cch  +45 CEM  --------- 2669:com.google.android.apps.photos/u0a179
+  #30: cch  +45 CEM  --------- 3510:com.google.android.settings.intelligence/u0a155
+  #29: cch  +45 CEM  --------- 2518:com.google.android.apps.restore/u0a144
+  #28: cch  +55 CEM  --------- 20680:com.google.android.gms.unstable/u0a210
+  #27: cch  +55 CEM  --------- 2451:com.google.android.apps.wallpaper/u0a198
+  #26: cch  +55 CEM  --------- 20635:com.google.android.adservices.api/u0a206
+  #25: cch  +55 CEM  --------- 2544:com.google.android.tts/u0a164
+  #24: cch  +55 CEM  --------- 3462:com.android.externalstorage/u0a113
+  #23: cch  +65 CEM  --------- 3448:com.google.android.photopicker/u0a204
+  #22: cch  +65 CEM  --------- 3662:com.android.vending:instant_app_installer/u0a160
+  #21: cch  +65 CEM  --------- 3217:com.google.android.configupdater/u0a157
+  #20: cch  +65 CEM  --------- 3381:com.google.android.ondevicepersonalization.services/u0a225
+  #19: cch  +65 CEM  --------- 3355:com.google.android.healthconnect.controller/u0a220
+  #18: cch  +75 CEM  --------- 3339:com.google.android.federatedcompute/u0a226
+  #17: cch  +75 CEM  --------- 3318:.adservices/u0a215
+  #16: cch  +75 CEM  --------- 3255:com.google.android.contacts/u0a184
+  #15: cch  +75 CEM  --------- 3124:com.android.shell/2000
+  #14: cch  +75 CEM  --------- 3040:com.android.managedprovisioning/u0a110
+  #13: cch  +85 CEM  --------- 3031:com.android.dynsystem:dynsystem/1000
+  #12: cch  +85 CEM  --------- 2983:com.android.dynsystem/1000
+  #11: cch  +85 CEM  --------- 2925:com.android.devicediagnostics/u0a111
+  #10: cch  +85 CEM  --------- 2835:com.android.camera2/u0a176
+  # 9: cch  +85 CEM  --------- 2755:com.android.traceur/u0a125
+  # 8: cch  +95 CEM  --------- 2332:com.android.imsserviceentitlement/u0a152
+  # 7: cch  +95 CEM  --------- 2431:com.google.android.as:captions/u0a158
+  # 6: cch  +95 CEM  --------- 2268:com.android.localtransport/1000
+  # 5: pers     PER  LCMNFUATI 1728:com.android.emulator.multidisplay/1000
+  # 4: pers     PER  LCMNFUATI 1070:com.android.se/1068
+  # 3: pers     PER  LCMNFUATI 1078:com.android.phone/1001
+  # 2: pers     PER  LCMNFUATI 1055:com.android.networkstack.process/1073
+  # 1: pers     PER  LCMNFUATI 949:com.android.systemui/u0a193
+  # 0: sys      PER  LCMNFUATI 662:system/1000

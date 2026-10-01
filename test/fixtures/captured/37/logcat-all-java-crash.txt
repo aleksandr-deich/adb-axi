@@ -1,0 +1,210 @@
+--------- beginning of main
+         1790834185.457   493   493 W skia    : AGTM parsing failed flags.readFromStream(s) at 159
+         1790834185.457   493   493 W skia    : AGTM parsing failed flags.readFromStream(s) at 159
+         1790834185.457   493   493 W skia    : AGTM parsing failed flags.readFromStream(s) at 159
+         1790834185.457   493   493 W skia    : AGTM parsing failed flags.readFromStream(s) at 159
+         1790834185.457   493   493 W skia    : AGTM parsing failed flags.readFromStream(s) at 159
+         1790834185.457   493   493 W skia    : AGTM parsing failed flags.readFromStream(s) at 159
+--------- beginning of events
+         1790834185.459   662   783 I input_focus: [Focus entering 2cd8a1 dev.probe/dev.probe.MainActivity,reason=Window became focusable. Previous reason: OK]
+         1790834185.470  8931  8931 I input_focus: ViewRootImpl focus=true for dev.probe/dev.probe.MainActivity
+--------- beginning of system
+         1790834185.471   662   795 I ImeTracker: dev.probe:458717a8: onRequestHide at ORIGIN_SERVER reason HIDE_UNSPECIFIED_WINDOW fromUser false userId 0 displayId 0
+         1790834185.476  1643  1643 I SubtypeOperator: SubtypeOperator$1.onUnbindInput():43 
+         1790834185.477   662   742 W InputChannel-JNI: Channel already disposed.
+         1790834185.478  1643  1643 I SubtypeOperator: SubtypeOperator$1.onBindInput():33 
+         1790834185.482   662   742 I ImeTracker: system_server:30b4e10c: onRequestHide at ORIGIN_SERVER reason IME_REQUESTED_CHANGED_LISTENER fromUser false displayId 0
+         1790834185.482  8931  8931 D InsetsController: hide(ime())
+         1790834185.482  8931  8931 I ImeTracker: dev.probe:458717a8: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+         1790834185.482   662   685 I ImeTracker: system_server:30b4e10c: onCancelled at PHASE_SERVER_SHOULD_HIDE
+         1790834185.486  1643  1643 I GoogleInputMethodService: GoogleInputMethodService.onFinishInput():2361 
+         1790834185.486  1643  1643 I GoogleInputMethodService: GoogleInputMethodService.onStartInput():1532 onStartInput(EditorInfo{EditorInfo{packageName=dev.probe, inputType=0, inputTypeString=NULL, enableLearning=false, autoCorrection=false, autoComplete=false, imeOptions=0, privateImeOptions=null, actionName=UNSPECIFIED, actionLabel=null, initialSelStart=-1, initialSelEnd=-1, initialCapsMode=0, label=null, fieldId=0, fieldName=null, extras=null, hintText=null, hintLocales=[]}}, false)
+         1790834185.486  1643  1643 W LatinIMEBase: LatinIMEBase.updateInputViewCoverNavigation():321 Null input view, cannot update padding!
+         1790834185.489  1643  6399 I Module  : DeviceLockedStatusModuleProvider$Module.updateDeviceLockedStatusInternal():119 repeatCheckTimes = 0, locked = false
+         1790834185.490   662   742 W PackageConfigPersister: App-specific configuration not found for packageName: dev.probe and userId: 0
+         1790834185.491  1643  6399 I Module  : DeviceLockedStatusModuleProvider$Module.updateDeviceLockedStatusInternal():119 repeatCheckTimes = 1, locked = false
+         1790834185.498   493   493 W skia    : AGTM parsing failed flags.readFromStream(s) at 159
+         1790834185.498   493   493 W skia    : AGTM parsing failed flags.readFromStream(s) at 159
+         1790834185.498   493   493 W skia    : AGTM parsing failed flags.readFromStream(s) at 159
+         1790834185.498   493   493 W skia    : AGTM parsing failed flags.readFromStream(s) at 159
+         1790834185.498   493   493 W skia    : AGTM parsing failed flags.readFromStream(s) at 159
+         1790834185.498   493   493 W skia    : AGTM parsing failed flags.readFromStream(s) at 159
+         1790834185.498   493   493 W skia    : AGTM parsing failed flags.readFromStream(s) at 159
+         1790834185.498  2826  4540 I artd    : GetBestInfo: odex next to the dex file (/data/app/~~UFT2dA-o0-xAspzJosXwhA==/com.google.android.gms-BtZ3Jr1-VRB2mDrsSazCiQ==/oat/arm64/base.odex) is kOatUpToDate with filter 'verify' executable 'false'
+         1790834185.499  2826  4540 I artd    : GetBestInfo: odex next to the dex file (/data/app/~~UFT2dA-o0-xAspzJosXwhA==/com.google.android.gms-BtZ3Jr1-VRB2mDrsSazCiQ==/oat/arm64/base.odex) is kOatUpToDate with filter 'verify' executable 'false'
+         1790834185.500  2826  4540 I artd    : GetBestInfo: dm (/data/app/~~UFT2dA-o0-xAspzJosXwhA==/com.google.android.gms-BtZ3Jr1-VRB2mDrsSazCiQ==/split_AdsDynamite_installtime.dm) is kOatUpToDate with filter 'verify' executable 'false'
+         1790834185.501  2826  4540 I artd    : GetBestInfo: odex next to the dex file (/data/app/~~UFT2dA-o0-xAspzJosXwhA==/com.google.android.gms-BtZ3Jr1-VRB2mDrsSazCiQ==/oat/arm64/split_CronetDynamite_installtime.odex) is kOatUpToDate with filter 'speed-profile' executable 'false'
+         1790834185.501  2826  4540 I artd    : GetBestInfo: odex next to the dex file (/data/app/~~UFT2dA-o0-xAspzJosXwhA==/com.google.android.gms-BtZ3Jr1-VRB2mDrsSazCiQ==/oat/arm64/split_CronetDynamite_installtime.odex) is kOatUpToDate with filter 'speed-profile' executable 'false'
+         1790834185.502  2826  4540 I artd    : GetBestInfo: dm (/data/app/~~UFT2dA-o0-xAspzJosXwhA==/com.google.android.gms-BtZ3Jr1-VRB2mDrsSazCiQ==/split_DynamiteLoader_installtime.dm) is kOatUpToDate with filter 'verify' executable 'false'
+         1790834185.504  2826  4540 I artd    : GetBestInfo: dm (/data/app/~~UFT2dA-o0-xAspzJosXwhA==/com.google.android.gms-BtZ3Jr1-VRB2mDrsSazCiQ==/split_DynamiteModulesA_installtime.dm) is kOatUpToDate with filter 'verify' executable 'false'
+         1790834185.508  2826  7801 I artd    : GetBestInfo: dm (/data/app/~~UFT2dA-o0-xAspzJosXwhA==/com.google.android.gms-BtZ3Jr1-VRB2mDrsSazCiQ==/split_DynamiteModulesC_installtime.dm) is kOatUpToDate with filter 'verify' executable 'false'
+         1790834185.509  2826  4540 I artd    : GetBestInfo: dm (/data/app/~~UFT2dA-o0-xAspzJosXwhA==/com.google.android.gms-BtZ3Jr1-VRB2mDrsSazCiQ==/split_GoogleCertificates_installtime.dm) is kOatUpToDate with filter 'verify' executable 'false'
+         1790834185.510  2826  7801 I artd    : GetBestInfo: dm (/data/app/~~UFT2dA-o0-xAspzJosXwhA==/com.google.android.gms-BtZ3Jr1-VRB2mDrsSazCiQ==/split_MapsDynamite_installtime.dm) is kOatUpToDate with filter 'verify' executable 'false'
+         1790834185.510  2826  4540 I artd    : GetBestInfo: dm (/data/app/~~UFT2dA-o0-xAspzJosXwhA==/com.google.android.gms-BtZ3Jr1-VRB2mDrsSazCiQ==/split_MeasurementDynamite_installtime.dm) is kOatUpToDate with filter 'verify' executable 'false'
+         1790834185.510  2826  7801 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/00000001/CronetDynamite.apk has no usable artifacts
+         1790834185.513  2826  7801 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/00000008/dl-MlkitOcrCommon.optional_262031100400.apk has no usable artifacts
+         1790834185.514  2826  4540 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/0000002b/dl-VisionOcr.optional_263234100000.apk has no usable artifacts
+         1790834185.514  2826  4540 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/00000002/DynamiteLoader.apk has no usable artifacts
+         1790834185.514  2826  4540 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/00000009/dl-VisionOcr.optional_262031100000.apk has no usable artifacts
+         1790834185.515  2826  4540 I artd    : GetBestInfo: /data/user/0/com.google.android.gms/app_dg_cache/AEB5BC832EBF3852F39BA4BE495DD40566104436/the.apk has no usable artifacts
+         1790834185.515  2826  4540 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/00000005/GoogleCertificates.apk has no usable artifacts
+         1790834185.519  2826  4540 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/0000002a/dl-IdentityCredentialsPlatform.optional_263234100400.apk has no usable artifacts
+         1790834185.520  2826  7801 I artd    : GetBestInfo: /data/user/0/com.google.android.gms/app_dg_cache/708EA63B31A09E17FD6C7CDE0FE83B45EA4CEC30/the.apk has no usable artifacts
+         1790834185.520  2826  7801 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/00000011/dl-MlkitBarcodeUi.optional_262833100400.apk has no usable artifacts
+         1790834185.521  2826  7801 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/0000000f/dl-TfliteDynamiteDynamite.integ_260580502100400.apk has no usable artifacts
+         1790834185.521  2826 10061 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/00000012/dl-MlkitOcrCommon.optional_262833100400.apk has no usable artifacts
+         1790834185.521  2826  7801 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/0000000d/dl-IdentityCredentialsPlatform.optional_262833100400.apk has no usable artifacts
+         1790834185.524  2826  7801 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/00000027/dl-MlkitBarcodeUi.optional_263234100400.apk has no usable artifacts
+         1790834185.525  2826  4540 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/00000028/dl-MlkitOcrCommon.optional_263234100400.apk has no usable artifacts
+         1790834185.525  2826  7801 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/00000029/dl-PlayCloudSearch.optional_263234100000.apk has no usable artifacts
+         1790834185.526  2826  4540 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/00000026/dl-Appsearch.optional_263234100400.apk has no usable artifacts
+         1790834185.526  2826  7801 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/0000000e/dl-VisionOcr.optional_262833100000.apk has no usable artifacts
+         1790834185.526  2826  7801 I artd    : GetBestInfo: /data/user/0/com.google.android.gms/app_dg_cache/D04EBEF623804AD1CEE87B2156DE98F2840B89F7/the.apk has no usable artifacts
+         1790834185.526  2826 10061 I artd    : GetBestInfo: vdex next to the dex file (/data/user/0/com.google.android.gms/app_dg_cache/D6F3613D77E3345A974691A7A7DC69F4388889A4/oat/arm64/the.vdex) is kOatUpToDate with filter 'verify' executable 'false'
+         1790834185.526  2826  7801 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/00000010/dl-Appsearch.optional_262833100400.apk has no usable artifacts
+         1790834185.526  2826  7801 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/0000000c/dl-PlayCloudSearch.optional_262833100000.apk has no usable artifacts
+         1790834185.527  2826  7801 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/0000000b/dl-PlayCloudSearch.optional_262031100000.apk has no usable artifacts
+         1790834185.527  2826 10061 I artd    : GetBestInfo: /data/user_de/0/com.google.android.gms/app_chimera/m/00000007/MeasurementDynamite.apk has no usable artifacts
+         1790834185.527  2826 10061 I artd    : GetBestInfo: /data/user/0/com.google.android.gms/app_dg_cache/D319D8C3DC71B672EA84C1992BA95AC108DDC9CF/the.apk has no usable artifacts
+         1790834185.540   493   493 W skia    : AGTM parsing failed flags.readFromStream(s) at 159
+         1790834185.540   493   493 W skia    : AGTM parsing failed flags.readFromStream(s) at 159
+         1790834185.540   493   493 W skia    : AGTM parsing failed flags.readFromStream(s) at 159
+         1790834185.540   493   493 W skia    : AGTM parsing failed flags.readFromStream(s) at 159
+         1790834185.540   493   493 W skia    : AGTM parsing failed flags.readFromStream(s) at 159
+         1790834185.540   493   493 W skia    : AGTM parsing failed flags.readFromStream(s) at 159
+         1790834185.540   493   493 W skia    : AGTM parsing failed flags.readFromStream(s) at 159
+         1790834185.558   522   522 I adbd    : adbd service requested 'shell,v2,TERM=xterm-256color,raw:am start -n dev.probe/.MainActivity --es probe crash'
+         1790834185.587   493   493 W skia    : AGTM parsing failed flags.readFromStream(s) at 159
+         1790834185.591   662  2259 W ActivityTaskManager: callingPackage for (uid=2000, pid=8974) has no WPC
+         1790834185.592   662  2259 V GrammaticalInflectionUtils: AttributionSource: android.content.AttributionSource@86339113 does not have READ_SYSTEM_GRAMMATICAL_GENDER permission.
+         1790834185.593   662  2259 I wm_new_intent: [0,121536743,1059,dev.probe/.MainActivity,NULL,NULL,NULL,268435456]
+         1790834185.599   662  2259 I wm_task_moved: [1059,1059,0,1,4]
+         1790834185.601   662  2259 V WindowManager: Aborting Transition: 194
+         1790834185.602   662  2259 I wm_set_keyguard_occluded: [0,0,0,setOccluded]
+         1790834185.602   949  1338 D KeyguardService: setOccluded(false)
+         1790834185.602   949  1338 D WindowManagerOcclusion: #onKeyguardServiceSetOccluded(false)
+         1790834185.603   949   997 D WindowManagerShell: onActivityRestartAttempt: topActivity=ComponentInfo{dev.probe/dev.probe.MainActivity}, wasVisible=true, displayId=0, pipDisplayLayoutState#displayId=0
+         1790834185.603   662  2259 V ActivityTaskManager: TaskLaunchParamsModifier: phase=2 task=Task{a8d7494 #1059 type=standard A=10264:dev.probe} activity=ActivityRecord{50014770 u0 dev.probe/.MainActivity t-1} display-from-task=0 display-id=0 task-display-area-windowing-mode=1 suggested-display-area=DefaultTaskDisplayArea@63989981 inherit-from-task=fullscreen non-freeform-task-display-area display-area=DefaultTaskDisplayArea@63989981 skip-bounds-fullscreen
+         1790834185.603   662  2259 I ActivityTaskManager: START u0 {flg=0x10000000 xflg=0x5 cmp=dev.probe/.MainActivity (has extras)} with LAUNCH_SINGLE_TOP from uid 2000 (com.android.shell) (BAL_ALLOW_ALLOWLISTED_UID) result code=3
+         1790834185.608  8931  8931 I wm_on_top_resumed_lost_called: [121536743,dev.probe.MainActivity,pausing]
+         1790834185.608  8931  8931 I wm_on_paused_called: [121536743,dev.probe.MainActivity,performPause,0]
+         1790834185.609  8931  8931 E TransactionExecutor: Failed to execute the transaction: tId:1688231161 ClientTransaction{
+         1790834185.609  8931  8931 E TransactionExecutor: tId:1688231161   transactionItems=[
+         1790834185.609  8931  8931 E TransactionExecutor: tId:1688231161     NewIntentItem{mActivityToken=android.os.BinderProxy@77eefaa,intents=[Intent { flg=0x10000000 xflg=0x5 cmp=dev.probe/.MainActivity (has extras) }],resume=true}
+         1790834185.609  8931  8931 E TransactionExecutor: tId:1688231161     Target activity: dev.probe.MainActivity
+         1790834185.609  8931  8931 E TransactionExecutor: tId:1688231161   ]
+         1790834185.609  8931  8931 E TransactionExecutor: tId:1688231161 }
+         1790834185.609  8931  8931 D AndroidRuntime: Shutting down VM
+--------- beginning of crash
+         1790834185.610  8931  8931 E AndroidRuntime: FATAL EXCEPTION: main
+         1790834185.610  8931  8931 E AndroidRuntime: Process: dev.probe, PID: 8931
+         1790834185.610  8931  8931 E AndroidRuntime: java.lang.IllegalStateException: probe crash requested
+         1790834185.610  8931  8931 E AndroidRuntime: 	at dev.probe.MainActivity.dispatch(MainActivity.kt:67)
+         1790834185.610  8931  8931 E AndroidRuntime: 	at dev.probe.MainActivity.onNewIntent(MainActivity.kt:56)
+         1790834185.610  8931  8931 E AndroidRuntime: 	at android.app.Activity.onNewIntent(Activity.java:2538)
+         1790834185.610  8931  8931 E AndroidRuntime: 	at android.app.Activity.performNewIntent(Activity.java:9354)
+         1790834185.610  8931  8931 E AndroidRuntime: 	at android.app.Instrumentation.callActivityOnNewIntent(Instrumentation.java:1661)
+         1790834185.610  8931  8931 E AndroidRuntime: 	at android.app.Instrumentation.internalCallActivityOnNewIntent(Instrumentation.java:1680)
+         1790834185.610  8931  8931 E AndroidRuntime: 	at android.app.Instrumentation.callActivityOnNewIntent(Instrumentation.java:1668)
+         1790834185.610  8931  8931 E AndroidRuntime: 	at android.app.ActivityThread.deliverNewIntents(ActivityThread.java:4843)
+         1790834185.610  8931  8931 E AndroidRuntime: 	at android.app.ActivityThread.handleNewIntent(ActivityThread.java:4853)
+         1790834185.610  8931  8931 E AndroidRuntime: 	at android.app.servertransaction.NewIntentItem.execute(NewIntentItem.java:69)
+         1790834185.610  8931  8931 E AndroidRuntime: 	at android.app.servertransaction.ActivityTransactionItem.execute(ActivityTransactionItem.java:64)
+         1790834185.610  8931  8931 E AndroidRuntime: 	at android.app.servertransaction.TransactionExecutor.executeNonLifecycleItem(TransactionExecutor.java:133)
+         1790834185.610  8931  8931 E AndroidRuntime: 	at android.app.servertransaction.TransactionExecutor.executeTransactionItems(TransactionExecutor.java:103)
+         1790834185.610  8931  8931 E AndroidRuntime: 	at android.app.servertransaction.TransactionExecutor.execute(TransactionExecutor.java:80)
+         1790834185.610  8931  8931 E AndroidRuntime: 	at android.app.ActivityThread$H.handleMessage(ActivityThread.java:3046)
+         1790834185.610  8931  8931 E AndroidRuntime: 	at android.os.Handler.dispatchMessageImpl(Handler.java:142)
+         1790834185.610  8931  8931 E AndroidRuntime: 	at android.os.Handler.dispatchMessage(Handler.java:126)
+         1790834185.610  8931  8931 E AndroidRuntime: 	at android.os.Looper.loopOnce(Looper.java:295)
+         1790834185.610  8931  8931 E AndroidRuntime: 	at android.os.Looper.loop(Looper.java:398)
+         1790834185.610  8931  8931 E AndroidRuntime: 	at android.app.ActivityThread.main(ActivityThread.java:9569)
+         1790834185.610  8931  8931 E AndroidRuntime: 	at java.lang.reflect.Method.invoke(Native Method)
+         1790834185.610  8931  8931 E AndroidRuntime: 	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:575)
+         1790834185.610  8931  8931 E AndroidRuntime: 	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:918)
+         1790834185.611   662  2259 I am_crash: [8931,0,dev.probe,549994054,java.lang.IllegalStateException,probe crash requested,MainActivity.kt,67,0]
+         1790834185.612   662  8977 I DropBoxManagerService: add tag=data_app_crash isTagEnabled=true flags=0x2
+         1790834185.612   662  2259 W ActivityTaskManager:   Force finishing activity dev.probe/.MainActivity
+         1790834185.613   662  2259 W TransitionChain: Combining AR.finish-force-crash into #195(CLOSE|R|0x10) from finishTopCrash
+         1790834185.613   662  2259 I wm_finish_activity: [0,121536743,1059,dev.probe/.MainActivity,force-crash]
+         1790834185.613   949   997 V WindowManagerShell: Transition requested (#195): android.os.BinderProxy@560a59b TransitionRequestInfo { type = CLOSE, triggerTask = TaskInfo{userId=0 taskId=1059 effectiveUid=10264 seqId=0 displayId=0 isRunning=true baseIntent=Intent { flg=0x10000000 cmp=dev.probe/.MainActivity } baseActivity=ComponentInfo{dev.probe/dev.probe.MainActivity} topActivity=ComponentInfo{dev.probe/dev.probe.MainActivity} origActivity=null realActivity=ComponentInfo{dev.probe/dev.probe.MainActivity} realActivityIsAppLockEnabled=false numActivities=1 lastActiveTime=33298378 supportsMultiWindow=true supportsMultiWindowWithoutConstraints=true resizeMode=1 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{android.os.BinderProxy@54fb3b5} topActivityType=1 pictureInPictureParams=null shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=Rect(0, 0 - 0, 0) topActivityInfo=ActivityInfo{d7ded38 dev.probe.MainActivity} launchCookies=[] positionInParent=Point(0, 0) parentTaskId=-1 isFocused=true isInteractive=true isVisible=true isVisibleRequested=true isTopActivityNoDisplay=false isSleeping=false locusId=null displayAreaFeatureId=1 isTopActivityTransparent=false isActivityStackTransparent=false lastNonFullscreenBounds=null leafTaskBoundsFromOptions= false capturedLink=null capturedLinkTimestamp=0 requestedVisibleTypes=503 topActivityRequestOpenInBrowserEducationTimestamp=0 appCompatTaskInfo=AppCompatTaskInfo { topActivityInSizeCompat=false isLeafTask= true eligibleForLetterboxEducation= false isLetterboxEducationEnabled= true isLetterboxDoubleTapEnabled= false eligibleForUserAspectRatioButton= false topActivityBoundsLetterboxed= false isFromLetterboxDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=-1 topActivityLetterboxHeight=-1 topActivityAppBounds=Rect(0, 0 - 1344, 2992) isUserFullscreenOverrideEnabled=false isSystemFullscreenOverrideEnabled=false hasMinAspectRatioOverride=false topActivityLetterboxBounds=null topNonResizableActivityAspectRatio=-1.0} topActivityMainWindowFrame=null isAppBubble=false}, pipChange = null, remoteTransitionInfo = null, displayChanges = null, requestedLocation = null, userChange = null, windowingLayerChange = null, fullscreenRequestChange = null, flags = 16, debugId = 195 }
+         1790834185.613   949   997 V ShellDesktopMode: DesktopTasksController: skipping handleRequest reason=triggerTask's display doesn't support desktop mode
+         1790834185.614   662  2259 I wm_pause_activity: [0,121536743,dev.probe/.MainActivity,userLeaving=false,finish]
+         1790834185.615   662  2259 V WindowManager: Defer transition id=195 for TaskFragmentTransaction=android.os.Binder@cba252c
+         1790834185.615   662  2259 I sysui_multi_action: [757,316,758,4,759,-1]
+         1790834185.617  8931  8931 I Process : Sending signal. PID: 8931 SIG: 9
+         1790834185.620   662   742 V WindowManager: Continue transition id=195 for TaskFragmentTransaction=android.os.Binder@cba252c
+         1790834185.623   493   493 W skia    : AGTM parsing failed flags.readFromStream(s) at 159
+         1790834185.623   493   493 W skia    : AGTM parsing failed flags.readFromStream(s) at 159
+         1790834185.623   493   493 W skia    : AGTM parsing failed flags.readFromStream(s) at 159
+         1790834185.623   493   493 W skia    : AGTM parsing failed flags.readFromStream(s) at 159
+         1790834185.623   493   493 W skia    : AGTM parsing failed flags.readFromStream(s) at 159
+         1790834185.623   493   493 W skia    : AGTM parsing failed flags.readFromStream(s) at 159
+         1790834185.623   493   493 W skia    : AGTM parsing failed flags.readFromStream(s) at 159
+         1790834185.641   522   522 I adbd    : adbd service requested 'shell,v2,TERM=xterm-256color,raw:logcat -d -b all -v epoch -T 1790834185.441'
+         1790834185.657   662   783 I input_focus: [Focus leaving 2cd8a1 dev.probe/dev.probe.MainActivity,reason=NO_WINDOW]
+         1790834185.667   662  1837 I ActivityManager: Process dev.probe (pid 8931) has died: fg  TOP 
+         1790834185.670   662  1846 I WindowManager: WIN DEATH: Window{2cd8a1 u0 dev.probe/dev.probe.MainActivity}
+         1790834185.670   662  1834 I ImeTracker: dev.probe:a3fce2e6: onRequestHide at ORIGIN_SERVER reason HIDE_REMOVE_CLIENT fromUser false userId 0 displayId 0
+         1790834185.670   662  1834 I ImeTracker: dev.probe:a3fce2e6: onCancelled at PHASE_SERVER_SHOULD_HIDE
+         1790834185.671  1643  1643 I SubtypeOperator: SubtypeOperator$1.onUnbindInput():43 
+         1790834185.671  1643  1643 W InputChannel-JNI: Channel already disposed.
+         1790834185.671   662  1837 I am_proc_died: [0,8931,dev.probe,0,2]
+         1790834185.672   662  1837 I am_uid_stopped: 10264
+         1790834185.672  5036  5036 I HidDeviceService: unregisterAppUid(): uid=10264
+         1790834185.672  5036  5036 W HidDeviceService: unregisterAppUid(): caller UID doesn't match user UID
+         1790834185.672   662  1837 W TransitionChain: Combining appDied into #195(CLOSE|R|0x10) from finishTopCrash
+         1790834185.673   662  1837 I wm_set_resumed_activity: [0,com.google.android.apps.nexuslauncher/.NexusLauncherActivity,resumeTopActivity - onActivityStateChanged]
+         1790834185.673   662  1837 I wm_resume_activity: [0,215682118,2,com.google.android.apps.nexuslauncher/.NexusLauncherActivity]
+         1790834185.674   662   693 I libprocessgroup: Removed cgroup /sys/fs/cgroup/apps/uid_10264/pid_8931
+         1790834185.674   522   522 I adbd    : Remote process closed the socket (on MSG_PEEK)
+         1790834185.674   662   685 W ActivityManager: setHasOverlayUi called on unknown pid: 8931
+         1790834185.674   949   997 V RecentTasksController: Notify recent tasks changed: 1
+         1790834185.675   436   436 I Zygote  : Process 8931 exited due to signal 9 (Killed)
+         1790834185.680  1079  1079 D RecentTasksList: invalidateLoadedTasks - previous requestLoadId: -1
+         1790834185.680  1079  1079 D ViewRootImpl: Skipping stats log for color mode
+         1790834185.680  1079  1079 I wm_on_restart_called: [215682118,com.google.android.apps.nexuslauncher.NexusLauncherActivity,performRestart,0]
+         1790834185.680  1079  1079 D BaseActivity: Launcher flags updated: [state_started] +[state_started]
+         1790834185.680  1079  1079 I wm_on_start_called: [215682118,com.google.android.apps.nexuslauncher.NexusLauncherActivity,handleStartActivity,0]
+         1790834185.680  1079  1079 D BaseActivity: Launcher flags updated: [state_started|state_resumed|state_user_active] +[state_resumed|state_user_active]
+         1790834185.680   522   522 I adbd    : adbd service requested 'shell,v2,TERM=xterm-256color,raw:logcat -d -v epoch -b crash -T 1790834185.441'
+         1790834185.680  1079  1079 I wm_on_resume_called: [215682118,com.google.android.apps.nexuslauncher.NexusLauncherActivity,RESUME_ACTIVITY,0]
+         1790834185.680  1079  1079 D BaseActivity: Launcher flags updated: [state_started|state_resumed|state_deferred_resumed|state_user_active] +[state_deferred_resumed]
+         1790834185.680  1079  1079 D StatsLog: LAUNCHER_ONRESUME
+         1790834185.681  1079  1194 D QuickstepModelDelegate: notifyAppTargetEvent action=1 launchLocation=workspace/0/[-1,-1]/[1,1]
+         1790834185.683  1680  1985 I AiAiEcho: Predicting[0]:  [CONTEXT sampling_count=5 ]
+         1790834185.683  1680  1985 I AiAiEcho: EchoTargets: 
+         1790834185.683  1680  1985 I AiAiEcho: Filtered by AiAi flag check: 
+         1790834185.683  1680  1985 I AiAiEcho: [CONTEXT ratelimit_period="10 SECONDS" ]
+         1790834185.683  1680  1985 I AiAiEcho: #remoteViewsTwiddler: feature disabled.
+         1790834185.683  1680  1985 I AiAiEcho: #postPredictionTargets: Sending updates to UISurface home with targets# 0 (types=[])
+         1790834185.687   493   493 W skia    : AGTM parsing failed flags.readFromStream(s) at 159
+         1790834185.687   493   493 W skia    : AGTM parsing failed flags.readFromStream(s) at 159
+         1790834185.687   493   493 W skia    : AGTM parsing failed flags.readFromStream(s) at 159
+         1790834185.687   493   493 W skia    : AGTM parsing failed flags.readFromStream(s) at 159
+         1790834185.687   493   493 W skia    : AGTM parsing failed flags.readFromStream(s) at 159
+         1790834185.687   493   493 W skia    : AGTM parsing failed flags.readFromStream(s) at 159
+         1790834185.687   493   493 W skia    : AGTM parsing failed flags.readFromStream(s) at 159
+         1790834185.687  1079  1079 D SmartspaceInteractor: notifySmartspaceEvent: SmartspaceTargetEvent{mSmartspaceTarget=null, mSmartspaceActionId='null', mEventType=6}
+         1790834185.688  1079  1079 I Surface : Creating surface for consumer unnamed-1079-35 with slotExpansion=1 for 64 slots
+         1790834185.688  1680  1985 I AiAiEcho: AmbientDataPredictorImpl No tracked ambient data found for ID: null; for event type: 6, skipping event processing.
+         1790834185.688  1079  1079 I Surface : Creating surface for consumer VRI[NexusLauncherActivity]#31(BLAST Consumer)31 with slotExpansion=1 for 64 slots
+         1790834185.688  1079  1079 I viewroot_draw_event: [VRI[NexusLauncherActivity]f9281b8,applyTransactionOnDraw applyImmediately]
+         1790834185.689  1079  1079 I viewroot_draw_event: [VRI[NexusLauncherActivity]f9281b8,Start draw after previous draw not visible]
+         1790834185.689  1079  1079 D BaseDepthController: setSurface:
+         1790834185.689  1079  1079 D BaseDepthController: 	mWaitingOnSurfaceValidity: true
+         1790834185.689  1079  1079 D BaseDepthController: 	mBaseSurface: Surface(name=VRI-com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity#2414)/@0x271bbc6
+         1790834185.689  1079  1079 V BaseDepthController: Applying blur: 0 to Surface(name=VRI-com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity#2414)/@0x271bbc6 applyImmediately: false
+         1790834185.689  1079  1079 D BaseDepthController: shouldBlurWorkspace: false targetState: Normal currentStableState: Normal mCurrentBlur: 0 mLauncher.getDepthBlurTargets(): [com.android.launcher3.Workspace{a5363f4 V.ED..... ......ID 0,0-1344,2992 #7f0a0493 app:id/workspace}, com.android.launcher3.Hotseat{bf84d1a V.ED..... ......ID 0,2425-1344,2992 #7f0a01f8 app:id/hotseat}]
+         1790834185.689   662   741 D WindowManager: setClientSurface Surface(name=VRI-com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity#2414)/@0xb9f3856 for 517391 com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity
+         1790834185.705   662   686 I input_focus: [Focus request 517391 com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity,reason=UpdateInputWindows]
+         1790834185.708   949  1545 D WallpaperService: onVisibilityChanged(true): com.android.systemui.wallpapers.ImageWallpaper$CanvasEngine@ca2f150
+         1790834185.725   662   686 I wm_wallpaper_surface: [0,1,Window{517391 u0 com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity}]
+         1790834185.726   522   522 I adbd    : adbd service requested 'shell,v2,TERM=xterm-256color,raw:logcat -d -v epoch -b all -T 1790834185.441'
+         1790834185.745   493   493 W skia    : AGTM parsing failed flags.readFromStream(s) at 159
+         1790834185.745   493   493 W skia    : AGTM parsing failed flags.readFromStream(s) at 159
+         1790834185.745   493   493 W skia    : AGTM parsing failed flags.readFromStream(s) at 159
+         1790834185.745   493   493 W skia    : AGTM parsing failed flags.readFromStream(s) at 159
+         1790834185.745   493   493 W skia    : AGTM parsing failed flags.readFromStream(s) at 159
+         1790834185.745   493   493 W skia    : AGTM parsing failed flags.readFromStream(s) at 159
+         1790834185.745   493   493 W skia    : AGTM parsing failed flags.readFromStream(s) at 159

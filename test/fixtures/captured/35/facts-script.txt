@@ -1,0 +1,10 @@
+@sdk
+35
+@boot_completed
+1
+@boot_id
+66bde4b2-e3c4-4549-8b6a-3c960cf0bd21
+@size
+Physical size: 2560x1600
+@density
+Physical density: 320

@@ -1,0 +1,153 @@
+--------- beginning of system
+         1790834326.701   552   574 W ActivityTaskManager: Activity top resumed state loss timeout for ActivityRecord{d789678 u0 dev.probe/.MainActivity t12 f} isExiting}
+         1790834326.719   552  1103 W ActivityTaskManager: callingPackage for (uid=2000, pid=9441) has no WPC
+         1790834326.719   552  1103 W OptProp : Cannot read opt property android.window.PROPERTY_COMPAT_ALLOW_USER_ASPECT_RATIO_OVERRIDE
+         1790834326.719   552  1103 W OptProp : Cannot read opt property android.window.PROPERTY_COMPAT_ALLOW_USER_ASPECT_RATIO_FULLSCREEN_OVERRIDE
+         1790834326.719   552  1103 W OptProp : Cannot read opt property android.window.PROPERTY_COMPAT_ALLOW_ORIENTATION_OVERRIDE
+         1790834326.719   552  1103 W OptProp : Cannot read opt property android.window.PROPERTY_COMPAT_ALLOW_RESIZEABLE_ACTIVITY_OVERRIDES
+         1790834326.719   552  1103 W OptProp : Cannot read opt property android.window.PROPERTY_COMPAT_ALLOW_MIN_ASPECT_RATIO_OVERRIDE
+         1790834326.740   552  1103 I ActivityTaskManager: Add Task{300d151 #12 type=standard A=10213:dev.probe} to hidden list because adding Task{517bc70 #13 type=standard A=10213:dev.probe}
+         1790834326.741   552  1103 I ActivityTaskManager: START u0 {flg=0x10000000 cmp=dev.probe/.MainActivity} with LAUNCH_SINGLE_TOP from uid 2000 (BAL_ALLOW_PERMISSION) result code=0
+         1790834326.748   552   582 I ActivityManager: Start proc 9448:dev.probe/u0a213 for next-top-activity {dev.probe/dev.probe.MainActivity}
+         1790834326.755   968  1065 V WindowManagerShell: Transition requested (#40): android.os.BinderProxy@ce858e TransitionRequestInfo { type = OPEN, triggerTask = TaskInfo{userId=0 taskId=13 displayId=0 isRunning=true baseIntent=Intent { flg=0x10000000 cmp=dev.probe/.MainActivity } baseActivity=ComponentInfo{dev.probe/dev.probe.MainActivity} topActivity=ComponentInfo{dev.probe/dev.probe.MainActivity} origActivity=null realActivity=ComponentInfo{dev.probe/dev.probe.MainActivity} numActivities=1 lastActiveTime=1247298 supportsMultiWindow=true resizeMode=1 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{android.window.IWindowContainerToken$Stub$Proxy@e7451af} topActivityType=1 pictureInPictureParams=null shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=null topActivityInfo=ActivityInfo{4c449bc dev.probe.MainActivity} launchCookies=[] positionInParent=Point(0, 0) parentTaskId=-1 isFocused=false isVisible=false isVisibleRequested=false isSleeping=false locusId=null displayAreaFeatureId=1 isTopActivityTransparent=false appCompatTaskInfo=AppCompatTaskInfo { topActivityInSizeCompat=false topActivityEligibleForLetterboxEducation= falseisLetterboxEducationEnabled= true isLetterboxDoubleTapEnabled= false topActivityEligibleForUserAspectRatioButton= true topActivityBoundsLetterboxed= false isFromLetterboxDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=2560 topActivityLetterboxHeight=1600 isUserFullscreenOverrideEnabled=false isSystemFullscreenOverrideEnabled=false cameraCompatTaskInfo=CameraCompatTaskInfo { cameraCompatControlState=hidden freeformCameraCompatMode=inactive}}}, pipTask = null, remoteTransition = null, displayChange = null, flags = 0, debugId = 40 }
+         1790834326.767   552   865 D CoreBackPreview: Window{87784b8 u0 Splash Screen dev.probe}: Setting back callback OnBackInvokedCallbackInfo{mCallback=android.window.IOnBackInvokedCallback$Stub$Proxy@d7c3464, mPriority=0, mIsAnimationCallback=false}
+         1790834326.769   552   865 W OptProp : Cannot read opt property android.window.PROPERTY_COMPAT_ALLOW_DISPLAY_ORIENTATION_OVERRIDE
+         1790834326.926   552  1394 W OptProp : Cannot read opt property android.window.PROPERTY_COMPAT_ENABLE_FAKE_FOCUS
+         1790834326.947   552   865 W WindowManager: Failed looking up window session=Session{2b0fd57 968:u0a10186} callers=com.android.server.wm.WindowManagerService.removeClientToken:2058 com.android.server.wm.Session.remove:274 android.view.IWindowSession$Stub.onTransact:685 
+         1790834326.948   968  1065 V WindowManagerShell: Transition animation finished (aborted=false), notifying core (#39) android.os.BinderProxy@89f4b63@0
+         1790834326.952   552   571 V WindowManager: Finish Transition (#39): created at 10-01 07:58:46.201 collect-started=0.025ms request-sent=0.066ms started=1.895ms ready=10.151ms sent=121.265ms finished=747.172ms
+         1790834326.956   968  1065 V WindowManagerShell: Track 0 became idle
+         1790834326.956   968  1065 D WindowManagerShell: setLauncherKeepClearAreaHeight: visible=false, height=202
+         1790834326.957   552   865 W UserManagerService: Requested status bar icon for non-badged user 0
+         1790834326.957   968  1065 V ShellDesktopMode: Task Vanished: #12 closed=true
+         1790834326.958   552   865 W UserManagerService: Requested status bar icon for non-badged user 0
+         1790834327.183   968  3416 V WindowManagerShell: onTransitionReady(transaction=2370821948586)
+         1790834327.183   552   571 V WindowManager: Sent Transition (#40) createdAt=10-01 07:58:46.720 via request=TransitionRequestInfo { type = OPEN, triggerTask = TaskInfo{userId=0 taskId=13 displayId=0 isRunning=true baseIntent=Intent { flg=0x10000000 cmp=dev.probe/.MainActivity } baseActivity=ComponentInfo{dev.probe/dev.probe.MainActivity} topActivity=ComponentInfo{dev.probe/dev.probe.MainActivity} origActivity=null realActivity=ComponentInfo{dev.probe/dev.probe.MainActivity} numActivities=1 lastActiveTime=1247298 supportsMultiWindow=true resizeMode=1 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{RemoteToken{541f19d Task{517bc70 #13 type=standard A=10213:dev.probe}}} topActivityType=1 pictureInPictureParams=null shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=null topActivityInfo=ActivityInfo{11fe612 dev.probe.MainActivity} launchCookies=[] positionInParent=Point(0, 0) parentTaskId=-1 isFocused=false isVisible=false isVisibleRequested=false isSleeping=false locusId=null displayAreaFeatureId=1 isTopActivityTransparent=false appCompatTaskInfo=AppCompatTaskInfo { topActivityInSizeCompat=false topActivityEligibleForLetterboxEducation= falseisLetterboxEducationEnabled= true isLetterboxDoubleTapEnabled= false topActivityEligibleForUserAspectRatioButton= true topActivityBoundsLetterboxed= false isFromLetterboxDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=2560 topActivityLetterboxHeight=1600 isUserFullscreenOverrideEnabled=false isSystemFullscreenOverrideEnabled=false cameraCompatTaskInfo=CameraCompatTaskInfo { cameraCompatControlState=hidden freeformCameraCompatMode=inactive}}}, pipTask = null, remoteTransition = null, displayChange = null, flags = 0, debugId = 40 }
+         1790834327.183   552   571 V WindowManager:     startWCT=WindowContainerTransaction { changes = {} hops = [] errorCallbackToken=null taskFragmentOrganizer=null }
+         1790834327.183   968  1065 V WindowManagerShell: onTransitionReady (#40) android.os.BinderProxy@ce858e: {id=40 t=OPEN f=0x0 trk=1 r=[0@Point(0, 0)] c=[{WCT{android.window.IWindowContainerToken$Stub$Proxy@18621c0} m=OPEN f=NONE leash=Surface(name=Task=13)/@0x33c6ffd sb=Rect(0, 0 - 2560, 1600) eb=Rect(0, 0 - 2560, 1600) d=0 taskParent=-1},{WCT{android.window.IWindowContainerToken$Stub$Proxy@ee50ef9} m=TO_BACK f=SHOW_WALLPAPER leash=Surface(name=Task=1)/@0x588f4f2 sb=Rect(0, 0 - 2560, 1600) eb=Rect(0, 0 - 2560, 1600) d=0 taskParent=-1}]}
+         1790834327.183   552   571 V WindowManager:     info={id=40 t=OPEN f=0x0 trk=1 r=[0@Point(0, 0)] c=[
+         1790834327.183   552   571 V WindowManager:         {WCT{RemoteToken{541f19d Task{517bc70 #13 type=standard A=10213:dev.probe}}} m=OPEN f=NONE leash=Surface(name=Task=13)/@0xc5bb061 sb=Rect(0, 0 - 2560, 1600) eb=Rect(0, 0 - 2560, 1600) d=0 taskParent=-1},
+         1790834327.183   552   571 V WindowManager:         {WCT{RemoteToken{565f9c6 Task{9c689e9 #1 type=home}}} m=TO_BACK f=SHOW_WALLPAPER leash=Surface(name=Task=1)/@0x27937ae sb=Rect(0, 0 - 2560, 1600) eb=Rect(0, 0 - 2560, 1600) d=0 taskParent=-1}
+         1790834327.183   552   571 V WindowManager:     ]}
+         1790834327.193   552  1941 W UserManagerService: Requested status bar icon for non-badged user 0
+         1790834327.194   968  1065 V WindowManagerShell: Playing animation for (#40) android.os.BinderProxy@ce858e@1
+         1790834327.194   968  1065 V WindowManagerShell:  try handler com.android.wm.shell.transition.DefaultMixedHandler@cdb834c
+         1790834327.194   968  1065 V WindowManagerShell:  try handler com.android.wm.shell.keyguard.KeyguardTransitionHandler@4403f95
+         1790834327.194   968  1065 V WindowManagerShell:  try handler com.android.wm.shell.pip.PipTransition@4f8a8aa
+         1790834327.194   968  1065 V WindowManagerShell:  try handler com.android.wm.shell.activityembedding.ActivityEmbeddingController@ebfcc9b
+         1790834327.194   968  1065 V WindowManagerShell:  try handler com.android.wm.shell.splitscreen.StageCoordinator@2e38838
+         1790834327.194   968  1065 V WindowManagerShell:  try handler com.android.wm.shell.desktopmode.DesktopTasksController@1b24011
+         1790834327.194   968  1065 V WindowManagerShell:  try handler com.android.wm.shell.recents.RecentsTransitionHandler@690a576
+         1790834327.194   968  1065 V ShellRecents: RecentsTransitionHandler.startAnimation: no controller found
+         1790834327.194   968  1065 V WindowManagerShell:  try handler com.android.wm.shell.transition.RemoteTransitionHandler@d449777
+         1790834327.194   968  1065 V WindowManagerShell: Transition doesn't have explicit remote, search filters for match for {id=40 t=OPEN f=0x0 trk=1 r=[0@Point(0, 0)] c=[{WCT{android.window.IWindowContainerToken$Stub$Proxy@18621c0} m=OPEN f=NONE leash=Surface(name=Task=13)/@0x33c6ffd sb=Rect(0, 0 - 2560, 1600) eb=Rect(0, 0 - 2560, 1600) d=0 taskParent=-1},{WCT{android.window.IWindowContainerToken$Stub$Proxy@ee50ef9} m=TO_BACK f=SHOW_WALLPAPER leash=Surface(name=Task=1)/@0x588f4f2 sb=Rect(0, 0 - 2560, 1600) eb=Rect(0, 0 - 2560, 1600) d=0 taskParent=-1}]}
+         1790834327.194   968  1065 V WindowManagerShell:  Checking filter Pair{{types=[] flags=0x0] notFlags=0x0 checks=[{atype=undefined independent=true modes=[OPEN,TO_FRONT] flags=IN_TASK_WITH_EMBEDDED_ACTIVITY mustBeTask=false order=ANY topActivity=ComponentInfo{com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity} launchCookie=null},{atype=undefined independent=true modes=[CLOSE,TO_BACK] flags=IN_TASK_WITH_EMBEDDED_ACTIVITY mustBeTask=false order=ANY topActivity=null launchCookie=null}]} RemoteTransition { remoteTransition = android.window.IRemoteTransition$Stub$Proxy@a37ca5f, appThread = android.app.IApplicationThread$Stub$Proxy@de44cac, debugName = OverlaySwipeBack }}
+         1790834327.194   968  1065 V WindowManagerShell:  Checking filter Pair{{types=[] flags=0x0] notFlags=0x0 checks=[{atype=dream independent=true modes=[OPEN,TO_FRONT] flags=NONE mustBeTask=false order=ANY topActivity=null launchCookie=null},{atype=home independent=true modes=[CLOSE,TO_BACK] flags=NONE mustBeTask=false order=ANY topActivity=null launchCookie=null}]} RemoteTransition { remoteTransition = android.window.IRemoteTransition$Stub$Proxy@2993d75, appThread = android.app.IApplicationThread$Stub$Proxy@977010a, debugName = LauncherToDream }}
+         1790834327.194   968  1065 V WindowManagerShell:  Checking filter Pair{{types=[] flags=0x0] notFlags=0x100 checks=[{atype=home independent=true modes=[OPEN,TO_FRONT] flags=NONE mustBeTask=false order=TOP topActivity=ComponentInfo{com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity} launchCookie=null},{atype=standard independent=true modes=[CLOSE,TO_BACK] flags=NONE mustBeTask=false order=ANY topActivity=null launchCookie=null}]} RemoteTransition { remoteTransition = android.window.IRemoteTransition$Stub$Proxy@1b8ad7b, appThread = android.app.IApplicationThread$Stub$Proxy@89f8798, debugName = QuickstepLaunchHome }}
+         1790834327.194   968  1065 V WindowManagerShell:  Delegate animation for (#40) to null
+         1790834327.194   968  1065 V WindowManagerShell:  try handler com.android.wm.shell.transition.DefaultTransitionHandler@6c2ed4e
+         1790834327.194   968  1065 V WindowManagerShell: start default transition animation, info = {id=40 t=OPEN f=0x0 trk=1 r=[0@Point(0, 0)] c=[{WCT{android.window.IWindowContainerToken$Stub$Proxy@18621c0} m=OPEN f=NONE leash=Surface(name=Task=13)/@0x33c6ffd sb=Rect(0, 0 - 2560, 1600) eb=Rect(0, 0 - 2560, 1600) d=0 taskParent=-1},{WCT{android.window.IWindowContainerToken$Stub$Proxy@ee50ef9} m=TO_BACK f=SHOW_WALLPAPER leash=Surface(name=Task=1)/@0x588f4f2 sb=Rect(0, 0 - 2560, 1600) eb=Rect(0, 0 - 2560, 1600) d=0 taskParent=-1}]}
+         1790834327.195   968  1065 V WindowManagerShell: loadAnimation: anim=android.view.animation.AnimationSet@f2ae897 animAttr=0x13 type=OPEN isEntrance=false
+         1790834327.195   968  1065 V WindowManagerShell: loadAnimation: anim=android.view.animation.AnimationSet@72b7733 animAttr=0x12 type=OPEN isEntrance=true
+         1790834327.195   968  1065 V WindowManagerShell:  animated by com.android.wm.shell.transition.DefaultTransitionHandler@6c2ed4e
+         1790834327.334   552  1941 D CoreBackPreview: Window{4705e4f u0 dev.probe/dev.probe.MainActivity}: Setting back callback OnBackInvokedCallbackInfo{mCallback=android.window.IOnBackInvokedCallback$Stub$Proxy@39eb755, mPriority=0, mIsAnimationCallback=false}
+         1790834327.521   968  1065 V WindowManagerShell: Transition animation finished (aborted=false), notifying core (#40) android.os.BinderProxy@ce858e@1
+         1790834327.523   552   571 V WindowManager: Finish Transition (#40): created at 10-01 07:58:46.720 collect-started=0.024ms request-sent=20.813ms started=36.137ms ready=441.994ms sent=463.091ms finished=802.156ms
+         1790834327.527   968  1065 V WindowManagerShell: Track 1 became idle
+         1790834327.527   968  1065 V WindowManagerShell: All active transition animations finished
+         1790834327.615   552  1941 W UserManagerService: Requested status bar icon for non-badged user 0
+         1790834327.617   552  1941 W UserManagerService: Requested status bar icon for non-badged user 0
+         1790834327.618   552  1941 W UserManagerService: Requested status bar icon for non-badged user 0
+         1790834328.082   552  1103 W ActivityTaskManager: callingPackage for (uid=2000, pid=9476) has no WPC
+         1790834328.082   552  1103 W OptProp : Cannot read opt property android.window.PROPERTY_COMPAT_ALLOW_USER_ASPECT_RATIO_OVERRIDE
+         1790834328.082   552  1103 W OptProp : Cannot read opt property android.window.PROPERTY_COMPAT_ALLOW_USER_ASPECT_RATIO_FULLSCREEN_OVERRIDE
+         1790834328.082   552  1103 W OptProp : Cannot read opt property android.window.PROPERTY_COMPAT_ALLOW_ORIENTATION_OVERRIDE
+         1790834328.083   552  1103 W OptProp : Cannot read opt property android.window.PROPERTY_COMPAT_ALLOW_RESIZEABLE_ACTIVITY_OVERRIDES
+         1790834328.083   552  1103 W OptProp : Cannot read opt property android.window.PROPERTY_COMPAT_ALLOW_MIN_ASPECT_RATIO_OVERRIDE
+         1790834328.084   552  1103 I ActivityTaskManager: START u0 {flg=0x10000000 cmp=dev.probe/.MainActivity (has extras)} with LAUNCH_SINGLE_TOP from uid 2000 (BAL_ALLOW_PERMISSION) result code=3
+         1790834328.093   552   865 W PackageConfigPersister: App-specific configuration not found for packageName: dev.probe and userId: 0
+         1790834328.095   968  1065 D WindowManagerShell: onActivityRestartAttempt: ComponentInfo{dev.probe/dev.probe.MainActivity}
+         1790834328.169   552  2891 E TaskPersister: File error accessing recents directory (directory doesn't exist?).
+         1790834328.484   552   865 D CoreBackPreview: Window{87784b8 u0 Splash Screen dev.probe EXITING}: Setting back callback null
+         1790834333.117   552   659 D ActivityManager: freezing 8013 com.google.android.documentsui
+         1790834333.144   552   659 D ActivityManager: freezing 6012 com.android.vending:background
+         1790834333.145   552   659 D ActivityManager: freezing 6875 com.android.vending
+         1790834333.227   552   659 D ActivityManager: freezing 979 com.google.android.permissioncontroller
+         1790834333.242   552   659 D ActivityManager: freezing 6402 com.android.chrome
+         1790834333.246   552   671 I WindowManager: ANR in Window{4705e4f u0 dev.probe/dev.probe.MainActivity}. Reason:Input dispatching timed out (4705e4f dev.probe/dev.probe.MainActivity (server) is not responding. Waited 5000ms for KeyEvent).
+         1790834333.249   552  9488 D ActivityManager: created ANR temporary file:/data/anr/temp_anr_6459404326533962954.txt
+         1790834333.249   552  9488 I ActivityManager: Collecting stacks for pid 9448 into temporary file temp_anr_6459404326533962954.txt
+         1790834333.252   552  9489 I ActivityManager: dumpStackTraces pids={979=true, 1131=true, 1376=true, 1514=true, 1516=true, 1560=true, 1663=true, 4121=true, 5961=true, 6012=true, 6402=true, 6569=true, 6820=true, 6875=true, 7005=true, 7018=true, 7160=true, 7408=true, 8013=true, 8127=true, 8185=true, 8292=true, 8339=true}
+         1790834333.252   552  9489 I ActivityManager: Dumping to /data/anr/anr_2026-10-01-07-58-53-252
+         1790834333.289   552  9489 I ActivityManager: Collecting stacks for pid 552
+         1790834333.330   552   584 E OomConnection: failed waiting for OOM events: java.lang.RuntimeException: listener failed waiting for OOM event
+         1790834333.418   552  9489 I ActivityManager: Collecting stacks for pid 1578
+         1790834333.434   180  9281 I keystore2: system/security/keystore2/watchdog/src/lib.rs:319 - Watchdog thread idle -> terminating. Have a great day.
+         1790834333.440   552  9489 I ActivityManager: Collecting stacks for pid 1142
+         1790834333.457   552  9489 I ActivityManager: Collecting stacks for pid 1144
+         1790834333.481   552  9489 I ActivityManager: Collecting stacks for pid 1095
+         1790834333.482   552  9490 I ActivityManager: Skipping next CPU consuming process, not a java proc: 552
+         1790834333.482   552  9490 I ActivityManager: Skipping next CPU consuming process, not a java proc: 1142
+         1790834333.482   552  9490 I ActivityManager: Skipping next CPU consuming process, not a java proc: 1144
+         1790834333.482   552  9490 I ActivityManager: Skipping next CPU consuming process, not a java proc: 1578
+         1790834333.482   552  9490 I ActivityManager: Skipping next CPU consuming process, not a java proc: 58
+         1790834333.482   552  9490 I ActivityManager: Skipping next CPU consuming process, not a java proc: 79
+         1790834333.482   552  9490 I ActivityManager: Skipping next CPU consuming process, not a java proc: 9448
+         1790834333.503   552  9489 I ActivityManager: Collecting stacks for pid 968
+         1790834333.556   552  9489 I ActivityManager: dumpStackTraces nativepids=null
+         1790834333.557   552  9489 I ActivityManager: dumpStackTraces extraPids=[]
+         1790834333.557   552  9489 I ActivityManager: Done dumping
+         1790834333.557   552  9489 E ActivityManager: ANR in dev.probe (dev.probe/.MainActivity)
+         1790834333.557   552  9489 E ActivityManager: PID: 9448
+         1790834333.557   552  9489 E ActivityManager: Reason: Input dispatching timed out (4705e4f dev.probe/dev.probe.MainActivity (server) is not responding. Waited 5000ms for KeyEvent).
+         1790834333.557   552  9489 E ActivityManager: Parent: dev.probe/.MainActivity
+         1790834333.557   552  9489 E ActivityManager: ErrorId: c7e5be36-9537-477b-96d3-a52706ef776d
+         1790834333.557   552  9489 E ActivityManager: Frozen: false
+         1790834333.557   552  9489 E ActivityManager: Load: 1.68 / 1.04 / 1.14
+         1790834333.557   552  9489 E ActivityManager: ----- Output from /proc/pressure/memory -----
+         1790834333.557   552  9489 E ActivityManager: some avg10=0.32 avg60=0.19 avg300=0.12 total=4254679
+         1790834333.557   552  9489 E ActivityManager: full avg10=0.08 avg60=0.02 avg300=0.00 total=963849
+         1790834333.557   552  9489 E ActivityManager: ----- End output from /proc/pressure/memory -----
+         1790834333.557   552  9489 E ActivityManager: ----- Output from /proc/pressure/cpu -----
+         1790834333.557   552  9489 E ActivityManager: some avg10=24.24 avg60=10.21 avg300=5.24 total=95918823
+         1790834333.557   552  9489 E ActivityManager: full avg10=0.00 avg60=0.00 avg300=0.00 total=0
+         1790834333.557   552  9489 E ActivityManager: ----- End output from /proc/pressure/cpu -----
+         1790834333.557   552  9489 E ActivityManager: ----- Output from /proc/pressure/io -----
+         1790834333.557   552  9489 E ActivityManager: some avg10=1.63 avg60=0.66 avg300=0.50 total=21592085
+         1790834333.557   552  9489 E ActivityManager: full avg10=0.54 avg60=0.16 avg300=0.13 total=6135549
+         1790834333.557   552  9489 E ActivityManager: ----- End output from /proc/pressure/io -----
+         1790834333.557   552  9489 E ActivityManager: 
+         1790834333.557   552  9489 E ActivityManager: CPU usage from 28317ms to -1ms ago (2026-10-01 07:58:24.932 to 2026-10-01 07:58:53.250):
+         1790834333.557   552  9489 E ActivityManager:   34% 381/android.hardware.graphics.composer3-service.ranchu: 0.3% user + 34% kernel / faults: 3 minor
+         1790834333.557   552  9489 E ActivityManager:   18% 1376/com.google.android.apps.nexuslauncher: 1.5% user + 16% kernel / faults: 5235 minor 1 major
+         1790834333.557   552  9489 E ActivityManager:   13% 968/com.android.systemui: 1.3% user + 11% kernel / faults: 5362 minor
+         1790834333.557   552  9489 E ActivityManager:   10% 422/surfaceflinger: 0.8% user + 9.7% kernel / faults: 462 minor
+         1790834333.557   552  9489 E ActivityManager:   6.7% 552/system_server: 3.3% user + 3.4% kernel / faults: 59770 minor 20 major
+         1790834333.557   552  9489 E ActivityManager:   3.1% 372/android.hardware.graphics.allocator@3.0-service.ranchu: 0% user + 3.1% kernel
+         1790834333.557   552  9489 E ActivityManager:   0.5% 1710/adbd: 0% user + 0.5% kernel / faults: 66850 minor
+         1790834333.557   552  9489 E ActivityManager:   0.5% 7160/com.google.android.googlequicksearchbox:search: 0.3% user + 0.2% kernel / faults: 1502 minor 2759 major
+         1790834333.557   552  9489 E ActivityManager:   0.5% 432/kworker/0:2: 0% user + 0.5% kernel
+         1790834333.557   552  9489 E ActivityManager:   0.4% 16/rcu_preempt: 0% user + 0.4% kernel
+         1790834333.557   552  9489 E ActivityManager: 36% TOTAL: 6.1% user + 24% kernel + 0.4% iowait + 5.6% irq + 0.1% softirq
+         1790834333.557   552  9489 E ActivityManager: CPU usage from 6ms to 229ms later (2026-10-01 07:58:53.255 to 2026-10-01 07:58:53.478):
+         1790834333.557   552  9489 E ActivityManager:   41% 552/system_server: 27% user + 13% kernel / faults: 3722 minor 47 major
+         1790834333.557   552  9489 E ActivityManager:     27% 558/Signal Catcher: 23% user + 4.6% kernel
+         1790834333.557   552  9489 E ActivityManager:     4.6% 9490/AnrAuxiliaryTas: 0% user + 4.6% kernel
+         1790834333.557   552  9489 E ActivityManager:   9.3% 1142/com.android.se: 4.6% user + 4.6% kernel / faults: 2984 minor
+         1790834333.557   552  9489 E ActivityManager:   9.3% 1144/com.android.phone: 4.6% user + 4.6% kernel / faults: 3216 minor
+         1790834333.557   552  9489 E ActivityManager:     4.6% 1146/Signal Catcher: 4.6% user + 0% kernel
+         1790834333.557   552  9489 E ActivityManager:   9.4% 1578/com.android.emulator.multidisplay: 4.7% user + 4.7% kernel / faults: 3058 minor 1 major
+         1790834333.557   552  9489 E ActivityManager:     4.7% 1579/Signal Catcher: 4.7% user + 0% kernel
+         1790834333.557   552  9489 E ActivityManager:   4.5% 58/erofs_worker/0: 0% user + 4.5% kernel
+         1790834333.557   552  9489 E ActivityManager:   4.5% 79/kworker/0:1H-kblockd: 0% user + 4.5% kernel
+         1790834333.557   552  9489 E ActivityManager:   4.8% 9448/dev.probe: 4.8% user + 0% kernel / faults: 552 minor 2 major
+         1790834333.557   552  9489 E ActivityManager:     4.8% 9449/Signal Catcher: 4.8% user + 0% kernel
+         1790834333.557   552  9489 E ActivityManager: 30% TOTAL: 14% user + 7.8% kernel + 2.2% iowait + 5.6% irq
+         1790834333.558   552  9489 D ActivityManager: Completed ANR of dev.probe in 312ms, latency 0ms
+         1790834333.559   552  9491 I DropBoxManagerService: add tag=data_app_anr isTagEnabled=true flags=0x6
+         1790834333.568   552   572 D CoreBackPreview: Window{7bf8e8e u0 Application Not Responding: dev.probe}: Setting back callback OnBackInvokedCallbackInfo{mCallback=android.window.WindowOnBackInvokedDispatcher$OnBackInvokedCallbackWrapper@61b3ca7, mPriority=0, mIsAnimationCallback=false}
+         1790834337.897   552   659 D ActivityManager: freezing 7160 com.google.android.googlequicksearchbox:search
+         1790834358.139   552   572 D CoreBackPreview: Window{7bf8e8e u0 Application Not Responding: dev.probe}: Setting back callback null
+         1790834358.161   552  1103 W InputManager: Input event injection from pid 9485 failed.
+         1790834358.279   552   572 W Looper  : Slow dispatch took 140ms android.ui h=com.android.server.am.ActivityManagerService$UiHandler c=com.android.server.am.ErrorDialogController$$ExternalSyntheticLambda4@e07c7de m=0
+         1790834358.354   552  1942 W PackageConfigPersister: App-specific configuration not found for packageName: dev.probe and userId: 0

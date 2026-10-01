@@ -1,0 +1,134 @@
+--------- beginning of main
+         1790834324.488   552   679 I ImeTracker: dev.probe:b0c040b6: onRequestHide at ORIGIN_SERVER reason HIDE_UNSPECIFIED_WINDOW fromUser false
+         1790834324.488   552   679 I ImeTracker: dev.probe:b0c040b6: onCancelled at PHASE_SERVER_SHOULD_HIDE
+         1790834324.495  7018  7018 I GoogleInputMethodService: GoogleInputMethodService.onFinishInput():3157 
+         1790834324.496  7408  7430 I FontLog : (REDACTED) Received query %s, URI %s
+         1790834324.496  7018  7018 I GoogleInputMethodService: GoogleInputMethodService.updateDeviceLockedStatus():2248 repeatCheckTimes = 0, locked = false
+         1790834324.496  7018  7018 I GoogleInputMethodService: GoogleInputMethodService.onStartInput():1986 onStartInput(EditorInfo{EditorInfo{packageName=dev.probe, inputType=0, inputTypeString=NULL, enableLearning=false, autoCorrection=false, autoComplete=false, imeOptions=0, privateImeOptions=null, actionName=UNSPECIFIED, actionLabel=null, initialSelStart=-1, initialSelEnd=-1, initialCapsMode=0, label=null, fieldId=0, fieldName=null, extras=null, hintText=null, hintLocales=[]}}, false)
+         1790834324.496  7408  7430 I FontLog : (REDACTED) Query [%s] resolved to %s
+         1790834324.496  7018  7018 I GoogleInputMethodService: GoogleInputMethodService.updateDeviceLockedStatus():2248 repeatCheckTimes = 1, locked = false
+         1790834324.497  7018  7018 I AndroidIME: InputBundleManager.loadActiveInputBundleId():450 loadActiveInputBundleId: und-Latn-x-password, password
+--------- beginning of system
+         1790834324.497   552  1040 W PackageConfigPersister: App-specific configuration not found for packageName: dev.probe and userId: 0
+         1790834324.497  7408  7430 I FontLog : (REDACTED) Fetch %s end status %s
+         1790834324.499  7408  7430 I FontLog : (REDACTED) Pulling font file for id = %d, cache size = %d
+         1790834324.504  1376  1376 D BaseDepthController: setSurface:
+         1790834324.504  1376  1376 D BaseDepthController: 	mWaitingOnSurfaceValidity: false
+         1790834324.504  1376  1376 D BaseDepthController: 	mSurface: null
+         1790834324.504  1376  1376 D BaseDepthController: mSurface is null and mCurrentBlur is: 0
+         1790834324.504  1376  1376 D StateManager: goToState - fromState: Normal, toState: Normal, partial trace:
+         1790834324.504  1376  1376 D StateManager: 	at com.android.launcher3.statemanager.StateManager.moveToRestState(go/retraceme 6880898d8cae178d08f8c6e9adec44ea003840882148de9d3f2387cda32e2ac9:4)
+         1790834324.504  1376  1376 D StateManager: 	at com.android.launcher3.statemanager.StateManager.moveToRestState(go/retraceme 6880898d8cae178d08f8c6e9adec44ea003840882148de9d3f2387cda32e2ac9:1)
+         1790834324.504  1376  1376 D StateManager: 	at com.android.launcher3.statemanager.StatefulActivity.onStop(go/retraceme 6880898d8cae178d08f8c6e9adec44ea003840882148de9d3f2387cda32e2ac9:34)
+         1790834324.504  1376  1376 D StatsLog: LAUNCHER_ONSTOP
+--------- beginning of events
+         1790834324.506  1376  1376 I wm_on_stop_called: [164195755,com.google.android.apps.nexuslauncher.NexusLauncherActivity,STOP_ACTIVITY_ITEM,2]
+         1790834324.506  1376  1376 D StatsLog: LAUNCHER_GOOGLE_SEARCH_RESTORE_LIST_SIZE_AFTER_ACTIVITY_RESTART
+         1790834324.513  7408  7430 I FontLog : (REDACTED) Pulling font file for id = %d, cache size = %d
+         1790834324.522  1376  1990 D OneSearchSuggestProvider: Shut down the binder channel
+         1790834324.523  1376  9339 I IPCThreadState: oneway function results for code 2 on binder at 0xb400007b6ece1660 will be dropped but finished with status UNKNOWN_TRANSACTION
+         1790834324.544   552  1040 W ActivityTaskManager: callingPackage for (uid=2000, pid=9360) has no WPC
+         1790834324.546   552  1040 W OptProp : Cannot read opt property android.window.PROPERTY_COMPAT_ALLOW_USER_ASPECT_RATIO_OVERRIDE
+         1790834324.546   552  1040 W OptProp : Cannot read opt property android.window.PROPERTY_COMPAT_ALLOW_USER_ASPECT_RATIO_FULLSCREEN_OVERRIDE
+         1790834324.546   552  1040 W OptProp : Cannot read opt property android.window.PROPERTY_COMPAT_ALLOW_ORIENTATION_OVERRIDE
+         1790834324.546   552  1040 V GrammaticalInflectionUtils: AttributionSource: android.content.AttributionSource@3540afc does not have READ_SYSTEM_GRAMMATICAL_GENDER permission.
+         1790834324.546   552  1040 W OptProp : Cannot read opt property android.window.PROPERTY_COMPAT_ALLOW_RESIZEABLE_ACTIVITY_OVERRIDES
+         1790834324.546   552  1040 W OptProp : Cannot read opt property android.window.PROPERTY_COMPAT_ALLOW_MIN_ASPECT_RATIO_OVERRIDE
+         1790834324.547   552  1040 I wm_new_intent: [0,121149445,11,dev.probe/.MainActivity,NULL,NULL,NULL,268435456]
+         1790834324.550   552  1040 I wm_task_moved: [11,11,0,1,2]
+         1790834324.550   552  1040 I wm_set_keyguard_occluded: [0,0,0,setOccluded]
+         1790834324.552   968   978 D KeyguardService: setOccluded(false)
+         1790834324.552   968   978 D KeyguardViewMediator: setOccluded(false)
+         1790834324.552   968   968 D KeyguardViewMediator: handleSetOccluded(false)
+         1790834324.552   968   968 I sysui_keyguard: [0,0]
+         1790834324.552   968   968 D KeyguardViewMediator: KeyguardViewMediator queue processing message: SET_OCCLUDED
+         1790834324.554   968  1068 I jank_cuj_events_cancel_request: [23,1790834324552299000,1245109892260,1245109892385]
+         1790834324.569   552  1040 I ActivityTaskManager: START u0 {flg=0x10000000 cmp=dev.probe/.MainActivity (has extras)} with LAUNCH_SINGLE_TOP from uid 2000 (BAL_ALLOW_PERMISSION) result code=3
+         1790834324.571   968  1065 D WindowManagerShell: onActivityRestartAttempt: ComponentInfo{dev.probe/dev.probe.MainActivity}
+         1790834324.589   552   563 I system_server: NativeAlloc concurrent mark compact GC freed 7341KB AllocSpace bytes, 27(700KB) LOS objects, 46% free, 27MB/51MB, paused 1.508ms,1.201ms total 217.826ms
+         1790834324.592  9328  9328 I wm_on_top_resumed_lost_called: [121149445,dev.probe.MainActivity,pausing]
+         1790834324.592   552   565 W System  : A resource failed to call HardwareBuffer.close. 
+         1790834324.592   552   565 W System  : A resource failed to call HardwareBuffer.close. 
+         1790834324.592   552   565 W System  : A resource failed to call release. 
+         1790834324.592   552   565 W system_server: ApkAssets: Deleting an ApkAssets object '<empty> and /product/app/LatinIMEGooglePrebuilt/LatinIMEGooglePrebuilt.apk' with 1 weak references
+         1790834324.592  9328  9328 I wm_on_paused_called: [121149445,dev.probe.MainActivity,performPause,0]
+         1790834324.593   552   565 W system_server: ApkAssets: Deleting an ApkAssets object '<empty> and /product/app/GoogleTTS/GoogleTTS.apk' with 1 weak references
+         1790834324.593   552   565 W System  : A resource failed to call release. 
+         1790834324.593   552   565 W System  : A resource failed to call release. 
+         1790834324.593  9328  9328 E TransactionExecutor: Failed to execute the transaction: tId:-2139109696 ClientTransaction{
+         1790834324.593  9328  9328 E TransactionExecutor: tId:-2139109696   transactionItems=[
+         1790834324.593  9328  9328 E TransactionExecutor: tId:-2139109696     NewIntentItem{mActivityToken=android.os.BinderProxy@12a9631,intents=[Intent { flg=0x10000000 cmp=dev.probe/.MainActivity (has extras) }],resume=true}
+         1790834324.593  9328  9328 E TransactionExecutor: tId:-2139109696     Target activity: dev.probe.MainActivity
+         1790834324.593  9328  9328 E TransactionExecutor: tId:-2139109696   ]
+         1790834324.593  9328  9328 E TransactionExecutor: tId:-2139109696 }
+         1790834324.593  9328  9328 D AndroidRuntime: Shutting down VM
+--------- beginning of crash
+         1790834324.594  9328  9328 E AndroidRuntime: FATAL EXCEPTION: main
+         1790834324.594  9328  9328 E AndroidRuntime: Process: dev.probe, PID: 9328
+         1790834324.594  9328  9328 E AndroidRuntime: java.lang.IllegalStateException: probe crash requested
+         1790834324.594  9328  9328 E AndroidRuntime: 	at dev.probe.MainActivity.dispatch(MainActivity.kt:67)
+         1790834324.594  9328  9328 E AndroidRuntime: 	at dev.probe.MainActivity.onNewIntent(MainActivity.kt:56)
+         1790834324.594  9328  9328 E AndroidRuntime: 	at android.app.Activity.onNewIntent(Activity.java:2418)
+         1790834324.594  9328  9328 E AndroidRuntime: 	at android.app.Activity.performNewIntent(Activity.java:9029)
+         1790834324.594  9328  9328 E AndroidRuntime: 	at android.app.Instrumentation.callActivityOnNewIntent(Instrumentation.java:1646)
+         1790834324.594  9328  9328 E AndroidRuntime: 	at android.app.Instrumentation.internalCallActivityOnNewIntent(Instrumentation.java:1667)
+         1790834324.594  9328  9328 E AndroidRuntime: 	at android.app.Instrumentation.callActivityOnNewIntent(Instrumentation.java:1655)
+         1790834324.594  9328  9328 E AndroidRuntime: 	at android.app.ActivityThread.deliverNewIntents(ActivityThread.java:4280)
+         1790834324.594  9328  9328 E AndroidRuntime: 	at android.app.ActivityThread.handleNewIntent(ActivityThread.java:4290)
+         1790834324.594  9328  9328 E AndroidRuntime: 	at android.app.servertransaction.NewIntentItem.execute(NewIntentItem.java:58)
+         1790834324.594  9328  9328 E AndroidRuntime: 	at android.app.servertransaction.ActivityTransactionItem.execute(ActivityTransactionItem.java:60)
+         1790834324.594  9328  9328 E AndroidRuntime: 	at android.app.servertransaction.TransactionExecutor.executeNonLifecycleItem(TransactionExecutor.java:174)
+         1790834324.594  9328  9328 E AndroidRuntime: 	at android.app.servertransaction.TransactionExecutor.executeTransactionItems(TransactionExecutor.java:109)
+         1790834324.594  9328  9328 E AndroidRuntime: 	at android.app.servertransaction.TransactionExecutor.execute(TransactionExecutor.java:81)
+         1790834324.594  9328  9328 E AndroidRuntime: 	at android.app.ActivityThread$H.handleMessage(ActivityThread.java:2636)
+         1790834324.594  9328  9328 E AndroidRuntime: 	at android.os.Handler.dispatchMessage(Handler.java:107)
+         1790834324.594  9328  9328 E AndroidRuntime: 	at android.os.Looper.loopOnce(Looper.java:232)
+         1790834324.594  9328  9328 E AndroidRuntime: 	at android.os.Looper.loop(Looper.java:317)
+         1790834324.594  9328  9328 E AndroidRuntime: 	at android.app.ActivityThread.main(ActivityThread.java:8705)
+         1790834324.594  9328  9328 E AndroidRuntime: 	at java.lang.reflect.Method.invoke(Native Method)
+         1790834324.594  9328  9328 E AndroidRuntime: 	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:580)
+         1790834324.594  9328  9328 E AndroidRuntime: 	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:886)
+         1790834324.606   552  1040 I am_crash: [9328,0,dev.probe,549994054,java.lang.IllegalStateException,probe crash requested,MainActivity.kt,67,0]
+         1790834324.608   552  1040 W ActivityTaskManager:   Force finishing activity dev.probe/.MainActivity
+         1790834324.608   552  1040 I wm_finish_activity: [0,121149445,11,dev.probe/.MainActivity,force-crash]
+         1790834324.608   552  1040 I wm_task_moved: [1,1,0,1,2]
+         1790834324.608   552  1040 I wm_task_moved: [7,1,0,1,2147483647]
+         1790834324.608   552  1040 I wm_task_to_front: [0,7,0]
+         1790834324.608   552  1040 I wm_focused_root_task: [0,0,1,11,finish-top adjustFocusToNextFocusableTask]
+         1790834324.609   968  1065 V WindowManagerShell: Transition requested (#37): android.os.BinderProxy@a2bc3a3 TransitionRequestInfo { type = CLOSE, triggerTask = null, pipTask = null, remoteTransition = null, displayChange = null, flags = 16, debugId = 37 }
+         1790834324.609   552  1040 I wm_pause_activity: [0,121149445,dev.probe/.MainActivity,userLeaving=false,finish]
+         1790834324.611   552  9364 I DropBoxManagerService: add tag=data_app_crash isTagEnabled=true flags=0x2
+         1790834324.615   552  1040 I sysui_multi_action: [757,316,758,4,759,-1]
+         1790834324.615  9328  9328 I Process : Sending signal. PID: 9328 SIG: 9
+         1790834324.622  1376  1376 I TopTaskTracker: onTaskMovedToFront: (moved taskInfo to front) taskId=7, baseIntent=Intent { act=android.intent.action.MAIN cat=[android.intent.category.HOME] flg=0x10000100 cmp=com.google.android.apps.nexuslauncher/.NexusLauncherActivity }
+         1790834324.626   422   422 I BpBinder: onLastStrongRef automatically unlinking death recipients: 
+         1790834324.644   552  1103 I ActivityManager: Process dev.probe (pid 9328) has died: fg  TOP 
+         1790834324.644   552  1103 I am_proc_died: [0,9328,dev.probe,0,2]
+         1790834324.644   552  1055 I WindowManager: WIN DEATH: Window{de2dad4 u0 dev.probe/dev.probe.MainActivity}
+         1790834324.645   552   583 I libprocessgroup: Removed cgroup /sys/fs/cgroup/uid_10213/pid_9328
+         1790834324.646   552  1394 I ImeTracker: dev.probe:b9335e9b: onRequestHide at ORIGIN_SERVER reason HIDE_REMOVE_CLIENT fromUser false
+         1790834324.646   552  1394 I ImeTracker: dev.probe:b9335e9b: onCancelled at PHASE_SERVER_SHOULD_HIDE
+         1790834324.647   552  1055 W InputManager-JNI: Input channel object 'de2dad4 dev.probe/dev.probe.MainActivity (client)' was disposed without first being removed with the input manager!
+         1790834324.648  1710  1710 I adbd    : Remote process closed the socket (on MSG_PEEK)
+         1790834324.649   552  1103 I am_uid_stopped: 10213
+         1790834324.650   552  1103 I wm_set_resumed_activity: [0,com.google.android.apps.nexuslauncher/.NexusLauncherActivity,resumeTopActivity - onActivityStateChanged]
+         1790834324.651   552  1103 I wm_resume_activity: [0,164195755,7,com.google.android.apps.nexuslauncher/.NexusLauncherActivity]
+         1790834324.651   552   572 D DisplayManagerService: Drop pending events for gone uid 10213
+         1790834324.656  1376  1376 I wm_on_restart_called: [164195755,com.google.android.apps.nexuslauncher.NexusLauncherActivity,performRestart,0]
+         1790834324.657   360   360 I Zygote  : Process 9328 exited due to signal 9 (Killed)
+         1790834324.657  1376  1376 I wm_on_start_called: [164195755,com.google.android.apps.nexuslauncher.NexusLauncherActivity,handleStartActivity,1]
+         1790834324.657  1376  1376 I wm_on_resume_called: [164195755,com.google.android.apps.nexuslauncher.NexusLauncherActivity,RESUME_ACTIVITY,0]
+         1790834324.658  1376  1376 D StatsLog: LAUNCHER_ONRESUME
+         1790834324.660  1376  1401 D QuickstepModelDelegate: notifyAppTargetEvent action=1 launchLocation=workspace/0/[-1,-1]/[1,1]
+         1790834324.662  1516  1769 I AiAiEcho: Predicting[0]:  [CONTEXT sampling_count=5 ]
+         1790834324.662  1516  1769 I AiAiEcho: EchoTargets: 
+         1790834324.662  1516  1769 I AiAiEcho: Filtered by AiAi flag check: 
+         1790834324.662  1516  1769 I AiAiEcho: [CONTEXT ratelimit_period="10 SECONDS" ]
+         1790834324.662  1516  1769 I AiAiEcho: Ranked targets strategy: SORT, count: 0, ranking metadata:  [CONTEXT ratelimit_period="10 SECONDS" ]
+         1790834324.662  1516  1769 I AiAiEcho: #remoteViewsTwiddler: feature disabled.
+         1790834324.663  1516  1769 I AiAiEcho: #postPredictionTargets: Sending updates to UISurface home with targets# 0 (types=[])
+         1790834324.664   968  1065 D WindowManagerShell: setLauncherKeepClearAreaHeight: visible=true, height=202
+         1790834324.664   552   574 W ActivityManager: setHasOverlayUi called on unknown pid: 9328
+         1790834324.664  1376  1990 D OneSearchSuggestProvider: Created the binder channel successfully for end point service =com.google.android.apps.search.googleapp.search.suggest.plugins.onesearch.server.OneSearchSuggestService , mChannel=i1{delegate=f{logId=29, target=directaddress:///AndroidComponentAddress%5BIntent%20%7B%20act=grpc.io.action.BIND%20cmp=com.google.android.googlequicksearchbox/com.google.android.apps.search.googleapp.search.suggest.plugins.onesearch.server.OneSearchSuggestService%20%7D%5D}} , mOneSearchConnection=m2.Z@571a396
+         1790834324.665   552   574 V WindowManager: Unknown focus tokens, dropping reportFocusChanged
+         1790834324.672  1376  1376 D NexusLauncherModelDelegate: notifySmartspaceEvent: SmartspaceTargetEvent{mSmartspaceTarget=null, mSmartspaceActionId='null', mEventType=6}

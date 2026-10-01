@@ -1,0 +1,29 @@
+{
+  "capturedAt": "2026-10-01T05:55:10.911Z",
+  "captures": [
+    {
+      "file": "adb-version.txt",
+      "argv": [
+        "adb",
+        "version"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 13,
+      "note": "adb client version",
+      "redacted": true
+    },
+    {
+      "file": "devices-l.txt",
+      "argv": [
+        "adb",
+        "devices",
+        "-l"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 13,
+      "note": "every attached device, long form"
+    }
+  ]
+}

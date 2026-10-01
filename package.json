@@ -37,6 +37,7 @@
     "format:check": "prettier --check .",
     "test": "npm run build && vitest run",
     "test:device": "npm run build && vitest run --config vitest.device.config.ts",
+    "capture": "tsx test/device/capture.ts",
     "check": "npm run build && npm run typecheck && npm run lint && npm run format:check && vitest run",
     "prepack": "npm run build"
   },

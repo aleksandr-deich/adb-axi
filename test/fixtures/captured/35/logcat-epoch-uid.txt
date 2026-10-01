@@ -1,0 +1,86 @@
+--------- beginning of main
+         1790834222.617  8235  8235 I dev.probe: Late-enabling -Xcheck:jni
+         1790834222.724  8235  8235 I dev.probe: Using CollectorTypeCMC GC.
+         1790834222.735  8235  8235 D nativeloader: Load libframework-connectivity-tiramisu-jni.so using APEX ns com_android_tethering for caller /apex/com.android.tethering/javalib/framework-connectivity-t.jar: ok
+         1790834222.843  8235  8235 D ApplicationLoaders: Returning zygote-cached class loader: /system_ext/framework/androidx.window.extensions.jar
+         1790834222.843  8235  8235 D ApplicationLoaders: Returning zygote-cached class loader: /system_ext/framework/androidx.window.sidecar.jar
+         1790834222.843  8235  8235 W ziparchive: Unable to open '/data/app/~~q9nqscILYtTzepYCjV11ag==/dev.probe-NGcv8M4B7ISXa68TH0Ck0A==/base.dm': No such file or directory
+         1790834222.843  8235  8235 W ziparchive: Unable to open '/data/app/~~q9nqscILYtTzepYCjV11ag==/dev.probe-NGcv8M4B7ISXa68TH0Ck0A==/base.dm': No such file or directory
+         1790834222.858  8235  8235 D nativeloader: Configuring clns-7 for other apk /data/app/~~q9nqscILYtTzepYCjV11ag==/dev.probe-NGcv8M4B7ISXa68TH0Ck0A==/base.apk. target_sdk_version=36, uses_libraries=, library_path=/data/app/~~q9nqscILYtTzepYCjV11ag==/dev.probe-NGcv8M4B7ISXa68TH0Ck0A==/lib/arm64:/data/app/~~q9nqscILYtTzepYCjV11ag==/dev.probe-NGcv8M4B7ISXa68TH0Ck0A==/base.apk!/lib/arm64-v8a, permitted_path=/data:/mnt/expand:/data/user/0/dev.probe
+         1790834222.870  8235  8235 V GraphicsEnvironment: Currently set values for:
+         1790834222.870  8235  8235 V GraphicsEnvironment:   angle_gl_driver_selection_pkgs=[]
+         1790834222.870  8235  8235 V GraphicsEnvironment:   angle_gl_driver_selection_values=[]
+         1790834222.870  8235  8235 V GraphicsEnvironment: Global.Settings values are invalid: number of packages: 0, number of values: 0
+         1790834222.870  8235  8235 V GraphicsEnvironment: Neither updatable production driver nor prerelease driver is supported.
+         1790834223.054  8235  8235 W HWUI    : Unknown dataspace 0
+         1790834223.235  8235  8235 W dev.probe: Accessing hidden method Landroid/os/SystemProperties;->addChangeCallback(Ljava/lang/Runnable;)V (unsupported, reflection, allowed)
+         1790834223.370  8235  8254 I EGL_emulation: Opening libGLESv1_CM_emulation.so
+         1790834223.370  8235  8254 I EGL_emulation: Opening libGLESv2_emulation.so
+         1790834223.389  8235  8254 W HWUI    : Failed to choose config with EGL_SWAP_BEHAVIOR_PRESERVED, retrying without...
+         1790834223.394  8235  8254 W HWUI    : Failed to initialize 101010-2 format, error = EGL_SUCCESS
+         1790834223.474  8235  8254 I Gralloc4: mapper 4.x is not supported
+         1790834223.550  8235  8235 I ProbeState: event=start saved=0 volatile=0 rows=0 restored=false pid=8235
+         1790834223.753  8235  8244 I dev.probe: Compiler allocated 5250KB to compile void android.view.ViewRootImpl.performTraversals()
+         1790834223.855  8235  8235 I ProbeState: event=inc saved=1 volatile=1 rows=0 restored=false pid=8235
+         1790834223.948  8235  8235 I ProbeState: event=inc saved=2 volatile=2 rows=0 restored=false pid=8235
+         1790834224.017  8235  8235 I ProbeState: event=inc saved=3 volatile=3 rows=0 restored=false pid=8235
+         1790834224.172  8235  8235 I ProbeState: event=write saved=3 volatile=3 rows=1 restored=false pid=8235
+         1790834225.589  8235  8235 D VRI[MainActivity]: visibilityChanged oldVisibility=true newVisibility=false
+         1790834227.455  8235  8235 D VRI[MainActivity]: visibilityChanged oldVisibility=true newVisibility=false
+         1790834228.327  8235  8527 D ProfileInstaller: Installing profile for dev.probe
+         1790834316.893  9123  9123 I dev.probe: Late-enabling -Xcheck:jni
+         1790834316.913  9123  9123 I dev.probe: Using CollectorTypeCMC GC.
+         1790834316.918  9123  9123 D nativeloader: Load libframework-connectivity-tiramisu-jni.so using APEX ns com_android_tethering for caller /apex/com.android.tethering/javalib/framework-connectivity-t.jar: ok
+         1790834316.962  9123  9123 D ApplicationLoaders: Returning zygote-cached class loader: /system_ext/framework/androidx.window.extensions.jar
+         1790834316.962  9123  9123 D ApplicationLoaders: Returning zygote-cached class loader: /system_ext/framework/androidx.window.sidecar.jar
+         1790834316.962  9123  9123 W ziparchive: Unable to open '/data/app/~~q9nqscILYtTzepYCjV11ag==/dev.probe-NGcv8M4B7ISXa68TH0Ck0A==/base.dm': No such file or directory
+         1790834316.962  9123  9123 W ziparchive: Unable to open '/data/app/~~q9nqscILYtTzepYCjV11ag==/dev.probe-NGcv8M4B7ISXa68TH0Ck0A==/base.dm': No such file or directory
+         1790834317.027  9123  9123 D nativeloader: Configuring clns-7 for other apk /data/app/~~q9nqscILYtTzepYCjV11ag==/dev.probe-NGcv8M4B7ISXa68TH0Ck0A==/base.apk. target_sdk_version=36, uses_libraries=, library_path=/data/app/~~q9nqscILYtTzepYCjV11ag==/dev.probe-NGcv8M4B7ISXa68TH0Ck0A==/lib/arm64:/data/app/~~q9nqscILYtTzepYCjV11ag==/dev.probe-NGcv8M4B7ISXa68TH0Ck0A==/base.apk!/lib/arm64-v8a, permitted_path=/data:/mnt/expand:/data/user/0/dev.probe
+         1790834317.068  9123  9123 V GraphicsEnvironment: Currently set values for:
+         1790834317.068  9123  9123 V GraphicsEnvironment:   angle_gl_driver_selection_pkgs=[]
+         1790834317.068  9123  9123 V GraphicsEnvironment:   angle_gl_driver_selection_values=[]
+         1790834317.068  9123  9123 V GraphicsEnvironment: Global.Settings values are invalid: number of packages: 0, number of values: 0
+         1790834317.068  9123  9123 V GraphicsEnvironment: Neither updatable production driver nor prerelease driver is supported.
+         1790834317.267  9123  9123 W HWUI    : Unknown dataspace 0
+         1790834317.401  9123  9123 W dev.probe: Accessing hidden method Landroid/os/SystemProperties;->addChangeCallback(Ljava/lang/Runnable;)V (unsupported, reflection, allowed)
+         1790834317.531  9123  9139 I EGL_emulation: Opening libGLESv1_CM_emulation.so
+         1790834317.532  9123  9139 I EGL_emulation: Opening libGLESv2_emulation.so
+         1790834317.557  9123  9139 W HWUI    : Failed to choose config with EGL_SWAP_BEHAVIOR_PRESERVED, retrying without...
+         1790834317.557  9123  9139 W HWUI    : Failed to initialize 101010-2 format, error = EGL_SUCCESS
+         1790834317.647  9123  9139 I Gralloc4: mapper 4.x is not supported
+         1790834317.809  9123  9123 I ProbeState: event=start saved=3 volatile=0 rows=1 restored=true pid=9123
+         1790834318.367  9123  9127 I dev.probe: Compiler allocated 5250KB to compile void android.view.ViewRootImpl.performTraversals()
+         1790834318.862  9123  9123 D VRI[MainActivity]: visibilityChanged oldVisibility=true newVisibility=false
+         1790834319.268  9191  9191 I dev.probe: Late-enabling -Xcheck:jni
+         1790834319.287  9191  9191 I dev.probe: Using CollectorTypeCMC GC.
+         1790834319.300  9191  9191 D nativeloader: Load libframework-connectivity-tiramisu-jni.so using APEX ns com_android_tethering for caller /apex/com.android.tethering/javalib/framework-connectivity-t.jar: ok
+         1790834319.340  9191  9191 D ApplicationLoaders: Returning zygote-cached class loader: /system_ext/framework/androidx.window.extensions.jar
+         1790834319.341  9191  9191 D ApplicationLoaders: Returning zygote-cached class loader: /system_ext/framework/androidx.window.sidecar.jar
+         1790834319.341  9191  9191 W ziparchive: Unable to open '/data/app/~~q9nqscILYtTzepYCjV11ag==/dev.probe-NGcv8M4B7ISXa68TH0Ck0A==/base.dm': No such file or directory
+         1790834319.341  9191  9191 W ziparchive: Unable to open '/data/app/~~q9nqscILYtTzepYCjV11ag==/dev.probe-NGcv8M4B7ISXa68TH0Ck0A==/base.dm': No such file or directory
+         1790834319.376  9191  9191 D nativeloader: Configuring clns-7 for other apk /data/app/~~q9nqscILYtTzepYCjV11ag==/dev.probe-NGcv8M4B7ISXa68TH0Ck0A==/base.apk. target_sdk_version=36, uses_libraries=, library_path=/data/app/~~q9nqscILYtTzepYCjV11ag==/dev.probe-NGcv8M4B7ISXa68TH0Ck0A==/lib/arm64:/data/app/~~q9nqscILYtTzepYCjV11ag==/dev.probe-NGcv8M4B7ISXa68TH0Ck0A==/base.apk!/lib/arm64-v8a, permitted_path=/data:/mnt/expand:/data/user/0/dev.probe
+         1790834319.391  9191  9191 V GraphicsEnvironment: Currently set values for:
+         1790834319.391  9191  9191 V GraphicsEnvironment:   angle_gl_driver_selection_pkgs=[]
+         1790834319.391  9191  9191 V GraphicsEnvironment:   angle_gl_driver_selection_values=[]
+         1790834319.391  9191  9191 V GraphicsEnvironment: Global.Settings values are invalid: number of packages: 0, number of values: 0
+         1790834319.391  9191  9191 V GraphicsEnvironment: Neither updatable production driver nor prerelease driver is supported.
+         1790834319.588  9191  9191 W HWUI    : Unknown dataspace 0
+         1790834319.817  9191  9191 W dev.probe: Accessing hidden method Landroid/os/SystemProperties;->addChangeCallback(Ljava/lang/Runnable;)V (unsupported, reflection, allowed)
+         1790834319.942  9191  9205 I EGL_emulation: Opening libGLESv1_CM_emulation.so
+         1790834319.943  9191  9205 I EGL_emulation: Opening libGLESv2_emulation.so
+         1790834319.971  9191  9205 W HWUI    : Failed to choose config with EGL_SWAP_BEHAVIOR_PRESERVED, retrying without...
+         1790834319.972  9191  9205 W HWUI    : Failed to initialize 101010-2 format, error = EGL_SUCCESS
+         1790834320.121  9191  9205 I Gralloc4: mapper 4.x is not supported
+         1790834320.241  9191  9191 I ProbeState: event=start saved=3 volatile=0 rows=1 restored=true pid=9191
+         1790834320.242  9191  9191 I Choreographer: Skipped 31 frames!  The application may be doing too much work on its main thread.
+         1790834320.253  9191  9200 I HWUI    : Davey! duration=792ms; Flags=1, FrameTimelineVsyncId=27611, IntendedVsync=1239990270236, Vsync=1240173603562, InputEventId=0, HandleInputStart=1240179877049, AnimationStart=1240179883591, PerformTraversalsStart=1240179997091, DrawStart=1240682988632, FrameDeadline=1240006936902, FrameInterval=1240179660132, FrameStartTime=16666666, SyncQueued=1240684818299, SyncStart=1240685280257, IssueDrawCommandsStart=1240685763674, SwapBuffers=1240750090132, FrameCompleted=1240783086632, DequeueBufferDuration=2958, QueueBufferDuration=31691958, GpuCompleted=1240782929216, SwapBuffersCompleted=1240783086632, DisplayPresentTime=72904454231359566, CommandSubmissionCompleted=1240750090132, 
+         1790834320.333  9191  9195 I dev.probe: Compiler allocated 5250KB to compile void android.view.ViewRootImpl.performTraversals()
+         1790834320.415  9191  9191 I ProbeState: event=finish pid=9191
+         1790834321.352  9191  9191 D VRI[MainActivity]: visibilityChanged oldVisibility=true newVisibility=false
+         1790834321.486  9191  9191 W WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=android.view.ViewRootImpl$$ExternalSyntheticLambda11@bfd4ce7
+         1790834321.692  9191  9205 I EGL_emulation: Opening libGLESv1_CM_emulation.so
+         1790834321.692  9191  9205 I EGL_emulation: Opening libGLESv2_emulation.so
+         1790834321.725  9191  9205 W HWUI    : Failed to choose config with EGL_SWAP_BEHAVIOR_PRESERVED, retrying without...
+         1790834321.726  9191  9205 W HWUI    : Failed to initialize 101010-2 format, error = EGL_SUCCESS
+         1790834322.215  9191  9191 I ProbeState: event=start saved=0 volatile=0 rows=1 restored=false pid=9191
+         1790834322.215  9191  9191 I Choreographer: Skipped 32 frames!  The application may be doing too much work on its main thread.

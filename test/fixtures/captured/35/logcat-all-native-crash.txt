@@ -1,0 +1,451 @@
+--------- beginning of events
+         1790834324.811  1376  1376 I viewroot_draw_event: [VRI[NexusLauncherActivity],reportDrawFinished seqId=0]
+--------- beginning of main
+         1790834324.812  1376  1376 D SsBaseTemplateCard: No text view can be set up
+         1790834324.812  1376  1376 D SsBaseTemplateCard: Passed-in item info is null
+         1790834324.812  1376  1376 D SsBaseTemplateCard: Passed-in item info is null
+         1790834324.812  1376  1376 D SsBaseTemplateCard: Passed-in item info is null
+         1790834324.812  1376  1376 I SsBaseTemplateCard: Secondary card pane is null
+         1790834324.815   968  1068 I jank_cuj_events_end_request: [39,1790834324813159000,1245370751510,1245370751635]
+         1790834324.816   968  1079 I viewroot_draw_event: [VRI[probe],Not drawing due to not visible. Reason=View.GONE]
+         1790834324.819   968  1079 W WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=android.view.ViewRootImpl$$ExternalSyntheticLambda11@2e5045b
+--------- beginning of system
+         1790834324.821   552  1394 D CoreBackPreview: Window{5e37b5e u0 Splash Screen dev.probe EXITING}: Setting back callback null
+         1790834324.821   552  1933 W InputManager-JNI: Input channel object '5e37b5e Splash Screen dev.probe (client)' was disposed without first being removed with the input manager!
+         1790834324.823   968  2498 V WindowManagerShell: onTransitionReady(transaction=2370821948489)
+         1790834324.823   968  1065 V WindowManagerShell: onTransitionReady (#37) android.os.BinderProxy@a2bc3a3: {id=37 t=CLOSE f=0x10 trk=0 r=[0@Point(0, 0)] c=[{WCT{android.window.IWindowContainerToken$Stub$Proxy@ce4041b} m=TO_FRONT f=SHOW_WALLPAPER|MOVE_TO_TOP leash=Surface(name=Task=1)/@0x92cf6ff sb=Rect(0, 0 - 2560, 1600) eb=Rect(0, 0 - 2560, 1600) d=0 taskParent=-1},{WCT{android.window.IWindowContainerToken$Stub$Proxy@e3829b8} m=CLOSE f=NONE leash=Surface(name=Task=11)/@0x3a10ccc sb=Rect(0, 0 - 2560, 1600) eb=Rect(0, 0 - 2560, 1600) d=0 taskParent=-1},{null m=TO_FRONT f=IS_WALLPAPER leash=Surface(name=WallpaperWindowToken{7f74c95 token=android.os.Binder@202a44c})/@0xf40cb15 sb=Rect(0, 0 - 2560, 1600) eb=Rect(0, 0 - 2560, 1600) d=0}]}
+         1790834324.823   968  1065 V WindowManagerShell: Playing animation for (#37) android.os.BinderProxy@a2bc3a3@0
+         1790834324.823   968  1065 V WindowManagerShell:  try handler com.android.wm.shell.transition.DefaultMixedHandler@cdb834c
+         1790834324.823   968  1065 V WindowManagerShell:  try handler com.android.wm.shell.keyguard.KeyguardTransitionHandler@4403f95
+         1790834324.823   968  1065 V WindowManagerShell:  try handler com.android.wm.shell.pip.PipTransition@4f8a8aa
+         1790834324.823   968  1065 V WindowManagerShell:  try handler com.android.wm.shell.activityembedding.ActivityEmbeddingController@ebfcc9b
+         1790834324.823   968  1065 V WindowManagerShell:  try handler com.android.wm.shell.splitscreen.StageCoordinator@2e38838
+         1790834324.823   968  1065 V WindowManagerShell:  try handler com.android.wm.shell.desktopmode.DesktopTasksController@1b24011
+         1790834324.823   968  1065 V WindowManagerShell:  try handler com.android.wm.shell.recents.RecentsTransitionHandler@690a576
+         1790834324.823   968  1065 V ShellRecents: RecentsTransitionHandler.startAnimation: no controller found
+         1790834324.823   968  1065 V WindowManagerShell:  try handler com.android.wm.shell.transition.RemoteTransitionHandler@d449777
+         1790834324.823   968  1065 V WindowManagerShell: Transition doesn't have explicit remote, search filters for match for {id=37 t=CLOSE f=0x10 trk=0 r=[0@Point(0, 0)] c=[{WCT{android.window.IWindowContainerToken$Stub$Proxy@ce4041b} m=TO_FRONT f=SHOW_WALLPAPER|MOVE_TO_TOP leash=Surface(name=Task=1)/@0x92cf6ff sb=Rect(0, 0 - 2560, 1600) eb=Rect(0, 0 - 2560, 1600) d=0 taskParent=-1},{WCT{android.window.IWindowContainerToken$Stub$Proxy@e3829b8} m=CLOSE f=NONE leash=Surface(name=Task=11)/@0x3a10ccc sb=Rect(0, 0 - 2560, 1600) eb=Rect(0, 0 - 2560, 1600) d=0 taskParent=-1},{null m=TO_FRONT f=IS_WALLPAPER leash=Surface(name=WallpaperWindowToken{7f74c95 token=android.os.Binder@202a44c})/@0xf40cb15 sb=Rect(0, 0 - 2560, 1600) eb=Rect(0, 0 - 2560, 1600) d=0}]}
+         1790834324.823   968  1065 V WindowManagerShell:  Checking filter Pair{{types=[] flags=0x0] notFlags=0x0 checks=[{atype=undefined independent=true modes=[OPEN,TO_FRONT] flags=IN_TASK_WITH_EMBEDDED_ACTIVITY mustBeTask=false order=ANY topActivity=ComponentInfo{com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity} launchCookie=null},{atype=undefined independent=true modes=[CLOSE,TO_BACK] flags=IN_TASK_WITH_EMBEDDED_ACTIVITY mustBeTask=false order=ANY topActivity=null launchCookie=null}]} RemoteTransition { remoteTransition = android.window.IRemoteTransition$Stub$Proxy@a37ca5f, appThread = android.app.IApplicationThread$Stub$Proxy@de44cac, debugName = OverlaySwipeBack }}
+         1790834324.823   968  1065 V WindowManagerShell:  Checking filter Pair{{types=[] flags=0x0] notFlags=0x0 checks=[{atype=dream independent=true modes=[OPEN,TO_FRONT] flags=NONE mustBeTask=false order=ANY topActivity=null launchCookie=null},{atype=home independent=true modes=[CLOSE,TO_BACK] flags=NONE mustBeTask=false order=ANY topActivity=null launchCookie=null}]} RemoteTransition { remoteTransition = android.window.IRemoteTransition$Stub$Proxy@2993d75, appThread = android.app.IApplicationThread$Stub$Proxy@977010a, debugName = LauncherToDream }}
+         1790834324.824   968  1065 V WindowManagerShell:  Checking filter Pair{{types=[] flags=0x0] notFlags=0x100 checks=[{atype=home independent=true modes=[OPEN,TO_FRONT] flags=NONE mustBeTask=false order=TOP topActivity=ComponentInfo{com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity} launchCookie=null},{atype=standard independent=true modes=[CLOSE,TO_BACK] flags=NONE mustBeTask=false order=ANY topActivity=null launchCookie=null}]} RemoteTransition { remoteTransition = android.window.IRemoteTransition$Stub$Proxy@1b8ad7b, appThread = android.app.IApplicationThread$Stub$Proxy@89f8798, debugName = QuickstepLaunchHome }}
+         1790834324.824   968  1065 D RemoteTransitionHandler: Found filterPair{{types=[] flags=0x0] notFlags=0x100 checks=[{atype=home independent=true modes=[OPEN,TO_FRONT] flags=NONE mustBeTask=false order=TOP topActivity=ComponentInfo{com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity} launchCookie=null},{atype=standard independent=true modes=[CLOSE,TO_BACK] flags=NONE mustBeTask=false order=ANY topActivity=null launchCookie=null}]} RemoteTransition { remoteTransition = android.window.IRemoteTransition$Stub$Proxy@1b8ad7b, appThread = android.app.IApplicationThread$Stub$Proxy@89f8798, debugName = QuickstepLaunchHome }}
+         1790834324.824   968  1065 V WindowManagerShell:  Delegate animation for (#37) to RemoteTransition { remoteTransition = android.window.IRemoteTransition$Stub$Proxy@1b8ad7b, appThread = android.app.IApplicationThread$Stub$Proxy@89f8798, debugName = QuickstepLaunchHome }
+         1790834324.833  1376  1395 I jank_cuj_events_begin_request: [60,1790834324831828000,1245389420260,1245389420510,App to Home]
+         1790834324.834  1376  1376 D StateManager: createAtomicAnimation - fromState: Background, toState: Normal, partial trace:
+         1790834324.834  1376  1376 D StateManager: 	at com.android.quickstep.util.StaggeredWorkspaceAnim.prepareToAnimate(go/retraceme 6880898d8cae178d08f8c6e9adec44ea003840882148de9d3f2387cda32e2ac9:22)
+         1790834324.834  1376  1376 D StateManager: 	at com.android.quickstep.util.StaggeredWorkspaceAnim.<init>(go/retraceme 6880898d8cae178d08f8c6e9adec44ea003840882148de9d3f2387cda32e2ac9:4)
+         1790834324.834  1376  1376 D StateManager: 	at com.android.quickstep.util.StaggeredWorkspaceAnim.<init>(go/retraceme 6880898d8cae178d08f8c6e9adec44ea003840882148de9d3f2387cda32e2ac9:1)
+         1790834324.860  1376  1395 I jank_cuj_events_begin_request: [9,1790834324859810000,1245417402301,1245417402510,]
+         1790834324.884   422   811 I BpBinder: onLastStrongRef automatically unlinking death recipients: 
+         1790834324.897   552   671 I input_focus: [Focus entering f58b5f2 com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity (server),reason=Window became focusable. Previous reason: NOT_VISIBLE]
+         1790834324.941   552   571 V WindowManager: Sent Transition (#37) createdAt=10-01 07:58:44.608 via request=TransitionRequestInfo { type = CLOSE, triggerTask = null, pipTask = null, remoteTransition = null, displayChange = null, flags = 16, debugId = 37 }
+         1790834324.941   552   571 V WindowManager:     startWCT=WindowContainerTransaction { changes = {} hops = [] errorCallbackToken=null taskFragmentOrganizer=null }
+         1790834324.941   552   571 V WindowManager:     info={id=37 t=CLOSE f=0x10 trk=0 r=[0@Point(0, 0)] c=[
+         1790834324.941   552   571 V WindowManager:         {WCT{RemoteToken{565f9c6 Task{9c689e9 #1 type=home}}} m=TO_FRONT f=SHOW_WALLPAPER|MOVE_TO_TOP leash=Surface(name=Task=1)/@0x27937ae sb=Rect(0, 0 - 2560, 1600) eb=Rect(0, 0 - 2560, 1600) d=0 taskParent=-1},
+         1790834324.941   552   571 V WindowManager:         {WCT{RemoteToken{dba3635 Task{aafaf81 #11 type=standard A=10213:dev.probe}}} m=CLOSE f=NONE leash=Surface(name=Task=11)/@0xfb35f72 sb=Rect(0, 0 - 2560, 1600) eb=Rect(0, 0 - 2560, 1600) d=0 taskParent=-1},
+         1790834324.941   552   571 V WindowManager:         {null m=TO_FRONT f=IS_WALLPAPER leash=Surface(name=WallpaperWindowToken{7f74c95 token=android.os.Binder@202a44c})/@0xe865fda sb=Rect(0, 0 - 2560, 1600) eb=Rect(0, 0 - 2560, 1600) d=0}
+         1790834324.941   552   571 V WindowManager:     ]}
+         1790834324.942   968  1079 W FrameTracker: Missed App frame:UNKNOWN: 10, 30225, 0, CUJ=J<SPLASHSCREEN_EXIT_ANIM>
+         1790834324.942   968  1079 W FrameTracker: Missed SF frame:UNKNOWN: 10, 30225, 0, CUJ=J<SPLASHSCREEN_EXIT_ANIM>
+         1790834324.942   968  1079 W FrameTracker: Missing HWUI jank callback for vsyncId: 30225, CUJ=J<SPLASHSCREEN_EXIT_ANIM>
+         1790834324.942   968  1079 W FrameTracker: Missed App frame:UNKNOWN: 74, 30247, 0, CUJ=J<SPLASHSCREEN_EXIT_ANIM>
+         1790834324.942   968  1079 W FrameTracker: Missed SF frame:UNKNOWN: 74, 30247, 0, CUJ=J<SPLASHSCREEN_EXIT_ANIM>
+         1790834324.942   968  1079 W FrameTracker: Missing HWUI jank callback for vsyncId: 30247, CUJ=J<SPLASHSCREEN_EXIT_ANIM>
+         1790834324.942   968  1079 W FrameTracker: Missed App frame:UNKNOWN: 74, 30255, 162492473, CUJ=J<SPLASHSCREEN_EXIT_ANIM>
+         1790834324.942   968  1079 W FrameTracker: Missed SF frame:UNKNOWN: 74, 30255, 162492473, CUJ=J<SPLASHSCREEN_EXIT_ANIM>
+         1790834324.942   968  1079 W FrameTracker: Missed SF frame:UNKNOWN: 66, 30285, 127698726, CUJ=J<SPLASHSCREEN_EXIT_ANIM>
+         1790834324.942   968  1079 W FrameTracker: Missed App frame:UNKNOWN: 74, 30322, 164614478, CUJ=J<SPLASHSCREEN_EXIT_ANIM>
+         1790834324.942   968  1079 W FrameTracker: Missed SF frame:UNKNOWN: 74, 30322, 164614478, CUJ=J<SPLASHSCREEN_EXIT_ANIM>
+         1790834324.942   968  1079 W FrameTracker: Missed App frame:UNKNOWN: 74, 30337, 180892605, CUJ=J<SPLASHSCREEN_EXIT_ANIM>
+         1790834324.942   968  1079 W FrameTracker: Missed SF frame:UNKNOWN: 74, 30337, 180892605, CUJ=J<SPLASHSCREEN_EXIT_ANIM>
+         1790834324.943   968  1065 V WindowManagerShell:  animated by com.android.wm.shell.transition.RemoteTransitionHandler@d449777
+         1790834324.943   552   575 I wm_wallpaper_surface: [0,1,Window{f58b5f2 u0 com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity}]
+         1790834324.947   552  1394 W ActivityTaskManager: callingPackage for (uid=2000, pid=9382) has no WPC
+         1790834324.948   552  1394 W OptProp : Cannot read opt property android.window.PROPERTY_COMPAT_ALLOW_USER_ASPECT_RATIO_OVERRIDE
+         1790834324.948   552  1394 W OptProp : Cannot read opt property android.window.PROPERTY_COMPAT_ALLOW_USER_ASPECT_RATIO_FULLSCREEN_OVERRIDE
+         1790834324.948   552  1394 W OptProp : Cannot read opt property android.window.PROPERTY_COMPAT_ALLOW_ORIENTATION_OVERRIDE
+         1790834324.948   552  1394 V GrammaticalInflectionUtils: AttributionSource: android.content.AttributionSource@3540afc does not have READ_SYSTEM_GRAMMATICAL_GENDER permission.
+         1790834324.948   552  1394 W OptProp : Cannot read opt property android.window.PROPERTY_COMPAT_ALLOW_RESIZEABLE_ACTIVITY_OVERRIDES
+         1790834324.948   552  1394 W OptProp : Cannot read opt property android.window.PROPERTY_COMPAT_ALLOW_MIN_ASPECT_RATIO_OVERRIDE
+         1790834324.953   552  1394 I wm_task_created: 12
+         1790834324.954   552  1394 I wm_task_moved: [12,12,0,1,3]
+         1790834324.954   552  1394 I wm_task_to_front: [0,12,0]
+         1790834324.954   552  1394 I wm_create_task: [0,12,12,0]
+         1790834324.954   552  1394 I wm_create_activity: [0,226006648,12,dev.probe/.MainActivity,NULL,NULL,NULL,268435456]
+         1790834324.954   552  1394 I wm_task_moved: [12,12,0,1,3]
+         1790834324.955   552  1394 I wm_pause_activity: [0,164195755,com.google.android.apps.nexuslauncher/.NexusLauncherActivity,userLeaving=true,pauseBackTasks]
+         1790834324.955   552  1394 I ActivityTaskManager: Add Task{aafaf81 #11 type=standard A=10213:dev.probe} to hidden list because adding Task{300d151 #12 type=standard A=10213:dev.probe}
+         1790834324.956   552  1394 I ActivityTaskManager: START u0 {flg=0x10000000 cmp=dev.probe/.MainActivity (has extras)} with LAUNCH_SINGLE_TOP from uid 2000 (BAL_ALLOW_PERMISSION) result code=0
+         1790834324.956   968  1065 V WindowManagerShell: Transition requested (#38): android.os.BinderProxy@9e740fc TransitionRequestInfo { type = OPEN, triggerTask = TaskInfo{userId=0 taskId=12 displayId=0 isRunning=true baseIntent=Intent { flg=0x10000000 cmp=dev.probe/.MainActivity } baseActivity=ComponentInfo{dev.probe/dev.probe.MainActivity} topActivity=ComponentInfo{dev.probe/dev.probe.MainActivity} origActivity=null realActivity=ComponentInfo{dev.probe/dev.probe.MainActivity} numActivities=1 lastActiveTime=1245513 supportsMultiWindow=true resizeMode=1 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{android.window.IWindowContainerToken$Stub$Proxy@c2ba385} topActivityType=1 pictureInPictureParams=null shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=null topActivityInfo=ActivityInfo{84555da dev.probe.MainActivity} launchCookies=[] positionInParent=Point(0, 0) parentTaskId=-1 isFocused=false isVisible=false isVisibleRequested=false isSleeping=false locusId=null displayAreaFeatureId=1 isTopActivityTransparent=false appCompatTaskInfo=AppCompatTaskInfo { topActivityInSizeCompat=false topActivityEligibleForLetterboxEducation= falseisLetterboxEducationEnabled= true isLetterboxDoubleTapEnabled= false topActivityEligibleForUserAspectRatioButton= true topActivityBoundsLetterboxed= false isFromLetterboxDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=2560 topActivityLetterboxHeight=1600 isUserFullscreenOverrideEnabled=false isSystemFullscreenOverrideEnabled=false cameraCompatTaskInfo=CameraCompatTaskInfo { cameraCompatControlState=hidden freeformCameraCompatMode=inactive}}}, pipTask = null, remoteTransition = null, displayChange = null, flags = 0, debugId = 38 }
+         1790834324.956   968  1065 D ShellDesktopMode: DesktopTaskRepo: visibleTaskCount= 0
+         1790834324.961   552   574 V GrammaticalInflectionUtils: AttributionSource: android.content.AttributionSource@3540afc does not have READ_SYSTEM_GRAMMATICAL_GENDER permission.
+         1790834324.961   552   574 I am_uid_running: 10213
+         1790834324.972   360   360 D Zygote  : Forked child process 9386
+         1790834324.973   552   582 I am_proc_start: [0,9386,10213,dev.probe,next-top-activity,{dev.probe/dev.probe.MainActivity}]
+         1790834324.973   552   582 I ActivityManager: Start proc 9386:dev.probe/u0a213 for next-top-activity {dev.probe/dev.probe.MainActivity}
+         1790834324.973   552   865 W UserManagerService: Requested status bar icon for non-badged user 0
+         1790834324.998  9386  9386 I dev.probe: Late-enabling -Xcheck:jni
+         1790834325.012  9386  9386 I dev.probe: Using CollectorTypeCMC GC.
+         1790834325.016  1710  1728 I adbd    : jdwp connection from 9386
+         1790834325.024  9386  9386 D nativeloader: Load libframework-connectivity-tiramisu-jni.so using APEX ns com_android_tethering for caller /apex/com.android.tethering/javalib/framework-connectivity-t.jar: ok
+         1790834325.035   552   865 I am_proc_bound: [0,9386,dev.probe]
+         1790834325.035   552   865 I am_uid_active: 10213
+         1790834325.061   968  1086 D EGL_emulation: app_time_stats: avg=181.50ms min=1.44ms max=1252.08ms count=10
+         1790834325.061  9386  9386 D ApplicationLoaders: Returning zygote-cached class loader: /system_ext/framework/androidx.window.extensions.jar
+         1790834325.061  9386  9386 D ApplicationLoaders: Returning zygote-cached class loader: /system_ext/framework/androidx.window.sidecar.jar
+         1790834325.062   552   679 I ImeTracker: com.google.android.apps.nexuslauncher:f14bc9a3: onRequestHide at ORIGIN_SERVER reason HIDE_UNSPECIFIED_WINDOW fromUser false
+         1790834325.062   552   679 I ImeTracker: com.google.android.apps.nexuslauncher:f14bc9a3: onCancelled at PHASE_SERVER_SHOULD_HIDE
+         1790834325.063  9386  9386 W ziparchive: Unable to open '/data/app/~~q9nqscILYtTzepYCjV11ag==/dev.probe-NGcv8M4B7ISXa68TH0Ck0A==/base.dm': No such file or directory
+         1790834325.063  9386  9386 W ziparchive: Unable to open '/data/app/~~q9nqscILYtTzepYCjV11ag==/dev.probe-NGcv8M4B7ISXa68TH0Ck0A==/base.dm': No such file or directory
+         1790834325.063  7018  7018 I GoogleInputMethodService: GoogleInputMethodService.onFinishInput():3157 
+         1790834325.064  7018  7018 I GoogleInputMethodService: GoogleInputMethodService.updateDeviceLockedStatus():2248 repeatCheckTimes = 0, locked = false
+         1790834325.064  7018  7018 I GoogleInputMethodService: GoogleInputMethodService.onStartInput():1986 onStartInput(EditorInfo{EditorInfo{packageName=com.google.android.apps.nexuslauncher, inputType=0, inputTypeString=NULL, enableLearning=false, autoCorrection=false, autoComplete=false, imeOptions=0, privateImeOptions=null, actionName=UNSPECIFIED, actionLabel=null, initialSelStart=-1, initialSelEnd=-1, initialCapsMode=0, label=null, fieldId=0, fieldName=null, extras=null, hintText=null, hintLocales=[]}}, false)
+         1790834325.064  7018  7018 I GoogleInputMethodService: GoogleInputMethodService.updateDeviceLockedStatus():2248 repeatCheckTimes = 1, locked = false
+         1790834325.064  7018  7018 I AndroidIME: InputBundleManager.loadActiveInputBundleId():450 loadActiveInputBundleId: und-Latn-x-password, password
+         1790834325.064   552   865 W PackageConfigPersister: App-specific configuration not found for packageName: com.google.android.apps.nexuslauncher and userId: 0
+         1790834325.107   552   865 D CoreBackPreview: Window{a42c1cb u0 Splash Screen dev.probe}: Setting back callback OnBackInvokedCallbackInfo{mCallback=android.window.IOnBackInvokedCallback$Stub$Proxy@a47b0c1, mPriority=0, mIsAnimationCallback=false}
+         1790834325.108   552   865 W OptProp : Cannot read opt property android.window.PROPERTY_COMPAT_ALLOW_DISPLAY_ORIENTATION_OVERRIDE
+         1790834325.108  9386  9386 D nativeloader: Configuring clns-7 for other apk /data/app/~~q9nqscILYtTzepYCjV11ag==/dev.probe-NGcv8M4B7ISXa68TH0Ck0A==/base.apk. target_sdk_version=36, uses_libraries=, library_path=/data/app/~~q9nqscILYtTzepYCjV11ag==/dev.probe-NGcv8M4B7ISXa68TH0Ck0A==/lib/arm64:/data/app/~~q9nqscILYtTzepYCjV11ag==/dev.probe-NGcv8M4B7ISXa68TH0Ck0A==/base.apk!/lib/arm64-v8a, permitted_path=/data:/mnt/expand:/data/user/0/dev.probe
+         1790834325.109   552   574 W ActivityTaskManager: Activity top resumed state loss timeout for ActivityRecord{7389805 u0 dev.probe/.MainActivity t11 f} isExiting}
+         1790834325.133  9386  9386 V GraphicsEnvironment: Currently set values for:
+         1790834325.133  9386  9386 V GraphicsEnvironment:   angle_gl_driver_selection_pkgs=[]
+         1790834325.133  9386  9386 V GraphicsEnvironment:   angle_gl_driver_selection_values=[]
+         1790834325.133  9386  9386 V GraphicsEnvironment: Global.Settings values are invalid: number of packages: 0, number of values: 0
+         1790834325.138  9386  9386 V GraphicsEnvironment: Neither updatable production driver nor prerelease driver is supported.
+         1790834325.187  1376  1376 D SearchTargetUtil: queryLength=0 size=0
+         1790834325.187  1376  1376 W SplitSelectStateCtor: Missing session instanceIds
+         1790834325.187  1376  1376 D StatsLog: LAUNCHER_SPLIT_SELECTION_EXIT_INTERRUPTED
+         1790834325.187  1376  1376 I wm_on_paused_called: [164195755,com.google.android.apps.nexuslauncher.NexusLauncherActivity,performPause,0]
+         1790834325.200  1376  1660 D EGL_emulation: app_time_stats: avg=100.50ms min=1.41ms max=488.34ms count=9
+         1790834325.226   552   647 I pm_snapshot_rebuild: [37,251]
+         1790834325.227   968  1065 D WindowManagerShell: setLauncherKeepClearAreaHeight: visible=false, height=202
+         1790834325.228   552  1394 I wm_add_to_stopping: [0,164195755,com.google.android.apps.nexuslauncher/.NexusLauncherActivity,makeInvisible]
+         1790834325.228   552  1394 I wm_restart_activity: [0,226006648,12,dev.probe/.MainActivity]
+         1790834325.228   552  1394 W OptProp : Cannot read opt property android.window.PROPERTY_COMPAT_ENABLE_FAKE_FOCUS
+         1790834325.229   552  1394 I wm_set_resumed_activity: [0,dev.probe/.MainActivity,realStartActivityLocked - onActivityStateChanged]
+         1790834325.230   552   571 I sysui_multi_action: [757,803,799,window_time_0,802,2]
+         1790834325.230  1376  1376 I TopTaskTracker: onTaskMovedToFront: (moved taskInfo to front) taskId=12, baseIntent=Intent { flg=0x10000000 cmp=dev.probe/.MainActivity }
+         1790834325.233   552   575 I input_focus: [Requesting to set focus to null window,reason=UpdateInputWindows]
+         1790834325.255  7408  9404 I DropBoxUtil: (REDACTED) Reading dropbox entry with tag %s and timestamp %d
+         1790834325.259  7408  9405 I DropBoxUtil: (REDACTED) Reading dropbox entry with tag %s and timestamp %d
+         1790834325.284   422   535 W VsyncModulator: setTransactionSchedule: Unexpected EarlyEnd
+         1790834325.290  9386  9386 I Process : Sending signal. PID: 9386 SIG: 11
+--------- beginning of crash
+         1790834325.290  9386  9386 F libc    : Fatal signal 11 (SIGSEGV), code 0 (SI_USER) in tid 9386 (dev.probe), pid 9386 (dev.probe)
+         1790834325.301  1376  1395 I jank_cuj_events_end_request: [60,1790834325297550000,1245855141760,1245855141885]
+         1790834325.312  1376  1383 W System  : A resource failed to call release. 
+         1790834325.312  1376  1383 W System  : A resource failed to call release. 
+         1790834325.312  1376  1383 W System  : A resource failed to call release. 
+         1790834325.312  1376  1383 W System  : A resource failed to call release. 
+         1790834325.313  1376  1383 W System  : A resource failed to call release. 
+         1790834325.313  1376  1383 W System  : A resource failed to call release. 
+         1790834325.313  1376  1383 W System  : A resource failed to call release. 
+         1790834325.313  1376  1383 W s.nexuslauncher: ApkAssets: Deleting an ApkAssets object '<empty> and /data/app/~~q9nqscILYtTzepYCjV11ag==/dev.probe-NGcv8M4B7ISXa68TH0Ck0A==/base.apk' with 1 weak references
+         1790834325.316  1376  1383 W System  : A resource failed to call release. 
+         1790834325.316  1376  1383 W System  : A resource failed to call release. 
+         1790834325.316  1376  1383 W System  : A resource failed to call release. 
+         1790834325.323   552   671 I input_focus: [Focus leaving f58b5f2 com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity (server),reason=NO_WINDOW]
+         1790834325.323  9409  9409 E crash_dump64: failed to get the guest state header for thread 9386: Bad address
+         1790834325.328  9409  9409 E crash_dump64: failed to get the guest state header for thread 9387: Bad address
+         1790834325.329  9409  9409 E crash_dump64: failed to get the guest state header for thread 9388: Bad address
+         1790834325.330  9409  9409 E crash_dump64: failed to get the guest state header for thread 9389: Bad address
+         1790834325.331  9409  9409 E crash_dump64: failed to get the guest state header for thread 9390: Bad address
+         1790834325.332  9409  9409 E crash_dump64: failed to get the guest state header for thread 9391: Bad address
+         1790834325.332  9409  9409 E crash_dump64: failed to get the guest state header for thread 9392: Bad address
+         1790834325.332  9409  9409 E crash_dump64: failed to get the guest state header for thread 9393: Bad address
+         1790834325.333  9409  9409 E crash_dump64: failed to get the guest state header for thread 9394: Bad address
+         1790834325.333  9409  9409 E crash_dump64: failed to get the guest state header for thread 9397: Bad address
+         1790834325.333  9409  9409 E crash_dump64: failed to get the guest state header for thread 9398: Bad address
+         1790834325.333  9409  9409 E crash_dump64: failed to get the guest state header for thread 9400: Bad address
+         1790834325.333  9409  9409 E crash_dump64: failed to get the guest state header for thread 9401: Bad address
+         1790834325.334  9409  9409 E crash_dump64: failed to get the guest state header for thread 9402: Bad address
+         1790834325.346  9409  9409 I crash_dump64: obtaining output fd from tombstoned, type: kDebuggerdTombstoneProto
+         1790834325.350   214   214 I tombstoned: received crash request for pid 9386
+         1790834325.358  9409  9409 I crash_dump64: performing dump of process 9386 (target tid = 9386)
+         1790834325.444   968  1079 I viewroot_draw_event: [VRI[probe],reportDrawFinished seqId=0]
+         1790834325.446   968  3414 V WindowManagerShell: onTransitionReady(transaction=2370821948521)
+         1790834325.446   552   571 V WindowManager: Sent Transition (#38) createdAt=10-01 07:58:44.948 via request=TransitionRequestInfo { type = OPEN, triggerTask = TaskInfo{userId=0 taskId=12 displayId=0 isRunning=true baseIntent=Intent { flg=0x10000000 cmp=dev.probe/.MainActivity } baseActivity=ComponentInfo{dev.probe/dev.probe.MainActivity} topActivity=ComponentInfo{dev.probe/dev.probe.MainActivity} origActivity=null realActivity=ComponentInfo{dev.probe/dev.probe.MainActivity} numActivities=1 lastActiveTime=1245513 supportsMultiWindow=true resizeMode=1 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{RemoteToken{26d01ab Task{300d151 #12 type=standard A=10213:dev.probe}}} topActivityType=1 pictureInPictureParams=null shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=null topActivityInfo=ActivityInfo{42e0008 dev.probe.MainActivity} launchCookies=[] positionInParent=Point(0, 0) parentTaskId=-1 isFocused=false isVisible=false isVisibleRequested=false isSleeping=false locusId=null displayAreaFeatureId=1 isTopActivityTransparent=false appCompatTaskInfo=AppCompatTaskInfo { topActivityInSizeCompat=false topActivityEligibleForLetterboxEducation= falseisLetterboxEducationEnabled= true isLetterboxDoubleTapEnabled= false topActivityEligibleForUserAspectRatioButton= true topActivityBoundsLetterboxed= false isFromLetterboxDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=2560 topActivityLetterboxHeight=1600 isUserFullscreenOverrideEnabled=false isSystemFullscreenOverrideEnabled=false cameraCompatTaskInfo=CameraCompatTaskInfo { cameraCompatControlState=hidden freeformCameraCompatMode=inactive}}}, pipTask = null, remoteTransition = null, displayChange = null, flags = 0, debugId = 38 }
+         1790834325.446   552   571 V WindowManager:     startWCT=WindowContainerTransaction { changes = {} hops = [] errorCallbackToken=null taskFragmentOrganizer=null }
+         1790834325.446   552   571 V WindowManager:     info={id=38 t=OPEN f=0x0 trk=0 r=[0@Point(0, 0)] c=[
+         1790834325.446   552   571 V WindowManager:         {WCT{RemoteToken{26d01ab Task{300d151 #12 type=standard A=10213:dev.probe}}} m=OPEN f=NONE leash=Surface(name=Task=12)/@0x4b48a25 sb=Rect(0, 0 - 2560, 1600) eb=Rect(0, 0 - 2560, 1600) d=0 taskParent=-1},
+         1790834325.446   552   571 V WindowManager:         {WCT{RemoteToken{565f9c6 Task{9c689e9 #1 type=home}}} m=TO_BACK f=SHOW_WALLPAPER leash=Surface(name=Task=1)/@0x27937ae sb=Rect(0, 0 - 2560, 1600) eb=Rect(0, 0 - 2560, 1600) d=0 taskParent=-1}
+         1790834325.446   552   571 V WindowManager:     ]}
+         1790834325.446   968  1065 V WindowManagerShell: onTransitionReady (#38) android.os.BinderProxy@9e740fc: {id=38 t=OPEN f=0x0 trk=0 r=[0@Point(0, 0)] c=[{WCT{android.window.IWindowContainerToken$Stub$Proxy@979137e} m=OPEN f=NONE leash=Surface(name=Task=12)/@0x7cbcf83 sb=Rect(0, 0 - 2560, 1600) eb=Rect(0, 0 - 2560, 1600) d=0 taskParent=-1},{WCT{android.window.IWindowContainerToken$Stub$Proxy@df1e0df} m=TO_BACK f=SHOW_WALLPAPER leash=Surface(name=Task=1)/@0xd537500 sb=Rect(0, 0 - 2560, 1600) eb=Rect(0, 0 - 2560, 1600) d=0 taskParent=-1}]}
+         1790834325.449   968  1065 V WindowManagerShell: Transition (#38) android.os.BinderProxy@9e740fc@0 ready while (#37) android.os.BinderProxy@a2bc3a3@0 is still animating. Notify the animating transition in case they can be merged
+         1790834325.449   968  1065 V WindowManagerShell:    Merge into remote: RemoteTransition { remoteTransition = android.window.IRemoteTransition$Stub$Proxy@1b8ad7b, appThread = android.app.IApplicationThread$Stub$Proxy@89f8798, debugName = QuickstepLaunchHome }
+         1790834325.458   552   567 W WindowManager: Failed looking up window session=Session{2b0fd57 968:u0a10186} callers=com.android.server.wm.WindowManagerService.removeClientToken:2058 com.android.server.wm.Session.remove:274 android.view.IWindowSession$Stub.onTransact:685 
+         1790834325.465   968  1065 V WindowManagerShell: Transition animation finished (aborted=false), notifying core (#37) android.os.BinderProxy@a2bc3a3@0
+         1790834325.466   552   567 E IPCThreadState: Binder transaction failure. id: 653770, BR_*: 29189, error: -22 (Invalid argument)
+         1790834325.466   552   567 W ActivityManager: pid 552 system sent binder code 7 with flags 1 to frozen apps and got error -32
+         1790834325.466   552   567 D ActivityManager: Too many transaction errors, throttling freezer binder callback.
+         1790834325.466   552   567 W WindowManager: Exception thrown during dispatchAppVisibility Window{de2dad4 u0 dev.probe/dev.probe.MainActivity EXITING}
+         1790834325.466   552   567 W WindowManager: android.os.DeadObjectException
+         1790834325.466   552   567 W WindowManager: 	at android.os.BinderProxy.transactNative(Native Method)
+         1790834325.466   552   567 W WindowManager: 	at android.os.BinderProxy.transact(BinderProxy.java:586)
+         1790834325.466   552   567 W WindowManager: 	at android.view.IWindow$Stub$Proxy.dispatchAppVisibility(IWindow.java:553)
+         1790834325.466   552   567 W WindowManager: 	at com.android.server.wm.WindowState.sendAppVisibilityToClients(WindowState.java:3253)
+         1790834325.466   552   567 W WindowManager: 	at com.android.server.wm.WindowContainer.sendAppVisibilityToClients(WindowContainer.java:1289)
+         1790834325.466   552   567 W WindowManager: 	at com.android.server.wm.WindowToken.setClientVisible(WindowToken.java:403)
+         1790834325.466   552   567 W WindowManager: 	at com.android.server.wm.ActivityRecord.setClientVisible(ActivityRecord.java:7166)
+         1790834325.466   552   567 W WindowManager: 	at com.android.server.wm.ActivityRecord.postApplyAnimation(ActivityRecord.java:5881)
+         1790834325.466   552   567 W WindowManager: 	at com.android.server.wm.ActivityRecord.commitVisibility(ActivityRecord.java:5823)
+         1790834325.466   552   567 W WindowManager: 	at com.android.server.wm.Transition.finishTransition(Transition.java:1286)
+         1790834325.466   552   567 W WindowManager: 	at com.android.server.wm.TransitionController.finishTransition(TransitionController.java:937)
+         1790834325.466   552   567 W WindowManager: 	at com.android.server.wm.WindowOrganizerController.finishTransition(WindowOrganizerController.java:494)
+         1790834325.466   552   567 W WindowManager: 	at android.window.IWindowOrganizerController$Stub.onTransact(IWindowOrganizerController.java:289)
+         1790834325.466   552   567 W WindowManager: 	at com.android.server.wm.WindowOrganizerController.onTransact(WindowOrganizerController.java:204)
+         1790834325.466   552   567 W WindowManager: 	at android.os.Binder.execTransactInternal(Binder.java:1500)
+         1790834325.466   552   567 W WindowManager: 	at android.os.Binder.execTransact(Binder.java:1444)
+         1790834325.466   552   567 W Process : Unable to open /proc/9328/status
+         1790834325.467   552   571 V WindowManager: Finish Transition (#37): created at 10-01 07:58:44.608 collect-started=0.012ms request-sent=0.03ms started=6.566ms ready=42.554ms sent=214.616ms finished=857.006ms
+         1790834325.471   552   567 I wm_task_removed: [11,11,0,removeChild, last child = ActivityRecord{7389805 u0 dev.probe/.MainActivity t-1 f} isExiting} in Task{aafaf81 #11 type=standard A=10213:dev.probe}]
+         1790834325.472   968  1065 V WindowManagerShell: Playing animation for (#38) android.os.BinderProxy@9e740fc@0
+         1790834325.472   968  1065 V WindowManagerShell:  try handler com.android.wm.shell.transition.DefaultMixedHandler@cdb834c
+         1790834325.472   968  1065 V WindowManagerShell:  try handler com.android.wm.shell.keyguard.KeyguardTransitionHandler@4403f95
+         1790834325.472   968  1065 V WindowManagerShell:  try handler com.android.wm.shell.pip.PipTransition@4f8a8aa
+         1790834325.472   968  1065 V WindowManagerShell:  try handler com.android.wm.shell.activityembedding.ActivityEmbeddingController@ebfcc9b
+         1790834325.472   968  1065 V WindowManagerShell:  try handler com.android.wm.shell.splitscreen.StageCoordinator@2e38838
+         1790834325.472   968  1065 V WindowManagerShell:  try handler com.android.wm.shell.desktopmode.DesktopTasksController@1b24011
+         1790834325.472   968  1065 V WindowManagerShell:  try handler com.android.wm.shell.recents.RecentsTransitionHandler@690a576
+         1790834325.472   968  1065 V ShellRecents: RecentsTransitionHandler.startAnimation: no controller found
+         1790834325.472   968  1065 V WindowManagerShell:  try handler com.android.wm.shell.transition.RemoteTransitionHandler@d449777
+         1790834325.472   968  1065 V WindowManagerShell: Transition doesn't have explicit remote, search filters for match for {id=38 t=OPEN f=0x0 trk=0 r=[0@Point(0, 0)] c=[{WCT{android.window.IWindowContainerToken$Stub$Proxy@979137e} m=OPEN f=NONE leash=Surface(name=Task=12)/@0x7cbcf83 sb=Rect(0, 0 - 2560, 1600) eb=Rect(0, 0 - 2560, 1600) d=0 taskParent=-1},{WCT{android.window.IWindowContainerToken$Stub$Proxy@df1e0df} m=TO_BACK f=SHOW_WALLPAPER leash=Surface(name=Task=1)/@0xd537500 sb=Rect(0, 0 - 2560, 1600) eb=Rect(0, 0 - 2560, 1600) d=0 taskParent=-1}]}
+         1790834325.472   968  1065 V WindowManagerShell:  Checking filter Pair{{types=[] flags=0x0] notFlags=0x0 checks=[{atype=undefined independent=true modes=[OPEN,TO_FRONT] flags=IN_TASK_WITH_EMBEDDED_ACTIVITY mustBeTask=false order=ANY topActivity=ComponentInfo{com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity} launchCookie=null},{atype=undefined independent=true modes=[CLOSE,TO_BACK] flags=IN_TASK_WITH_EMBEDDED_ACTIVITY mustBeTask=false order=ANY topActivity=null launchCookie=null}]} RemoteTransition { remoteTransition = android.window.IRemoteTransition$Stub$Proxy@a37ca5f, appThread = android.app.IApplicationThread$Stub$Proxy@de44cac, debugName = OverlaySwipeBack }}
+         1790834325.472   968  1065 V WindowManagerShell:  Checking filter Pair{{types=[] flags=0x0] notFlags=0x0 checks=[{atype=dream independent=true modes=[OPEN,TO_FRONT] flags=NONE mustBeTask=false order=ANY topActivity=null launchCookie=null},{atype=home independent=true modes=[CLOSE,TO_BACK] flags=NONE mustBeTask=false order=ANY topActivity=null launchCookie=null}]} RemoteTransition { remoteTransition = android.window.IRemoteTransition$Stub$Proxy@2993d75, appThread = android.app.IApplicationThread$Stub$Proxy@977010a, debugName = LauncherToDream }}
+         1790834325.472   968  1065 V WindowManagerShell:  Checking filter Pair{{types=[] flags=0x0] notFlags=0x100 checks=[{atype=home independent=true modes=[OPEN,TO_FRONT] flags=NONE mustBeTask=false order=TOP topActivity=ComponentInfo{com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity} launchCookie=null},{atype=standard independent=true modes=[CLOSE,TO_BACK] flags=NONE mustBeTask=false order=ANY topActivity=null launchCookie=null}]} RemoteTransition { remoteTransition = android.window.IRemoteTransition$Stub$Proxy@1b8ad7b, appThread = android.app.IApplicationThread$Stub$Proxy@89f8798, debugName = QuickstepLaunchHome }}
+         1790834325.472   968  1065 V WindowManagerShell:  Delegate animation for (#38) to null
+         1790834325.472   968  1065 V WindowManagerShell:  try handler com.android.wm.shell.transition.DefaultTransitionHandler@6c2ed4e
+         1790834325.472   968  1065 V WindowManagerShell: start default transition animation, info = {id=38 t=OPEN f=0x0 trk=0 r=[0@Point(0, 0)] c=[{WCT{android.window.IWindowContainerToken$Stub$Proxy@979137e} m=OPEN f=NONE leash=Surface(name=Task=12)/@0x7cbcf83 sb=Rect(0, 0 - 2560, 1600) eb=Rect(0, 0 - 2560, 1600) d=0 taskParent=-1},{WCT{android.window.IWindowContainerToken$Stub$Proxy@df1e0df} m=TO_BACK f=SHOW_WALLPAPER leash=Surface(name=Task=1)/@0xd537500 sb=Rect(0, 0 - 2560, 1600) eb=Rect(0, 0 - 2560, 1600) d=0 taskParent=-1}]}
+         1790834325.473   968  1065 V WindowManagerShell: loadAnimation: anim=android.view.animation.AnimationSet@cae1e30 animAttr=0x13 type=OPEN isEntrance=false
+         1790834325.473   968  1065 V WindowManagerShell: loadAnimation: anim=android.view.animation.AnimationSet@40eed5c animAttr=0x12 type=OPEN isEntrance=true
+         1790834325.475   968  1065 V WindowManagerShell:  animated by com.android.wm.shell.transition.DefaultTransitionHandler@6c2ed4e
+         1790834325.491   552  1933 W UserManagerService: Requested status bar icon for non-badged user 0
+         1790834325.504   552  1933 W UserManagerService: Requested status bar icon for non-badged user 0
+         1790834325.506   552  1933 W UserManagerService: Requested status bar icon for non-badged user 0
+         1790834325.509  1376  1395 I jank_cuj_events_end_request: [9,1790834325509101000,1246066693218,1246066693385]
+         1790834325.527   422   422 E BpTransactionCompletedListener: Failed to transact (-32)
+         1790834325.609   968  1065 V ShellDesktopMode: Task Vanished: #11 closed=true
+         1790834325.641  1376  1376 I TopTaskTracker: onTaskRemoved: taskId=11
+         1790834325.641  1376  1376 I TopTaskTracker: onTaskRemoved: taskId=11
+         1790834325.655  1376  1395 I jank_cuj_events_begin_request: [61,1790834325641193000,1246198784927,1246198785010,Home to App]
+         1790834325.793   968  1065 V WindowManagerShell: Transition animation finished (aborted=false), notifying core (#38) android.os.BinderProxy@9e740fc@0
+         1790834325.808   552   571 V WindowManager: Finish Transition (#38): created at 10-01 07:58:44.948 collect-started=0.015ms request-sent=7.058ms started=7.981ms ready=349.114ms sent=497.409ms finished=859.248ms
+         1790834325.812   968  1065 V WindowManagerShell: Track 0 became idle
+         1790834325.812   968  1065 V WindowManagerShell: All active transition animations finished
+         1790834325.850   552  1394 W UserManagerService: Requested status bar icon for non-badged user 0
+         1790834325.851   552  1394 W UserManagerService: Requested status bar icon for non-badged user 0
+         1790834325.897  1376  1660 D EGL_emulation: app_time_stats: avg=120.65ms min=40.72ms max=244.38ms count=9
+         1790834326.001  1376  1376 D VRI[NexusLauncherActivity]: visibilityChanged oldVisibility=true newVisibility=false
+         1790834326.002  1376  1376 D NexusLauncherModelDelegate: notifySmartspaceEvent: SmartspaceTargetEvent{mSmartspaceTarget=null, mSmartspaceActionId='null', mEventType=7}
+         1790834326.043  1376  1376 I viewroot_draw_event: [VRI[NexusLauncherActivity],Not drawing due to not visible. Reason=!mAppVisible && !mForceDecorViewVisibility]
+         1790834326.050   552   575 I wm_wallpaper_surface: [0,0,null]
+         1790834326.085  1376  1395 I jank_cuj_events_end_request: [61,1790834326085798000,1246643390219,1246643390302]
+         1790834326.195  9409  9409 F DEBUG   : *** *** *** *** *** *** *** *** *** *** *** *** *** *** *** ***
+         1790834326.195  9409  9409 F DEBUG   : Build fingerprint: 'google/sdk_gtablet_arm64/emu64a:15/AE3A.240806.046.T1/13135149:user/dev-keys'
+         1790834326.195  9409  9409 F DEBUG   : Revision: '0'
+         1790834326.195  9409  9409 F DEBUG   : ABI: 'arm64'
+         1790834326.195  9409  9409 F DEBUG   : Timestamp: 2026-10-01 07:58:45.361188010+0200
+         1790834326.195  9409  9409 F DEBUG   : Process uptime: 1s
+         1790834326.195  9409  9409 F DEBUG   : Cmdline: dev.probe
+         1790834326.195  9409  9409 F DEBUG   : pid: 9386, tid: 9386, name: dev.probe  >>> dev.probe <<<
+         1790834326.195  9409  9409 F DEBUG   : uid: 10213
+         1790834326.195  9409  9409 F DEBUG   : tagged_addr_ctrl: 0000000000000001 (PR_TAGGED_ADDR_ENABLE)
+         1790834326.195  9409  9409 F DEBUG   : pac_enabled_keys: 000000000000000f (PR_PAC_APIAKEY, PR_PAC_APIBKEY, PR_PAC_APDAKEY, PR_PAC_APDBKEY)
+         1790834326.195  9409  9409 F DEBUG   : signal 11 (SIGSEGV), code 0 (SI_USER), fault addr --------
+         1790834326.195  9409  9409 F DEBUG   :     x0  0000000000000000  x1  000000000000000b  x2  0000007ff7fa1628  x3  0000000000000003
+         1790834326.195  9409  9409 F DEBUG   :     x4  0000007ff7fa14d0  x5  000000000005a3bc  x6  301f394648521f35  x7  7f7f7f7f7f7f7f7f
+         1790834326.195  9409  9409 F DEBUG   :     x8  0000000000000081  x9  ed3bbebb9c8a27a6  x10 000000000000002b  x11 fffffffffffffffd
+         1790834326.195  9409  9409 F DEBUG   :     x12 0000007ff7fa1660  x13 0000000000000022  x14 0000007ff7fa2958  x15 000001b888a95d51
+         1790834326.195  9409  9409 F DEBUG   :     x16 0000007dd8325018  x17 0000007dee33f420  x18 0000007e02e84000  x19 b400007c0ec5b010
+         1790834326.195  9409  9409 F DEBUG   :     x20 0000000000000000  x21 b400007c0ec5b0d0  x22 0000000000000002  x23 0000007ff7fa2f10
+         1790834326.195  9409  9409 F DEBUG   :     x24 0000000070a7af80  x25 0000000000000002  x26 0000007a4003faf0  x27 0000000000000002
+         1790834326.195  9409  9409 F DEBUG   :     x28 0000007ff7fa2de0  x29 0000007ff7fa2ed0
+         1790834326.195  9409  9409 F DEBUG   :     lr  0000007b3b978f74  sp  0000007ff7fa2dd0  pc  0000007dee33f428  pst 0000000060001000
+         1790834326.195  9409  9409 F DEBUG   : 87 total frames
+         1790834326.195  9409  9409 F DEBUG   : backtrace:
+         1790834326.195  9409  9409 F DEBUG   :       #00 pc 00000000000bd428  /apex/com.android.runtime/lib64/bionic/libc.so (kill+8) (BuildId: 1b9fecf834d610f77e641f026ca7269b)
+         1790834326.195  9409  9409 F DEBUG   :       #01 pc 0000000000378f70  /apex/com.android.art/lib64/libart.so (art_quick_generic_jni_trampoline+144) (BuildId: dcb9fe2b5c99aa3f1a682a6008427d08)
+         1790834326.195  9409  9409 F DEBUG   :       #02 pc 0000000000362a40  /apex/com.android.art/lib64/libart.so (art_quick_invoke_static_stub+640) (BuildId: dcb9fe2b5c99aa3f1a682a6008427d08)
+         1790834326.195  9409  9409 F DEBUG   :       #03 pc 000000000035bd94  /apex/com.android.art/lib64/libart.so (bool art::interpreter::DoCall<false>(art::ArtMethod*, art::Thread*, art::ShadowFrame&, art::Instruction const*, unsigned short, bool, art::JValue*)+2048) (BuildId: dcb9fe2b5c99aa3f1a682a6008427d08)
+         1790834326.195  9409  9409 F DEBUG   :       #04 pc 000000000076da48  /apex/com.android.art/lib64/libart.so (void art::interpreter::ExecuteSwitchImplCpp<false>(art::interpreter::SwitchImplContext*)+12208) (BuildId: dcb9fe2b5c99aa3f1a682a6008427d08)
+         1790834326.195  9409  9409 F DEBUG   :       #05 pc 000000000037b5d8  /apex/com.android.art/lib64/libart.so (ExecuteSwitchImplAsm+8) (BuildId: dcb9fe2b5c99aa3f1a682a6008427d08)
+         1790834326.195  9409  9409 F DEBUG   :       #06 pc 00000000001b1488  /data/app/~~q9nqscILYtTzepYCjV11ag==/dev.probe-NGcv8M4B7ISXa68TH0Ck0A==/base.apk (dev.probe.MainActivity.dispatch+0)
+         1790834326.195  9409  9409 F DEBUG   :       #07 pc 000000000034e21c  /apex/com.android.art/lib64/libart.so (art::interpreter::Execute(art::Thread*, art::CodeItemDataAccessor const&, art::ShadowFrame&, art::JValue, bool, bool) (.__uniq.112435418011751916792819755956732575238.llvm.2845697060370838518)+428) (BuildId: dcb9fe2b5c99aa3f1a682a6008427d08)
+         1790834326.195  9409  9409 F DEBUG   :       #08 pc 000000000035c5b0  /apex/com.android.art/lib64/libart.so (bool art::interpreter::DoCall<false>(art::ArtMethod*, art::Thread*, art::ShadowFrame&, art::Instruction const*, unsigned short, bool, art::JValue*)+4124) (BuildId: dcb9fe2b5c99aa3f1a682a6008427d08)
+         1790834326.196  9409  9409 F DEBUG   :       #09 pc 000000000076da48  /apex/com.android.art/lib64/libart.so (void art::interpreter::ExecuteSwitchImplCpp<false>(art::interpreter::SwitchImplContext*)+12208) (BuildId: dcb9fe2b5c99aa3f1a682a6008427d08)
+         1790834326.196  9409  9409 F DEBUG   :       #10 pc 000000000037b5d8  /apex/com.android.art/lib64/libart.so (ExecuteSwitchImplAsm+8) (BuildId: dcb9fe2b5c99aa3f1a682a6008427d08)
+         1790834326.196  9409  9409 F DEBUG   :       #11 pc 00000000001b166c  /data/app/~~q9nqscILYtTzepYCjV11ag==/dev.probe-NGcv8M4B7ISXa68TH0Ck0A==/base.apk (dev.probe.MainActivity.onCreate+0)
+         1790834326.196  9409  9409 F DEBUG   :       #12 pc 000000000034e21c  /apex/com.android.art/lib64/libart.so (art::interpreter::Execute(art::Thread*, art::CodeItemDataAccessor const&, art::ShadowFrame&, art::JValue, bool, bool) (.__uniq.112435418011751916792819755956732575238.llvm.2845697060370838518)+428) (BuildId: dcb9fe2b5c99aa3f1a682a6008427d08)
+         1790834326.196  9409  9409 F DEBUG   :       #13 pc 000000000035c5b0  /apex/com.android.art/lib64/libart.so (bool art::interpreter::DoCall<false>(art::ArtMethod*, art::Thread*, art::ShadowFrame&, art::Instruction const*, unsigned short, bool, art::JValue*)+4124) (BuildId: dcb9fe2b5c99aa3f1a682a6008427d08)
+         1790834326.196  9409  9409 F DEBUG   :       #14 pc 000000000076da48  /apex/com.android.art/lib64/libart.so (void art::interpreter::ExecuteSwitchImplCpp<false>(art::interpreter::SwitchImplContext*)+12208) (BuildId: dcb9fe2b5c99aa3f1a682a6008427d08)
+         1790834326.196  9409  9409 F DEBUG   :       #15 pc 000000000037b5d8  /apex/com.android.art/lib64/libart.so (ExecuteSwitchImplAsm+8) (BuildId: dcb9fe2b5c99aa3f1a682a6008427d08)
+         1790834326.196  9409  9409 F DEBUG   :       #16 pc 00000000001de27c  /system/framework/framework.jar (android.app.Activity.performCreate+0)
+         1790834326.196  9409  9409 F DEBUG   :       #17 pc 000000000034e21c  /apex/com.android.art/lib64/libart.so (art::interpreter::Execute(art::Thread*, art::CodeItemDataAccessor const&, art::ShadowFrame&, art::JValue, bool, bool) (.__uniq.112435418011751916792819755956732575238.llvm.2845697060370838518)+428) (BuildId: dcb9fe2b5c99aa3f1a682a6008427d08)
+         1790834326.196  9409  9409 F DEBUG   :       #18 pc 000000000035c5b0  /apex/com.android.art/lib64/libart.so (bool art::interpreter::DoCall<false>(art::ArtMethod*, art::Thread*, art::ShadowFrame&, art::Instruction const*, unsigned short, bool, art::JValue*)+4124) (BuildId: dcb9fe2b5c99aa3f1a682a6008427d08)
+         1790834326.196  9409  9409 F DEBUG   :       #19 pc 000000000076da48  /apex/com.android.art/lib64/libart.so (void art::interpreter::ExecuteSwitchImplCpp<false>(art::interpreter::SwitchImplContext*)+12208) (BuildId: dcb9fe2b5c99aa3f1a682a6008427d08)
+         1790834326.196  9409  9409 F DEBUG   :       #20 pc 000000000037b5d8  /apex/com.android.art/lib64/libart.so (ExecuteSwitchImplAsm+8) (BuildId: dcb9fe2b5c99aa3f1a682a6008427d08)
+         1790834326.196  9409  9409 F DEBUG   :       #21 pc 00000000001de260  /system/framework/framework.jar (android.app.Activity.performCreate+0)
+         1790834326.196  9409  9409 F DEBUG   :       #22 pc 000000000034e21c  /apex/com.android.art/lib64/libart.so (art::interpreter::Execute(art::Thread*, art::CodeItemDataAccessor const&, art::ShadowFrame&, art::JValue, bool, bool) (.__uniq.112435418011751916792819755956732575238.llvm.2845697060370838518)+428) (BuildId: dcb9fe2b5c99aa3f1a682a6008427d08)
+         1790834326.196  9409  9409 F DEBUG   :       #23 pc 000000000035c5b0  /apex/com.android.art/lib64/libart.so (bool art::interpreter::DoCall<false>(art::ArtMethod*, art::Thread*, art::ShadowFrame&, art::Instruction const*, unsigned short, bool, art::JValue*)+4124) (BuildId: dcb9fe2b5c99aa3f1a682a6008427d08)
+         1790834326.196  9409  9409 F DEBUG   :       #24 pc 000000000076da48  /apex/com.android.art/lib64/libart.so (void art::interpreter::ExecuteSwitchImplCpp<false>(art::interpreter::SwitchImplContext*)+12208) (BuildId: dcb9fe2b5c99aa3f1a682a6008427d08)
+         1790834326.196  9409  9409 F DEBUG   :       #25 pc 000000000037b5d8  /apex/com.android.art/lib64/libart.so (ExecuteSwitchImplAsm+8) (BuildId: dcb9fe2b5c99aa3f1a682a6008427d08)
+         1790834326.196  9409  9409 F DEBUG   :       #26 pc 0000000000255254  /system/framework/framework.jar (android.app.Instrumentation.callActivityOnCreate+0)
+         1790834326.196  9409  9409 F DEBUG   :       #27 pc 000000000034e21c  /apex/com.android.art/lib64/libart.so (art::interpreter::Execute(art::Thread*, art::CodeItemDataAccessor const&, art::ShadowFrame&, art::JValue, bool, bool) (.__uniq.112435418011751916792819755956732575238.llvm.2845697060370838518)+428) (BuildId: dcb9fe2b5c99aa3f1a682a6008427d08)
+         1790834326.196  9409  9409 F DEBUG   :       #28 pc 000000000035c5b0  /apex/com.android.art/lib64/libart.so (bool art::interpreter::DoCall<false>(art::ArtMethod*, art::Thread*, art::ShadowFrame&, art::Instruction const*, unsigned short, bool, art::JValue*)+4124) (BuildId: dcb9fe2b5c99aa3f1a682a6008427d08)
+         1790834326.196  9409  9409 F DEBUG   :       #29 pc 000000000076da48  /apex/com.android.art/lib64/libart.so (void art::interpreter::ExecuteSwitchImplCpp<false>(art::interpreter::SwitchImplContext*)+12208) (BuildId: dcb9fe2b5c99aa3f1a682a6008427d08)
+         1790834326.196  9409  9409 F DEBUG   :       #30 pc 000000000037b5d8  /apex/com.android.art/lib64/libart.so (ExecuteSwitchImplAsm+8) (BuildId: dcb9fe2b5c99aa3f1a682a6008427d08)
+         1790834326.196  9409  9409 F DEBUG   :       #31 pc 00000000001cbfc0  /system/framework/framework.jar (android.app.ActivityThread.performLaunchActivity+0)
+         1790834326.196  9409  9409 F DEBUG   :       #32 pc 000000000034e21c  /apex/com.android.art/lib64/libart.so (art::interpreter::Execute(art::Thread*, art::CodeItemDataAccessor const&, art::ShadowFrame&, art::JValue, bool, bool) (.__uniq.112435418011751916792819755956732575238.llvm.2845697060370838518)+428) (BuildId: dcb9fe2b5c99aa3f1a682a6008427d08)
+         1790834326.196  9409  9409 F DEBUG   :       #33 pc 000000000035c5b0  /apex/com.android.art/lib64/libart.so (bool art::interpreter::DoCall<false>(art::ArtMethod*, art::Thread*, art::ShadowFrame&, art::Instruction const*, unsigned short, bool, art::JValue*)+4124) (BuildId: dcb9fe2b5c99aa3f1a682a6008427d08)
+         1790834326.196  9409  9409 F DEBUG   :       #34 pc 000000000076da48  /apex/com.android.art/lib64/libart.so (void art::interpreter::ExecuteSwitchImplCpp<false>(art::interpreter::SwitchImplContext*)+12208) (BuildId: dcb9fe2b5c99aa3f1a682a6008427d08)
+         1790834326.196  9409  9409 F DEBUG   :       #35 pc 000000000037b5d8  /apex/com.android.art/lib64/libart.so (ExecuteSwitchImplAsm+8) (BuildId: dcb9fe2b5c99aa3f1a682a6008427d08)
+         1790834326.196  9409  9409 F DEBUG   :       #36 pc 00000000001cbec8  /system/framework/framework.jar (android.app.ActivityThread.handleLaunchActivity+0)
+         1790834326.196  9409  9409 F DEBUG   :       #37 pc 000000000034d5a8  /apex/com.android.art/lib64/libart.so (artQuickToInterpreterBridge+1932) (BuildId: dcb9fe2b5c99aa3f1a682a6008427d08)
+         1790834326.196  9409  9409 F DEBUG   :       #38 pc 0000000000379098  /apex/com.android.art/lib64/libart.so (art_quick_to_interpreter_bridge+88) (BuildId: dcb9fe2b5c99aa3f1a682a6008427d08)
+         1790834326.196  9409  9409 F DEBUG   :       #39 pc 000000000077f320  /apex/com.android.art/lib64/libart.so (nterp_helper+4016) (BuildId: dcb9fe2b5c99aa3f1a682a6008427d08)
+         1790834326.196  9409  9409 F DEBUG   :       #40 pc 00000000002fcd62  /system/framework/framework.jar (android.app.servertransaction.LaunchActivityItem.execute+170)
+         1790834326.196  9409  9409 F DEBUG   :       #41 pc 000000000077f2c4  /apex/com.android.art/lib64/libart.so (nterp_helper+3924) (BuildId: dcb9fe2b5c99aa3f1a682a6008427d08)
+         1790834326.196  9409  9409 F DEBUG   :       #42 pc 00000000002ff8e6  /system/framework/framework.jar (android.app.servertransaction.TransactionExecutor.executeNonLifecycleItem+154)
+         1790834326.196  9409  9409 F DEBUG   :       #43 pc 000000000077f2c4  /apex/com.android.art/lib64/libart.so (nterp_helper+3924) (BuildId: dcb9fe2b5c99aa3f1a682a6008427d08)
+         1790834326.196  9409  9409 F DEBUG   :       #44 pc 00000000002ff972  /system/framework/framework.jar (android.app.servertransaction.TransactionExecutor.executeTransactionItems+70)
+         1790834326.196  9409  9409 F DEBUG   :       #45 pc 0000000000362774  /apex/com.android.art/lib64/libart.so (art_quick_invoke_stub+612) (BuildId: dcb9fe2b5c99aa3f1a682a6008427d08)
+         1790834326.196  9409  9409 F DEBUG   :       #46 pc 000000000035bd1c  /apex/com.android.art/lib64/libart.so (bool art::interpreter::DoCall<false>(art::ArtMethod*, art::Thread*, art::ShadowFrame&, art::Instruction const*, unsigned short, bool, art::JValue*)+1928) (BuildId: dcb9fe2b5c99aa3f1a682a6008427d08)
+         1790834326.196  9409  9409 F DEBUG   :       #47 pc 000000000076da48  /apex/com.android.art/lib64/libart.so (void art::interpreter::ExecuteSwitchImplCpp<false>(art::interpreter::SwitchImplContext*)+12208) (BuildId: dcb9fe2b5c99aa3f1a682a6008427d08)
+         1790834326.196  9409  9409 F DEBUG   :       #48 pc 000000000037b5d8  /apex/com.android.art/lib64/libart.so (ExecuteSwitchImplAsm+8) (BuildId: dcb9fe2b5c99aa3f1a682a6008427d08)
+         1790834326.196  9409  9409 F DEBUG   :       #49 pc 00000000002ff658  /system/framework/framework.jar (android.app.servertransaction.TransactionExecutor.execute+0)
+         1790834326.196  9409  9409 F DEBUG   :       #50 pc 000000000034d5a8  /apex/com.android.art/lib64/libart.so (artQuickToInterpreterBridge+1932) (BuildId: dcb9fe2b5c99aa3f1a682a6008427d08)
+         1790834326.196  9409  9409 F DEBUG   :       #51 pc 0000000000379098  /apex/com.android.art/lib64/libart.so (art_quick_to_interpreter_bridge+88) (BuildId: dcb9fe2b5c99aa3f1a682a6008427d08)
+         1790834326.196  9409  9409 F DEBUG   :       #52 pc 00000000000534fc  [anon_shmem:dalvik-jit-code-cache] (offset 0x2000000) (android.app.ActivityThread$H.handleMessage+1756)
+         1790834326.196  9409  9409 F DEBUG   :       #53 pc 0000000000052d40  [anon_shmem:dalvik-jit-code-cache] (offset 0x2000000) (android.os.Handler.dispatchMessage+304)
+         1790834326.196  9409  9409 F DEBUG   :       #54 pc 0000000000042114  [anon_shmem:dalvik-jit-code-cache] (offset 0x2000000) (android.os.Looper.loopOnce+1140)
+         1790834326.196  9409  9409 F DEBUG   :       #55 pc 0000000000362a40  /apex/com.android.art/lib64/libart.so (art_quick_invoke_static_stub+640) (BuildId: dcb9fe2b5c99aa3f1a682a6008427d08)
+         1790834326.196  9409  9409 F DEBUG   :       #56 pc 000000000035bd94  /apex/com.android.art/lib64/libart.so (bool art::interpreter::DoCall<false>(art::ArtMethod*, art::Thread*, art::ShadowFrame&, art::Instruction const*, unsigned short, bool, art::JValue*)+2048) (BuildId: dcb9fe2b5c99aa3f1a682a6008427d08)
+         1790834326.196  9409  9409 F DEBUG   :       #57 pc 000000000076da48  /apex/com.android.art/lib64/libart.so (void art::interpreter::ExecuteSwitchImplCpp<false>(art::interpreter::SwitchImplContext*)+12208) (BuildId: dcb9fe2b5c99aa3f1a682a6008427d08)
+         1790834326.196  9409  9409 F DEBUG   :       #58 pc 000000000037b5d8  /apex/com.android.art/lib64/libart.so (ExecuteSwitchImplAsm+8) (BuildId: dcb9fe2b5c99aa3f1a682a6008427d08)
+         1790834326.196  9409  9409 F DEBUG   :       #59 pc 000000000020c024  /system/framework/framework.jar (android.os.Looper.loop+0)
+         1790834326.196  9409  9409 F DEBUG   :       #60 pc 000000000034e21c  /apex/com.android.art/lib64/libart.so (art::interpreter::Execute(art::Thread*, art::CodeItemDataAccessor const&, art::ShadowFrame&, art::JValue, bool, bool) (.__uniq.112435418011751916792819755956732575238.llvm.2845697060370838518)+428) (BuildId: dcb9fe2b5c99aa3f1a682a6008427d08)
+         1790834326.196  9409  9409 F DEBUG   :       #61 pc 000000000035c5b0  /apex/com.android.art/lib64/libart.so (bool art::interpreter::DoCall<false>(art::ArtMethod*, art::Thread*, art::ShadowFrame&, art::Instruction const*, unsigned short, bool, art::JValue*)+4124) (BuildId: dcb9fe2b5c99aa3f1a682a6008427d08)
+         1790834326.196  9409  9409 F DEBUG   :       #62 pc 000000000076da48  /apex/com.android.art/lib64/libart.so (void art::interpreter::ExecuteSwitchImplCpp<false>(art::interpreter::SwitchImplContext*)+12208) (BuildId: dcb9fe2b5c99aa3f1a682a6008427d08)
+         1790834326.196  9409  9409 F DEBUG   :       #63 pc 000000000037b5d8  /apex/com.android.art/lib64/libart.so (ExecuteSwitchImplAsm+8) (BuildId: dcb9fe2b5c99aa3f1a682a6008427d08)
+         1790834326.196  9409  9409 F DEBUG   :       #64 pc 00000000001d6138  /system/framework/framework.jar (android.app.ActivityThread.main+0)
+         1790834326.196  9409  9409 F DEBUG   :       #65 pc 000000000034d5a8  /apex/com.android.art/lib64/libart.so (artQuickToInterpreterBridge+1932) (BuildId: dcb9fe2b5c99aa3f1a682a6008427d08)
+         1790834326.196  9409  9409 F DEBUG   :       #66 pc 0000000000379098  /apex/com.android.art/lib64/libart.so (art_quick_to_interpreter_bridge+88) (BuildId: dcb9fe2b5c99aa3f1a682a6008427d08)
+         1790834326.196  9409  9409 F DEBUG   :       #67 pc 0000000000362a40  /apex/com.android.art/lib64/libart.so (art_quick_invoke_static_stub+640) (BuildId: dcb9fe2b5c99aa3f1a682a6008427d08)
+         1790834326.196  9409  9409 F DEBUG   :       #68 pc 000000000035e42c  /apex/com.android.art/lib64/libart.so (_jobject* art::InvokeMethod<(art::PointerSize)8>(art::ScopedObjectAccessAlreadyRunnable const&, _jobject*, _jobject*, _jobject*, unsigned long)+732) (BuildId: dcb9fe2b5c99aa3f1a682a6008427d08)
+         1790834326.196  9409  9409 F DEBUG   :       #69 pc 00000000006c87f8  /apex/com.android.art/lib64/libart.so (art::Method_invoke(_JNIEnv*, _jobject*, _jobject*, _jobjectArray*) (.__uniq.165753521025965369065708152063621506277)+32) (BuildId: dcb9fe2b5c99aa3f1a682a6008427d08)
+         1790834326.196  9409  9409 F DEBUG   :       #70 pc 0000000000378f70  /apex/com.android.art/lib64/libart.so (art_quick_generic_jni_trampoline+144) (BuildId: dcb9fe2b5c99aa3f1a682a6008427d08)
+         1790834326.196  9409  9409 F DEBUG   :       #71 pc 0000000000362774  /apex/com.android.art/lib64/libart.so (art_quick_invoke_stub+612) (BuildId: dcb9fe2b5c99aa3f1a682a6008427d08)
+         1790834326.196  9409  9409 F DEBUG   :       #72 pc 000000000035bd1c  /apex/com.android.art/lib64/libart.so (bool art::interpreter::DoCall<false>(art::ArtMethod*, art::Thread*, art::ShadowFrame&, art::Instruction const*, unsigned short, bool, art::JValue*)+1928) (BuildId: dcb9fe2b5c99aa3f1a682a6008427d08)
+         1790834326.196  9409  9409 F DEBUG   :       #73 pc 000000000076da48  /apex/com.android.art/lib64/libart.so (void art::interpreter::ExecuteSwitchImplCpp<false>(art::interpreter::SwitchImplContext*)+12208) (BuildId: dcb9fe2b5c99aa3f1a682a6008427d08)
+         1790834326.196  9409  9409 F DEBUG   :       #74 pc 000000000037b5d8  /apex/com.android.art/lib64/libart.so (ExecuteSwitchImplAsm+8) (BuildId: dcb9fe2b5c99aa3f1a682a6008427d08)
+         1790834326.196  9409  9409 F DEBUG   :       #75 pc 00000000001d23e8  /system/framework/framework.jar (com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run+0)
+         1790834326.196  9409  9409 F DEBUG   :       #76 pc 000000000034d5a8  /apex/com.android.art/lib64/libart.so (artQuickToInterpreterBridge+1932) (BuildId: dcb9fe2b5c99aa3f1a682a6008427d08)
+         1790834326.196  9409  9409 F DEBUG   :       #77 pc 0000000000379098  /apex/com.android.art/lib64/libart.so (art_quick_to_interpreter_bridge+88) (BuildId: dcb9fe2b5c99aa3f1a682a6008427d08)
+         1790834326.196  9409  9409 F DEBUG   :       #78 pc 0000000000806064  /system/framework/arm64/boot-framework.oat (com.android.internal.os.ZygoteInit.main+3028) (BuildId: 01aac877f98adfcada8a999b931b49cf6741adbf)
+         1790834326.196  9409  9409 F DEBUG   :       #79 pc 0000000000362a40  /apex/com.android.art/lib64/libart.so (art_quick_invoke_static_stub+640) (BuildId: dcb9fe2b5c99aa3f1a682a6008427d08)
+         1790834326.196  9409  9409 F DEBUG   :       #80 pc 000000000034df38  /apex/com.android.art/lib64/libart.so (art::ArtMethod::Invoke(art::Thread*, unsigned int*, unsigned int, art::JValue*, char const*)+204) (BuildId: dcb9fe2b5c99aa3f1a682a6008427d08)
+         1790834326.196  9409  9409 F DEBUG   :       #81 pc 000000000034beec  /apex/com.android.art/lib64/libart.so (art::JValue art::InvokeWithVarArgs<_jmethodID*>(art::ScopedObjectAccessAlreadyRunnable const&, _jobject*, _jmethodID*, std::__va_list)+512) (BuildId: dcb9fe2b5c99aa3f1a682a6008427d08)
+         1790834326.196  9409  9409 F DEBUG   :       #82 pc 00000000007398bc  /apex/com.android.art/lib64/libart.so (art::JNI<true>::CallStaticVoidMethodV(_JNIEnv*, _jclass*, _jmethodID*, std::__va_list)+104) (BuildId: dcb9fe2b5c99aa3f1a682a6008427d08)
+         1790834326.196  9409  9409 F DEBUG   :       #83 pc 00000000000d5290  /system/lib64/libandroid_runtime.so (_JNIEnv::CallStaticVoidMethod(_jclass*, _jmethodID*, ...)+104) (BuildId: 7e2a886b7a4523debea27d91258da727)
+         1790834326.196  9409  9409 F DEBUG   :       #84 pc 00000000000ea74c  /system/lib64/libandroid_runtime.so (android::AndroidRuntime::start(char const*, android::Vector<android::String8> const&, bool)+908) (BuildId: 7e2a886b7a4523debea27d91258da727)
+         1790834326.196  9409  9409 F DEBUG   :       #85 pc 0000000000004568  /system/bin/app_process64 (main+1204) (BuildId: ca426b31a2d06fac00c886329fb5d520)
+         1790834326.196  9409  9409 F DEBUG   :       #86 pc 00000000000552cc  /apex/com.android.runtime/lib64/bionic/libc.so (__libc_init+116) (BuildId: 1b9fecf834d610f77e641f026ca7269b)
+         1790834326.200   552  9420 I am_crash: [552,0,dev.probe,552091206,Native crash,Segmentation fault,unknown,0,0]
+         1790834326.201   214   214 E tombstoned: Tombstone written to: tombstone_00
+         1790834326.201   552  9421 I DropBoxManagerService: add tag=data_app_native_crash isTagEnabled=true flags=0x6
+         1790834326.201   552  9420 W ActivityTaskManager:   Force finishing activity dev.probe/.MainActivity
+         1790834326.202   552  9420 I wm_finish_activity: [0,226006648,12,dev.probe/.MainActivity,force-crash]
+         1790834326.202   552  9420 I wm_task_moved: [1,1,0,1,2]
+         1790834326.202   552  9420 I wm_task_moved: [7,1,0,1,2147483647]
+         1790834326.202   552  9420 I wm_task_to_front: [0,7,0]
+         1790834326.202   968  1065 V WindowManagerShell: Transition requested (#39): android.os.BinderProxy@89f4b63 TransitionRequestInfo { type = CLOSE, triggerTask = null, pipTask = null, remoteTransition = null, displayChange = null, flags = 16, debugId = 39 }
+         1790834326.202   552  9420 I wm_focused_root_task: [0,0,1,12,finish-top adjustFocusToNextFocusableTask]
+         1790834326.202   552  9420 I wm_pause_activity: [0,226006648,dev.probe/.MainActivity,userLeaving=false,finish]
+         1790834326.203   552   572 I ActivityManager: Showing crash dialog for package dev.probe u0
+         1790834326.203  1376  1376 D VRI[NexusLauncherActivity]: visibilityChanged oldVisibility=false newVisibility=true
+         1790834326.204   552   574 I sysui_multi_action: [757,1144,758,7,806,dev.probe,871,dev.probe.MainActivity]
+         1790834326.205   552   655 I DropBoxManagerService: add tag=SYSTEM_TOMBSTONE_PROTO_WITH_HEADERS isTagEnabled=true flags=0x4
+         1790834326.209   552   865 I ActivityManager: Process dev.probe (pid 9386) has died: fg  TOP 
+         1790834326.209  1710  1710 I adbd    : Remote process closed the socket (on MSG_PEEK)
+         1790834326.209   552   865 I am_proc_died: [0,9386,dev.probe,0,2]
+         1790834326.209   552   865 I am_uid_stopped: 10213
+         1790834326.210   360   360 I Zygote  : Process 9386 exited due to signal 11 (Segmentation fault)
+         1790834326.210   552   583 I libprocessgroup: Removed cgroup /sys/fs/cgroup/uid_10213/pid_9386
+         1790834326.210   552   865 I wm_set_resumed_activity: [0,com.google.android.apps.nexuslauncher/.NexusLauncherActivity,resumeTopActivity - onActivityStateChanged]
+         1790834326.211   552   865 I wm_resume_activity: [0,164195755,7,com.google.android.apps.nexuslauncher/.NexusLauncherActivity]
+         1790834326.215   552   655 I commit_sys_config_file: [log-files,3]
+         1790834326.216   422   422 I BpBinder: onLastStrongRef automatically unlinking death recipients: 
+         1790834326.216  1376  1376 D NexusLauncherModelDelegate: notifySmartspaceEvent: SmartspaceTargetEvent{mSmartspaceTarget=null, mSmartspaceActionId='null', mEventType=6}
+         1790834326.217   552   655 I BootReceiver: Copying /data/tombstones/tombstone_00 to DropBox (SYSTEM_TOMBSTONE)
+         1790834326.218   552   655 I DropBoxManagerService: add tag=SYSTEM_TOMBSTONE isTagEnabled=true flags=0x6
+         1790834326.219   552   655 I dropbox_file_copy: [/data/tombstones/tombstone_00,65536,SYSTEM_TOMBSTONE]
+         1790834326.228   552   655 I commit_sys_config_file: [log-files,10]
+         1790834326.235   552  9420 I sysui_multi_action: [757,316,758,4,759,1]
+         1790834326.235   552  9420 W ActivityManager: Ignoring remove of inactive process: ProcessRecord{4dca224 0:dev.probe/u0a213}
+         1790834326.240  1376  1376 I viewroot_draw_event: [VRI[NexusLauncherActivity],Start draw after previous draw not visible]
+         1790834326.241   552   572 W InputManager-JNI: Input channel object '89363e5 Application Error: dev.probe (client)' was disposed without first being removed with the input manager!
+         1790834326.243   552   575 I input_focus: [Focus request f58b5f2 com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity,reason=UpdateInputWindows]
+         1790834326.243   552   572 D DisplayManagerService: Drop pending events for gone uid 10213
+         1790834326.321  1376  1376 I viewroot_draw_event: [VRI[NexusLauncherActivity],reportDrawFinished seqId=0]
+         1790834326.321  1376  1376 I TopTaskTracker: onTaskMovedToFront: (moved taskInfo to front) taskId=7, baseIntent=Intent { act=android.intent.action.MAIN cat=[android.intent.category.HOME] flg=0x10000100 cmp=com.google.android.apps.nexuslauncher/.NexusLauncherActivity }
+         1790834326.322  1376  1376 I wm_on_resume_called: [164195755,com.google.android.apps.nexuslauncher.NexusLauncherActivity,RESUME_ACTIVITY,1]
+         1790834326.322  1376  1376 D StatsLog: LAUNCHER_ONRESUME
+         1790834326.323   968  1065 D WindowManagerShell: setLauncherKeepClearAreaHeight: visible=true, height=202
+         1790834326.327   968  3414 V WindowManagerShell: onTransitionReady(transaction=2370821948554)
+         1790834326.328   968  1065 V WindowManagerShell: onTransitionReady (#39) android.os.BinderProxy@89f4b63: {id=39 t=CLOSE f=0x10 trk=0 r=[0@Point(0, 0)] c=[{WCT{android.window.IWindowContainerToken$Stub$Proxy@316658c} m=TO_FRONT f=SHOW_WALLPAPER|MOVE_TO_TOP leash=Surface(name=Task=1)/@0x65d7360 sb=Rect(0, 0 - 2560, 1600) eb=Rect(0, 0 - 2560, 1600) d=0 taskParent=-1},{WCT{android.window.IWindowContainerToken$Stub$Proxy@9c214d5} m=CLOSE f=NONE leash=Surface(name=Task=12)/@0xb319019 sb=Rect(0, 0 - 2560, 1600) eb=Rect(0, 0 - 2560, 1600) d=0 taskParent=-1},{null m=TO_FRONT f=IS_WALLPAPER leash=Surface(name=WallpaperWindowToken{7f74c95 token=android.os.Binder@202a44c})/@0xa5828de sb=Rect(0, 0 - 2560, 1600) eb=Rect(0, 0 - 2560, 1600) d=0}]}
+         1790834326.328   968  1065 V WindowManagerShell: Playing animation for (#39) android.os.BinderProxy@89f4b63@0
+         1790834326.328   968  1065 V WindowManagerShell:  try handler com.android.wm.shell.transition.DefaultMixedHandler@cdb834c
+         1790834326.328   968  1065 V WindowManagerShell:  try handler com.android.wm.shell.keyguard.KeyguardTransitionHandler@4403f95
+         1790834326.328   968  1065 V WindowManagerShell:  try handler com.android.wm.shell.pip.PipTransition@4f8a8aa
+         1790834326.328   968  1065 V WindowManagerShell:  try handler com.android.wm.shell.activityembedding.ActivityEmbeddingController@ebfcc9b
+         1790834326.328   968  1065 V WindowManagerShell:  try handler com.android.wm.shell.splitscreen.StageCoordinator@2e38838
+         1790834326.328   968  1065 V WindowManagerShell:  try handler com.android.wm.shell.desktopmode.DesktopTasksController@1b24011
+         1790834326.328   968  1065 V WindowManagerShell:  try handler com.android.wm.shell.recents.RecentsTransitionHandler@690a576
+         1790834326.328   968  1065 V ShellRecents: RecentsTransitionHandler.startAnimation: no controller found
+         1790834326.328   968  1065 V WindowManagerShell:  try handler com.android.wm.shell.transition.RemoteTransitionHandler@d449777
+         1790834326.328   968  1065 V WindowManagerShell: Transition doesn't have explicit remote, search filters for match for {id=39 t=CLOSE f=0x10 trk=0 r=[0@Point(0, 0)] c=[{WCT{android.window.IWindowContainerToken$Stub$Proxy@316658c} m=TO_FRONT f=SHOW_WALLPAPER|MOVE_TO_TOP leash=Surface(name=Task=1)/@0x65d7360 sb=Rect(0, 0 - 2560, 1600) eb=Rect(0, 0 - 2560, 1600) d=0 taskParent=-1},{WCT{android.window.IWindowContainerToken$Stub$Proxy@9c214d5} m=CLOSE f=NONE leash=Surface(name=Task=12)/@0xb319019 sb=Rect(0, 0 - 2560, 1600) eb=Rect(0, 0 - 2560, 1600) d=0 taskParent=-1},{null m=TO_FRONT f=IS_WALLPAPER leash=Surface(name=WallpaperWindowToken{7f74c95 token=android.os.Binder@202a44c})/@0xa5828de sb=Rect(0, 0 - 2560, 1600) eb=Rect(0, 0 - 2560, 1600) d=0}]}
+         1790834326.328   968  1065 V WindowManagerShell:  Checking filter Pair{{types=[] flags=0x0] notFlags=0x0 checks=[{atype=undefined independent=true modes=[OPEN,TO_FRONT] flags=IN_TASK_WITH_EMBEDDED_ACTIVITY mustBeTask=false order=ANY topActivity=ComponentInfo{com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity} launchCookie=null},{atype=undefined independent=true modes=[CLOSE,TO_BACK] flags=IN_TASK_WITH_EMBEDDED_ACTIVITY mustBeTask=false order=ANY topActivity=null launchCookie=null}]} RemoteTransition { remoteTransition = android.window.IRemoteTransition$Stub$Proxy@a37ca5f, appThread = android.app.IApplicationThread$Stub$Proxy@de44cac, debugName = OverlaySwipeBack }}
+         1790834326.328   968  1065 V WindowManagerShell:  Checking filter Pair{{types=[] flags=0x0] notFlags=0x0 checks=[{atype=dream independent=true modes=[OPEN,TO_FRONT] flags=NONE mustBeTask=false order=ANY topActivity=null launchCookie=null},{atype=home independent=true modes=[CLOSE,TO_BACK] flags=NONE mustBeTask=false order=ANY topActivity=null launchCookie=null}]} RemoteTransition { remoteTransition = android.window.IRemoteTransition$Stub$Proxy@2993d75, appThread = android.app.IApplicationThread$Stub$Proxy@977010a, debugName = LauncherToDream }}
+         1790834326.328   968  1065 V WindowManagerShell:  Checking filter Pair{{types=[] flags=0x0] notFlags=0x100 checks=[{atype=home independent=true modes=[OPEN,TO_FRONT] flags=NONE mustBeTask=false order=TOP topActivity=ComponentInfo{com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity} launchCookie=null},{atype=standard independent=true modes=[CLOSE,TO_BACK] flags=NONE mustBeTask=false order=ANY topActivity=null launchCookie=null}]} RemoteTransition { remoteTransition = android.window.IRemoteTransition$Stub$Proxy@1b8ad7b, appThread = android.app.IApplicationThread$Stub$Proxy@89f8798, debugName = QuickstepLaunchHome }}
+         1790834326.328   968  1065 D RemoteTransitionHandler: Found filterPair{{types=[] flags=0x0] notFlags=0x100 checks=[{atype=home independent=true modes=[OPEN,TO_FRONT] flags=NONE mustBeTask=false order=TOP topActivity=ComponentInfo{com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity} launchCookie=null},{atype=standard independent=true modes=[CLOSE,TO_BACK] flags=NONE mustBeTask=false order=ANY topActivity=null launchCookie=null}]} RemoteTransition { remoteTransition = android.window.IRemoteTransition$Stub$Proxy@1b8ad7b, appThread = android.app.IApplicationThread$Stub$Proxy@89f8798, debugName = QuickstepLaunchHome }}
+         1790834326.328   968  1065 V WindowManagerShell:  Delegate animation for (#39) to RemoteTransition { remoteTransition = android.window.IRemoteTransition$Stub$Proxy@1b8ad7b, appThread = android.app.IApplicationThread$Stub$Proxy@89f8798, debugName = QuickstepLaunchHome }
+         1790834326.331  1376  1376 D StateManager: createAtomicAnimation - fromState: Background, toState: Normal, partial trace:
+         1790834326.331  1376  1376 D StateManager: 	at com.android.quickstep.util.StaggeredWorkspaceAnim.prepareToAnimate(go/retraceme 6880898d8cae178d08f8c6e9adec44ea003840882148de9d3f2387cda32e2ac9:22)
+         1790834326.331  1376  1376 D StateManager: 	at com.android.quickstep.util.StaggeredWorkspaceAnim.<init>(go/retraceme 6880898d8cae178d08f8c6e9adec44ea003840882148de9d3f2387cda32e2ac9:4)
+         1790834326.331  1376  1376 D StateManager: 	at com.android.quickstep.util.StaggeredWorkspaceAnim.<init>(go/retraceme 6880898d8cae178d08f8c6e9adec44ea003840882148de9d3f2387cda32e2ac9:1)
+         1790834326.333  1376  1395 I jank_cuj_events_begin_request: [9,1790834326333343000,1246890935010,1246890935052,]
+         1790834326.348   552   571 V WindowManager: Sent Transition (#39) createdAt=10-01 07:58:46.201 via request=TransitionRequestInfo { type = CLOSE, triggerTask = null, pipTask = null, remoteTransition = null, displayChange = null, flags = 16, debugId = 39 }
+         1790834326.348   552   571 V WindowManager:     startWCT=WindowContainerTransaction { changes = {} hops = [] errorCallbackToken=null taskFragmentOrganizer=null }
+         1790834326.348   552   571 V WindowManager:     info={id=39 t=CLOSE f=0x10 trk=0 r=[0@Point(0, 0)] c=[
+         1790834326.348   552   571 V WindowManager:         {WCT{RemoteToken{565f9c6 Task{9c689e9 #1 type=home}}} m=TO_FRONT f=SHOW_WALLPAPER|MOVE_TO_TOP leash=Surface(name=Task=1)/@0x27937ae sb=Rect(0, 0 - 2560, 1600) eb=Rect(0, 0 - 2560, 1600) d=0 taskParent=-1},
+         1790834326.348   552   571 V WindowManager:         {WCT{RemoteToken{26d01ab Task{300d151 #12 type=standard A=10213:dev.probe}}} m=CLOSE f=NONE leash=Surface(name=Task=12)/@0x4b48a25 sb=Rect(0, 0 - 2560, 1600) eb=Rect(0, 0 - 2560, 1600) d=0 taskParent=-1},
+         1790834326.348   552   571 V WindowManager:         {null m=TO_FRONT f=IS_WALLPAPER leash=Surface(name=WallpaperWindowToken{7f74c95 token=android.os.Binder@202a44c})/@0xe865fda sb=Rect(0, 0 - 2560, 1600) eb=Rect(0, 0 - 2560, 1600) d=0}
+         1790834326.348   552   571 V WindowManager:     ]}
+         1790834326.349   968  1065 V WindowManagerShell:  animated by com.android.wm.shell.transition.RemoteTransitionHandler@d449777
+         1790834326.353  1376  1990 D OneSearchSuggestProvider: Established or reuse existing binder channel authority=com.google.android.googlequicksearchbox
+         1790834326.357   552  1055 W UserManagerService: Requested status bar icon for non-badged user 0
+         1790834326.357   552   575 I wm_wallpaper_surface: [0,1,Window{f58b5f2 u0 com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity}]
+         1790834326.365   968  1079 I viewroot_draw_event: [VRI[probe],Not drawing due to not visible. Reason=View.GONE]
+         1790834326.365   968  1079 W WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=android.view.ViewRootImpl$$ExternalSyntheticLambda11@7b2f5a6
+         1790834326.365   552  1103 W InputManager-JNI: Input channel object 'a42c1cb Splash Screen dev.probe (client)' was disposed without first being removed with the input manager!
+         1790834326.366   552   865 W WindowManager: Failed looking up window session=Session{2b0fd57 968:u0a10186} callers=com.android.server.wm.WindowManagerService.windowForClientLocked:6311 com.android.server.wm.Session.setOnBackInvokedCallbackInfo:1020 android.view.IWindowSession$Stub.onTransact:1199 
+         1790834326.366   552   865 I WindowManager: setOnBackInvokedCallback(): No window state for package:com.android.systemui
+         1790834326.371  1516  1769 I AiAiEcho: Predicting[0]:  [CONTEXT sampling_count=5 ]
+         1790834326.371  1516  1769 I AiAiEcho: EchoTargets: 
+         1790834326.371  1516  1769 I AiAiEcho: Filtered by AiAi flag check: 
+         1790834326.371  1516  1769 I AiAiEcho: [CONTEXT ratelimit_period="10 SECONDS" ]
+         1790834326.371  1516  1769 I AiAiEcho: Ranked targets strategy: SORT, count: 0, ranking metadata:  [CONTEXT ratelimit_period="10 SECONDS" ]
+         1790834326.371  1516  1769 I AiAiEcho: #remoteViewsTwiddler: feature disabled.
+         1790834326.371  1516  1769 I AiAiEcho: #postPredictionTargets: Sending updates to UISurface home with targets# 0 (types=[])
+         1790834326.384  1376  5057 E FrameEvents: addRelease: Did not find frame.
+         1790834326.384  1376  1401 D QuickstepModelDelegate: notifyAppTargetEvent action=1 launchLocation=workspace/0/[-1,-1]/[1,1]
+         1790834326.400   552   671 I input_focus: [Focus entering f58b5f2 com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity (server),reason=Window became focusable. Previous reason: NOT_VISIBLE]
+         1790834326.421  1376  1376 I viewroot_draw_event: [VRI[NexusLauncherActivity],reportDrawFinished seqId=0]
+         1790834326.426  1376  1395 I jank_cuj_events_begin_request: [60,1790834326422835000,1246980426719,1246980426760,App to Home]
+         1790834326.426   422   462 I BpBinder: onLastStrongRef automatically unlinking death recipients: 
+         1790834326.470   422   422 E SurfaceFlinger: Out of order buffers detected for RequestedLayerState{com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity#316 parentId=97} producedId=9 frameNumber=11 -> producedId=9 frameNumber=2
+         1790834326.470   381   381 I RanchuHwc: logCompositionFallbackIfChanged: layer 51 CompositionType fallback from 2 to 1
+         1790834326.471  1376  1660 D EGL_emulation: app_time_stats: avg=95.54ms min=1.28ms max=329.75ms count=11
+         1790834326.473  1376  1376 D SearchTargetUtil: queryLength=0 size=0
+         1790834326.483   552   679 I ImeTracker: com.google.android.apps.nexuslauncher:a4a9744e: onRequestHide at ORIGIN_SERVER reason HIDE_SAME_WINDOW_FOCUSED_WITHOUT_EDITOR fromUser false
+         1790834326.484   552   679 I ImeTracker: com.google.android.apps.nexuslauncher:a4a9744e: onCancelled at PHASE_SERVER_SHOULD_HIDE

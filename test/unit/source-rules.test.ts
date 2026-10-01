@@ -6,7 +6,12 @@ import { ROOT } from "../helpers/run.js";
 function files(dir: string, keep: (path: string) => boolean): string[] {
   const out: string[] = [];
   for (const name of readdirSync(dir)) {
-    if (["node_modules", "dist", ".git", "coverage"].includes(name)) continue;
+    // Build output and caches, including the probe app's Gradle directories.
+    if (
+      ["node_modules", "dist", ".git", "coverage", "build", ".gradle", ".kotlin"].includes(name)
+    ) {
+      continue;
+    }
     const path = join(dir, name);
     if (statSync(path).isDirectory()) out.push(...files(path, keep));
     else if (keep(path)) out.push(path);

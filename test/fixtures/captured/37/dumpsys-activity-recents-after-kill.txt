@@ -1,0 +1,147 @@
+ACTIVITY MANAGER RECENT TASKS (dumpsys activity recents)
+mRecentsUid=10197
+mRecentsComponent=ComponentInfo{com.google.android.apps.nexuslauncher/com.android.quickstep.RecentsActivity}
+mFreezeTaskListReordering=false
+mFreezeTaskListReorderingPendingTimeout=false
+mHiddenTasks=[Task{42edc3c #1055 type=standard A=10262:dev.probe}, Task{4857518 #1054 type=standard A=10262:dev.probe}, Task{103e25f #1049 type=standard A=10260:dev.probe}, Task{a09117 #1047 type=standard A=10260:dev.probe}, Task{67ddbf0 #1046 type=standard A=10260:dev.probe}, Task{5ff6d3d #1045 type=standard A=10260:dev.probe}, Task{f3112c0 #1044 type=standard A=10260:dev.probe}, Task{695b5b8 #1025 type=standard A=10238:dev.probe}, Task{cd82a47 #1028 type=standard A=1000:com.android.settings.root}, Task{b146c8 #1024 type=standard A=10238:dev.probe}]
+  Recent tasks:
+  * Recent #0: Task{b25be07 #2 type=home I=com.google.android.apps.nexuslauncher/.NexusLauncherActivity}
+    userId=0 effectiveUid=u0a197 mCallingUid=0 mUserSetupComplete=true mCallingPackage=null mCallingFeatureId=null
+    intent={act=android.intent.action.MAIN cat=[android.intent.category.HOME] flg=0x10000100 cmp=com.google.android.apps.nexuslauncher/.NexusLauncherActivity}
+    mActivityComponent=com.google.android.apps.nexuslauncher/.NexusLauncherActivity
+    autoRemoveRecents=false isPersistable=true activityType=2
+    rootWasReset=false mNeverRelinquishIdentity=true mReuseTask=false mLockTaskAuth=LOCK_TASK_AUTH_PINNABLE
+    Activities=[TaskFragment{46170fc mode=multi-window}, ActivityRecord{215682118 u0 com.google.android.apps.nexuslauncher/.NexusLauncherActivity t2}]
+    mRootProcess=ProcessRecord{9876882 1079:com.google.android.apps.nexuslauncher/u0a197}
+    taskId=2 rootTaskId=1
+    hasChildPipActivity=false
+    mHasBeenVisible=true
+    mResizeMode=RESIZE_MODE_RESIZEABLE mSupportsPictureInPicture=false isResizeable=true
+    isPerceptible=false
+    lastActiveTime=33229206 (inactive for 61s)
+     isTrimmable=true isForceHidden=false isForceExcludedFromRecents=false
+    mSelfMovable=0
+    mHandlePackageUpdate=false
+  * Recent #1: Task{de4747e #1057 type=standard A=10264:dev.probe}
+    userId=0 effectiveUid=u0a264 mCallingUid=2000 mUserSetupComplete=true mCallingPackage=com.android.shell mCallingFeatureId=null
+    affinity=10264:dev.probe
+    intent={flg=0x10000000 xflg=0x5 cmp=dev.probe/.MainActivity}
+    mActivityComponent=dev.probe/.MainActivity
+    autoRemoveRecents=false isPersistable=true activityType=1
+    rootWasReset=false mNeverRelinquishIdentity=true mReuseTask=false mLockTaskAuth=LOCK_TASK_AUTH_PINNABLE
+    Activities=[ActivityRecord{26691129 u0 dev.probe/.MainActivity t1057}]
+    taskId=1057 rootTaskId=1057
+    hasChildPipActivity=false
+    mHasBeenVisible=true
+    mResizeMode=RESIZE_MODE_RESIZEABLE_VIA_SDK_VERSION mSupportsPictureInPicture=false isResizeable=true
+    isPerceptible=false
+    lastActiveTime=33229205 (inactive for 61s)
+     isTrimmable=true isForceHidden=false isForceExcludedFromRecents=false
+    mSelfMovable=0
+    mHandlePackageUpdate=false
+  * Recent #2: Task{1f9b597 #974 type=standard A=10229:com.example.reply}
+    userId=0 effectiveUid=u0a229 mCallingUid=2000 mUserSetupComplete=true mCallingPackage=com.android.shell mCallingFeatureId=null
+    affinity=10229:com.example.reply
+    intent={act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10000000 xflg=0x4 cmp=com.example.reply/.ui.MainActivity}
+    mActivityComponent=com.example.reply/.ui.MainActivity
+    autoRemoveRecents=false isPersistable=true activityType=1
+    rootWasReset=false mNeverRelinquishIdentity=true mReuseTask=false mLockTaskAuth=LOCK_TASK_AUTH_PINNABLE
+    Activities=[ActivityRecord{164423702 u0 com.example.reply/.ui.MainActivity t974}]
+    mRootProcess=ProcessRecord{d7b0d69 3989:com.example.reply/u0a229}
+    taskId=974 rootTaskId=974
+    hasChildPipActivity=false
+    mHasBeenVisible=true
+    mResizeMode=RESIZE_MODE_RESIZEABLE_VIA_SDK_VERSION mSupportsPictureInPicture=false isResizeable=true
+    isPerceptible=false
+    lastActiveTime=3817911 (inactive for 29473s)
+     isTrimmable=true isForceHidden=false isForceExcludedFromRecents=false
+    mSelfMovable=0
+    mHandlePackageUpdate=false
+  * Recent #3: Task{5ecb6a5 #1030 type=standard A=1000:com.android.settings.root}
+    userId=0 effectiveUid=1000 mCallingUid=2000 mUserSetupComplete=true mCallingPackage=com.android.shell mCallingFeatureId=null
+    affinity=1000:com.android.settings.root
+    intent={act=android.settings.SETTINGS flg=0x10000000 xflg=0x4 cmp=com.android.settings/.homepage.SettingsHomepageActivity}
+    mActivityComponent=com.android.settings/.homepage.SettingsHomepageActivity
+    autoRemoveRecents=false isPersistable=true activityType=1
+    rootWasReset=false mNeverRelinquishIdentity=true mReuseTask=false mLockTaskAuth=LOCK_TASK_AUTH_PINNABLE
+    Activities=[]
+    taskId=1030 rootTaskId=1030
+    hasChildPipActivity=false
+    mHasBeenVisible=false
+    mResizeMode=RESIZE_MODE_RESIZEABLE_VIA_SDK_VERSION mSupportsPictureInPicture=false isResizeable=true
+    isPerceptible=false
+    lastActiveTime=3452303 (inactive for 29838s)
+     isTrimmable=true isForceHidden=false isForceExcludedFromRecents=false
+    mSelfMovable=0
+    mHandlePackageUpdate=false
+  * Recent #4: Task{8583efa #975 type=standard A=10237:com.deych.notessa}
+    userId=0 effectiveUid=u0a237 mCallingUid=2000 mUserSetupComplete=true mCallingPackage=com.android.shell mCallingFeatureId=null
+    affinity=10237:com.deych.notessa
+    intent={flg=0x10000000 xflg=0x5 cmp=com.deych.notessa/.MainActivity}
+    mActivityComponent=com.deych.notessa/.MainActivity
+    autoRemoveRecents=false isPersistable=true activityType=1
+    rootWasReset=false mNeverRelinquishIdentity=true mReuseTask=false mLockTaskAuth=LOCK_TASK_AUTH_PINNABLE
+    Activities=[]
+    taskId=975 rootTaskId=975
+    hasChildPipActivity=false
+    mHasBeenVisible=false
+    mResizeMode=RESIZE_MODE_RESIZEABLE_VIA_SDK_VERSION mSupportsPictureInPicture=false isResizeable=true
+    isPerceptible=false
+    lastActiveTime=1618311 (inactive for 31672s)
+     isTrimmable=true isForceHidden=false isForceExcludedFromRecents=false
+    mSelfMovable=0
+    mHandlePackageUpdate=false
+  * Recent #5: Task{d339982 #932 type=undefined A=10234:com.repcap}
+    userId=0 effectiveUid=u0a234 mCallingUid=2000 mUserSetupComplete=true mCallingPackage=com.android.shell mCallingFeatureId=
+    affinity=10234:com.repcap
+    intent={flg=0x10000000 cmp=com.repcap/.MainActivity}
+    mActivityComponent=com.repcap/.MainActivity
+    autoRemoveRecents=false isPersistable=true activityType=0
+    rootWasReset=false mNeverRelinquishIdentity=true mReuseTask=false mLockTaskAuth=LOCK_TASK_AUTH_PINNABLE
+    Activities=[]
+    taskId=932 rootTaskId=932
+    hasChildPipActivity=false
+    mHasBeenVisible=false
+    mResizeMode=RESIZE_MODE_RESIZEABLE_VIA_SDK_VERSION mSupportsPictureInPicture=false isResizeable=true
+    isPerceptible=false
+    lastActiveTime=15813 (inactive for 33275s)
+     isTrimmable=true isForceHidden=false isForceExcludedFromRecents=false
+    mSelfMovable=0
+    mHandlePackageUpdate=false
+
+  Visible recent tasks (most recent first):
+  * RecentTaskInfo #0: 
+    id=1057 userId=0 hasTask=true lastActiveTime=33229205
+    baseIntent=Intent { flg=0x10000000 cmp=dev.probe/.MainActivity }
+    baseActivity={dev.probe/dev.probe.MainActivity}
+    topActivity={dev.probe/dev.probe.MainActivity}
+    realActivity={dev.probe/dev.probe.MainActivity}
+    isExcluded=false activityType=standard windowingMode=fullscreen supportsMultiWindow=true
+    taskDescription { colorBackground=#fffafafa colorPrimary=#fff5f5f5 iconRes=/0 iconBitmap=false resizeMode=RESIZE_MODE_RESIZEABLE_VIA_SDK_VERSION minWidth=-1 minHeight=-1 colorBackgroundFloating=#ffffffff }
+     * RecentTaskInfo #1: 
+    id=974 userId=0 hasTask=true lastActiveTime=3817911
+    baseIntent=Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10000000 cmp=com.example.reply/.ui.MainActivity }
+    baseActivity={com.example.reply/com.example.reply.ui.MainActivity}
+    topActivity={com.example.reply/com.example.reply.ui.MainActivity}
+    realActivity={com.example.reply/com.example.reply.ui.MainActivity}
+    isExcluded=false activityType=standard windowingMode=fullscreen supportsMultiWindow=true
+    taskDescription { colorBackground=#fffafafa colorPrimary=#fff5f5f5 iconRes=/0 iconBitmap=false resizeMode=RESIZE_MODE_RESIZEABLE_VIA_SDK_VERSION minWidth=-1 minHeight=-1 colorBackgroundFloating=#ffffffff }
+     * RecentTaskInfo #2: 
+    id=1030 userId=0 hasTask=false lastActiveTime=3452303
+    baseIntent=Intent { act=android.settings.SETTINGS flg=0x10000000 cmp=com.android.settings/.homepage.SettingsHomepageActivity }
+    realActivity={com.android.settings/com.android.settings.homepage.SettingsHomepageActivity}
+    isExcluded=false activityType=standard windowingMode=fullscreen supportsMultiWindow=true
+    taskDescription { colorBackground=#ffeeedf6 colorPrimary=#fff2f0f6 iconRes=/0 iconBitmap=false resizeMode=RESIZE_MODE_RESIZEABLE_VIA_SDK_VERSION minWidth=-1 minHeight=-1 colorBackgroundFloating=#fff2f0f6 }
+     * RecentTaskInfo #3: 
+    id=975 userId=0 hasTask=false lastActiveTime=1618311
+    baseIntent=Intent { flg=0x10000000 cmp=com.deych.notessa/.MainActivity }
+    realActivity={com.deych.notessa/com.deych.notessa.MainActivity}
+    isExcluded=false activityType=standard windowingMode=fullscreen supportsMultiWindow=true
+    taskDescription { colorBackground=#fffafafa colorPrimary=#fff5f5f5 iconRes=/0 iconBitmap=false resizeMode=RESIZE_MODE_RESIZEABLE_VIA_SDK_VERSION minWidth=-1 minHeight=-1 colorBackgroundFloating=#ffffffff }
+     * RecentTaskInfo #4: 
+    id=932 userId=0 hasTask=false lastActiveTime=15813
+    baseIntent=Intent { flg=0x10000000 cmp=com.repcap/.MainActivity }
+    realActivity={com.repcap/com.repcap.MainActivity}
+    isExcluded=false activityType=undefined windowingMode=undefined supportsMultiWindow=true
+    taskDescription { colorBackground=#fffafafa colorPrimary=#fff5f5f5 iconRes=/0 iconBitmap=false resizeMode=RESIZE_MODE_RESIZEABLE minWidth=-1 minHeight=-1 colorBackgroundFloating=#ffffffff }
+   

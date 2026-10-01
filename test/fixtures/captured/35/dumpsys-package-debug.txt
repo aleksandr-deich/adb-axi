@@ -1,0 +1,129 @@
+Activity Resolver Table:
+  Non-Data Actions:
+      android.intent.action.MAIN:
+        a4023a5 dev.probe/.MainActivity filter ec9a37a
+          Action: "android.intent.action.MAIN"
+          Category: "android.intent.category.LAUNCHER"
+
+Receiver Resolver Table:
+  Non-Data Actions:
+      androidx.profileinstaller.action.SAVE_PROFILE:
+        605f72b dev.probe/androidx.profileinstaller.ProfileInstallReceiver filter abe7d46
+          Action: "androidx.profileinstaller.action.SAVE_PROFILE"
+      androidx.profileinstaller.action.INSTALL_PROFILE:
+        605f72b dev.probe/androidx.profileinstaller.ProfileInstallReceiver filter 81b8788
+          Action: "androidx.profileinstaller.action.INSTALL_PROFILE"
+      androidx.profileinstaller.action.SKIP_FILE:
+        605f72b dev.probe/androidx.profileinstaller.ProfileInstallReceiver filter 2345521
+          Action: "androidx.profileinstaller.action.SKIP_FILE"
+      androidx.profileinstaller.action.BENCHMARK_OPERATION:
+        605f72b dev.probe/androidx.profileinstaller.ProfileInstallReceiver filter 76adb07
+          Action: "androidx.profileinstaller.action.BENCHMARK_OPERATION"
+
+Domain verification status:
+
+Permissions:
+  Permission [dev.probe.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION] (16db35f):
+    sourcePackage=dev.probe
+    uid=10213 gids=[] type=0 prot=signature
+    perm=PermissionInfo{2d681ac dev.probe.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION}
+    flags=0x0
+
+Registered ContentProviders:
+  dev.probe/androidx.startup.InitializationProvider:
+    Provider{7dfce75 dev.probe/androidx.startup.InitializationProvider}
+
+ContentProvider Authorities:
+  [dev.probe.androidx-startup]:
+    Provider{7dfce75 dev.probe/androidx.startup.InitializationProvider}
+      applicationInfo=ApplicationInfo{eb0be0a dev.probe}
+
+Key Set Manager:
+  [dev.probe]
+      Signing KeySets: 66
+
+Packages:
+  Package [dev.probe] (e4267b):
+    appId=10213
+    pkg=Package{3000c98 dev.probe}
+    codePath=/data/app/~~q9nqscILYtTzepYCjV11ag==/dev.probe-NGcv8M4B7ISXa68TH0Ck0A==
+    resourcePath=/data/app/~~q9nqscILYtTzepYCjV11ag==/dev.probe-NGcv8M4B7ISXa68TH0Ck0A==
+    legacyNativeLibraryDir=/data/app/~~q9nqscILYtTzepYCjV11ag==/dev.probe-NGcv8M4B7ISXa68TH0Ck0A==/lib
+    extractNativeLibs=false
+    primaryCpuAbi=arm64-v8a
+    secondaryCpuAbi=null
+    cpuAbiOverride=null
+    versionCode=1 minSdk=29 targetSdk=36
+    minExtensionVersions=[]
+    versionName=1.0
+    hiddenApiEnforcementPolicy=2
+    usesNonSdkApi=false
+    splits=[base]
+    apkSigningVersion=2
+    flags=[ DEBUGGABLE HAS_CODE ALLOW_CLEAR_USER_DATA ]
+    privateFlags=[ PRIVATE_FLAG_ACTIVITIES_RESIZE_MODE_RESIZEABLE_VIA_SDK_VERSION ALLOW_AUDIO_PLAYBACK_CAPTURE PARTIALLY_DIRECT_BOOT_AWARE PRIVATE_FLAG_ALLOW_NATIVE_HEAP_POINTER_TAGGING ]
+    forceQueryable=false
+    scannedAsStoppedSystemApp=false
+    supportsScreens=[small, medium, large, xlarge, resizeable, anyDensity]
+    usesOptionalLibraries:
+      androidx.window.extensions
+      androidx.window.sidecar
+    usesLibraryFiles:
+      /system_ext/framework/androidx.window.extensions.jar
+      /system_ext/framework/androidx.window.sidecar.jar
+    timeStamp=2026-10-01 07:57:01
+    lastUpdateTime=2026-10-01 07:57:01
+    installerPackageName=null
+    installerPackageUid=-1
+    initiatingPackageName=com.android.shell
+    originatingPackageName=null
+    packageSource=1
+    appMetadataFilePath=null
+    appMetadataSource=0
+    signatures=PackageSignatures{6bdcf1 version:2, signatures:[9ad7e673], past signatures:[]}
+    installPermissionsFixed=false
+    pkgFlags=[ DEBUGGABLE HAS_CODE ALLOW_CLEAR_USER_DATA ]
+    privatePkgFlags=[ PRIVATE_FLAG_ACTIVITIES_RESIZE_MODE_RESIZEABLE_VIA_SDK_VERSION ALLOW_AUDIO_PLAYBACK_CAPTURE PARTIALLY_DIRECT_BOOT_AWARE PRIVATE_FLAG_ALLOW_NATIVE_HEAP_POINTER_TAGGING ]
+    apexModuleName=null
+    declared permissions:
+      dev.probe.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION: prot=signature
+    requested permissions:
+      dev.probe.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
+    install permissions:
+      dev.probe.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION: granted=true
+    User 0: ceDataInode=353833 deDataInode=65579 installed=true hidden=false suspended=false distractionFlags=0 stopped=true notLaunched=true enabled=0 instant=false virtual=false quarantined=false
+      installReason=0
+      dataDir=/data/user/0/dev.probe
+      firstInstallTime=2026-10-01 07:57:01
+      uninstallReason=0
+      overlay paths:
+        /product/overlay/NavigationBarModeGestural/NavigationBarModeGesturalOverlay.apk
+        /data/resource-cache/com.android.systemui-neutral-5m5R.frro
+        /data/resource-cache/com.android.systemui-accent-2yhd.frro
+        /data/resource-cache/com.android.systemui-dynamic-qHAu.frro
+      legacy overlay paths:
+        /product/overlay/NavigationBarModeGestural/NavigationBarModeGesturalOverlay.apk
+      runtime permissions:
+
+Queries:
+  system apps queryable: false
+  queries via forceQueryable:
+  queries via package name:
+  queries via component:
+    com.google.android.as:
+      dev.probe
+    com.google.android.settings.intelligence:
+      dev.probe
+  queryable via interaction:
+    User 0:
+  queryable via uses-library:
+
+Dexopt state:
+  [dev.probe]
+    path: /data/app/~~q9nqscILYtTzepYCjV11ag==/dev.probe-NGcv8M4B7ISXa68TH0Ck0A==/base.apk
+      arm64: [status=run-from-apk] [reason=unknown] [primary-abi]
+        [location is error]
+
+Compiler stats:
+  [dev.probe]
+    (No recorded stats)

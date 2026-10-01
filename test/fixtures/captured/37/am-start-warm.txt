@@ -1,0 +1,7 @@
+Starting: Intent { cmp=dev.probe/.MainActivity }
+Status: ok
+LaunchState: WARM
+Activity: dev.probe/.MainActivity
+TotalTime: 574
+WaitTime: 576
+Complete

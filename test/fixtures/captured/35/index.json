@@ -1,0 +1,1063 @@
+{
+  "api": 35,
+  "serial": "emulator-5556",
+  "avd": "medium_tablet",
+  "capturedAt": "2026-10-01T05:59:20.076Z",
+  "probe": {
+    "package": "dev.probe",
+    "activity": "dev.probe/.MainActivity",
+    "uid": 10213
+  },
+  "observations": {
+    "logcatClearedAt": "1790834222.435",
+    "afterIncrements": "1790834224.017  8235  8235 I ProbeState: event=inc saved=3 volatile=3 rows=0 restored=false pid=8235",
+    "afterWrite": "1790834224.172  8235  8235 I ProbeState: event=write saved=3 volatile=3 rows=1 restored=false pid=8235",
+    "amKillForeground": {
+      "pidBefore": "8235",
+      "pidAfter": "8235"
+    },
+    "afterHome": {
+      "lru": "#33: prev LAST ------- 8235:dev.probe/u0a213 act:activities|recents",
+      "waitedMs": 1440
+    },
+    "cachedWatch": {
+      "watchedMs": 90044,
+      "cachedAfterMs": null,
+      "timeline": [
+        {
+          "atMs": 28,
+          "lru": "#31: prcp TOP LCMNFUA 8235:dev.probe/u0a213 act:activities|recents"
+        },
+        {
+          "atMs": 1123,
+          "lru": "#31: prev LAST ------- 8235:dev.probe/u0a213 act:activities|recents"
+        }
+      ]
+    },
+    "amKillAfterWatch": {
+      "state": "previous-after-watch",
+      "pidBefore": "8235",
+      "killed": true,
+      "waitedMs": 35
+    },
+    "afterRestore": "1790834317.809  9123  9123 I ProbeState: event=start saved=3 volatile=0 rows=1 restored=true pid=9123",
+    "amKillPrevious": {
+      "lru": "#29: prev LAST ------- 9123:dev.probe/u0a213 act:activities|recents",
+      "state": "previous",
+      "pidBefore": "9123",
+      "killed": true,
+      "waitedMs": 23
+    },
+    "afterSecondRestore": "1790834320.241  9191  9191 I ProbeState: event=start saved=3 volatile=0 rows=1 restored=true pid=9191",
+    "javaCrashWaitMs": 49,
+    "nativeCrashWaitMs": 1421,
+    "anrInputMs": 30018,
+    "anrWaitMs": 117,
+    "anrBuffers": {
+      "main": {
+        "ANR in dev.probe": false,
+        "am_anr": false,
+        "Input dispatching timed out": false
+      },
+      "system": {
+        "ANR in dev.probe": true,
+        "am_anr": false,
+        "Input dispatching timed out": true
+      },
+      "events": {
+        "ANR in dev.probe": false,
+        "am_anr": true,
+        "Input dispatching timed out": true
+      },
+      "crash": {
+        "ANR in dev.probe": false,
+        "am_anr": false,
+        "Input dispatching timed out": false
+      }
+    }
+  },
+  "captures": [
+    {
+      "file": "emu-avd-name.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "emu",
+        "avd",
+        "name"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 14,
+      "note": "AVD name; CRLF, then OK"
+    },
+    {
+      "file": "getprop.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "getprop"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 48,
+      "note": "every system property",
+      "redacted": true
+    },
+    {
+      "file": "wm-size.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "wm size"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 58,
+      "note": "physical display size"
+    },
+    {
+      "file": "wm-density.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "wm density"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 36,
+      "note": "physical density"
+    },
+    {
+      "file": "facts-script.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "echo @sdk; getprop ro.build.version.sdk; echo @boot_completed; getprop sys.boot_completed; echo @boot_id; cat /proc/sys/kernel/random/boot_id; echo @size; wm size; echo @density; wm density"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 55,
+      "note": "the src/device/facts.ts shell call"
+    },
+    {
+      "file": "date-epoch.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "date +%s.%N"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 27,
+      "note": "device wall clock, s.ns"
+    },
+    {
+      "file": "proc-uptime.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "cat /proc/uptime"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 24,
+      "note": "device uptime, s"
+    },
+    {
+      "file": "uninstall-missing.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "uninstall",
+        "dev.probe"
+      ],
+      "exitCode": 1,
+      "stderr": "",
+      "durationMs": 106,
+      "note": "L7: uninstall of a package that is not installed"
+    },
+    {
+      "file": "pm-list-packages-absent.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "pm list packages dev.probe"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 69,
+      "note": "filter matching nothing"
+    },
+    {
+      "file": "dumpsys-package-absent.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "dumpsys package dev.probe.missing"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 74,
+      "note": "package not installed"
+    },
+    {
+      "file": "pidof-not-running.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "pidof dev.probe"
+      ],
+      "exitCode": 1,
+      "stderr": "",
+      "durationMs": 155,
+      "note": "no process"
+    },
+    {
+      "file": "install-debug.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "install",
+        "-r",
+        "test/fixtures/apk/probe-debug.apk"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 462,
+      "note": "adb install -r, debuggable build"
+    },
+    {
+      "file": "pm-list-packages.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "pm list packages"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 64,
+      "note": "every package"
+    },
+    {
+      "file": "pm-list-packages-3.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "pm list packages -3"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 69,
+      "note": "third-party packages"
+    },
+    {
+      "file": "pm-list-packages-probe.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "pm list packages dev.probe"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 106,
+      "note": "filter by name (substring)"
+    },
+    {
+      "file": "pm-list-packages-uid.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "pm list packages -U dev.probe"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 108,
+      "note": "with uid"
+    },
+    {
+      "file": "pm-list-packages-versioncode.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "pm list packages --show-versioncode dev.probe"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 56,
+      "note": "with versionCode"
+    },
+    {
+      "file": "pm-path.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "pm path dev.probe"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 42,
+      "note": "installed APK paths"
+    },
+    {
+      "file": "dumpsys-package-debug.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "dumpsys package dev.probe"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 129,
+      "note": "debuggable build installed"
+    },
+    {
+      "file": "am-start-cold.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "am start -W -n dev.probe/.MainActivity"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 1180,
+      "note": "cold start: no process"
+    },
+    {
+      "file": "pidof-running.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "pidof dev.probe"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 57,
+      "note": "one process"
+    },
+    {
+      "file": "am-start-delivered-to-top.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "am start -W -n dev.probe/.MainActivity --es probe inc"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 99,
+      "note": "singleTop activity already on top: the intent goes to onNewIntent"
+    },
+    {
+      "file": "run-as-ls-databases.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "run-as dev.probe ls databases"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 40,
+      "note": "file names"
+    },
+    {
+      "file": "run-as-ls-l-databases.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "run-as dev.probe ls -l databases"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 40,
+      "note": "with sizes; the row is only in -wal"
+    },
+    {
+      "file": "exec-out-probe-db.bin",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "exec-out",
+        "run-as",
+        "dev.probe",
+        "cat",
+        "databases/probe.db"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 35,
+      "note": "main file bytes, header page only"
+    },
+    {
+      "file": "exec-out-probe-db-wal.bin",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "exec-out",
+        "run-as",
+        "dev.probe",
+        "cat",
+        "databases/probe.db-wal"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 37,
+      "note": "WAL bytes holding the row"
+    },
+    {
+      "file": "exec-out-missing-db.bin",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "exec-out",
+        "run-as",
+        "dev.probe",
+        "cat",
+        "databases/missing.db"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 32,
+      "note": "S1: error text as the bytes"
+    },
+    {
+      "file": "dumpsys-activity-activities-probe-front.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "dumpsys activity activities"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 71,
+      "note": "probe resumed"
+    },
+    {
+      "file": "dumpsys-activity-recents-probe-front.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "dumpsys activity recents"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 30,
+      "note": "probe task on top"
+    },
+    {
+      "file": "dumpsys-activity-lru-probe-front.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "dumpsys activity lru"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 35,
+      "note": "probe fg TOP"
+    },
+    {
+      "file": "dumpsys-activity-processes-probe-front.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "dumpsys activity processes dev.probe"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 33,
+      "note": "probe process record, foreground"
+    },
+    {
+      "file": "am-kill-foreground.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "am kill dev.probe"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 33,
+      "note": "S5: no-op on a foreground app"
+    },
+    {
+      "file": "pidof-after-kill-foreground.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "pidof dev.probe"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 47,
+      "note": "same pid: still running"
+    },
+    {
+      "file": "dumpsys-activity-activities-launcher-front.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "dumpsys activity activities"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 23,
+      "note": "launcher resumed, probe stopped"
+    },
+    {
+      "file": "dumpsys-activity-lru-previous.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "dumpsys activity lru"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 22,
+      "note": "probe as the previous app"
+    },
+    {
+      "file": "dumpsys-activity-processes-probe-previous.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "dumpsys activity processes dev.probe"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 21,
+      "note": "probe process record, previous app"
+    },
+    {
+      "file": "am-start-hot.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "am start -W -n dev.probe/.MainActivity"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 189,
+      "note": "hot start from the background"
+    },
+    {
+      "file": "dumpsys-activity-lru-previous-after-watch.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "dumpsys activity lru"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 25,
+      "note": "probe state after the 90 s watch"
+    },
+    {
+      "file": "dumpsys-activity-processes-probe-previous-after-watch.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "dumpsys activity processes dev.probe"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 23,
+      "note": "probe process record after the watch"
+    },
+    {
+      "file": "am-kill-after-watch.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "am kill dev.probe"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 27,
+      "note": "am kill with the probe previous-after-watch"
+    },
+    {
+      "file": "pidof-after-kill-after-watch.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "pidof dev.probe"
+      ],
+      "exitCode": 1,
+      "stderr": "",
+      "durationMs": 89,
+      "note": "empty when the kill worked"
+    },
+    {
+      "file": "dumpsys-activity-recents-after-kill.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "dumpsys activity recents"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 25,
+      "note": "probe task kept, no process"
+    },
+    {
+      "file": "dumpsys-activity-activities-after-kill.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "dumpsys activity activities"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 22,
+      "note": "probe activity record kept, no process"
+    },
+    {
+      "file": "am-start-restore-after-kill.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "am start -W -n dev.probe/.MainActivity"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 1006,
+      "note": "task to front, new process"
+    },
+    {
+      "file": "am-kill-previous.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "am kill dev.probe"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 39,
+      "note": "am kill with the probe previous"
+    },
+    {
+      "file": "pidof-after-kill-previous.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "pidof dev.probe"
+      ],
+      "exitCode": 1,
+      "stderr": "",
+      "durationMs": 40,
+      "note": "empty when the kill worked"
+    },
+    {
+      "file": "dumpsys-activity-lru-no-activity.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "dumpsys activity lru"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 37,
+      "note": "process alive, no activity"
+    },
+    {
+      "file": "am-start-warm.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "am start -W -n dev.probe/.MainActivity"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 737,
+      "note": "warm start: process alive, activity created"
+    },
+    {
+      "file": "logcat-probestate.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "logcat -d -v epoch -s ProbeState"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 90,
+      "note": "the oracle across the whole run"
+    },
+    {
+      "file": "am-start-missing-activity.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "am start -W -n dev.probe/.Missing"
+      ],
+      "exitCode": 1,
+      "stderr": "",
+      "durationMs": 78,
+      "note": "activity does not exist"
+    },
+    {
+      "file": "am-start-missing-package.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "am start -W -n dev.probe.missing/.MainActivity"
+      ],
+      "exitCode": 1,
+      "stderr": "",
+      "durationMs": 63,
+      "note": "package does not exist"
+    },
+    {
+      "file": "logcat-epoch.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "logcat -d -v epoch"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 52,
+      "note": "default buffers since the clear"
+    },
+    {
+      "file": "logcat-epoch-uid.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "logcat -d -v epoch --uid 10213"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 60,
+      "note": "only the probe's uid"
+    },
+    {
+      "file": "logcat-epoch-since.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "logcat -d -v epoch -T 1790834316.828"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 64,
+      "note": "since a device-clock mark"
+    },
+    {
+      "file": "pm-clear.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "pm clear dev.probe"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 107,
+      "note": "clears data and stops the app"
+    },
+    {
+      "file": "pidof-after-clear.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "pidof dev.probe"
+      ],
+      "exitCode": 1,
+      "stderr": "",
+      "durationMs": 56,
+      "note": "no process after clear"
+    },
+    {
+      "file": "logcat-crash-java.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "logcat -d -v epoch -b crash -T 1790834324.473"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 37,
+      "note": "crash buffer: a Java crash"
+    },
+    {
+      "file": "logcat-all-java-crash.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "logcat -d -v epoch -b all -T 1790834324.473"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 34,
+      "note": "all buffers around the Java crash"
+    },
+    {
+      "file": "logcat-crash-native.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "logcat -d -v epoch -b crash -T 1790834324.777"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 62,
+      "note": "crash buffer: a native crash"
+    },
+    {
+      "file": "logcat-all-native-crash.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "logcat -d -v epoch -b all -T 1790834324.777"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 34,
+      "note": "all buffers around the native crash"
+    },
+    {
+      "file": "logcat-anr-main.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "logcat -d -v epoch -b main -T 1790834326.675"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 74,
+      "note": "main buffer around the ANR"
+    },
+    {
+      "file": "logcat-anr-system.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "logcat -d -v epoch -b system -T 1790834326.675"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 53,
+      "note": "system buffer around the ANR"
+    },
+    {
+      "file": "logcat-anr-events.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "logcat -d -v epoch -b events -T 1790834326.675"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 40,
+      "note": "events buffer around the ANR"
+    },
+    {
+      "file": "logcat-anr-crash.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "logcat -d -v epoch -b crash -T 1790834326.675"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 33,
+      "note": "crash buffer around the ANR"
+    },
+    {
+      "file": "install-release.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "install",
+        "-r",
+        "test/fixtures/apk/probe-release.apk"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 758,
+      "note": "release build over the debug one"
+    },
+    {
+      "file": "dumpsys-package-release.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "dumpsys package dev.probe"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 57,
+      "note": "non-debuggable build installed"
+    },
+    {
+      "file": "run-as-release.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "run-as dev.probe ls databases"
+      ],
+      "exitCode": 1,
+      "stderr": "run-as: package not debuggable: dev.probe\n",
+      "durationMs": 69,
+      "note": "run-as refused: not debuggable"
+    },
+    {
+      "file": "exec-out-run-as-release.bin",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "exec-out",
+        "run-as",
+        "dev.probe",
+        "cat",
+        "databases/probe.db"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 105,
+      "note": "S1: refusal text as the bytes"
+    },
+    {
+      "file": "uninstall.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "uninstall",
+        "dev.probe"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 131,
+      "note": "uninstall of an installed package"
+    }
+  ]
+}

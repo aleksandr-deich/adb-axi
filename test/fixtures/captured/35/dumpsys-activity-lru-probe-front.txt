@@ -1,0 +1,38 @@
+ACTIVITY MANAGER LRU PROCESSES (dumpsys activity lru)
+  Activities:
+  #34: fg     TOP  LCMNFUA 8235:dev.probe/u0a213 act:activities|recents
+  #33: vis    BFGS ---NFU- 1376:com.google.android.apps.nexuslauncher/u0a179 act:activities|recents
+  Other:
+  #32: fg     CEM  ------- 8339:com.android.providers.calendar/u0a84
+  #31: fg     CEM  ------- 8292:com.google.android.calendar/u0a148
+  #30: fg     BTOP ---NFU- 7408:com.google.android.gms/u0a143
+  #29: cch+ 5 CEM  ------- 6875:com.android.vending/u0a140
+  #28: vis    BTOP ---NFU- 6820:com.google.android.gms.unstable/u0a143
+  #27: cch+ 5 CEM  ------- 8185:com.google.android.packageinstaller/u0a93
+  #26: cch+15 CEM  ------- 7160:com.google.android.googlequicksearchbox:search/u0a144
+  #25: vis    BFGS LCMNFUA 1560:com.google.android.googlequicksearchbox:interactor/u0a144
+  #24: vis    BFGS LCMNFUA 1516:com.google.android.as/u0a129
+  #23: cch+15 CEM  ------- 8127:android.process.media/u0a88
+  #22: vis    BFGS ----F-- 7005:com.google.android.apps.wellbeing/u0a142
+  #21: cch+25 CEM  ------- 6012:com.android.vending:background/u0a140
+  #20: psvc   PER  LCMNFUA 1514:com.google.android.providers.media.module/u0a193
+  #19: cch+25 CEM  ------- 8013:com.google.android.documentsui/u0a90
+  #18: cch+35 CEM  ------- 8107:com.android.externalstorage/u0a89
+  #17: vis    IMPF ------- 979:com.google.android.permissioncontroller/u0a202
+  #16: psvc   PER  LCMNFUA 1131:com.google.android.bluetooth/1002
+  #15: vis    BFGS LCMNFUA 4121:com.google.android.ext.services/u0a208
+  #14: cch+35 CEM  ------- 5961:com.android.keychain/1000
+  #13: cch+45 CEM  ------- 6402:com.android.chrome/u0a145
+  #12: cch+45 CEM  ------- 6569:com.google.android.configupdater/u0a123
+  #11: cch+55 CEM  ------- 1663:android.process.acore/u0a83
+  #10: cch+55 CEM  ------- 7602:com.google.android.gms.learning/u0a143
+  # 9: cch+65 CEM  ------- 7616:com.google.android.gms.feedback/u0a143
+  # 8: prcp   IMPB ------- 7018:com.google.android.inputmethod.latin/u0a159
+  # 7: cch+65 CEM  ------- 5876:com.google.android.rkpdapp/u0a194
+  # 6: cch+75 CEM  ------- 6873:com.google.android.settings.intelligence/u0a138
+  # 5: pers   PER  LCMNFUA 1578:com.android.emulator.multidisplay/1000
+  # 4: pers   PER  LCMNFUA 1142:com.android.se/1068
+  # 3: pers   PER  LCMNFUA 1144:com.android.phone/1001
+  # 2: pers   PER  LCMNFUA 1095:com.android.networkstack.process/1073
+  # 1: pers   PER  LCMNFUA 968:com.android.systemui/u0a186
+  # 0: sys    PER  LCMNFUA 552:system/1000

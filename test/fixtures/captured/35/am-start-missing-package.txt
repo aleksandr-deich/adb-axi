@@ -1,0 +1,3 @@
+Starting: Intent { cmp=dev.probe.missing/.MainActivity }
+Error type 3
+Error: Activity class {dev.probe.missing/dev.probe.missing.MainActivity} does not exist.

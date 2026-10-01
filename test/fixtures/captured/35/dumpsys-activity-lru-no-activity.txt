@@ -1,0 +1,34 @@
+ACTIVITY MANAGER LRU PROCESSES (dumpsys activity lru)
+  Activities:
+  #30: fg     TOP  LCMNFUA 1376:com.google.android.apps.nexuslauncher/u0a179 act:activities|recents
+  #29: cch    CRE  ------- 9191:dev.probe/u0a213 act:recents
+  #28: vis    BTOP ---NFU- 7160:com.google.android.googlequicksearchbox:search/u0a144 act:client
+  Other:
+  #27: vis    BTOP LCMNFUA 1560:com.google.android.googlequicksearchbox:interactor/u0a144
+  #26: vis    BTOP ---NFU- 7408:com.google.android.gms/u0a143
+  #25: cch+ 5 CEM  ------- 979:com.google.android.permissioncontroller/u0a202
+  #24: cch+ 5 CEM  ------- 8292:com.google.android.calendar/u0a148
+  #23: psvc   PER  LCMNFUA 1131:com.google.android.bluetooth/1002
+  #22: cch+15 CEM  ------- 6875:com.android.vending/u0a140
+  #21: cch+15 CEM  ------- 6820:com.google.android.gms.unstable/u0a143
+  #20: cch+25 CEM  ------- 7005:com.google.android.apps.wellbeing/u0a142
+  #19: cch+25 CEM  ------- 8339:com.android.providers.calendar/u0a84
+  #18: cch+35 CEM  ------- 8185:com.google.android.packageinstaller/u0a93
+  #17: vis    BFGS LCMNFUA 1516:com.google.android.as/u0a129
+  #16: cch+35 CEM  ------- 8127:android.process.media/u0a88
+  #15: cch+45 CEM  ------- 6012:com.android.vending:background/u0a140
+  #14: psvc   PER  LCMNFUA 1514:com.google.android.providers.media.module/u0a193
+  #13: cch+45 CEM  ------- 8013:com.google.android.documentsui/u0a90
+  #12: cch+55 CEM  ------- 8107:com.android.externalstorage/u0a89
+  #11: vis    BFGS LCMNFUA 4121:com.google.android.ext.services/u0a208
+  #10: cch+55 CEM  ------- 5961:com.android.keychain/1000
+  # 9: cch+65 CEM  ------- 6402:com.android.chrome/u0a145
+  # 8: cch+65 CEM  ------- 6569:com.google.android.configupdater/u0a123
+  # 7: cch+75 CEM  ------- 1663:android.process.acore/u0a83
+  # 6: prcp   IMPB ------- 7018:com.google.android.inputmethod.latin/u0a159
+  # 5: pers   PER  LCMNFUA 1578:com.android.emulator.multidisplay/1000
+  # 4: pers   PER  LCMNFUA 1142:com.android.se/1068
+  # 3: pers   PER  LCMNFUA 1144:com.android.phone/1001
+  # 2: pers   PER  LCMNFUA 1095:com.android.networkstack.process/1073
+  # 1: pers   PER  LCMNFUA 968:com.android.systemui/u0a186
+  # 0: sys    PER  LCMNFUA 552:system/1000

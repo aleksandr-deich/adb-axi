@@ -1,0 +1,140 @@
+--------- beginning of main
+         1790834111.441  7882  7882 I Zygote  : Process 7882 created for dev.probe
+         1790834111.442  7882  7882 I dev.probe: Late-enabling -Xcheck:jni
+         1790834111.466  7882  7882 I dev.probe: Using generational CollectorTypeCMC GC.
+         1790834111.482  7882  7882 D nativeloader: Load libframework-connectivity-tiramisu-jni.so using APEX ns com_android_tethering for caller /apex/com.android.tethering/javalib/framework-connectivity-t.jar: ok
+         1790834111.536  7882  7882 I ActivityThread: Relaunch all activities: onCoreSettingsChange
+         1790834111.557  7882  7882 D ApplicationLoaders: Returning zygote-cached class loader: /system_ext/framework/androidx.window.extensions.jar
+         1790834111.557  7882  7882 D ApplicationLoaders: Returning zygote-cached class loader: /system_ext/framework/androidx.window.sidecar.jar
+         1790834111.620  7882  7882 D nativeloader: Configuring clns-9 for other apk /data/app/~~VhasxvmgdklBuiWZqYjyBw==/dev.probe-rb3A2TB6ZURxOPpRNwFT8A==/base.apk. target_sdk_version=36, uses_libraries=, library_path=/data/app/~~VhasxvmgdklBuiWZqYjyBw==/dev.probe-rb3A2TB6ZURxOPpRNwFT8A==/lib/arm64:/data/app/~~VhasxvmgdklBuiWZqYjyBw==/dev.probe-rb3A2TB6ZURxOPpRNwFT8A==/base.apk!/lib/arm64-v8a, permitted_path=/data:/mnt/expand:/data/user/0/dev.probe
+--------- beginning of system
+         1790834111.632  7882  7882 D ActivityThread: Set OS env TMPDIR to /data/user/0/dev.probe/cache
+         1790834111.632  7882  7882 V GraphicsEnvironment: Currently set values for:
+         1790834111.632  7882  7882 V GraphicsEnvironment:   angle_gl_driver_selection_pkgs=[]
+         1790834111.632  7882  7882 V GraphicsEnvironment:   angle_gl_driver_selection_values=[]
+         1790834111.632  7882  7882 V GraphicsEnvironment: dev.probe is not listed in per-application setting
+         1790834111.633  7882  7882 V GraphicsEnvironment: No special selections for ANGLE, returning default driver choice
+         1790834111.633  7882  7882 V GraphicsEnvironment: Neither updatable production driver nor prerelease driver is supported.
+         1790834111.698  7882  7898 I DisplayManager: Choreographer implicitly registered for the refresh rate.
+         1790834111.776  7882  7882 E dev.probe: Invalid resource ID 0x00000000.
+         1790834111.778  7882  7882 D CompatChangeReporter: Compat change id reported: 377864165; UID 10264; state: ENABLED
+         1790834111.789  7882  7898 I GFXSTREAM: [eglDisplay.cpp(297)] Opening libGLESv1_CM_emulation.so
+         1790834111.789  7882  7898 I GFXSTREAM: [eglDisplay.cpp(297)] Opening libGLESv2_emulation.so
+         1790834111.790  7882  7898 W libc    : Access denied finding property "vendor.mesa.virtgpu.kumquat"
+         1790834111.802  7882  7898 W HWUI    : Failed to choose config with EGL_SWAP_BEHAVIOR_PRESERVED, retrying without...
+         1790834111.803  7882  7898 W HWUI    : Failed to initialize 101010-2 format, error = EGL_SUCCESS
+         1790834111.804  7882  7882 W HWUI    : Unknown dataspace 0
+         1790834111.829  7882  7903 W libc    : Access denied finding property "vendor.mesa.virtgpu.kumquat"
+         1790834112.005  7882  7882 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): android.app.Activity$$ExternalSyntheticLambda0@41248c2
+         1790834112.006  7882  7904 D WindowOnBackDispatcher: setOnBackInvokedCallbackInfo: android.app.Activity$$ExternalSyntheticLambda0@41248c2
+         1790834112.101  7882  7882 I dev.probe: hiddenapi: Accessing hidden method Landroid/os/SystemProperties;->addChangeCallback(Ljava/lang/Runnable;)V (runtime_flags=0, domain=platform, api=unsupported) from Landroidx/compose/ui/platform/AndroidComposeView$Companion; (domain=app, TargetSdkVersion=36) using reflection: allowed
+         1790834112.139  7882  7882 D VRI[MainActivity]: WindowInsets changed: 1344x2992 statusBars:[0,159,0,0] navigationBars:[0,0,0,144] mandatorySystemGestures:[0,195,0,144] 
+         1790834112.146  7882  7882 I HWUI    : Using FreeType backend (prop=Auto)
+         1790834112.160  7882  7882 I Surface : Creating surface for consumer unnamed-7882-0 with slotExpansion=1 for 64 slots
+         1790834112.160  7882  7882 I Surface : Creating surface for consumer VRI[MainActivity]#0(BLAST Consumer)0 with slotExpansion=1 for 64 slots
+         1790834112.261  7882  7882 I ProbeState: event=start saved=0 volatile=0 rows=0 restored=false pid=7882
+         1790834112.374  7882  7882 D InsetsController: hide(ime())
+         1790834112.374  7882  7882 I ImeTracker: dev.probe:09162bc1: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+         1790834112.501  7882  7882 I ProbeState: event=inc saved=1 volatile=1 rows=0 restored=false pid=7882
+         1790834112.597  7882  7882 I ProbeState: event=inc saved=2 volatile=2 rows=0 restored=false pid=7882
+         1790834112.684  7882  7882 I ProbeState: event=inc saved=3 volatile=3 rows=0 restored=false pid=7882
+         1790834112.730  7882  7887 I dev.probe: Compiler allocated 5599KB to compile void android.view.ViewRootImpl.performTraversals(long)
+         1790834112.854  7882  7882 I ProbeState: event=write saved=3 volatile=3 rows=1 restored=false pid=7882
+         1790834114.498  7882  7882 D VRI[MainActivity]: visibilityChanged oldVisibility=true newVisibility=false
+         1790834114.987  7882  7882 D ViewRootImpl: Skipping stats log for color mode
+         1790834114.991  7882  7882 I Surface : Creating surface for consumer unnamed-7882-1 with slotExpansion=1 for 64 slots
+         1790834114.991  7882  7882 I Surface : Creating surface for consumer VRI[MainActivity]#1(BLAST Consumer)1 with slotExpansion=1 for 64 slots
+         1790834115.164  7882  7882 D InsetsController: hide(ime())
+         1790834115.164  7882  7882 I ImeTracker: dev.probe:b631d44b: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+         1790834116.430  7882  7882 D VRI[MainActivity]: visibilityChanged oldVisibility=true newVisibility=false
+         1790834117.171  7882  8075 D ProfileInstaller: Installing profile for dev.probe
+         1790834177.110  8706  8706 I Zygote  : Process 8706 created for dev.probe
+         1790834177.110  8706  8706 I dev.probe: Late-enabling -Xcheck:jni
+         1790834177.116  8706  8706 I dev.probe: Using generational CollectorTypeCMC GC.
+         1790834177.122  8706  8706 D nativeloader: Load libframework-connectivity-tiramisu-jni.so using APEX ns com_android_tethering for caller /apex/com.android.tethering/javalib/framework-connectivity-t.jar: ok
+         1790834177.189  8706  8706 I ActivityThread: Relaunch all activities: onCoreSettingsChange
+         1790834177.210  8706  8706 D ApplicationLoaders: Returning zygote-cached class loader: /system_ext/framework/androidx.window.extensions.jar
+         1790834177.210  8706  8706 D ApplicationLoaders: Returning zygote-cached class loader: /system_ext/framework/androidx.window.sidecar.jar
+         1790834177.230  8706  8706 D nativeloader: Configuring clns-9 for other apk /data/app/~~VhasxvmgdklBuiWZqYjyBw==/dev.probe-rb3A2TB6ZURxOPpRNwFT8A==/base.apk. target_sdk_version=36, uses_libraries=, library_path=/data/app/~~VhasxvmgdklBuiWZqYjyBw==/dev.probe-rb3A2TB6ZURxOPpRNwFT8A==/lib/arm64:/data/app/~~VhasxvmgdklBuiWZqYjyBw==/dev.probe-rb3A2TB6ZURxOPpRNwFT8A==/base.apk!/lib/arm64-v8a, permitted_path=/data:/mnt/expand:/data/user/0/dev.probe
+         1790834177.237  8706  8706 D ActivityThread: Set OS env TMPDIR to /data/user/0/dev.probe/cache
+         1790834177.238  8706  8706 V GraphicsEnvironment: Currently set values for:
+         1790834177.240  8706  8706 V GraphicsEnvironment:   angle_gl_driver_selection_pkgs=[]
+         1790834177.240  8706  8706 V GraphicsEnvironment:   angle_gl_driver_selection_values=[]
+         1790834177.240  8706  8706 V GraphicsEnvironment: dev.probe is not listed in per-application setting
+         1790834177.241  8706  8706 V GraphicsEnvironment: No special selections for ANGLE, returning default driver choice
+         1790834177.241  8706  8706 V GraphicsEnvironment: Neither updatable production driver nor prerelease driver is supported.
+         1790834177.321  8706  8706 E dev.probe: Invalid resource ID 0x00000000.
+         1790834177.323  8706  8706 D CompatChangeReporter: Compat change id reported: 377864165; UID 10264; state: ENABLED
+         1790834177.324  8706  8721 I DisplayManager: Choreographer implicitly registered for the refresh rate.
+         1790834177.384  8706  8721 I GFXSTREAM: [eglDisplay.cpp(297)] Opening libGLESv1_CM_emulation.so
+         1790834177.384  8706  8721 I GFXSTREAM: [eglDisplay.cpp(297)] Opening libGLESv2_emulation.so
+         1790834177.404  8706  8721 W libc    : Access denied finding property "vendor.mesa.virtgpu.kumquat"
+         1790834177.433  8706  8721 W HWUI    : Failed to choose config with EGL_SWAP_BEHAVIOR_PRESERVED, retrying without...
+         1790834177.444  8706  8721 W HWUI    : Failed to initialize 101010-2 format, error = EGL_SUCCESS
+         1790834177.475  8706  8706 W HWUI    : Unknown dataspace 0
+         1790834177.494  8706  8726 W libc    : Access denied finding property "vendor.mesa.virtgpu.kumquat"
+         1790834177.705  8706  8706 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): android.app.Activity$$ExternalSyntheticLambda0@60046d3
+         1790834177.717  8706  8727 D WindowOnBackDispatcher: setOnBackInvokedCallbackInfo: android.app.Activity$$ExternalSyntheticLambda0@60046d3
+         1790834177.824  8706  8706 I dev.probe: hiddenapi: Accessing hidden method Landroid/os/SystemProperties;->addChangeCallback(Ljava/lang/Runnable;)V (runtime_flags=0, domain=platform, api=unsupported) from Landroidx/compose/ui/platform/AndroidComposeView$Companion; (domain=app, TargetSdkVersion=36) using reflection: allowed
+         1790834177.856  8706  8706 D VRI[MainActivity]: WindowInsets changed: 1344x2992 statusBars:[0,159,0,0] navigationBars:[0,0,0,144] mandatorySystemGestures:[0,195,0,144] 
+         1790834177.864  8706  8706 I HWUI    : Using FreeType backend (prop=Auto)
+         1790834177.874  8706  8706 I Surface : Creating surface for consumer unnamed-8706-0 with slotExpansion=1 for 64 slots
+         1790834177.874  8706  8706 I Surface : Creating surface for consumer VRI[MainActivity]#0(BLAST Consumer)0 with slotExpansion=1 for 64 slots
+         1790834177.971  8706  8706 I ProbeState: event=start saved=3 volatile=0 rows=1 restored=true pid=8706
+         1790834178.084  8706  8706 D InsetsController: hide(ime())
+         1790834178.088  8706  8706 I ImeTracker: dev.probe:cb1af5b5: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+         1790834178.542  8706  8710 I dev.probe: Compiler allocated 5599KB to compile void android.view.ViewRootImpl.performTraversals(long)
+         1790834179.573  8706  8706 D VRI[MainActivity]: visibilityChanged oldVisibility=true newVisibility=false
+         1790834180.051  8781  8781 I Zygote  : Process 8781 created for dev.probe
+         1790834180.051  8781  8781 I dev.probe: Late-enabling -Xcheck:jni
+         1790834180.061  8781  8781 I dev.probe: Using generational CollectorTypeCMC GC.
+         1790834180.068  8781  8781 D nativeloader: Load libframework-connectivity-tiramisu-jni.so using APEX ns com_android_tethering for caller /apex/com.android.tethering/javalib/framework-connectivity-t.jar: ok
+         1790834180.092  8781  8781 I ActivityThread: Relaunch all activities: onCoreSettingsChange
+         1790834180.111  8781  8781 D ApplicationLoaders: Returning zygote-cached class loader: /system_ext/framework/androidx.window.extensions.jar
+         1790834180.112  8781  8781 D ApplicationLoaders: Returning zygote-cached class loader: /system_ext/framework/androidx.window.sidecar.jar
+         1790834180.153  8781  8781 D nativeloader: Configuring clns-9 for other apk /data/app/~~VhasxvmgdklBuiWZqYjyBw==/dev.probe-rb3A2TB6ZURxOPpRNwFT8A==/base.apk. target_sdk_version=36, uses_libraries=, library_path=/data/app/~~VhasxvmgdklBuiWZqYjyBw==/dev.probe-rb3A2TB6ZURxOPpRNwFT8A==/lib/arm64:/data/app/~~VhasxvmgdklBuiWZqYjyBw==/dev.probe-rb3A2TB6ZURxOPpRNwFT8A==/base.apk!/lib/arm64-v8a, permitted_path=/data:/mnt/expand:/data/user/0/dev.probe
+         1790834180.156  8781  8781 D ActivityThread: Set OS env TMPDIR to /data/user/0/dev.probe/cache
+         1790834180.157  8781  8781 V GraphicsEnvironment: Currently set values for:
+         1790834180.157  8781  8781 V GraphicsEnvironment:   angle_gl_driver_selection_pkgs=[]
+         1790834180.157  8781  8781 V GraphicsEnvironment:   angle_gl_driver_selection_values=[]
+         1790834180.157  8781  8781 V GraphicsEnvironment: dev.probe is not listed in per-application setting
+         1790834180.157  8781  8781 V GraphicsEnvironment: No special selections for ANGLE, returning default driver choice
+         1790834180.157  8781  8781 V GraphicsEnvironment: Neither updatable production driver nor prerelease driver is supported.
+         1790834180.186  8781  8795 I DisplayManager: Choreographer implicitly registered for the refresh rate.
+         1790834180.245  8781  8795 I GFXSTREAM: [eglDisplay.cpp(297)] Opening libGLESv1_CM_emulation.so
+         1790834180.245  8781  8795 I GFXSTREAM: [eglDisplay.cpp(297)] Opening libGLESv2_emulation.so
+         1790834180.254  8781  8795 W libc    : Access denied finding property "vendor.mesa.virtgpu.kumquat"
+         1790834180.259  8781  8795 W HWUI    : Failed to choose config with EGL_SWAP_BEHAVIOR_PRESERVED, retrying without...
+         1790834180.259  8781  8795 W HWUI    : Failed to initialize 101010-2 format, error = EGL_SUCCESS
+         1790834180.270  8781  8781 E dev.probe: Invalid resource ID 0x00000000.
+         1790834180.277  8781  8781 D CompatChangeReporter: Compat change id reported: 377864165; UID 10264; state: ENABLED
+         1790834180.371  8781  8781 W HWUI    : Unknown dataspace 0
+         1790834180.384  8781  8800 W libc    : Access denied finding property "vendor.mesa.virtgpu.kumquat"
+         1790834180.571  8781  8781 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): android.app.Activity$$ExternalSyntheticLambda0@60046d3
+         1790834180.589  8781  8802 D WindowOnBackDispatcher: setOnBackInvokedCallbackInfo: android.app.Activity$$ExternalSyntheticLambda0@60046d3
+         1790834180.674  8781  8781 I dev.probe: hiddenapi: Accessing hidden method Landroid/os/SystemProperties;->addChangeCallback(Ljava/lang/Runnable;)V (runtime_flags=0, domain=platform, api=unsupported) from Landroidx/compose/ui/platform/AndroidComposeView$Companion; (domain=app, TargetSdkVersion=36) using reflection: allowed
+         1790834180.710  8781  8781 D VRI[MainActivity]: WindowInsets changed: 1344x2992 statusBars:[0,159,0,0] navigationBars:[0,0,0,144] mandatorySystemGestures:[0,195,0,144] 
+         1790834180.741  8781  8781 I HWUI    : Using FreeType backend (prop=Auto)
+         1790834180.750  8781  8781 I Surface : Creating surface for consumer unnamed-8781-0 with slotExpansion=1 for 64 slots
+         1790834180.751  8781  8781 I Surface : Creating surface for consumer VRI[MainActivity]#0(BLAST Consumer)0 with slotExpansion=1 for 64 slots
+         1790834180.847  8781  8781 I ProbeState: event=start saved=3 volatile=0 rows=1 restored=true pid=8781
+         1790834180.948  8781  8781 D InsetsController: hide(ime())
+         1790834180.951  8781  8781 I ImeTracker: dev.probe:6f728c40: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+         1790834181.035  8781  8781 I ProbeState: event=finish pid=8781
+         1790834181.207  8781  8785 I dev.probe: Compiler allocated 5599KB to compile void android.view.ViewRootImpl.performTraversals(long)
+         1790834182.294  8781  8781 D VRI[MainActivity]: visibilityChanged oldVisibility=true newVisibility=false
+         1790834182.425  8781  8781 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): null
+         1790834182.426  8781  8781 D ViewRootImpl: Skipping stats log for color mode
+         1790834182.670  8781  8795 I GFXSTREAM: [eglDisplay.cpp(297)] Opening libGLESv1_CM_emulation.so
+         1790834182.670  8781  8795 I GFXSTREAM: [eglDisplay.cpp(297)] Opening libGLESv2_emulation.so
+         1790834182.672  8781  8795 W libc    : Access denied finding property "vendor.mesa.virtgpu.kumquat"
+         1790834182.681  8781  8795 W HWUI    : Failed to choose config with EGL_SWAP_BEHAVIOR_PRESERVED, retrying without...
+         1790834182.681  8781  8795 W HWUI    : Failed to initialize 101010-2 format, error = EGL_SUCCESS
+         1790834182.795  8781  8781 D WindowOnBackDispatcher: setTopOnBackInvokedCallback (unwrapped): android.app.Activity$$ExternalSyntheticLambda0@990cc2f
+         1790834182.795  8781  8802 D WindowOnBackDispatcher: setOnBackInvokedCallbackInfo: android.app.Activity$$ExternalSyntheticLambda0@990cc2f
+         1790834182.812  8781  8781 D VRI[MainActivity]: WindowInsets changed: 1344x2992 statusBars:[0,159,0,0] navigationBars:[0,0,0,144] mandatorySystemGestures:[0,195,0,144] 
+         1790834182.822  8781  8781 I Surface : Creating surface for consumer unnamed-8781-1 with slotExpansion=1 for 64 slots
+         1790834182.822  8781  8781 I Surface : Creating surface for consumer VRI[MainActivity]#1(BLAST Consumer)1 with slotExpansion=1 for 64 slots
+         1790834183.188  8781  8781 I ProbeState: event=start saved=0 volatile=0 rows=1 restored=false pid=8781
+         1790834183.290  8781  8781 D InsetsController: hide(ime())
+         1790834183.290  8781  8781 I ImeTracker: dev.probe:3214f51b: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN

@@ -3,3 +3,5 @@ node_modules/
 package-lock.json
 coverage/
 test/fixtures/captured/
+test/device/probe-app/
+.claude/settings.local.json

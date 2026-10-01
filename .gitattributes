@@ -1,0 +1,5 @@
+# Captured device output is kept byte for byte (CRLF included); APKs and dumps are binary.
+test/fixtures/captured/** -text
+*.apk binary
+*.bin binary
+*.jar binary

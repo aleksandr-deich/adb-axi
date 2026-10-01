@@ -1,0 +1,26 @@
+--------- beginning of crash
+         1790834324.594  9328  9328 E AndroidRuntime: FATAL EXCEPTION: main
+         1790834324.594  9328  9328 E AndroidRuntime: Process: dev.probe, PID: 9328
+         1790834324.594  9328  9328 E AndroidRuntime: java.lang.IllegalStateException: probe crash requested
+         1790834324.594  9328  9328 E AndroidRuntime: 	at dev.probe.MainActivity.dispatch(MainActivity.kt:67)
+         1790834324.594  9328  9328 E AndroidRuntime: 	at dev.probe.MainActivity.onNewIntent(MainActivity.kt:56)
+         1790834324.594  9328  9328 E AndroidRuntime: 	at android.app.Activity.onNewIntent(Activity.java:2418)
+         1790834324.594  9328  9328 E AndroidRuntime: 	at android.app.Activity.performNewIntent(Activity.java:9029)
+         1790834324.594  9328  9328 E AndroidRuntime: 	at android.app.Instrumentation.callActivityOnNewIntent(Instrumentation.java:1646)
+         1790834324.594  9328  9328 E AndroidRuntime: 	at android.app.Instrumentation.internalCallActivityOnNewIntent(Instrumentation.java:1667)
+         1790834324.594  9328  9328 E AndroidRuntime: 	at android.app.Instrumentation.callActivityOnNewIntent(Instrumentation.java:1655)
+         1790834324.594  9328  9328 E AndroidRuntime: 	at android.app.ActivityThread.deliverNewIntents(ActivityThread.java:4280)
+         1790834324.594  9328  9328 E AndroidRuntime: 	at android.app.ActivityThread.handleNewIntent(ActivityThread.java:4290)
+         1790834324.594  9328  9328 E AndroidRuntime: 	at android.app.servertransaction.NewIntentItem.execute(NewIntentItem.java:58)
+         1790834324.594  9328  9328 E AndroidRuntime: 	at android.app.servertransaction.ActivityTransactionItem.execute(ActivityTransactionItem.java:60)
+         1790834324.594  9328  9328 E AndroidRuntime: 	at android.app.servertransaction.TransactionExecutor.executeNonLifecycleItem(TransactionExecutor.java:174)
+         1790834324.594  9328  9328 E AndroidRuntime: 	at android.app.servertransaction.TransactionExecutor.executeTransactionItems(TransactionExecutor.java:109)
+         1790834324.594  9328  9328 E AndroidRuntime: 	at android.app.servertransaction.TransactionExecutor.execute(TransactionExecutor.java:81)
+         1790834324.594  9328  9328 E AndroidRuntime: 	at android.app.ActivityThread$H.handleMessage(ActivityThread.java:2636)
+         1790834324.594  9328  9328 E AndroidRuntime: 	at android.os.Handler.dispatchMessage(Handler.java:107)
+         1790834324.594  9328  9328 E AndroidRuntime: 	at android.os.Looper.loopOnce(Looper.java:232)
+         1790834324.594  9328  9328 E AndroidRuntime: 	at android.os.Looper.loop(Looper.java:317)
+         1790834324.594  9328  9328 E AndroidRuntime: 	at android.app.ActivityThread.main(ActivityThread.java:8705)
+         1790834324.594  9328  9328 E AndroidRuntime: 	at java.lang.reflect.Method.invoke(Native Method)
+         1790834324.594  9328  9328 E AndroidRuntime: 	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:580)
+         1790834324.594  9328  9328 E AndroidRuntime: 	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:886)

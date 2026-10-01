@@ -1,0 +1,10 @@
+--------- beginning of main
+         1790834112.261  7882  7882 I ProbeState: event=start saved=0 volatile=0 rows=0 restored=false pid=7882
+         1790834112.501  7882  7882 I ProbeState: event=inc saved=1 volatile=1 rows=0 restored=false pid=7882
+         1790834112.597  7882  7882 I ProbeState: event=inc saved=2 volatile=2 rows=0 restored=false pid=7882
+         1790834112.684  7882  7882 I ProbeState: event=inc saved=3 volatile=3 rows=0 restored=false pid=7882
+         1790834112.854  7882  7882 I ProbeState: event=write saved=3 volatile=3 rows=1 restored=false pid=7882
+         1790834177.971  8706  8706 I ProbeState: event=start saved=3 volatile=0 rows=1 restored=true pid=8706
+         1790834180.847  8781  8781 I ProbeState: event=start saved=3 volatile=0 rows=1 restored=true pid=8781
+         1790834181.035  8781  8781 I ProbeState: event=finish pid=8781
+         1790834183.188  8781  8781 I ProbeState: event=start saved=0 volatile=0 rows=1 restored=false pid=8781
