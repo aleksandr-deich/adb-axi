@@ -189,16 +189,15 @@ describe("app start", () => {
     expect(toon.durationMs).toBeLessThan(3000);
     expect(toon.stdout).toBe(
       [
-        "error: dev.probe was still running at the 1 s deadline after am force-stop in `app start dev.probe --fresh`",
+        "error: dev.probe was still running at the 1 s deadline after am force-stop in `adb-axi app start dev.probe --fresh`",
         "code: STOP_FAILED",
-        "step: am force-stop",
         "last:",
         "  pid: 8235",
         "help[2]: Run `adb-axi app start dev.probe --fresh --timeout 30s` to give it longer,Run `adb-axi app info dev.probe` for its pid and foreground state",
         "",
       ].join("\n"),
     );
-    expect(data).toMatchObject({ code: "STOP_FAILED", step: "am force-stop", last: { pid: 8235 } });
+    expect(data).toMatchObject({ code: "STOP_FAILED", last: { pid: 8235 } });
     expect(shellCommands(f)).not.toContain(START);
     expectClean(f);
   });
@@ -540,9 +539,8 @@ describe("app stop", () => {
     expect(toon.durationMs).toBeLessThan(3000);
     expect(toon.stdout).toBe(
       [
-        "error: dev.probe was still running at the 1 s deadline after am force-stop in `app stop dev.probe`",
+        "error: dev.probe was still running at the 1 s deadline after am force-stop in `adb-axi app stop dev.probe`",
         "code: STOP_FAILED",
-        "step: am force-stop",
         "last:",
         "  pid: 8235",
         "help[2]: Run `adb-axi app stop dev.probe --timeout 30s` to give it longer,Run `adb-axi app info dev.probe` for its pid and foreground state",
@@ -650,6 +648,30 @@ describe("app clear", () => {
     expectClean(f);
   });
 
+  it("says only pm clear confirms the clear when the device refuses run-as for a debuggable app", async () => {
+    const f = device({
+      [PACKAGE]: INSTALLED,
+      [CLEAR]: { stdoutFile: "captured/35/pm-clear.txt" },
+      [PIDOF]: PROBE_STOPPED,
+      [DATA_FILES]: { stderr: "run-as: package not debuggable: dev.probe\n", exit: 1 },
+    });
+    const { toon, data } = await both(["app", "clear", "dev.probe"], f);
+    expect(toon.exitCode).toBe(0);
+    expect(toon.stdout).toBe(
+      [
+        'ok: "clear dev.probe -> data cleared, process stopped"',
+        "confirmed_by[1]: pm clear",
+        "",
+      ].join("\n"),
+    );
+    expect(data).toEqual({
+      ok: "clear dev.probe -> data cleared, process stopped",
+      confirmed_by: ["pm clear"],
+    });
+    expect(shellCommands(f)).toEqual(twice([PACKAGE, CLEAR, PIDOF, DATA_FILES]));
+    expectClean(f);
+  });
+
   it("fails with STOP_FAILED, naming pm clear, when the process is still there at the deadline", async () => {
     const f = device({
       [PACKAGE]: INSTALLED,
@@ -660,9 +682,8 @@ describe("app clear", () => {
     expect(toon.exitCode).toBe(1);
     expect(data).toMatchObject({
       error:
-        "dev.probe was still running at the 1 s deadline after pm clear in `app clear dev.probe`",
+        "dev.probe was still running at the 1 s deadline after pm clear in `adb-axi app clear dev.probe`",
       code: "STOP_FAILED",
-      step: "pm clear",
       last: { pid: 8235 },
       help: [
         "Run `adb-axi app clear dev.probe --timeout 30s` to give it longer",

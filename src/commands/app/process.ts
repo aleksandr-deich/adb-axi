@@ -3,7 +3,7 @@ import { parseDumpsysPackage, type PackageInfo } from "../../android/packages.js
 import { pidof } from "../../android/pidof.js";
 import { readShell, type ReadOptions } from "../../android/read.js";
 import { AdbAxiError } from "../../core/errors.js";
-import { runHint, shellWords } from "../../core/output.js";
+import { commandLine, runHint } from "../../core/output.js";
 import { poll } from "../../core/poll.js";
 import type { CommandContext } from "../types.js";
 import { appInstall } from "./install.js";
@@ -99,9 +99,9 @@ export function stopFailed(
     last === null || last.length === 0 ? UNKNOWN : last.length === 1 ? last[0] : last.join(" ");
   return new AdbAxiError(
     "STOP_FAILED",
-    `${pkg} was still running at the ${formatDuration(timeoutMs)} deadline after ${after.step} in \`${shellWords(after.command)}\``,
+    `${pkg} was still running at the ${formatDuration(timeoutMs)} deadline after ${after.step} in \`${commandLine(after.command)}\``,
     {
-      fields: { step: after.step, last: { pid } },
+      fields: { last: { pid } },
       help: [
         runHint([...after.command, "--timeout", "30s"], "to give it longer"),
         runHint(["app", "info", pkg], "for its pid and foreground state"),

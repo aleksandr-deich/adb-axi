@@ -41,10 +41,10 @@ export const appClear = defineCommand({
       });
     }
 
-    if (info.debuggable) await requireNoFiles(context, pkg);
+    const listed = info.debuggable && (await checkNoFiles(context, pkg));
     return {
       ok: okLine("clear", pkg, "data cleared, process stopped"),
-      confirmed_by: info.debuggable ? ["pm clear", "run-as"] : ["pm clear"],
+      confirmed_by: listed ? ["pm clear", "run-as"] : ["pm clear"],
     };
   },
 });
@@ -52,21 +52,29 @@ export const appClear = defineCommand({
 /**
  * List every regular file left in the app's data directory (`databases`, `shared_prefs`,
  * `files`, ...). An empty `cache` or `code_cache` directory is not data; any file is.
+ * Only `run-as` can list them, so a refusal means the files were not listed (`false`).
  */
-async function requireNoFiles(context: CommandContext, pkg: string): Promise<void> {
-  const result = await readShell(
-    context.adb(),
-    targetSerial(context),
-    `run-as ${pkg} find . -type f`,
-    `listing the data files of ${pkg}`,
-    readOptions(context),
-  );
-  const files = result.stdout
+async function checkNoFiles(context: CommandContext, pkg: string): Promise<boolean> {
+  let stdout: string;
+  try {
+    const result = await readShell(
+      context.adb(),
+      targetSerial(context),
+      `run-as ${pkg} find . -type f`,
+      `listing the data files of ${pkg}`,
+      readOptions(context),
+    );
+    stdout = result.stdout;
+  } catch (error) {
+    if (error instanceof AdbAxiError && error.code === "REMOTE_EXIT") return false;
+    throw error;
+  }
+  const files = stdout
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter((line) => line !== "")
     .map((line) => line.replace(/^\.\//, ""));
-  if (files.length === 0) return;
+  if (files.length === 0) return true;
   throw new AdbAxiError(
     "CLEAR_FAILED",
     `${pkg} still has ${files.length === 1 ? "1 file" : `${files.length} files`} in its data directory after pm clear`,
