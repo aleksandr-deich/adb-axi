@@ -37,8 +37,9 @@ export type PollResult<TValue, TLast> =
   | { ok: false; last: TLast | undefined; waitedMs: number; attempts: number };
 
 /**
- * Observe until `check` reports done or the deadline passes. A final observation is
- * taken at the deadline, so a state reached during the last interval is not missed.
+ * Observe until `check` reports done or the deadline passes. Observations start one
+ * interval apart; one slower than the interval is followed by the next at once. A final
+ * observation is taken at the deadline, so a state reached during the last interval is not missed.
  * The caller turns a timeout into its own error (`WAIT_TIMEOUT`, `KILL_TIMEOUT`, ...)
  * with `last` as the evidence.
  */
@@ -62,6 +63,7 @@ export async function poll<TValue, TLast>(
 
   for (;;) {
     attempts++;
+    const observedAt = clock.now();
     const observation = await options.check(Math.max(0, deadline - clock.now()));
     const waitedMs = Math.round(clock.now() - start);
     if (observation.done) {
@@ -72,6 +74,6 @@ export async function poll<TValue, TLast>(
     if (remaining <= 0) {
       return { ok: false, last, waitedMs, attempts };
     }
-    await clock.sleep(Math.min(interval, remaining));
+    await clock.sleep(Math.min(Math.max(0, interval - (clock.now() - observedAt)), remaining));
   }
 }
