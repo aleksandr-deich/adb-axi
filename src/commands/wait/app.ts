@@ -1,4 +1,5 @@
 import { assertPackageName } from "../../android/component.js";
+import { Deadline } from "../../core/deadline.js";
 import { AdbAxiError } from "../../core/errors.js";
 import { okLine, runHint } from "../../core/output.js";
 import { MAX_INTERVAL_MS, poll } from "../../core/poll.js";
@@ -36,10 +37,12 @@ export const waitApp = defineCommand({
 
     let latest: AppObservation | undefined;
     const result = await poll({
-      timeoutMs: Math.max(0, context.deadline.remainingMs() - MAX_INTERVAL_MS),
-      check: async () => {
+      timeoutMs: context.deadline.remainingMs(),
+      check: async (remainingMs) => {
+        const reads =
+          remainingMs < MAX_INTERVAL_MS ? { deadline: new Deadline(MAX_INTERVAL_MS) } : options;
         try {
-          latest = await observeApp(adb, serial, pkg, wanted === "foreground", options);
+          latest = await observeApp(adb, serial, pkg, wanted === "foreground", reads);
         } catch (error) {
           // A read cut off by the deadline ends the wait; the last full observation is the evidence.
           if (error instanceof AdbAxiError && error.code === "TIMEOUT") {

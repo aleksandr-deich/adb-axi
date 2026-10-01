@@ -533,22 +533,29 @@ describe("wait app", () => {
     expectClean(f);
   });
 
-  it("takes the final observation inside the deadline, so a state reached late is not missed", async () => {
+  it("takes the final observation at the deadline, so a state reached in the last interval is not missed", async () => {
     const f = deviceWithRules([
       {
         match: ["-s", SERIAL, "shell", PIDOF],
         respond: PROBE_STOPPED,
-        times: 2,
+        times: 3,
         then: PROBE_RUNNING,
       },
     ]);
-    const result = await once(
-      ["wait", "app", "dev.probe", "--state", "running", "--timeout", "1300ms"],
-      f,
+    const run = await runCli(
+      ["wait", "app", "dev.probe", "--state", "running", "--timeout", "1100ms"],
+      f.env,
     );
-    expect(result.toon.exitCode).toBe(0);
-    expect(expectWaited(result, "dev.probe", "running")).toBeLessThan(1300);
-    expect(shellCommands(f)).toEqual([PIDOF, PIDOF, PIDOF]);
+    expect(run.exitCode).toBe(0);
+    const result = {
+      toon: run,
+      json: run,
+      data: decode(run.stdout.trimEnd()) as Record<string, unknown>,
+    };
+    // Polls at 0, 400 and 800 ms saw it stopped; the fourth, at the deadline, saw it running.
+    expect(expectWaited(result, "dev.probe", "running")).toBeLessThan(1100 + 500);
+    expect(shellCommands(f)).toEqual([PIDOF, PIDOF, PIDOF, PIDOF]);
+    expect(run.durationMs).toBeLessThan(1100 + 500 + 1500);
     expectClean(f);
   });
 
