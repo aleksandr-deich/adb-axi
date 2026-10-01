@@ -533,7 +533,7 @@ describe("wait app", () => {
     expectClean(f);
   });
 
-  it("takes the final observation at the deadline, so a state reached in the last interval is not missed", async () => {
+  it("keeps polling under a --timeout until the state is reached", async () => {
     const f = deviceWithRules([
       {
         match: ["-s", SERIAL, "shell", PIDOF],
@@ -542,22 +542,16 @@ describe("wait app", () => {
         then: PROBE_RUNNING,
       },
     ]);
-    const run = await runCli(
-      ["wait", "app", "dev.probe", "--state", "running", "--timeout", "1200ms"],
-      f.env,
+    // The deadline outlasts a slow runner's process spawns; test/unit/wait-app.test.ts covers the final observation at the deadline.
+    const result = await once(
+      ["wait", "app", "dev.probe", "--state", "running", "--timeout", "10s"],
+      f,
     );
-    expect(run.exitCode).toBe(0);
-    const result = {
-      toon: run,
-      json: run,
-      data: decode(run.stdout.trimEnd()) as Record<string, unknown>,
-    };
-    // Polls at about 0, 400 and 800 ms saw it stopped; only a fourth at the 1200 ms deadline sees it running.
-    expect(expectWaited(result, "dev.probe", "running")).toBeLessThan(1200 + 500);
-    expect(shellCommands(f)).toEqual([PIDOF, PIDOF, PIDOF, PIDOF]);
-    expect(run.durationMs).toBeLessThan(1200 + 500 + 1500);
+    expect(result.toon.exitCode).toBe(0);
+    // Three polls saw it stopped, so the fourth came three poll intervals in.
+    expect(expectWaited(result, "dev.probe", "running")).toBeGreaterThanOrEqual(1000);
     expectClean(f);
-  });
+  }, 20_000);
 
   it("waits for a stopped app", async () => {
     const f = deviceWithRules([
@@ -575,22 +569,28 @@ describe("wait app", () => {
   });
 
   it("succeeds at once for a stopped app that is already stopped", async () => {
-    const f = device({ [PIDOF]: PROBE_STOPPED });
+    const f = device({ [PIDOF]: { ...PROBE_STOPPED, delayMs: 300 } });
     const result = await both(["wait", "app", "dev.probe", "--state", "stopped"], f);
     expect(result.toon.exitCode).toBe(0);
-    expect(expectWaited(result, "dev.probe", "stopped")).toBeLessThan(250);
+    expectWaited(result, "dev.probe", "stopped");
+    // A slow first read still succeeds without another poll, regardless of elapsed time.
+    expect(shellCommands(f)).toEqual(twice([PIDOF]));
+    expectClean(f);
   });
 
   it("fails with WAIT_TIMEOUT carrying the last observation when the state is never reached", async () => {
     const f = device({ [FOREGROUND]: LAUNCHER_FRONT, [PIDOF]: PROBE_RUNNING });
+    // Device resolution and each observation's two reads start the fake adb, so the deadline
+    // must outlast a slow runner's process spawns in both runs; a run with no finished
+    // observation reports `unknown`.
     const { toon, data } = await both(
-      ["wait", "app", "dev.probe", "--state", "foreground", "--timeout", "1s"],
+      ["wait", "app", "dev.probe", "--state", "foreground", "--timeout", "3s"],
       f,
     );
     expect(toon.exitCode).toBe(1);
     expect(toon.stdout).toBe(
       [
-        "error: dev.probe did not reach foreground within 1 s",
+        "error: dev.probe did not reach foreground within 3 s",
         "code: WAIT_TIMEOUT",
         "last:",
         "  state: running",
@@ -602,16 +602,16 @@ describe("wait app", () => {
     );
     expect(data).toMatchObject({ code: "WAIT_TIMEOUT" });
     expectClean(f);
-  });
+  }, 20_000);
 
   it("keeps the deadline: a wait for a stop that never comes ends within the timeout plus a margin", async () => {
     const f = device({ [PIDOF]: PROBE_RUNNING });
     const run = await runCli(
-      ["wait", "app", "dev.probe", "--state", "stopped", "--timeout", "1s"],
+      ["wait", "app", "dev.probe", "--state", "stopped", "--timeout", "2s"],
       f.env,
     );
     expect(run.exitCode).toBe(1);
-    expect(run.durationMs).toBeLessThan(2500);
+    expect(run.durationMs).toBeLessThan(2000 + 1500);
     expect(decode(run.stdout.trimEnd())).toMatchObject({
       code: "WAIT_TIMEOUT",
       last: { state: "running", pid: 8235 },
