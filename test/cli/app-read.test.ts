@@ -577,8 +577,9 @@ describe("wait app", () => {
 
   it("fails with WAIT_TIMEOUT carrying the last observation when the state is never reached", async () => {
     const f = device({ [FOREGROUND]: LAUNCHER_FRONT, [PIDOF]: PROBE_RUNNING });
-    // One observation starts the fake adb twice, so the deadline must outlast a slow runner's
-    // process spawns in both runs; a run with no finished observation reports `unknown`.
+    // Device resolution and each observation's two reads start the fake adb, so the deadline
+    // must outlast a slow runner's process spawns in both runs; a run with no finished
+    // observation reports `unknown`.
     const { toon, data } = await both(
       ["wait", "app", "dev.probe", "--state", "foreground", "--timeout", "3s"],
       f,

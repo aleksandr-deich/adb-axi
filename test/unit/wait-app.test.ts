@@ -6,28 +6,37 @@ import { AdbAxiError } from "../../src/core/errors.js";
 
 const SERIAL = "emulator-5554";
 
-/** Answers `pidof` at once from a script, and refuses a call whose deadline has passed, as AdbClient does. */
+/**
+ * Answers `pidof` from a script, and refuses a call whose deadline has passed, as AdbClient does.
+ * The last answer is held until the command deadline has passed, so the final read is always
+ * taken after it.
+ */
 class ScriptedAdb extends AdbClient {
   readonly calls: string[][] = [];
+  private readonly commandDeadline: Deadline;
   private readonly answers: AdbExit[];
 
-  constructor(answers: AdbExit[]) {
+  constructor(commandDeadline: Deadline, answers: AdbExit[]) {
     super("scripted-adb");
+    this.commandDeadline = commandDeadline;
     this.answers = answers;
   }
 
-  override device(
+  override async device(
     serial: string,
     args: readonly string[],
     options: AdbCallOptions,
   ): Promise<AdbExit> {
     this.calls.push(["-s", serial, ...args]);
-    if (options.deadline.remainingMs() <= 0) {
-      return Promise.reject(new AdbAxiError("TIMEOUT", `${options.step} did not finish`));
-    }
     const answer = this.answers.shift();
     if (answer === undefined) throw new Error(`no scripted answer for ${args.join(" ")}`);
-    return Promise.resolve(answer);
+    while (this.answers.length === 0 && this.commandDeadline.remainingMs() > 0) {
+      await new Promise((resolve) => setTimeout(resolve, 1));
+    }
+    if (options.deadline.remainingMs() <= 0) {
+      throw new AdbAxiError("TIMEOUT", `${options.step} did not finish`);
+    }
+    return answer;
   }
 }
 
@@ -43,7 +52,8 @@ function pidofExit(stdout: string): AdbExit {
 describe("wait app", () => {
   it("gives the final observation at the deadline its own short deadline, so a state reached in the last interval is not missed", async () => {
     const timeoutMs = 300;
-    const adb = new ScriptedAdb([pidofExit(""), pidofExit("8235\n")]);
+    const deadline = new Deadline(timeoutMs);
+    const adb = new ScriptedAdb(deadline, [pidofExit(""), pidofExit("8235\n")]);
     const result = await waitApp.run({
       spec: waitApp,
       flags: { state: "running" },
@@ -51,7 +61,7 @@ describe("wait app", () => {
       mode: "toon",
       timeoutMs,
       debug: false,
-      deadline: new Deadline(timeoutMs),
+      deadline,
       adb: () => adb,
       target: {
         serial: SERIAL,
