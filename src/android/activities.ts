@@ -45,13 +45,13 @@ export async function resolveLauncherActivity(
   const result = await readShell(
     adb,
     serial,
-    `cmd package resolve-activity --components --user ${userId} -a ${ACTION_MAIN} -c ${CATEGORY_LAUNCHER} -p ${pkg}`,
+    `cmd package query-activities --components --user ${userId} -a ${ACTION_MAIN} -c ${CATEGORY_LAUNCHER} -p ${pkg}`,
     step,
     options,
   );
   const text = result.stdout.trim();
-  if (text === "No activity found") return null;
-  const component = parseComponent(text);
+  if (text === "No activities found") return null;
+  const component = parseComponent(text.split(/\r?\n/)[0] ?? "");
   if (component?.package !== pkg) throw invalidOutput(step, result.stdout);
   return component.activity;
 }

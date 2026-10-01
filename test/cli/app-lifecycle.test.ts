@@ -10,7 +10,8 @@ const ONE_ONLINE = `List of devices attached\n${SERIAL}          device product:
 
 const CURRENT_USER = "am get-current-user";
 const RESOLVE =
-  "cmd package resolve-activity --components --user 0 -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -p dev.probe";
+  "cmd package query-activities --components --user 0 -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -p dev.probe";
+const KERNEL_UIDS = "ps -A -o PID,UID";
 const PROCESSES = "dumpsys activity processes dev.probe";
 const PROCESS_RUNNING = { stdoutFile: "captured/35/dumpsys-activity-processes-probe-front.txt" };
 const PACKAGE = "dumpsys package dev.probe";
@@ -60,6 +61,7 @@ function deviceWithRules(rules: Rule[]): FakeAdb {
       { match: shell(CURRENT_USER), respond: { stdout: "0\n" } },
       { match: shell(RESOLVE), respond: { stdout: "dev.probe/.MainActivity\n" } },
       { match: shell(PROCESSES), respond: PROCESS_RUNNING },
+      { match: shell(KERNEL_UIDS), respond: { stdout: "  PID   UID\n 8235 10213\n" } },
     ],
   });
   return fake;
@@ -85,6 +87,16 @@ function liveDevice(started: Response, initially: "running" | "stopped"): FakeAd
       { match: shell(RESOLVE), respond: { stdout: "dev.probe/.MainActivity\n" } },
       { match: shell(PROCESSES), when: { proc: "running" }, respond: PROCESS_RUNNING },
       { match: shell(PROCESSES), when: { proc: "stopped" }, respond: {} },
+      {
+        match: shell(KERNEL_UIDS),
+        when: { proc: "running" },
+        respond: { stdout: "  PID   UID\n 8235 10213\n" },
+      },
+      {
+        match: shell(KERNEL_UIDS),
+        when: { proc: "stopped" },
+        respond: { stdout: "  PID   UID\n" },
+      },
       { match: shell(PACKAGE), respond: INSTALLED },
       { match: shell(FORCE_STOP), respond: {}, set: { proc: "stopped" } },
       { match: shell(CLEAR), respond: { stdout: "Success\n" }, set: { proc: "stopped" } },
@@ -365,7 +377,7 @@ describe("app start", () => {
 
   it("fails with ACTIVITY_NOT_FOUND, without a start, when the app has no launcher activity", async () => {
     const f = device({
-      [RESOLVE]: { stdout: "No activity found\n" },
+      [RESOLVE]: { stdout: "No activities found\n" },
       [PACKAGE]: {
         stdout:
           "Packages:\n  Package [dev.probe] (4f2a9c1):\n    appId=10213\n    User 0: ceDataInode=1 installed=true hidden=false stopped=false\n",
@@ -496,7 +508,14 @@ describe("app stop", () => {
     expect(toon.stdout).toMatch(
       /^ok: stop dev\.probe -> not running \(pid 8235 gone after \d+ ms\)\n$/,
     );
-    expect(shellCommands(f)).toEqual([CURRENT_USER, PACKAGE, PIDOF, PROCESSES, FORCE_STOP, PIDOF]);
+    expect(shellCommands(f)).toEqual([
+      CURRENT_USER,
+      PACKAGE,
+      PIDOF,
+      KERNEL_UIDS,
+      FORCE_STOP,
+      PIDOF,
+    ]);
     expectClean(f);
   });
 
@@ -522,11 +541,8 @@ describe("app stop", () => {
         { match: ["devices", "-l"], respond: { stdout: ONE_ONLINE } },
         { match: shell(CURRENT_USER), respond: { stdout: "0\n" } },
         {
-          match: shell(PROCESSES),
-          respond: {
-            stdout:
-              "  *APP* UID 10213 ProcessRecord{abc 5120:dev.probe/u0a213}\n  *APP* UID 10213 ProcessRecord{def 5187:dev.probe/u0a213}\n",
-          },
+          match: shell(KERNEL_UIDS),
+          respond: { stdout: "  PID   UID\n 5120 10213\n 5187 10213\n" },
         },
         { match: shell(PACKAGE), respond: INSTALLED },
         { match: shell(FORCE_STOP), respond: {}, set: { proc: "stopped" } },
@@ -740,9 +756,9 @@ describe("app clear", () => {
 });
 
 describe("lifecycle review regressions", () => {
-  it.each([false, true])(
-    "resolves an enabled alternate launcher before starting, fresh=%s",
-    async (fresh) => {
+  it.each([false, true].flatMap((fresh) => [false, true].map((multiple) => ({ fresh, multiple }))))(
+    "selects enabled package launcher candidates before starting, fresh=$fresh, multiple=$multiple",
+    async ({ fresh, multiple }) => {
       const f = device({
         [PACKAGE]: {
           stdout: [
@@ -755,6 +771,9 @@ describe("lifecycle review regressions", () => {
             "        def dev.probe/.Alternate filter abc",
             '          Action: "android.intent.action.MAIN"',
             '          Category: "android.intent.category.LAUNCHER"',
+            "        abd dev.probe/.OtherIcon filter bcd",
+            '          Action: "android.intent.action.MAIN"',
+            '          Category: "android.intent.category.LAUNCHER"',
             "Packages:",
             "  Package [dev.probe] (abc):",
             "    appId=10213",
@@ -763,7 +782,17 @@ describe("lifecycle review regressions", () => {
             "        dev.probe.Disabled",
           ].join("\n"),
         },
-        [RESOLVE]: { stdout: "dev.probe/.Alternate\n" },
+        [RESOLVE]: {
+          stdout: multiple
+            ? "dev.probe/.Alternate\ndev.probe/.OtherIcon\n"
+            : "dev.probe/.Alternate\n",
+        },
+        "cmd package resolve-activity --components --user 0 -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -p dev.probe":
+          {
+            stdout: multiple
+              ? "android/com.android.internal.app.ResolverActivity\n"
+              : "dev.probe/.Alternate\n",
+          },
         [startOf(".Alternate")]: AM_START.cold,
         [FOREGROUND]: {
           stdout: "  ResumedActivity: ActivityRecord{abc u0 dev.probe/.Alternate t8}\n",
@@ -779,11 +808,122 @@ describe("lifecycle review regressions", () => {
       expect(data.app).toMatchObject({ activity: ".Alternate", pid: 8235 });
       const calls = shellCommands(f);
       expect(calls).not.toContain(startOf(".Disabled"));
+      expect(calls).not.toContain(startOf(".OtherIcon"));
       expect(calls.indexOf(RESOLVE)).toBeLessThan(calls.indexOf(startOf(".Alternate")));
       if (fresh) expect(calls.indexOf(RESOLVE)).toBeLessThan(calls.indexOf(FORCE_STOP));
       expectClean(f);
     },
   );
+
+  it.each(
+    [0, 10].flatMap((userId) => ["stop", "start", "clear"].map((command) => ({ userId, command }))),
+  )(
+    "keeps polling a kernel main PID after AMS removes it, user=$userId, command=$command",
+    async ({ userId, command }) => {
+      const otherUser = userId === 0 ? 10 : 0;
+      const forceStop = FORCE_STOP.replace("--user 0", `--user ${userId}`);
+      const clear = CLEAR.replace("--user 0", `--user ${userId}`);
+      const start = START.replace("--user 0", `--user ${userId}`);
+      const dataFiles = DATA_FILES.replace("--user 0", `--user ${userId}`);
+      const f = device({
+        [CURRENT_USER]: { stdout: `${userId}\n` },
+        [PACKAGE]: {
+          stdout:
+            "Packages:\n  Package [dev.probe] (abc):\n    appId=10213\n    flags=[ DEBUGGABLE HAS_CODE ]\n    User 0: installed=true hidden=false\n    User 10: installed=true hidden=false\n",
+        },
+        [forceStop]: {},
+        [clear]: { stdout: "Success\n" },
+        [start]: AM_START.cold,
+        [PIDOF]: { stdout: "8235 9001\n" },
+        [KERNEL_UIDS]: {
+          stdout: `  PID   UID\n 8235 ${userId * 100000 + 10213}\n 9001 ${otherUser * 100000 + 10213}\n`,
+        },
+        [PROCESSES]: {},
+        [FOREGROUND]: PROBE_FRONT,
+        [dataFiles]: {},
+      });
+      const { toon, data } = await both(
+        [
+          "app",
+          command,
+          "dev.probe",
+          ...(command === "start" ? ["--activity", ".MainActivity", "--fresh"] : []),
+          "--timeout",
+          "1s",
+        ],
+        f,
+      );
+      expect(toon.exitCode).toBe(1);
+      expect(data).toMatchObject({ code: "STOP_FAILED", last: { pid: 8235 } });
+      const calls = shellCommands(f);
+      expect(calls).toContain(command === "clear" ? clear : forceStop);
+      expect(calls).toContain(KERNEL_UIDS);
+      expect(calls).not.toContain(PROCESSES);
+      expect(calls).not.toContain(start);
+      expect(calls).not.toContain(dataFiles);
+      expectClean(f);
+    },
+  );
+
+  it.each([
+    ["No activities found\n", "ACTIVITY_NOT_FOUND"],
+    ["android/com.android.internal.app.ResolverActivity\n", "INVALID_OUTPUT"],
+  ])(
+    "rejects unavailable package launcher candidates (%s) before a fresh stop",
+    async (stdout, code) => {
+      const f = device({ [PACKAGE]: INSTALLED, [RESOLVE]: { stdout } });
+      const { toon, data } = await both(["app", "start", "dev.probe", "--fresh"], f);
+      expect(toon.exitCode).toBe(1);
+      expect(data.code).toBe(code);
+      expect(shellCommands(f)).not.toContain(FORCE_STOP);
+      expect(shellCommands(f)).not.toContain(START);
+      expectClean(f);
+    },
+  );
+
+  it.each([
+    "",
+    "PID USER\n8235 u0_a213\n",
+    "PID UID\n8235 invalid\n",
+    "PID UID\n8235 9007199254740993\n",
+    "PID UID\n9007199254740993 10213\n",
+  ])("does not guess process ownership from unreadable kernel UID output (%s)", async (stdout) => {
+    const f = device({ [PACKAGE]: INSTALLED, [PIDOF]: PROBE_RUNNING, [KERNEL_UIDS]: { stdout } });
+    const { toon, data } = await both(["app", "stop", "dev.probe"], f);
+    expect(toon.exitCode).toBe(1);
+    expect(data).toMatchObject({ code: "INVALID_OUTPUT", step: "reading process user IDs" });
+    expect(shellCommands(f)).not.toContain(FORCE_STOP);
+    expectClean(f);
+  });
+
+  it("reports a kernel UID read refusal rather than assuming the main PID is gone", async () => {
+    const f = device({
+      [PACKAGE]: INSTALLED,
+      [PIDOF]: PROBE_RUNNING,
+      [KERNEL_UIDS]: { stderr: "Permission denied\n", exit: 1 },
+    });
+    const { toon, data } = await both(["app", "stop", "dev.probe"], f);
+    expect(toon.exitCode).toBe(1);
+    expect(data).toMatchObject({ code: "REMOTE_EXIT", step: "reading process user IDs" });
+    expect(shellCommands(f)).not.toContain(FORCE_STOP);
+    expectClean(f);
+  });
+
+  it("handles a main PID exiting between pidof and the kernel UID read", async () => {
+    const f = device({
+      [PACKAGE]: INSTALLED,
+      [PIDOF]: PROBE_RUNNING,
+      [KERNEL_UIDS]: { stdout: "  PID   UID\n" },
+      [FORCE_STOP]: {},
+    });
+    const { toon, data } = await both(["app", "stop", "dev.probe"], f);
+    expect(toon.exitCode).toBe(0);
+    expect(data).toEqual({ ok: "stop dev.probe -> already not running (no-op)" });
+    expect(shellCommands(f)).toEqual(
+      twice([CURRENT_USER, PACKAGE, PIDOF, KERNEL_UIDS, FORCE_STOP]),
+    );
+    expectClean(f);
+  });
 
   it.each([
     ["app", "  ResumedActivity: ActivityRecord{abc u0 dev.probe/.MainActivity t8}\n", "foreground"],
@@ -939,6 +1079,16 @@ describe("lifecycle review regressions", () => {
             },
             { match: shell(PIDOF), when: { current: "stopped" }, respond: { stdout: "9001\n" } },
             {
+              match: shell(KERNEL_UIDS),
+              when: { current: "running" },
+              respond: { stdout: "  PID   UID\n 9001 10213\n 8235 1010213\n" },
+            },
+            {
+              match: shell(KERNEL_UIDS),
+              when: { current: "stopped" },
+              respond: { stdout: "  PID   UID\n 9001 10213\n" },
+            },
+            {
               match: shell(PROCESSES),
               when: { current: "running" },
               respond: {
@@ -1090,12 +1240,14 @@ describe("lifecycle review regressions", () => {
       [PACKAGE]: INSTALLED,
       [PIDOF]: { stdout: "9001\n" },
       [FORCE_STOP]: {},
-      [PROCESSES]: { stdout: "  *APP* UID 1010213 ProcessRecord{abc 9001:dev.probe/u10a213}\n" },
+      [KERNEL_UIDS]: { stdout: "  PID   UID\n 9001 1010213\n" },
     });
     const { toon, data } = await both(["app", "stop", "dev.probe"], f);
     expect(toon.exitCode).toBe(0);
     expect(data).toEqual({ ok: "stop dev.probe -> already not running (no-op)" });
-    expect(shellCommands(f)).toEqual(twice([CURRENT_USER, PACKAGE, PIDOF, PROCESSES, FORCE_STOP]));
+    expect(shellCommands(f)).toEqual(
+      twice([CURRENT_USER, PACKAGE, PIDOF, KERNEL_UIDS, FORCE_STOP]),
+    );
     expectClean(f);
   });
 

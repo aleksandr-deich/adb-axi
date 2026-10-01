@@ -43,8 +43,32 @@ export async function mainPids(
 ): Promise<number[]> {
   const pids = await pidof(context.adb(), targetSerial(context), pkg, readOptions(context));
   if (pids.length === 0) return pids;
-  const processes = await packageProcesses(context, pkg, userId);
-  return pids.filter((pid) => processes.some((process) => process.pid === pid));
+  const step = "reading process user IDs";
+  const result = await readShell(
+    context.adb(),
+    targetSerial(context),
+    "ps -A -o PID,UID",
+    step,
+    readOptions(context),
+  );
+  const [header, ...lines] = result.stdout.trim().split(/\r?\n/);
+  if (header?.trim().replace(/\s+/g, " ") !== "PID UID") {
+    throw invalidOutput(step, result.stdout);
+  }
+  const uids = new Map<number, number>();
+  for (const line of lines) {
+    const row = /^\s*(\d+)\s+(\d+)\s*$/.exec(line);
+    const pid = Number(row?.[1]);
+    const uid = Number(row?.[2]);
+    if (!Number.isSafeInteger(pid) || pid <= 0 || !Number.isSafeInteger(uid)) {
+      throw invalidOutput(step, result.stdout);
+    }
+    uids.set(pid, uid);
+  }
+  return pids.filter((pid) => {
+    const uid = uids.get(pid);
+    return uid !== undefined && Math.floor(uid / 100000) === userId;
+  });
 }
 
 /**
