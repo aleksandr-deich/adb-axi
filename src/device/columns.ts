@@ -33,19 +33,28 @@ export async function readExtraFields(
   fields: readonly ExtraField[],
   options: { deadline: Deadline },
 ): Promise<Partial<ExtraValues>> {
-  const values: Partial<ExtraValues> = {};
   const wanted = fields.filter((field) => SOURCES[field] !== undefined);
-  let sections = new Map<string, string[]>();
-  if (device.state === ONLINE && wanted.length > 0) {
-    const script = wanted.map((field) => `echo @${field}; ${SOURCES[field] ?? ""}`).join("; ");
-    const result = await runShell(adb, device.serial, script, {
-      deadline: options.deadline,
-      step: `reading ${wanted.join(", ")} of ${device.serial}`,
-      capMs: FACTS_CAP_MS,
-    });
-    sections = splitSections(result.stdout);
-  }
+  if (device.state !== ONLINE || wanted.length === 0) return extraValues(device, facts, fields);
+  const script = wanted.map((field) => `echo @${field}; ${SOURCES[field] ?? ""}`).join("; ");
+  const result = await runShell(adb, device.serial, script, {
+    deadline: options.deadline,
+    step: `reading ${wanted.join(", ")} of ${device.serial}`,
+    capMs: FACTS_CAP_MS,
+  });
+  return extraValues(device, facts, fields, splitSections(result.stdout));
+}
 
+/**
+ * The extra columns from what is already known (`boot` from the facts, `model` from
+ * `adb devices -l`) and the device's own answers, if any; the rest is unknown.
+ */
+export function extraValues(
+  device: AttachedDevice,
+  facts: DeviceFacts,
+  fields: readonly ExtraField[],
+  sections: ReadonlyMap<string, readonly string[]> = new Map(),
+): Partial<ExtraValues> {
+  const values: Partial<ExtraValues> = {};
   for (const field of fields) {
     const lines = sections.get(field) ?? [];
     switch (field) {

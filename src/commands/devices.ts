@@ -1,7 +1,8 @@
 import { AdbAxiError } from "../core/errors.js";
 import { runHint, type Output } from "../core/output.js";
-import { EXTRA_FIELDS, readExtraFields, type ExtraField } from "../device/columns.js";
-import { readFacts, type DeviceFacts } from "../device/facts.js";
+import { EXTRA_FIELDS, extraValues, readExtraFields, type ExtraField } from "../device/columns.js";
+import type { AdbClient } from "../adb/run.js";
+import { avdName, readShellFacts, type DeviceFacts, type FactsOptions } from "../device/facts.js";
 import { listDevices, ONLINE, type AttachedDevice } from "../device/list.js";
 import { defineCommand } from "./define.js";
 import type { CommandContext } from "./types.js";
@@ -43,7 +44,7 @@ interface Row {
   device: AttachedDevice;
   facts: DeviceFacts;
   extra: Partial<Record<ExtraField, string>>;
-  /** The device's own reads failed, so its facts are unknown. */
+  /** Some of the device's own reads failed, so what they would have told is unknown. */
   degraded: boolean;
 }
 
@@ -56,27 +57,55 @@ async function runDevices(context: CommandContext): Promise<Output> {
       ? attached
       : attached.filter((device) => USUAL_STATES.has(device.state));
 
-  const facts = { deadline: context.deadline, env: context.env };
-  const rows = await Promise.all(
-    listed.map(async (device): Promise<Row> => {
-      try {
-        const base = await readFacts(adb, device, facts);
-        const extra = await readExtraFields(adb, device, base, fields, facts);
-        return { device, facts: base, extra, degraded: false };
-      } catch (error) {
-        if (error instanceof AdbAxiError && PER_DEVICE_CODES.has(error.code)) {
-          return { device, facts: unknownFacts(device), extra: {}, degraded: true };
-        }
-        throw error;
-      }
-    }),
-  );
+  const options = { deadline: context.deadline, env: context.env };
+  const rows = await Promise.all(listed.map((device) => readRow(adb, device, fields, options)));
 
   const online = rows.filter((row) => row.device.state === ONLINE).length;
   return {
     count: `${rows.length} attached, ${online} online`,
     devices: rows.map((row) => deviceRow(row, fields)),
-    ...helpFor(rows, attached.length - listed.length, context),
+    ...helpFor(rows, attached.length, context),
+  };
+}
+
+/**
+ * One device's row. When the shell facts fail, the device is not answering and nothing
+ * else is asked; the AVD name and the extra columns are separate reads, and one failing
+ * leaves only its own columns unknown.
+ */
+async function readRow(
+  adb: AdbClient,
+  device: AttachedDevice,
+  fields: readonly ExtraField[],
+  options: FactsOptions,
+): Promise<Row> {
+  let degraded = false;
+  const settle = async <T>(read: () => Promise<T>): Promise<T | undefined> => {
+    try {
+      return await read();
+    } catch (error) {
+      if (error instanceof AdbAxiError && PER_DEVICE_CODES.has(error.code)) {
+        degraded = true;
+        return undefined;
+      }
+      throw error;
+    }
+  };
+
+  const facts = await settle(() => readShellFacts(adb, device, options));
+  if (facts === undefined) {
+    const unknown = unknownFacts(device);
+    return { device, facts: unknown, extra: extraValues(device, unknown, fields), degraded };
+  }
+  const [avd, extra] = await Promise.all([
+    settle(() => avdName(adb, device.serial, facts.bootId, options)),
+    settle(() => readExtraFields(adb, device, facts, fields, options)),
+  ]);
+  return {
+    device,
+    facts: { ...facts, avd: avd ?? null },
+    extra: extra ?? extraValues(device, facts, fields),
+    degraded,
   };
 }
 
@@ -108,11 +137,12 @@ function unknownFacts(device: AttachedDevice): DeviceFacts {
 
 function helpFor(
   rows: readonly Row[],
-  hidden: number,
+  attached: number,
   context: CommandContext,
 ): { help?: string[] } {
+  const hidden = attached - rows.length;
   const help: string[] = [];
-  if (rows.length === 0) {
+  if (attached === 0) {
     help.push("Start an emulator or connect a device, then run `adb-axi devices` again");
   }
   const named = rows.find((row) => row.device.state === ONLINE && row.facts.avd !== null);

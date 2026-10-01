@@ -126,6 +126,64 @@ describe("devices", () => {
     expect(json.devices).toEqual([]);
   });
 
+  it("does not ask to connect a device when only devices in other states are attached", async () => {
+    const f = withFake({
+      rules: [
+        {
+          match: ["devices", "-l"],
+          respond: {
+            stdout: "List of devices attached\n0123456789ABCDEF       recovery transport_id:4\n\n",
+          },
+        },
+      ],
+    });
+    const { json } = await both(f);
+    expect(json.count).toBe("0 attached, 0 online");
+    expect(json.help).toEqual(["Run `adb-axi devices --all` to list the 1 device in other states"]);
+  });
+
+  it("keeps the facts it read when the AVD name or an extra column does not answer in time", async () => {
+    const f = withFake({
+      rules: [
+        {
+          match: ["devices", "-l"],
+          respond: {
+            stdout: "List of devices attached\nemulator-5554          device transport_id:1\n\n",
+          },
+        },
+        {
+          match: ["-s", "emulator-5554", "shell", { re: "echo @sdk; .*" }],
+          respond: {
+            stdout:
+              "@sdk\n37\n@boot_completed\n1\n@boot_id\n3f1c8a52-0d7e-4c1b-9b1e-5a3f2d6c7e81\n@size\nPhysical size: 1344x2992\n@density\nPhysical density: 480\n",
+          },
+        },
+        { match: ["-s", "emulator-5554", "emu", "avd", "name"], respond: { hang: true } },
+        {
+          match: ["-s", "emulator-5554", "shell", { re: "echo @data_free; .*" }],
+          respond: { hang: true },
+        },
+      ],
+    });
+    const { toon, json } = await both(f, ["--timeout", "1s", "--fields", "boot,data_free"]);
+    expect(toon.exitCode).toBe(0);
+    expect(json.devices).toEqual([
+      {
+        serial: "emulator-5554",
+        avd: "-",
+        state: "device",
+        api: 37,
+        form: "phone",
+        boot: "completed",
+        data_free: "-",
+      },
+    ]);
+    expect(json.help).toContain(
+      "A device that did not answer in time shows `-` for what it could not tell",
+    );
+    for (const call of f.calls()) expect(isProcessAlive(call.pid)).toBe(false);
+  });
+
   it("reads an unknown AVD name as - when emu avd name stays silent (H6)", async () => {
     const f = withFake("silent-emu-failure.json");
     const { json } = await both(f);

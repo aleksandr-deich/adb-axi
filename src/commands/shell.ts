@@ -56,7 +56,10 @@ async function runShellCommand(context: CommandContext): Promise<Output> {
       );
       throw new AdbAxiError("TIMEOUT", error.message, {
         fields: { step: error.fields.step, ...partial.fields },
-        help: [...error.help, ...(partial.truncated ? [fullHint(target.serial, command)] : [])],
+        help: [
+          ...error.help,
+          ...(partial.truncated && !full ? [fullHint(target.serial, command)] : []),
+        ],
         cause: error,
       });
     }

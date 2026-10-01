@@ -2,7 +2,7 @@ import type { Deadline } from "../core/deadline.js";
 import { AdbAxiError } from "../core/errors.js";
 import { exec } from "../core/exec.js";
 import { shellWords } from "../core/output.js";
-import { adbFailureError, classifyAdbFailure } from "./variants.js";
+import { adbFailureError, classifyAdbFailure, classifyShellFailure } from "./variants.js";
 
 export interface AdbCallOptions {
   deadline: Deadline;
@@ -13,6 +13,8 @@ export interface AdbCallOptions {
   input?: string | Uint8Array;
   /** On timeout, keep the partial stdout and stderr in the error's fields. */
   keepPartialOutput?: boolean;
+  /** The output is a remote command's, so only adb's own prefixed stderr lines are classified. */
+  remoteOutput?: boolean;
 }
 
 export interface AdbExit {
@@ -100,8 +102,10 @@ export class AdbClient {
     const exitCode = result.exitCode ?? 128 + signalNumber(result.signal);
     this.debug(`  exit ${exitCode} in ${result.durationMs} ms`);
     if (exitCode !== 0) {
-      const text = `${result.stderr.toString("utf8")}\n${result.stdout.toString("utf8")}`;
-      const code = classifyAdbFailure(text);
+      const stderr = result.stderr.toString("utf8");
+      const remote = options.remoteOutput === true;
+      const text = remote ? stderr : `${stderr}\n${result.stdout.toString("utf8")}`;
+      const code = remote ? classifyShellFailure(text) : classifyAdbFailure(text);
       if (code !== undefined) throw adbFailureError(code, serial, text);
     }
     return {

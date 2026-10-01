@@ -25,6 +25,7 @@ export async function runShell(
   const result = await adb.device(serial, ["shell", command], {
     keepPartialOutput: true,
     ...options,
+    remoteOutput: true,
   });
   return {
     stdout: result.stdout.toString("utf8"),

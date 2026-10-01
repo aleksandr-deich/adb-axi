@@ -112,6 +112,27 @@ describe("shell", () => {
     });
   });
 
+  it("reports remote output that reads like an adb error as the remote command's own failure", async () => {
+    const f = withFake();
+    const { data } = await both(f, [
+      "--",
+      "echo 'Device offline'; echo 'more than one device' >&2; exit 3",
+    ]);
+    expect(data).toEqual({
+      error: "remote command exited 3",
+      code: "REMOTE_EXIT",
+      exit: 3,
+      stdout: "Device offline",
+      stderr: "more than one device",
+    });
+  });
+
+  it("still reports adb's own failure on the device, not a remote exit", async () => {
+    const f = withFake();
+    const { data } = await both(f, ["--", "echo gone"]);
+    expect(data).toMatchObject({ code: "DEVICE_NOT_FOUND" });
+  });
+
   it("prints an empty stderr for a silent failure", async () => {
     const f = withFake();
     const { data } = await both(f, ["--", "false"]);
@@ -207,6 +228,21 @@ describe("shell", () => {
     expect((data.stdout as string).split("\n")).toHaveLength(50);
     expect(data.shown).toBe("50 of 80 lines");
     expect(data.help).toHaveLength(2);
+  });
+
+  it("does not point at --full on a timeout that already has it", async () => {
+    const f = withFake();
+    const toon = await runCli(
+      ["shell", "--full", "--timeout", "1s", "--", "sleep 30; seq 1 80"],
+      f.env,
+    );
+    const data = decode(toon.stdout.trimEnd()) as Record<string, unknown>;
+    expect(data.code).toBe("TIMEOUT");
+    expect(data.shown).toBe("50 of 80 lines");
+    expect(existsSync(data.full as string)).toBe(true);
+    expect(data.help).toEqual([
+      "Run the same command with a longer `--timeout`, for example `--timeout 60s`",
+    ]);
   });
 
   it("uses a 15 s default deadline", async () => {

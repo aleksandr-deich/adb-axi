@@ -38,6 +38,26 @@
       }
     },
     {
+      "match": [
+        "-s",
+        "emulator-5554",
+        "shell",
+        "echo 'Device offline'; echo 'more than one device' >&2; exit 3"
+      ],
+      "respond": {
+        "stdout": "Device offline\n",
+        "stderr": "more than one device\n",
+        "exit": 3
+      }
+    },
+    {
+      "match": ["-s", "emulator-5554", "shell", "echo gone"],
+      "respond": {
+        "stderr": "adb: device 'emulator-5554' not found\n",
+        "exit": 1
+      }
+    },
+    {
       "match": ["-s", "emulator-5554", "shell", "echo --json"],
       "respond": {
         "stdout": "--json\n"

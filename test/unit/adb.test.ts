@@ -6,7 +6,7 @@ import { execOut } from "../../src/adb/execout.js";
 import { findSdkTool, locateAdb } from "../../src/adb/locate.js";
 import { AdbClient } from "../../src/adb/run.js";
 import { runShell } from "../../src/adb/shell.js";
-import { classifyAdbFailure } from "../../src/adb/variants.js";
+import { classifyAdbFailure, classifyShellFailure } from "../../src/adb/variants.js";
 import { Deadline } from "../../src/core/deadline.js";
 import { AdbAxiError, errorObject } from "../../src/core/errors.js";
 import { isProcessAlive } from "../../src/core/exec.js";
@@ -118,12 +118,25 @@ describe("adb error variants (H7-H9)", () => {
     ["adb: unknown command shell", "INTERNAL_ERROR"],
   ])("maps %j to %s", (text, code) => {
     expect(classifyAdbFailure(text)).toBe(code);
+    expect(classifyShellFailure(text)).toBe(code);
   });
 
   it("ignores text a remote command prints about devices", () => {
     expect(classifyAdbFailure("ls: /data/misc: Permission denied")).toBeUndefined();
     expect(classifyAdbFailure("my app says: device offline")).toBeUndefined();
     expect(classifyAdbFailure("")).toBeUndefined();
+  });
+
+  it("reads remote shell stderr as adb's own failure only with adb's prefix", () => {
+    for (const text of [
+      "Device offline",
+      "device unauthorized",
+      "more than one device",
+      "no devices/emulators found",
+      "cannot connect to daemon",
+    ]) {
+      expect(classifyShellFailure(text)).toBeUndefined();
+    }
   });
 });
 
