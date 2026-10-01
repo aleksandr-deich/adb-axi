@@ -533,6 +533,25 @@ describe("wait app", () => {
     expectClean(f);
   });
 
+  it("takes the final observation inside the deadline, so a state reached late is not missed", async () => {
+    const f = deviceWithRules([
+      {
+        match: ["-s", SERIAL, "shell", PIDOF],
+        respond: PROBE_STOPPED,
+        times: 2,
+        then: PROBE_RUNNING,
+      },
+    ]);
+    const result = await once(
+      ["wait", "app", "dev.probe", "--state", "running", "--timeout", "1300ms"],
+      f,
+    );
+    expect(result.toon.exitCode).toBe(0);
+    expect(expectWaited(result, "dev.probe", "running")).toBeLessThan(1300);
+    expect(shellCommands(f)).toEqual([PIDOF, PIDOF, PIDOF]);
+    expectClean(f);
+  });
+
   it("waits for a stopped app", async () => {
     const f = deviceWithRules([
       {

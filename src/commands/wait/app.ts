@@ -1,7 +1,7 @@
 import { assertPackageName } from "../../android/component.js";
 import { AdbAxiError } from "../../core/errors.js";
 import { okLine, runHint } from "../../core/output.js";
-import { poll } from "../../core/poll.js";
+import { MAX_INTERVAL_MS, poll } from "../../core/poll.js";
 import { observeApp, type AppObservation, type AppState } from "../app/state.js";
 import { readOptions, targetSerial } from "../app/shared.js";
 import { defineCommand } from "../define.js";
@@ -36,7 +36,7 @@ export const waitApp = defineCommand({
 
     let latest: AppObservation | undefined;
     const result = await poll({
-      timeoutMs: context.deadline.remainingMs(),
+      timeoutMs: Math.max(0, context.deadline.remainingMs() - MAX_INTERVAL_MS),
       check: async () => {
         try {
           latest = await observeApp(adb, serial, pkg, wanted === "foreground", options);
