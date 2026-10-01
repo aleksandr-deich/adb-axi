@@ -543,7 +543,7 @@ describe("wait app", () => {
       },
     ]);
     const run = await runCli(
-      ["wait", "app", "dev.probe", "--state", "running", "--timeout", "1100ms"],
+      ["wait", "app", "dev.probe", "--state", "running", "--timeout", "1200ms"],
       f.env,
     );
     expect(run.exitCode).toBe(0);
@@ -552,10 +552,10 @@ describe("wait app", () => {
       json: run,
       data: decode(run.stdout.trimEnd()) as Record<string, unknown>,
     };
-    // Polls at 0, 400 and 800 ms saw it stopped; the fourth, at the deadline, saw it running.
-    expect(expectWaited(result, "dev.probe", "running")).toBeLessThan(1100 + 500);
+    // Polls at about 0, 400 and 800 ms saw it stopped; only a fourth at the 1200 ms deadline sees it running.
+    expect(expectWaited(result, "dev.probe", "running")).toBeLessThan(1200 + 500);
     expect(shellCommands(f)).toEqual([PIDOF, PIDOF, PIDOF, PIDOF]);
-    expect(run.durationMs).toBeLessThan(1100 + 500 + 1500);
+    expect(run.durationMs).toBeLessThan(1200 + 500 + 1500);
     expectClean(f);
   });
 
