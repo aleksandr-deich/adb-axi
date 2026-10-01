@@ -583,14 +583,16 @@ describe("wait app", () => {
 
   it("fails with WAIT_TIMEOUT carrying the last observation when the state is never reached", async () => {
     const f = device({ [FOREGROUND]: LAUNCHER_FRONT, [PIDOF]: PROBE_RUNNING });
+    // One observation starts the fake adb twice, so the deadline must outlast a slow runner's
+    // process spawns in both runs; a run with no finished observation reports `unknown`.
     const { toon, data } = await both(
-      ["wait", "app", "dev.probe", "--state", "foreground", "--timeout", "1s"],
+      ["wait", "app", "dev.probe", "--state", "foreground", "--timeout", "3s"],
       f,
     );
     expect(toon.exitCode).toBe(1);
     expect(toon.stdout).toBe(
       [
-        "error: dev.probe did not reach foreground within 1 s",
+        "error: dev.probe did not reach foreground within 3 s",
         "code: WAIT_TIMEOUT",
         "last:",
         "  state: running",
@@ -602,16 +604,16 @@ describe("wait app", () => {
     );
     expect(data).toMatchObject({ code: "WAIT_TIMEOUT" });
     expectClean(f);
-  });
+  }, 20_000);
 
   it("keeps the deadline: a wait for a stop that never comes ends within the timeout plus a margin", async () => {
     const f = device({ [PIDOF]: PROBE_RUNNING });
     const run = await runCli(
-      ["wait", "app", "dev.probe", "--state", "stopped", "--timeout", "1s"],
+      ["wait", "app", "dev.probe", "--state", "stopped", "--timeout", "2s"],
       f.env,
     );
     expect(run.exitCode).toBe(1);
-    expect(run.durationMs).toBeLessThan(2500);
+    expect(run.durationMs).toBeLessThan(2000 + 1500);
     expect(decode(run.stdout.trimEnd())).toMatchObject({
       code: "WAIT_TIMEOUT",
       last: { state: "running", pid: 8235 },
