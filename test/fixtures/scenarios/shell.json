@@ -51,6 +51,38 @@
       }
     },
     {
+      "match": ["-s", "emulator-5554", "shell", "echo 'error: device unauthorized.' >&2; exit 4"],
+      "respond": {
+        "stderr": "error: device unauthorized.\n",
+        "exit": 4
+      }
+    },
+    {
+      "match": [
+        "-s",
+        "emulator-5554",
+        "shell",
+        "echo 'adb: error: failed to check server version: cannot connect to daemon' >&2; exit 2"
+      ],
+      "respond": {
+        "stderr": "adb: error: failed to check server version: cannot connect to daemon\n",
+        "exit": 2
+      }
+    },
+    {
+      "match": [
+        "-s",
+        "emulator-5554",
+        "shell",
+        "echo out; echo 'error: no devices/emulators found' >&2; exit 1"
+      ],
+      "respond": {
+        "stdout": "out\n",
+        "stderr": "error: no devices/emulators found\n",
+        "exit": 1
+      }
+    },
+    {
       "match": ["-s", "emulator-5554", "shell", "echo gone"],
       "respond": {
         "stderr": "adb: device 'emulator-5554' not found\n",

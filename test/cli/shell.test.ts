@@ -127,6 +127,35 @@ describe("shell", () => {
     });
   });
 
+  it.each([
+    ["error: device unauthorized.", 4, "", "echo 'error: device unauthorized.' >&2; exit 4"],
+    [
+      "adb: error: failed to check server version: cannot connect to daemon",
+      2,
+      "",
+      "echo 'adb: error: failed to check server version: cannot connect to daemon' >&2; exit 2",
+    ],
+    [
+      "error: no devices/emulators found",
+      1,
+      "out",
+      "echo out; echo 'error: no devices/emulators found' >&2; exit 1",
+    ],
+  ])(
+    "reports remote stderr copying adb's line %j as the remote exit %i",
+    async (stderr, exit, stdout, command) => {
+      const f = withFake();
+      const { data } = await both(f, ["--", command]);
+      expect(data).toEqual({
+        error: `remote command exited ${exit}`,
+        code: "REMOTE_EXIT",
+        exit,
+        ...(stdout === "" ? {} : { stdout }),
+        stderr,
+      });
+    },
+  );
+
   it("still reports adb's own failure on the device, not a remote exit", async () => {
     const f = withFake();
     const { data } = await both(f, ["--", "echo gone"]);
@@ -277,7 +306,13 @@ describe("shell", () => {
     const f = withFake("multi-device.json");
     const ambiguous = await runCli(["shell", "--", "id"], f.env);
     expect(ambiguous.exitCode).toBe(1);
-    expect(decode(ambiguous.stdout.trimEnd())).toMatchObject({ code: "DEVICE_AMBIGUOUS" });
+    expect(decode(ambiguous.stdout.trimEnd())).toMatchObject({
+      code: "DEVICE_AMBIGUOUS",
+      help: [
+        "Run `adb-axi shell --device <serial or avd> -- id`",
+        "Or export ANDROID_SERIAL=<serial> in this shell",
+      ],
+    });
     expect(f.calls().some((call) => call.argv.includes("id"))).toBe(false);
   });
 
@@ -297,7 +332,10 @@ describe("shell", () => {
     const f = withFake();
     const { stdout, exitCode } = await runCli(["shell", "-s", "emulator-9999", "--", "id"], f.env);
     expect(exitCode).toBe(1);
-    expect(decode(stdout.trimEnd())).toMatchObject({ code: "DEVICE_NOT_FOUND" });
+    expect(decode(stdout.trimEnd())).toMatchObject({
+      code: "DEVICE_NOT_FOUND",
+      help: ["Run `adb-axi shell --device <serial or avd> -- id` with one of the devices above"],
+    });
   });
 
   it("fails with ADB_NOT_FOUND when there is no adb", async () => {

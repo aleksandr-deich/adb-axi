@@ -13,7 +13,10 @@ export interface AdbCallOptions {
   input?: string | Uint8Array;
   /** On timeout, keep the partial stdout and stderr in the error's fields. */
   keepPartialOutput?: boolean;
-  /** The output is a remote command's, so only adb's own prefixed stderr lines are classified. */
+  /**
+   * The output is a remote command's: only an exit 1 with empty stdout and one of adb's own
+   * prefixed stderr lines is classified as adb's failure.
+   */
   remoteOutput?: boolean;
 }
 
@@ -103,10 +106,16 @@ export class AdbClient {
     this.debug(`  exit ${exitCode} in ${result.durationMs} ms`);
     if (exitCode !== 0) {
       const stderr = result.stderr.toString("utf8");
-      const remote = options.remoteOutput === true;
-      const text = remote ? stderr : `${stderr}\n${result.stdout.toString("utf8")}`;
-      const code = remote ? classifyShellFailure(text) : classifyAdbFailure(text);
-      if (code !== undefined) throw adbFailureError(code, serial, text);
+      const stdout = result.stdout.toString("utf8");
+      // adb's own failure exits 1 and prints nothing on stdout, so any other remote exit,
+      // or a remote command that printed on stdout, is the remote command's own.
+      const code =
+        options.remoteOutput !== true
+          ? classifyAdbFailure(`${stderr}\n${stdout}`)
+          : exitCode === 1 && stdout === ""
+            ? classifyShellFailure(stderr)
+            : undefined;
+      if (code !== undefined) throw adbFailureError(code, serial, `${stderr}\n${stdout}`);
     }
     return {
       stdout: result.stdout,
