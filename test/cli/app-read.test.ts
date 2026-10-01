@@ -569,10 +569,13 @@ describe("wait app", () => {
   });
 
   it("succeeds at once for a stopped app that is already stopped", async () => {
-    const f = device({ [PIDOF]: PROBE_STOPPED });
+    const f = device({ [PIDOF]: { ...PROBE_STOPPED, delayMs: 300 } });
     const result = await both(["wait", "app", "dev.probe", "--state", "stopped"], f);
     expect(result.toon.exitCode).toBe(0);
-    expect(expectWaited(result, "dev.probe", "stopped")).toBeLessThan(250);
+    expectWaited(result, "dev.probe", "stopped");
+    // A slow first read still succeeds without another poll, regardless of elapsed time.
+    expect(shellCommands(f)).toEqual(twice([PIDOF]));
+    expectClean(f);
   });
 
   it("fails with WAIT_TIMEOUT carrying the last observation when the state is never reached", async () => {
