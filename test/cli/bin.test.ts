@@ -1,5 +1,6 @@
 import { decode } from "@toon-format/toon";
 import { afterEach, describe, expect, it } from "vitest";
+import { allCommands, REGISTRY } from "../../src/commands/registry.js";
 import { exec } from "../../src/core/exec.js";
 import { createFakeAdb, type FakeAdb } from "../fake-adb/harness.js";
 import { BIN_PATH, runCli } from "../helpers/run.js";
@@ -145,7 +146,12 @@ describe("adb-axi bin", () => {
     const { stdout, exitCode } = await runCli(["--help"], f.env);
     expect(exitCode).toBe(0);
     const help = decode(stdout.trimEnd()) as { commands: { command: string }[] };
-    expect(help.commands.map((c) => c.command)).toEqual(["adb-axi update"]);
+    // Exactly the shipped commands, so each slice that ships one needs no edit here.
+    const shipped = allCommands(REGISTRY)
+      .filter((command) => command.shipped)
+      .map((command) => `adb-axi ${command.path.join(" ")}`);
+    expect(help.commands.map((c) => c.command).sort()).toEqual(shipped.sort());
+    expect(help.commands.map((c) => c.command)).not.toContain("adb-axi app kill");
     const json = await runCli(["--json", "--help"], f.env);
     expect(JSON.parse(json.stdout)).toEqual(help);
   });
