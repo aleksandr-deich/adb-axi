@@ -22,6 +22,26 @@ const CLEAR = "pm clear --user 0 dev.probe";
 const DATA_FILES = "run-as dev.probe --user 0 find . -type f";
 const startOf = (activity: string): string => `am start --user 0 -W -n 'dev.probe/${activity}'`;
 const START = startOf(".MainActivity");
+const metadataOf = (activity: string, userId = 0): string =>
+  `cmd package resolve-activity --user ${userId} -n 'dev.probe/${activity}'`;
+const METADATA = metadataOf(".MainActivity");
+
+function activityInfo(activity = ".MainActivity", process = "dev.probe"): Response {
+  return {
+    stdout: [
+      "priority=0 preferredOrder=0 match=0x100000 specificIndex=-1 isDefault=false",
+      "ActivityInfo:",
+      ` name=${activity.startsWith(".") ? `dev.probe${activity}` : activity}`,
+      " packageName=dev.probe",
+      ...(process === "dev.probe" ? [] : [` processName=${process}`]),
+      " enabled=true exported=true directBootAware=false",
+      " ApplicationInfo:",
+      "  packageName=dev.probe",
+      "  processName=dev.probe",
+      "",
+    ].join("\n"),
+  };
+}
 
 const INSTALLED = { stdoutFile: "captured/35/dumpsys-package-debug.txt" };
 const INSTALLED_RELEASE = { stdoutFile: "captured/35/dumpsys-package-release.txt" };
@@ -61,6 +81,7 @@ function deviceWithRules(rules: Rule[]): FakeAdb {
       { match: shell(CURRENT_USER), respond: { stdout: "0\n" } },
       { match: shell(RESOLVE), respond: { stdout: "dev.probe/.MainActivity\n" } },
       { match: shell(PROCESSES), respond: PROCESS_RUNNING },
+      { match: shell(METADATA), respond: activityInfo() },
       { match: shell(KERNEL_UIDS), respond: { stdout: "  PID   UID\n 8235 10213\n" } },
     ],
   });
@@ -85,6 +106,7 @@ function liveDevice(started: Response, initially: "running" | "stopped"): FakeAd
       { match: ["devices", "-l"], respond: { stdout: ONE_ONLINE } },
       { match: shell(CURRENT_USER), respond: { stdout: "0\n" } },
       { match: shell(RESOLVE), respond: { stdout: "dev.probe/.MainActivity\n" } },
+      { match: shell(METADATA), respond: activityInfo() },
       { match: shell(PROCESSES), when: { proc: "running" }, respond: PROCESS_RUNNING },
       { match: shell(PROCESSES), when: { proc: "stopped" }, respond: {} },
       {
@@ -179,7 +201,7 @@ describe("app start", () => {
       help: ["Run `adb-axi app start dev.probe --fresh` to kill the process and cold-start"],
     });
     expect(shellCommands(f)).toEqual(
-      twice([CURRENT_USER, PACKAGE, RESOLVE, START, PROCESSES, FOREGROUND]),
+      twice([CURRENT_USER, PACKAGE, RESOLVE, START, METADATA, PROCESSES, FOREGROUND]),
     );
     expectClean(f);
   });
@@ -205,7 +227,17 @@ describe("app start", () => {
       app: { activity: ".MainActivity", pid: 8235, launch: "cold", recreated: true, took_ms: 1102 },
     });
     expect(shellCommands(f)).toEqual(
-      twice([CURRENT_USER, PACKAGE, RESOLVE, FORCE_STOP, PIDOF, START, PROCESSES, FOREGROUND]),
+      twice([
+        CURRENT_USER,
+        PACKAGE,
+        RESOLVE,
+        FORCE_STOP,
+        PIDOF,
+        START,
+        METADATA,
+        PROCESSES,
+        FOREGROUND,
+      ]),
     );
     expectClean(f);
   });
@@ -440,7 +472,7 @@ describe("app start", () => {
     expect(toon.exitCode).toBe(1);
     expect(toon.stdout).toBe(
       [
-        "error: dev.probe has no process right after its start",
+        "error: the dev.probe process of dev.probe/.MainActivity is gone right after its start",
         "code: APP_DIED_ON_START",
         "last:",
         "  state: stopped",
@@ -793,7 +825,11 @@ describe("lifecycle review regressions", () => {
               ? "android/com.android.internal.app.ResolverActivity\n"
               : "dev.probe/.Alternate\n",
           },
-        [startOf(".Alternate")]: AM_START.cold,
+        [startOf(".Alternate")]: {
+          stdout:
+            "Status: ok\nLaunchState: COLD\nActivity: dev.probe/.Alternate\nTotalTime: 1102\nComplete\n",
+        },
+        [metadataOf(".Alternate")]: activityInfo(".Alternate"),
         [FOREGROUND]: {
           stdout: "  ResumedActivity: ActivityRecord{abc u0 dev.probe/.Alternate t8}\n",
         },
@@ -928,6 +964,16 @@ describe("lifecycle review regressions", () => {
   it.each([
     ["app", "  ResumedActivity: ActivityRecord{abc u0 dev.probe/.MainActivity t8}\n", "foreground"],
     [
+      "app with full class name",
+      "  ResumedActivity: ActivityRecord{abc u0 dev.probe/dev.probe.MainActivity t8}\n",
+      "foreground",
+    ],
+    [
+      "another activity of the same app",
+      "  ResumedActivity: ActivityRecord{abc u0 dev.probe/.OtherActivity t8}\n",
+      "running",
+    ],
+    [
       "permission dialog",
       "  ResumedActivity: ActivityRecord{abc u0 com.android.permissioncontroller/.Grant t9}\n",
       "running",
@@ -940,12 +986,21 @@ describe("lifecycle review regressions", () => {
         [PACKAGE]: INSTALLED,
         [START]: AM_START.cold,
         [PIDOF]: PROBE_STOPPED,
-        [PROCESSES]: { stdout: "  *APP* UID 10213 ProcessRecord{abc 8123:dev.probe:ui/u0a213}\n" },
+        [METADATA]: activityInfo(".MainActivity", "dev.probe:ui"),
+        [PROCESSES]: {
+          stdout:
+            "  *APP* UID 10213 ProcessRecord{abc 8235:dev.probe/u0a213}\n  *APP* UID 10213 ProcessRecord{def 8111:dev.probe:sync/u0a213}\n  *APP* UID 10213 ProcessRecord{fed 8123:dev.probe:ui/u0a213}\n",
+        },
         [FOREGROUND]: { stdout: front },
       });
       const { toon, data } = await both(["app", "start", "dev.probe/.MainActivity"], f);
       expect(toon.exitCode).toBe(0);
-      expect(data.app).toMatchObject({ pid: 8123 });
+      expect(data.app).toMatchObject({
+        pid: 8123,
+        activity: front.includes("dev.probe/dev.probe.MainActivity")
+          ? "dev.probe.MainActivity"
+          : ".MainActivity",
+      });
       expect(data.ok).toContain(`-> ${state}`);
       expect(shellCommands(f)).not.toContain(PIDOF);
       expect(shellCommands(f)).not.toContain(RESOLVE);
@@ -1064,6 +1119,7 @@ describe("lifecycle review regressions", () => {
               },
             },
             { match: shell(resolve), respond: { stdout: "dev.probe/.MainActivity\n" } },
+            { match: shell(metadataOf(".MainActivity", 10)), respond: activityInfo() },
             { match: shell(stop), respond: {}, set: { current: "stopped" } },
             {
               match: shell(clear),
@@ -1218,6 +1274,7 @@ describe("lifecycle review regressions", () => {
             "Packages:\n  Package [dev.probe] (abc):\n    appId=10213\n    User 0: installed=true hidden=false\n    User 10: installed=true hidden=false\n",
         },
         [start]: AM_START.cold,
+        [metadataOf(".MainActivity", userId)]: activityInfo(),
         [PROCESSES]: {
           stdout: `  *APP* UID ${other * 100000 + 10213} ProcessRecord{abc 9001:dev.probe/u${other}a213}\n`,
         },
@@ -1273,6 +1330,154 @@ describe("lifecycle review regressions", () => {
     ]);
     expectClean(f);
   });
+});
+
+describe("launched activity process identity", () => {
+  it.each(
+    [0, 10].flatMap((userId) =>
+      [false, true].flatMap((fresh) =>
+        ["dev.probe", "dev.probe:ui"].map((process) => ({ userId, fresh, process })),
+      ),
+    ),
+  )(
+    "reports launch death despite surviving unrelated processes, user=$userId, fresh=$fresh, process=$process",
+    async ({ userId, fresh, process }) => {
+      const other = userId === 0 ? 10 : 0;
+      const uid = userId * 100000 + 10213;
+      const start = START.replace("--user 0", `--user ${userId}`);
+      const front = fresh
+        ? "dev.probe/.MainActivity"
+        : "com.google.android.apps.nexuslauncher/.NexusLauncherActivity";
+      const f = device({
+        [CURRENT_USER]: { stdout: `${userId}\n` },
+        [PACKAGE]: {
+          stdout:
+            "Packages:\n  Package [dev.probe] (abc):\n    appId=10213\n    User 0: installed=true hidden=false\n    User 10: installed=true hidden=false\n",
+        },
+        [start]: AM_START.cold,
+        [FORCE_STOP.replace("--user 0", `--user ${userId}`)]: {},
+        [PIDOF]: PROBE_STOPPED,
+        [metadataOf(".MainActivity", userId)]: activityInfo(".MainActivity", process),
+        [PROCESSES]: {
+          stdout: [
+            `  *APP* UID ${uid} ProcessRecord{abc 8111:dev.probe:sync/u${userId}a213}`,
+            ...(process === "dev.probe:ui"
+              ? [`  *APP* UID ${uid} ProcessRecord{def 8235:dev.probe/u${userId}a213}`]
+              : []),
+            `  *APP* UID ${other * 100000 + 10213} ProcessRecord{fed 9001:${process}/u${other}a213}`,
+            "",
+          ].join("\n"),
+        },
+        [FOREGROUND]: { stdout: `  ResumedActivity: ActivityRecord{abc u${userId} ${front} t8}\n` },
+      });
+      const { toon, data } = await both(
+        ["app", "start", "dev.probe/.MainActivity", ...(fresh ? ["--fresh"] : [])],
+        f,
+      );
+      expect(toon.exitCode).toBe(1);
+      expect(data).toMatchObject({
+        code: "APP_DIED_ON_START",
+        error: `the ${process} process of dev.probe/.MainActivity is gone right after its start`,
+        last: { state: "stopped", pid: "-" },
+      });
+      expect(data).not.toHaveProperty("app");
+      expectClean(f);
+    },
+  );
+
+  it.each([false, true])("reports the live UI process in user 10, fresh=%s", async (fresh) => {
+    const f = device({
+      [CURRENT_USER]: { stdout: "10\n" },
+      [PACKAGE]: {
+        stdout:
+          "Packages:\n  Package [dev.probe] (abc):\n    appId=10213\n    User 0: installed=true hidden=false\n    User 10: installed=true hidden=false\n",
+      },
+      [START.replace("--user 0", "--user 10")]: AM_START.cold,
+      [FORCE_STOP.replace("--user 0", "--user 10")]: {},
+      [PIDOF]: PROBE_STOPPED,
+      [metadataOf(".MainActivity", 10)]: activityInfo(".MainActivity", "dev.probe:ui"),
+      [PROCESSES]: {
+        stdout:
+          "  *APP* UID 10213 ProcessRecord{abc 9001:dev.probe:ui/u0a213}\n  *APP* UID 1010213 ProcessRecord{def 8235:dev.probe/u10a213}\n  *APP* UID 1010213 ProcessRecord{fed 8123:dev.probe:ui/u10a213}\n",
+      },
+      [FOREGROUND]: {
+        stdout:
+          "  ResumedActivity: ActivityRecord{abc u0 dev.probe/.MainActivity t2}\n  ResumedActivity: ActivityRecord{def u10 dev.probe/.MainActivity t8}\n",
+      },
+    });
+    const { toon, data } = await both(
+      ["app", "start", "dev.probe/.MainActivity", ...(fresh ? ["--fresh"] : [])],
+      f,
+    );
+    expect(toon.exitCode).toBe(0);
+    expect(data).toMatchObject({
+      ok: "start dev.probe -> foreground (cold start)",
+      app: { activity: ".MainActivity", pid: 8123 },
+    });
+    expectClean(f);
+  });
+
+  it("correlates an alias launch to the actual activity reported by am", async () => {
+    const f = device({
+      [PACKAGE]: INSTALLED,
+      [startOf(".IconAlias")]: AM_START.cold,
+      [METADATA]: activityInfo(".MainActivity", "dev.probe:ui"),
+      [PROCESSES]: {
+        stdout:
+          "  *APP* UID 10213 ProcessRecord{abc 8111:dev.probe:sync/u0a213}\n  *APP* UID 10213 ProcessRecord{def 8123:dev.probe:ui/u0a213}\n",
+      },
+      [FOREGROUND]: PROBE_FRONT,
+    });
+    const { toon, data } = await both(["app", "start", "dev.probe/.IconAlias"], f);
+    expect(toon.exitCode).toBe(0);
+    expect(data.app).toMatchObject({ activity: ".MainActivity", pid: 8123 });
+    expect(shellCommands(f)).toContain(METADATA);
+    expect(shellCommands(f)).not.toContain(metadataOf(".IconAlias"));
+    expectClean(f);
+  });
+
+  it("uses the explicitly selected activity when am omits Activity", async () => {
+    const f = device({
+      [PACKAGE]: INSTALLED,
+      [startOf("dev.probe.MainActivity")]: { stdout: "Status: ok\nLaunchState: COLD\nComplete\n" },
+      [metadataOf("dev.probe.MainActivity")]: activityInfo(".MainActivity", "dev.probe:ui"),
+      [PROCESSES]: {
+        stdout:
+          "  *APP* UID 10213 ProcessRecord{abc 8111:dev.probe:sync/u0a213}\n  *APP* UID 10213 ProcessRecord{def 8123:dev.probe:ui/u0a213}\n",
+      },
+      [FOREGROUND]: PROBE_FRONT,
+    });
+    const { toon, data } = await both(
+      ["app", "start", "dev.probe", "--activity", "dev.probe.MainActivity"],
+      f,
+    );
+    expect(toon.exitCode).toBe(0);
+    expect(data.app).toMatchObject({ activity: ".MainActivity", pid: 8123 });
+    expectClean(f);
+  });
+
+  it.each([
+    ["No activity found\n", 0, "INVALID_OUTPUT"],
+    ["ActivityInfo:\n name=dev.probe.Other\n packageName=dev.probe\n", 0, "INVALID_OUTPUT"],
+    ["", 1, "REMOTE_EXIT"],
+  ])(
+    "does not guess a process when ActivityInfo is unavailable (%s)",
+    async (stdout, exit, code) => {
+      const f = device({
+        [PACKAGE]: INSTALLED,
+        [START]: AM_START.cold,
+        [METADATA]: { stdout, exit },
+      });
+      const { toon, data } = await both(["app", "start", "dev.probe"], f);
+      expect(toon.exitCode).toBe(1);
+      expect(data).toMatchObject({
+        code,
+        step: "reading the process of activity dev.probe/.MainActivity",
+      });
+      expect(data).not.toHaveProperty("app");
+      expectClean(f);
+    },
+  );
 });
 
 describe("help for the shipped app lifecycle commands", () => {

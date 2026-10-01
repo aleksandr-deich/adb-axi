@@ -1,7 +1,11 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { declaredActivities, parseActivityFilters } from "../../src/android/activities.js";
+import {
+  declaredActivities,
+  parseActivityFilters,
+  parseActivityProcessName,
+} from "../../src/android/activities.js";
 import { parseAmStart, wasRecreated } from "../../src/android/amstart.js";
 import { FIXTURES_DIR } from "../fake-adb/harness.js";
 
@@ -124,6 +128,64 @@ describe("parseAmStart", () => {
 
   it("finds no status in text that is not am start output", () => {
     expect(parseAmStart("")).toMatchObject({ status: null, error: null, activity: null });
+  });
+});
+
+describe("ActivityInfo process identity", () => {
+  it.each([".MainActivity", "dev.probe.MainActivity"])(
+    "reads a package process for %s without using nested application fields",
+    (activity) => {
+      const stdout = [
+        "priority=0 preferredOrder=0 match=0x100000 specificIndex=-1 isDefault=false",
+        "ActivityInfo:",
+        " name=dev.probe.MainActivity",
+        " packageName=dev.probe",
+        " enabled=true exported=true",
+        " ApplicationInfo:",
+        "  name=dev.probe.Application",
+        "  packageName=dev.probe",
+        "  processName=dev.probe:application",
+        "",
+      ].join("\n");
+      expect(
+        parseActivityProcessName(stdout, {
+          ...PROBE_ACTIVITY,
+          activity,
+          component: `dev.probe/${activity}`,
+        }),
+      ).toBe("dev.probe");
+    },
+  );
+
+  it.each(["dev.probe:ui", "com.example.shared"])(
+    "reads the activity's declared process %s rather than the application default",
+    (process) => {
+      const stdout = `ActivityInfo:\n name=dev.probe.MainActivity\n packageName=dev.probe\n processName=${process}\n ApplicationInfo:\n  processName=dev.probe\n`;
+      expect(parseActivityProcessName(stdout, PROBE_ACTIVITY)).toBe(process);
+    },
+  );
+
+  it("reads the process of a declared alias without replacing its identity with targetActivity", () => {
+    const stdout =
+      "ActivityInfo:\n name=dev.probe.IconAlias\n packageName=dev.probe\n processName=dev.probe:ui\n taskAffinity=dev.probe targetActivity=dev.probe.MainActivity\n ApplicationInfo:\n  processName=dev.probe\n";
+    expect(
+      parseActivityProcessName(stdout, {
+        ...PROBE_ACTIVITY,
+        activity: ".IconAlias",
+        component: "dev.probe/.IconAlias",
+      }),
+    ).toBe("dev.probe:ui");
+  });
+
+  it.each([
+    "No activity found\n",
+    "ActivityInfo: null\n",
+    "ActivityInfo:\n name=dev.probe.Other\n packageName=dev.probe\n",
+    "ActivityInfo:\n name=dev.probe.MainActivity\n packageName=com.other\n",
+    "ActivityInfo:\n ApplicationInfo:\n  name=dev.probe.MainActivity\n  packageName=dev.probe\n",
+    "ActivityInfo:\n name=dev.probe.MainActivity\n packageName=dev.probe\n processName=\n",
+  ])("refuses ActivityInfo that cannot establish the component process (%s)", (stdout) => {
+    expect(parseActivityProcessName(stdout, PROBE_ACTIVITY)).toBeNull();
   });
 });
 

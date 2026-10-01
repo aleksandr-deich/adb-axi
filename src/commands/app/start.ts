@@ -4,9 +4,15 @@ import {
   declaredActivities,
   resolveLauncherActivity,
   parseActivityFilters,
+  readActivityProcessName,
 } from "../../android/activities.js";
 import { parseAmStart, wasRecreated, type AmStart } from "../../android/amstart.js";
-import { assertPackageName, type ActivityRecord } from "../../android/component.js";
+import {
+  activityClassName,
+  assertPackageName,
+  type ActivityRecord,
+  type Component,
+} from "../../android/component.js";
 import { readForeground } from "../../android/foreground.js";
 import { invalidOutput } from "../../android/read.js";
 import { AdbAxiError } from "../../core/errors.js";
@@ -93,8 +99,17 @@ export const appStart = defineCommand({
     const start = await amStart(context, adb, serial, pkg, activity, userId, command, () =>
       declaredActivities(filters, pkg),
     );
-    const settled = await settle(context, adb, serial, pkg, userId);
-    if (settled.state === "stopped") throw diedOnStart(context, pkg, settled, command);
+    const launched = start.activity ?? { package: pkg, activity, component: `${pkg}/${activity}` };
+    const processName = await readActivityProcessName(
+      adb,
+      serial,
+      launched,
+      userId,
+      readOptions(context),
+    );
+    const settled = await settle(context, adb, serial, launched, userId, processName);
+    if (settled.state === "stopped")
+      throw diedOnStart(context, launched, processName, settled, command);
     return report(context, pkg, activity, fresh, start, settled, command);
   },
 });
@@ -213,17 +228,20 @@ async function settle(
   context: CommandContext,
   adb: AdbClient,
   serial: string,
-  pkg: string,
+  activity: Component,
   userId: number,
+  processName: string,
 ): Promise<Seen> {
   const result = await poll<Seen, Seen>({
     timeoutMs: Math.min(SETTLE_MS, context.deadline.remainingMs()),
     check: async () => {
-      const processes = await packageProcesses(context, pkg, userId);
+      const processes = await packageProcesses(context, activity.package, userId);
       const front = await readForeground(adb, serial, { ...readOptions(context), userId });
-      const pid =
-        (processes.find((process) => process.process === pkg) ?? processes[0])?.pid ?? UNKNOWN;
-      const state = pid === UNKNOWN ? "stopped" : front?.package === pkg ? "foreground" : "running";
+      const pid = processes.find((process) => process.process === processName)?.pid ?? UNKNOWN;
+      const inFront =
+        front?.package === activity.package &&
+        activityClassName(front) === activityClassName(activity);
+      const state = pid === UNKNOWN ? "stopped" : inFront ? "foreground" : "running";
       const seen: Seen = { state, pid, front };
       return state === "running" ? { done: false, last: seen } : { done: true, value: seen };
     },
@@ -330,27 +348,39 @@ function startTimeout(
 
 function diedOnStart(
   context: CommandContext,
-  pkg: string,
+  activity: Component,
+  processName: string,
   last: Seen,
   command: string[],
 ): AdbAxiError {
-  return new AdbAxiError("APP_DIED_ON_START", `${pkg} has no process right after its start`, {
-    fields: {
-      last: { state: last.state, pid: last.pid, foreground: last.front?.package ?? UNKNOWN },
+  return new AdbAxiError(
+    "APP_DIED_ON_START",
+    `the ${processName} process of ${activity.component} is gone right after its start`,
+    {
+      fields: {
+        last: { state: last.state, pid: last.pid, foreground: last.front?.package ?? UNKNOWN },
+      },
+      help: [
+        ...(logsCrash.shipped
+          ? [
+              runHint(
+                lifecycleCommand(context, [
+                  "logs",
+                  "crash",
+                  "--pkg",
+                  activity.package,
+                  "--since",
+                  "1m",
+                ]),
+                "for the crash",
+              ),
+            ]
+          : []),
+        runHint(
+          context.flags.fresh === true ? command : [...command, "--fresh"],
+          "to try a cold start",
+        ),
+      ],
     },
-    help: [
-      ...(logsCrash.shipped
-        ? [
-            runHint(
-              lifecycleCommand(context, ["logs", "crash", "--pkg", pkg, "--since", "1m"]),
-              "for the crash",
-            ),
-          ]
-        : []),
-      runHint(
-        context.flags.fresh === true ? command : [...command, "--fresh"],
-        "to try a cold start",
-      ),
-    ],
-  });
+  );
 }

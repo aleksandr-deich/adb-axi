@@ -1,5 +1,5 @@
 import type { AdbClient } from "../adb/run.js";
-import { parseComponent, type Component } from "./component.js";
+import { activityClassName, parseComponent, type Component } from "./component.js";
 import { invalidOutput, readShell, type ReadOptions } from "./read.js";
 
 export const ACTION_MAIN = "android.intent.action.MAIN";
@@ -54,6 +54,44 @@ export async function resolveLauncherActivity(
   const component = parseComponent(text.split(/\r?\n/)[0] ?? "");
   if (component?.package !== pkg) throw invalidOutput(step, result.stdout);
   return component.activity;
+}
+
+export function parseActivityProcessName(stdout: string, component: Component): string | null {
+  const section = stdout.split(/^ActivityInfo:\s*$/m)[1]?.split(/^\s*ApplicationInfo:/m)[0];
+  if (section === undefined) return null;
+  const fields = new Map<string, string>();
+  for (const line of section.split(/\r?\n/)) {
+    const field = /^\s*(name|packageName|processName)=(.*)$/.exec(line);
+    if (field?.[1] !== undefined && field[2] !== undefined) fields.set(field[1], field[2].trim());
+  }
+  if (
+    fields.get("packageName") !== component.package ||
+    fields.get("name") !== activityClassName(component)
+  ) {
+    return null;
+  }
+  const process = fields.get("processName") ?? component.package;
+  return process === "" ? null : process;
+}
+
+export async function readActivityProcessName(
+  adb: AdbClient,
+  serial: string,
+  component: Component,
+  userId: number,
+  options: ReadOptions,
+): Promise<string> {
+  const step = `reading the process of activity ${component.component}`;
+  const result = await readShell(
+    adb,
+    serial,
+    `cmd package resolve-activity --user ${userId} -n '${component.component}'`,
+    step,
+    options,
+  );
+  const process = parseActivityProcessName(result.stdout, component);
+  if (process === null) throw invalidOutput(step, result.stdout);
+  return process;
 }
 
 /** The package's activities that the table names, each once, in the order first printed. */

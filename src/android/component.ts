@@ -34,6 +34,10 @@ export function parseComponent(flat: string): Component | null {
   return { package: match[1], activity: match[2], component: `${match[1]}/${match[2]}` };
 }
 
+export function activityClassName(component: Component): string {
+  return component.activity.replace(/^\./, `${component.package}.`);
+}
+
 /** An activity as `ActivityRecord.toString` prints it. */
 export interface ActivityRecord extends Component {
   taskId: number;
