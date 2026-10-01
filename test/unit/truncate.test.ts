@@ -51,6 +51,12 @@ describe("capLines", () => {
     expect(window.truncated).toBe(true);
   });
 
+  it("does not call a line of exactly the byte cap cut", () => {
+    const window = capLines(["x".repeat(4096)]);
+    expect(window).toEqual({ lines: ["x".repeat(4096)], total: 1, truncated: false });
+    expect(shownLine(capLines(["x".repeat(4096), "y"]))).toBe("1 of 2 lines");
+  });
+
   it("says how many bytes of a cut line are shown", () => {
     expect(shownLine(capLines(["x".repeat(10_000)]))).toBe(
       "1 of 1 lines, cut at 4096 of 10000 bytes",

@@ -45,10 +45,12 @@ export function capLines(input: string | readonly string[], caps: LineCaps = {})
       if (kept.length === 0) {
         const shown = cutToBytes(line, maxBytes);
         kept.push(shown);
-        cut = {
-          shownBytes: Buffer.byteLength(shown, "utf8"),
-          totalBytes: Buffer.byteLength(line, "utf8"),
-        };
+        if (shown !== line) {
+          cut = {
+            shownBytes: Buffer.byteLength(shown, "utf8"),
+            totalBytes: Buffer.byteLength(line, "utf8"),
+          };
+        }
       }
       break;
     }
