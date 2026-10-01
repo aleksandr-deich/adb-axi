@@ -13,10 +13,12 @@ const FOREGROUND = "dumpsys activity activities";
 const PIDOF = "pidof dev.probe";
 const FORCE_STOP = "am force-stop dev.probe";
 const CLEAR = "pm clear dev.probe";
+const DATA_FILES = "run-as dev.probe find . -type f";
 const startOf = (activity: string): string => `am start -W -n 'dev.probe/${activity}'`;
 const START = startOf(".MainActivity");
 
 const INSTALLED = { stdoutFile: "captured/35/dumpsys-package-debug.txt" };
+const INSTALLED_RELEASE = { stdoutFile: "captured/35/dumpsys-package-release.txt" };
 const ABSENT = { stdoutFile: "captured/35/dumpsys-package-absent.txt" };
 const PROBE_FRONT = { stdoutFile: "captured/35/dumpsys-activity-activities-probe-front.txt" };
 const LAUNCHER_FRONT = { stdoutFile: "captured/35/dumpsys-activity-activities-launcher-front.txt" };
@@ -58,7 +60,8 @@ function shell(command: string): string[] {
 
 /**
  * A device where the probe's process follows the commands sent to it: `am force-stop` and
- * `pm clear` end it, `am start` (answered with `started`) brings it up in front.
+ * `pm clear` end it, `am start` (answered with `started`) brings it up in front. Its data
+ * directory holds no files.
  */
 function liveDevice(started: Response, initially: "running" | "stopped"): FakeAdb {
   fake = createFakeAdb({
@@ -70,6 +73,7 @@ function liveDevice(started: Response, initially: "running" | "stopped"): FakeAd
       { match: shell(PACKAGE), respond: INSTALLED },
       { match: shell(FORCE_STOP), respond: {}, set: { proc: "stopped" } },
       { match: shell(CLEAR), respond: { stdout: "Success\n" }, set: { proc: "stopped" } },
+      { match: shell(DATA_FILES), respond: {} },
       { match: shell(START), respond: started, set: { proc: "running" } },
       { match: shell(PIDOF), when: { proc: "running" }, respond: PROBE_RUNNING },
       { match: shell(PIDOF), when: { proc: "stopped" }, respond: PROBE_STOPPED },
@@ -173,6 +177,45 @@ describe("app start", () => {
     });
     expect(shellCommands(f)).toEqual(twice([PACKAGE, FORCE_STOP, PIDOF, START, PIDOF, FOREGROUND]));
     expectClean(f);
+  });
+
+  it("fails with STOP_FAILED, naming --fresh, when the process outlives the force-stop", async () => {
+    const f = device({ [PACKAGE]: INSTALLED, [FORCE_STOP]: {}, [PIDOF]: PROBE_RUNNING });
+    const { toon, data } = await both(
+      ["app", "start", "dev.probe", "--fresh", "--timeout", "1s"],
+      f,
+    );
+    expect(toon.exitCode).toBe(1);
+    expect(toon.durationMs).toBeLessThan(3000);
+    expect(toon.stdout).toBe(
+      [
+        "error: dev.probe was still running at the 1 s deadline after am force-stop in `app start dev.probe --fresh`",
+        "code: STOP_FAILED",
+        "step: am force-stop",
+        "last:",
+        "  pid: 8235",
+        "help[2]: Run `adb-axi app start dev.probe --fresh --timeout 30s` to give it longer,Run `adb-axi app info dev.probe` for its pid and foreground state",
+        "",
+      ].join("\n"),
+    );
+    expect(data).toMatchObject({ code: "STOP_FAILED", step: "am force-stop", last: { pid: 8235 } });
+    expect(shellCommands(f)).not.toContain(START);
+    expectClean(f);
+  });
+
+  it("names the requested activity in the STOP_FAILED help of --fresh", async () => {
+    const f = device({ [PACKAGE]: INSTALLED, [FORCE_STOP]: {}, [PIDOF]: PROBE_RUNNING });
+    const { data } = await both(
+      ["app", "start", "dev.probe/.MainActivity", "--fresh", "--timeout", "1s"],
+      f,
+    );
+    expect(data).toMatchObject({
+      code: "STOP_FAILED",
+      help: [
+        "Run `adb-axi app start dev.probe/.MainActivity --fresh --timeout 30s` to give it longer",
+        "Run `adb-axi app info dev.probe` for its pid and foreground state",
+      ],
+    });
   });
 
   it("reports a warm start as recreated, with the system's launch time", async () => {
@@ -475,12 +518,19 @@ describe("app stop", () => {
   });
 
   it("is the 'already not running' no-op with exit 0 for an app that is not running", async () => {
-    const f = device({ [PACKAGE]: INSTALLED, [PIDOF]: PROBE_STOPPED });
+    const f = device({ [PACKAGE]: INSTALLED, [PIDOF]: PROBE_STOPPED, [FORCE_STOP]: {} });
     const { toon, data } = await both(["app", "stop", "dev.probe"], f);
     expect(toon.exitCode).toBe(0);
     expect(toon.stdout).toBe("ok: stop dev.probe -> already not running (no-op)\n");
     expect(data).toEqual({ ok: "stop dev.probe -> already not running (no-op)" });
-    expect(shellCommands(f)).toEqual(twice([PACKAGE, PIDOF]));
+    expectClean(f);
+  });
+
+  it("still force-stops on the no-op, ending processes pidof does not see", async () => {
+    const f = device({ [PACKAGE]: INSTALLED, [PIDOF]: PROBE_STOPPED, [FORCE_STOP]: {} });
+    const run = await runCli(["app", "stop", "dev.probe"], f.env);
+    expect(run.exitCode).toBe(0);
+    expect(shellCommands(f)).toEqual([PACKAGE, PIDOF, FORCE_STOP]);
   });
 
   it("fails with STOP_FAILED, carrying the pid, when the process outlives the deadline", async () => {
@@ -490,8 +540,9 @@ describe("app stop", () => {
     expect(toon.durationMs).toBeLessThan(3000);
     expect(toon.stdout).toBe(
       [
-        "error: dev.probe was still running at the 1 s deadline after a force-stop",
+        "error: dev.probe was still running at the 1 s deadline after am force-stop in `app stop dev.probe`",
         "code: STOP_FAILED",
+        "step: am force-stop",
         "last:",
         "  pid: 8235",
         "help[2]: Run `adb-axi app stop dev.probe --timeout 30s` to give it longer,Run `adb-axi app info dev.probe` for its pid and foreground state",
@@ -520,13 +571,22 @@ describe("app stop", () => {
 });
 
 describe("app clear", () => {
-  it("clears the data and reports the process stopped", async () => {
+  it("clears the data, verifies with run-as that no file is left, and reports the process stopped", async () => {
     const f = liveDevice(AM_START.hot, "running");
     const { toon, data } = await both(["app", "clear", "dev.probe"], f);
     expect(toon.exitCode).toBe(0);
-    expect(toon.stdout).toBe('ok: "clear dev.probe -> data cleared, process stopped"\n');
-    expect(data).toEqual({ ok: "clear dev.probe -> data cleared, process stopped" });
-    expect(shellCommands(f)).toEqual(twice([PACKAGE, CLEAR, PIDOF]));
+    expect(toon.stdout).toBe(
+      [
+        'ok: "clear dev.probe -> data cleared, process stopped"',
+        "confirmed_by[2]: pm clear,run-as",
+        "",
+      ].join("\n"),
+    );
+    expect(data).toEqual({
+      ok: "clear dev.probe -> data cleared, process stopped",
+      confirmed_by: ["pm clear", "run-as"],
+    });
+    expect(shellCommands(f)).toEqual(twice([PACKAGE, CLEAR, PIDOF, DATA_FILES]));
     expectClean(f);
   });
 
@@ -534,10 +594,63 @@ describe("app clear", () => {
     const f = liveDevice(AM_START.hot, "stopped");
     const { toon, data } = await both(["app", "clear", "dev.probe"], f);
     expect(toon.exitCode).toBe(0);
-    expect(data).toEqual({ ok: "clear dev.probe -> data cleared, process stopped" });
+    expect(data).toEqual({
+      ok: "clear dev.probe -> data cleared, process stopped",
+      confirmed_by: ["pm clear", "run-as"],
+    });
   });
 
-  it("fails with STOP_FAILED when the process is still there at the deadline", async () => {
+  it("says only pm clear confirms the clear of an app that is not debuggable, without run-as", async () => {
+    const f = device({
+      [PACKAGE]: INSTALLED_RELEASE,
+      [CLEAR]: { stdoutFile: "captured/35/pm-clear.txt" },
+      [PIDOF]: PROBE_STOPPED,
+    });
+    const { toon, data } = await both(["app", "clear", "dev.probe"], f);
+    expect(toon.exitCode).toBe(0);
+    expect(toon.stdout).toBe(
+      [
+        'ok: "clear dev.probe -> data cleared, process stopped"',
+        "confirmed_by[1]: pm clear",
+        "",
+      ].join("\n"),
+    );
+    expect(data).toEqual({
+      ok: "clear dev.probe -> data cleared, process stopped",
+      confirmed_by: ["pm clear"],
+    });
+    expect(shellCommands(f)).toEqual(twice([PACKAGE, CLEAR, PIDOF]));
+    expectClean(f);
+  });
+
+  it("fails with CLEAR_FAILED, listing the files, when run-as still finds data after pm clear", async () => {
+    const f = device({
+      [PACKAGE]: INSTALLED,
+      [CLEAR]: { stdoutFile: "captured/35/pm-clear.txt" },
+      [PIDOF]: PROBE_STOPPED,
+      [DATA_FILES]: { stdout: "./databases/probe.db\n./shared_prefs/probe.xml\n" },
+    });
+    const { toon, data } = await both(["app", "clear", "dev.probe"], f);
+    expect(toon.exitCode).toBe(1);
+    expect(toon.stdout).toBe(
+      [
+        "error: dev.probe still has 2 files in its data directory after pm clear",
+        "code: CLEAR_FAILED",
+        "left:",
+        "  count: 2",
+        "  files[2]: databases/probe.db,shared_prefs/probe.xml",
+        "help[2]: Run `adb-axi app clear dev.probe` to clear it again,Run `adb-axi app info dev.probe` for its data size",
+        "",
+      ].join("\n"),
+    );
+    expect(data).toMatchObject({
+      code: "CLEAR_FAILED",
+      left: { count: 2, files: ["databases/probe.db", "shared_prefs/probe.xml"] },
+    });
+    expectClean(f);
+  });
+
+  it("fails with STOP_FAILED, naming pm clear, when the process is still there at the deadline", async () => {
     const f = device({
       [PACKAGE]: INSTALLED,
       [CLEAR]: { stdoutFile: "captured/35/pm-clear.txt" },
@@ -545,7 +658,18 @@ describe("app clear", () => {
     });
     const { toon, data } = await both(["app", "clear", "dev.probe", "--timeout", "1s"], f);
     expect(toon.exitCode).toBe(1);
-    expect(data).toMatchObject({ code: "STOP_FAILED", last: { pid: 8235 } });
+    expect(data).toMatchObject({
+      error:
+        "dev.probe was still running at the 1 s deadline after pm clear in `app clear dev.probe`",
+      code: "STOP_FAILED",
+      step: "pm clear",
+      last: { pid: 8235 },
+      help: [
+        "Run `adb-axi app clear dev.probe --timeout 30s` to give it longer",
+        "Run `adb-axi app info dev.probe` for its pid and foreground state",
+      ],
+    });
+    expect(shellCommands(f)).not.toContain(DATA_FILES);
   });
 
   it("fails with REMOTE_EXIT, never a cleared claim, when the package manager refuses", async () => {

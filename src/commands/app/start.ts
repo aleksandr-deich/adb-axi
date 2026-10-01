@@ -68,7 +68,12 @@ export const appStart = defineCommand({
     if (fresh) {
       await forceStop(adb, serial, pkg, readOptions(context));
       const exit = await waitForExit(adb, serial, pkg, context);
-      if (!exit.gone) throw stopFailed(pkg, exit.last, context.timeoutMs);
+      if (!exit.gone) {
+        throw stopFailed(pkg, exit.last, context.timeoutMs, {
+          command: ["app", "start", requested === null ? pkg : `${pkg}/${requested}`, "--fresh"],
+          step: "am force-stop",
+        });
+      }
     }
 
     const start = await amStart(context, adb, serial, pkg, activity, () =>

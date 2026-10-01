@@ -22,14 +22,19 @@ export const appStop = defineCommand({
 
     await requireInstalled(context, pkg);
     const before = await pidof(adb, serial, pkg, readOptions(context));
+    const started = realClock.now();
+    await forceStop(adb, serial, pkg, readOptions(context));
     if (before.length === 0) {
       return { ok: okLine("stop", pkg, noop("already not running")) };
     }
 
-    const started = realClock.now();
-    await forceStop(adb, serial, pkg, readOptions(context));
     const exit = await waitForExit(adb, serial, pkg, context);
-    if (!exit.gone) throw stopFailed(pkg, exit.last, context.timeoutMs);
+    if (!exit.gone) {
+      throw stopFailed(pkg, exit.last, context.timeoutMs, {
+        command: ["app", "stop", pkg],
+        step: "am force-stop",
+      });
+    }
     const tookMs = Math.round(realClock.now() - started);
     return {
       ok: okLine("stop", pkg, `not running (${pidLabel(before)} gone after ${tookMs} ms)`),
