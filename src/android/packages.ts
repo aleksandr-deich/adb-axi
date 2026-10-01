@@ -41,14 +41,13 @@ export function parsePackageList(stdout: string): ListedPackage[] {
 export interface PackageInfo {
   package: string;
   /**
-   * Installed for user 0. A package uninstalled with its data kept (`pm uninstall -k`)
+   * A package uninstalled with its data kept (`pm uninstall -k`)
    * still has a record, with `installed=false`.
    */
   installed: boolean;
   versionName: string | null;
   versionCode: number | null;
   debuggable: boolean;
-  /** The app's uid for user 0 (its app id). */
   uid: number | null;
   minSdk: number | null;
   targetSdk: number | null;
@@ -63,10 +62,10 @@ export interface PackageInfo {
  * and `appId=` from API 31; flags are `flags=[ DEBUGGABLE HAS_CODE ... ]`; each user has a
  * `User <n>: ... installed=<bool> ...` line.
  */
-export function parsePackageRecords(stdout: string): Map<string, PackageInfo> {
+export function parsePackageRecords(stdout: string, userId = 0): Map<string, PackageInfo> {
   const records = new Map<string, PackageInfo>();
   let inPackages = false;
-  let current: { info: PackageInfo; seenUser0: boolean } | undefined;
+  let current: { info: PackageInfo; seenUser: boolean } | undefined;
 
   for (const line of stdout.split(/\r?\n/)) {
     if (/^\S/.test(line)) {
@@ -81,7 +80,7 @@ export function parsePackageRecords(stdout: string): Map<string, PackageInfo> {
     if (header?.[1] !== undefined) {
       const info: PackageInfo = {
         package: header[1],
-        installed: true,
+        installed: false,
         versionName: null,
         versionCode: null,
         debuggable: false,
@@ -90,7 +89,7 @@ export function parsePackageRecords(stdout: string): Map<string, PackageInfo> {
         targetSdk: null,
       };
       records.set(info.package, info);
-      current = { info, seenUser0: false };
+      current = { info, seenUser: false };
       continue;
     }
     if (current === undefined) continue;
@@ -99,7 +98,7 @@ export function parsePackageRecords(stdout: string): Map<string, PackageInfo> {
 
     const id = /^(?:appId|userId)=(\d+)$/.exec(text);
     if (id?.[1] !== undefined) {
-      info.uid = Number(id[1]);
+      info.uid = userId * 100000 + Number(id[1]);
       continue;
     }
     const version = /^versionCode=(\d+)(?: minSdk=(\d+))?(?: targetSdk=(\d+))?/.exec(text);
@@ -119,18 +118,18 @@ export function parsePackageRecords(stdout: string): Map<string, PackageInfo> {
       info.debuggable = flags[1].trim().split(/\s+/).includes("DEBUGGABLE");
       continue;
     }
-    const user = /^User 0: .*\binstalled=(true|false)\b/.exec(text);
-    if (user?.[1] !== undefined && !current.seenUser0) {
-      info.installed = user[1] === "true";
-      current.seenUser0 = true;
+    const user = /^User (\d+): .*\binstalled=(true|false)\b/.exec(text);
+    if (user?.[2] !== undefined && Number(user[1]) === userId && !current.seenUser) {
+      info.installed = user[2] === "true";
+      current.seenUser = true;
     }
   }
   return records;
 }
 
 /** One package's record, or `null` when the device has none (never installed). */
-export function parseDumpsysPackage(stdout: string, pkg: string): PackageInfo | null {
-  return parsePackageRecords(stdout).get(pkg) ?? null;
+export function parseDumpsysPackage(stdout: string, pkg: string, userId = 0): PackageInfo | null {
+  return parsePackageRecords(stdout, userId).get(pkg) ?? null;
 }
 
 /**

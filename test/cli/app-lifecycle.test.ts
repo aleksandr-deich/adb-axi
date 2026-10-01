@@ -8,13 +8,18 @@ import { runCli, type CliRun } from "../helpers/run.js";
 const SERIAL = "emulator-5554";
 const ONE_ONLINE = `List of devices attached\n${SERIAL}          device product:sdk_gphone64_arm64 model:sdk_gphone64_arm64 device:emu64a transport_id:1\n\n`;
 
+const CURRENT_USER = "am get-current-user";
+const RESOLVE =
+  "cmd package resolve-activity --components --user 0 -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -p dev.probe";
+const PROCESSES = "dumpsys activity processes dev.probe";
+const PROCESS_RUNNING = { stdoutFile: "captured/35/dumpsys-activity-processes-probe-front.txt" };
 const PACKAGE = "dumpsys package dev.probe";
 const FOREGROUND = "dumpsys activity activities";
 const PIDOF = "pidof dev.probe";
-const FORCE_STOP = "am force-stop dev.probe";
-const CLEAR = "pm clear dev.probe";
-const DATA_FILES = "run-as dev.probe find . -type f";
-const startOf = (activity: string): string => `am start -W -n 'dev.probe/${activity}'`;
+const FORCE_STOP = "am force-stop --user 0 dev.probe";
+const CLEAR = "pm clear --user 0 dev.probe";
+const DATA_FILES = "run-as dev.probe --user 0 find . -type f";
+const startOf = (activity: string): string => `am start --user 0 -W -n 'dev.probe/${activity}'`;
 const START = startOf(".MainActivity");
 
 const INSTALLED = { stdoutFile: "captured/35/dumpsys-package-debug.txt" };
@@ -49,7 +54,13 @@ function deviceWithRules(rules: Rule[]): FakeAdb {
   fake = createFakeAdb({
     description: "One online emulator answering the app lifecycle commands",
     synthetic: true,
-    rules: [{ match: ["devices", "-l"], respond: { stdout: ONE_ONLINE } }, ...rules],
+    rules: [
+      { match: ["devices", "-l"], respond: { stdout: ONE_ONLINE } },
+      ...rules,
+      { match: shell(CURRENT_USER), respond: { stdout: "0\n" } },
+      { match: shell(RESOLVE), respond: { stdout: "dev.probe/.MainActivity\n" } },
+      { match: shell(PROCESSES), respond: PROCESS_RUNNING },
+    ],
   });
   return fake;
 }
@@ -70,6 +81,10 @@ function liveDevice(started: Response, initially: "running" | "stopped"): FakeAd
     state: { proc: initially },
     rules: [
       { match: ["devices", "-l"], respond: { stdout: ONE_ONLINE } },
+      { match: shell(CURRENT_USER), respond: { stdout: "0\n" } },
+      { match: shell(RESOLVE), respond: { stdout: "dev.probe/.MainActivity\n" } },
+      { match: shell(PROCESSES), when: { proc: "running" }, respond: PROCESS_RUNNING },
+      { match: shell(PROCESSES), when: { proc: "stopped" }, respond: {} },
       { match: shell(PACKAGE), respond: INSTALLED },
       { match: shell(FORCE_STOP), respond: {}, set: { proc: "stopped" } },
       { match: shell(CLEAR), respond: { stdout: "Success\n" }, set: { proc: "stopped" } },
@@ -151,7 +166,9 @@ describe("app start", () => {
       app: { activity: ".MainActivity", pid: 8235, launch: "hot", recreated: false },
       help: ["Run `adb-axi app start dev.probe --fresh` to kill the process and cold-start"],
     });
-    expect(shellCommands(f)).toEqual(twice([PACKAGE, START, PIDOF, FOREGROUND]));
+    expect(shellCommands(f)).toEqual(
+      twice([CURRENT_USER, PACKAGE, RESOLVE, START, PROCESSES, FOREGROUND]),
+    );
     expectClean(f);
   });
 
@@ -175,7 +192,9 @@ describe("app start", () => {
       ok: "start dev.probe -> foreground (cold start)",
       app: { activity: ".MainActivity", pid: 8235, launch: "cold", recreated: true, took_ms: 1102 },
     });
-    expect(shellCommands(f)).toEqual(twice([PACKAGE, FORCE_STOP, PIDOF, START, PIDOF, FOREGROUND]));
+    expect(shellCommands(f)).toEqual(
+      twice([CURRENT_USER, PACKAGE, RESOLVE, FORCE_STOP, PIDOF, START, PROCESSES, FOREGROUND]),
+    );
     expectClean(f);
   });
 
@@ -261,7 +280,6 @@ describe("app start", () => {
     for (const args of [
       ["app", "start", "dev.probe/.MainActivity"],
       ["app", "start", "dev.probe", "--activity", ".MainActivity"],
-      ["app", "start", "dev.probe/.MainActivity", "--activity", ".MainActivity"],
     ]) {
       const f = liveDevice(AM_START.hot, "running");
       const { toon } = await both(args, f);
@@ -300,7 +318,7 @@ describe("app start", () => {
       app: { activity: ".MainActivity", pid: 8235, launch: "hot", recreated: false },
       help: ["Run `adb-axi app current` to see what is in front"],
     });
-  });
+  }, 10000);
 
   it("fails with APP_NOT_INSTALLED, before any start, when the package is not installed", async () => {
     const f = device({ "dumpsys package dev.probe.missing": ABSENT });
@@ -315,7 +333,7 @@ describe("app start", () => {
       ].join("\n"),
     );
     expect(data).toMatchObject({ code: "APP_NOT_INSTALLED" });
-    expect(shellCommands(f)).toEqual(twice(["dumpsys package dev.probe.missing"]));
+    expect(shellCommands(f)).toEqual(twice([CURRENT_USER, "dumpsys package dev.probe.missing"]));
   });
 
   it("fails with ACTIVITY_NOT_FOUND from am's Error type 3, listing the activities that exist", async () => {
@@ -347,6 +365,7 @@ describe("app start", () => {
 
   it("fails with ACTIVITY_NOT_FOUND, without a start, when the app has no launcher activity", async () => {
     const f = device({
+      [RESOLVE]: { stdout: "No activity found\n" },
       [PACKAGE]: {
         stdout:
           "Packages:\n  Package [dev.probe] (4f2a9c1):\n    appId=10213\n    User 0: ceDataInode=1 installed=true hidden=false stopped=false\n",
@@ -359,7 +378,7 @@ describe("app start", () => {
       error: "dev.probe has no launcher activity",
       activities: [],
     });
-    expect(shellCommands(f)).toEqual(twice([PACKAGE]));
+    expect(shellCommands(f)).toEqual(twice([CURRENT_USER, PACKAGE, RESOLVE]));
   });
 
   it("fails with WAIT_TIMEOUT when am reports Status: timeout with exit 0 (S4)", async () => {
@@ -382,7 +401,7 @@ describe("app start", () => {
     );
     expect(data).toMatchObject({ code: "WAIT_TIMEOUT" });
     // The timed-out start is never read as a launched app.
-    expect(shellCommands(f)).toEqual(twice([PACKAGE, START]));
+    expect(shellCommands(f)).toEqual(twice([CURRENT_USER, PACKAGE, RESOLVE, START]));
   });
 
   it("fails with WAIT_TIMEOUT when am start does not answer within --timeout", async () => {
@@ -401,6 +420,7 @@ describe("app start", () => {
     const f = device({
       [PACKAGE]: INSTALLED,
       [START]: AM_START.cold,
+      [PROCESSES]: {},
       [PIDOF]: PROBE_STOPPED,
       [FOREGROUND]: LAUNCHER_FRONT,
     });
@@ -443,13 +463,14 @@ describe("app start", () => {
     });
   });
 
-  it("rejects a bad package, a bad activity and two different activities with exit 2, before any device call", async () => {
+  it("rejects bad names and simultaneous activity selectors with exit 2 before any shell call", async () => {
     const f = device({});
     for (const args of [
       ["app", "start", "dev.probe; reboot"],
       ["app", "start", "dev.probe/.Main; reboot"],
       ["app", "start", "dev.probe", "--activity", "'.Main'"],
       ["app", "start", "dev.probe/.MainActivity", "--activity", ".OtherActivity"],
+      ["app", "start", "dev.probe/.MainActivity", "--activity", ".MainActivity"],
       ["app", "start"],
     ]) {
       const { toon, data } = await both(args, f);
@@ -475,7 +496,7 @@ describe("app stop", () => {
     expect(toon.stdout).toMatch(
       /^ok: stop dev\.probe -> not running \(pid 8235 gone after \d+ ms\)\n$/,
     );
-    expect(shellCommands(f)).toEqual([PACKAGE, PIDOF, FORCE_STOP, PIDOF]);
+    expect(shellCommands(f)).toEqual([CURRENT_USER, PACKAGE, PIDOF, PROCESSES, FORCE_STOP, PIDOF]);
     expectClean(f);
   });
 
@@ -499,6 +520,14 @@ describe("app stop", () => {
       state: { proc: "running" },
       rules: [
         { match: ["devices", "-l"], respond: { stdout: ONE_ONLINE } },
+        { match: shell(CURRENT_USER), respond: { stdout: "0\n" } },
+        {
+          match: shell(PROCESSES),
+          respond: {
+            stdout:
+              "  *APP* UID 10213 ProcessRecord{abc 5120:dev.probe/u0a213}\n  *APP* UID 10213 ProcessRecord{def 5187:dev.probe/u0a213}\n",
+          },
+        },
         { match: shell(PACKAGE), respond: INSTALLED },
         { match: shell(FORCE_STOP), respond: {}, set: { proc: "stopped" } },
         {
@@ -529,7 +558,7 @@ describe("app stop", () => {
     const f = device({ [PACKAGE]: INSTALLED, [PIDOF]: PROBE_STOPPED, [FORCE_STOP]: {} });
     const run = await runCli(["app", "stop", "dev.probe"], f.env);
     expect(run.exitCode).toBe(0);
-    expect(shellCommands(f)).toEqual([PACKAGE, PIDOF, FORCE_STOP]);
+    expect(shellCommands(f)).toEqual([CURRENT_USER, PACKAGE, PIDOF, FORCE_STOP]);
   });
 
   it("fails with STOP_FAILED, carrying the pid, when the process outlives the deadline", async () => {
@@ -556,7 +585,7 @@ describe("app stop", () => {
     const { toon, data } = await both(["app", "stop", "dev.probe.missing"], f);
     expect(toon.exitCode).toBe(1);
     expect(data).toMatchObject({ code: "APP_NOT_INSTALLED" });
-    expect(shellCommands(f)).toEqual(twice(["dumpsys package dev.probe.missing"]));
+    expect(shellCommands(f)).toEqual(twice([CURRENT_USER, "dumpsys package dev.probe.missing"]));
   });
 
   it("rejects a package name that is not one with exit 2, before any shell call", async () => {
@@ -584,7 +613,7 @@ describe("app clear", () => {
       ok: "clear dev.probe -> data cleared, process stopped",
       confirmed_by: ["pm clear", "run-as"],
     });
-    expect(shellCommands(f)).toEqual(twice([PACKAGE, CLEAR, PIDOF, DATA_FILES]));
+    expect(shellCommands(f)).toEqual(twice([CURRENT_USER, PACKAGE, CLEAR, PIDOF, DATA_FILES]));
     expectClean(f);
   });
 
@@ -617,7 +646,7 @@ describe("app clear", () => {
       ok: "clear dev.probe -> data cleared, process stopped",
       confirmed_by: ["pm clear"],
     });
-    expect(shellCommands(f)).toEqual(twice([PACKAGE, CLEAR, PIDOF]));
+    expect(shellCommands(f)).toEqual(twice([CURRENT_USER, PACKAGE, CLEAR, PIDOF]));
     expectClean(f);
   });
 
@@ -668,7 +697,7 @@ describe("app clear", () => {
       ok: "clear dev.probe -> data cleared, process stopped",
       confirmed_by: ["pm clear"],
     });
-    expect(shellCommands(f)).toEqual(twice([PACKAGE, CLEAR, PIDOF, DATA_FILES]));
+    expect(shellCommands(f)).toEqual(twice([CURRENT_USER, PACKAGE, CLEAR, PIDOF, DATA_FILES]));
     expectClean(f);
   });
 
@@ -706,7 +735,391 @@ describe("app clear", () => {
     const { toon, data } = await both(["app", "clear", "dev.probe.missing"], f);
     expect(toon.exitCode).toBe(1);
     expect(data).toMatchObject({ code: "APP_NOT_INSTALLED" });
-    expect(shellCommands(f)).toEqual(twice(["dumpsys package dev.probe.missing"]));
+    expect(shellCommands(f)).toEqual(twice([CURRENT_USER, "dumpsys package dev.probe.missing"]));
+  });
+});
+
+describe("lifecycle review regressions", () => {
+  it.each([false, true])(
+    "resolves an enabled alternate launcher before starting, fresh=%s",
+    async (fresh) => {
+      const f = device({
+        [PACKAGE]: {
+          stdout: [
+            "Activity Resolver Table:",
+            "  Non-Data Actions:",
+            "      android.intent.action.MAIN:",
+            "        abc dev.probe/.Disabled filter def",
+            '          Action: "android.intent.action.MAIN"',
+            '          Category: "android.intent.category.LAUNCHER"',
+            "        def dev.probe/.Alternate filter abc",
+            '          Action: "android.intent.action.MAIN"',
+            '          Category: "android.intent.category.LAUNCHER"',
+            "Packages:",
+            "  Package [dev.probe] (abc):",
+            "    appId=10213",
+            "    User 0: installed=true hidden=false",
+            "      disabledComponents:",
+            "        dev.probe.Disabled",
+          ].join("\n"),
+        },
+        [RESOLVE]: { stdout: "dev.probe/.Alternate\n" },
+        [startOf(".Alternate")]: AM_START.cold,
+        [FOREGROUND]: {
+          stdout: "  ResumedActivity: ActivityRecord{abc u0 dev.probe/.Alternate t8}\n",
+        },
+        [FORCE_STOP]: {},
+        [PIDOF]: PROBE_STOPPED,
+      });
+      const { toon, data } = await both(
+        ["app", "start", "dev.probe", ...(fresh ? ["--fresh"] : [])],
+        f,
+      );
+      expect(toon.exitCode).toBe(0);
+      expect(data.app).toMatchObject({ activity: ".Alternate", pid: 8235 });
+      const calls = shellCommands(f);
+      expect(calls).not.toContain(startOf(".Disabled"));
+      expect(calls.indexOf(RESOLVE)).toBeLessThan(calls.indexOf(startOf(".Alternate")));
+      if (fresh) expect(calls.indexOf(RESOLVE)).toBeLessThan(calls.indexOf(FORCE_STOP));
+      expectClean(f);
+    },
+  );
+
+  it.each([
+    ["app", "  ResumedActivity: ActivityRecord{abc u0 dev.probe/.MainActivity t8}\n", "foreground"],
+    [
+      "permission dialog",
+      "  ResumedActivity: ActivityRecord{abc u0 com.android.permissioncontroller/.Grant t9}\n",
+      "running",
+    ],
+    ["screen off", "", "running"],
+  ])(
+    "observes a secondary UI process with %s in front",
+    async (_name, front, state) => {
+      const f = device({
+        [PACKAGE]: INSTALLED,
+        [START]: AM_START.cold,
+        [PIDOF]: PROBE_STOPPED,
+        [PROCESSES]: { stdout: "  *APP* UID 10213 ProcessRecord{abc 8123:dev.probe:ui/u0a213}\n" },
+        [FOREGROUND]: { stdout: front },
+      });
+      const { toon, data } = await both(["app", "start", "dev.probe/.MainActivity"], f);
+      expect(toon.exitCode).toBe(0);
+      expect(data.app).toMatchObject({ pid: 8123 });
+      expect(data.ok).toContain(`-> ${state}`);
+      expect(shellCommands(f)).not.toContain(PIDOF);
+      expect(shellCommands(f)).not.toContain(RESOLVE);
+      expectClean(f);
+    },
+    10000,
+  );
+
+  it.each([0, 1])("rejects remaining files even when find exits %s", async (exit) => {
+    const f = device({
+      [PACKAGE]: INSTALLED,
+      [CLEAR]: { stdout: "Success\n" },
+      [PIDOF]: PROBE_STOPPED,
+      [DATA_FILES]: {
+        stdout: "./databases/probe.db\n",
+        stderr: exit === 1 ? "find: ./files: Permission denied\n" : "",
+        exit,
+      },
+    });
+    const { toon, data } = await both(["app", "clear", "dev.probe", "--device", SERIAL], f);
+    expect(toon.exitCode).toBe(1);
+    expect(data).toMatchObject({
+      code: "CLEAR_FAILED",
+      left: { count: 1, files: ["databases/probe.db"] },
+      help: [
+        `Run \`adb-axi app clear dev.probe --device ${SERIAL}\` to clear it again`,
+        `Run \`adb-axi app info dev.probe --device ${SERIAL}\` for its data size`,
+      ],
+    });
+    expectClean(f);
+  });
+
+  it.each([false, true])("offers full remaining-file output, full=%s", async (full) => {
+    const files = Array.from({ length: 11 }, (_, i) => `files/${i}.txt`);
+    const f = device({
+      [PACKAGE]: INSTALLED,
+      [CLEAR]: { stdout: "Success\n" },
+      [PIDOF]: PROBE_STOPPED,
+      [DATA_FILES]: { stdout: files.map((file) => `./${file}\n`).join("") },
+    });
+    const { toon, data } = await both(
+      ["app", "clear", "dev.probe", "--device", SERIAL, ...(full ? ["--full"] : [])],
+      f,
+    );
+    expect(toon.exitCode).toBe(1);
+    expect(data).toMatchObject({
+      code: "CLEAR_FAILED",
+      left: { count: 11, files: full ? files : files.slice(0, 10) },
+    });
+    const help = data.help as string[];
+    if (full)
+      expect(help).not.toContain(
+        `Run \`adb-axi app clear dev.probe --full --device ${SERIAL}\` to list all remaining files`,
+      );
+    else
+      expect(help).toContain(
+        `Run \`adb-axi app clear dev.probe --full --device ${SERIAL}\` to list all remaining files`,
+      );
+    expectClean(f);
+  });
+
+  it.each([
+    [
+      "start",
+      START,
+      "Starting: Intent { cmp=dev.probe/.MainActivity }\n",
+      "starting dev.probe/.MainActivity",
+    ],
+    ["clear", CLEAR, "Unexpected\n", "clearing the data of dev.probe"],
+  ])(
+    "reports INVALID_OUTPUT from %s with output parity",
+    async (command, shellCommand, stdout, step) => {
+      const f = device({ [PACKAGE]: INSTALLED, [shellCommand]: { stdout } });
+      const { toon, data } = await both(["app", command, "dev.probe"], f);
+      expect(toon.exitCode).toBe(1);
+      expect(data).toMatchObject({ code: "INVALID_OUTPUT", step, detail: stdout.trim() });
+      expectClean(f);
+    },
+  );
+
+  it("rejects an invalid clear package with output parity before shell calls", async () => {
+    const f = device({});
+    const { toon, data } = await both(["app", "clear", "dev.probe; reboot"], f);
+    expect(toon.exitCode).toBe(2);
+    expect(data).toMatchObject({ code: "VALIDATION_ERROR" });
+    expect(shellCommands(f)).toEqual([]);
+  });
+
+  it.each(["start", "stop", "clear"])(
+    "limits %s mutations and observations to current user 10",
+    async (command) => {
+      let previous: Record<string, unknown> | undefined;
+      for (const json of [false, true]) {
+        const stop = "am force-stop --user 10 dev.probe";
+        const clear = "pm clear --user 10 dev.probe";
+        const start = "am start --user 10 -W -n 'dev.probe/.MainActivity'";
+        const resolve = RESOLVE.replace("--user 0", "--user 10");
+        const files = DATA_FILES.replace("--user 0", "--user 10");
+        fake = createFakeAdb({
+          description: "Only the current user's process and data change",
+          synthetic: true,
+          state: {
+            current: "running",
+            other: "running",
+            otherData: "present",
+            currentData: "present",
+          },
+          rules: [
+            { match: ["devices", "-l"], respond: { stdout: ONE_ONLINE } },
+            { match: shell(CURRENT_USER), respond: { stdout: "10\n" } },
+            {
+              match: shell(PACKAGE),
+              respond: {
+                stdout:
+                  "Packages:\n  Package [dev.probe] (abc):\n    appId=10213\n    flags=[ DEBUGGABLE HAS_CODE ]\n    User 0: installed=true hidden=false\n    User 10: installed=true hidden=false\n",
+              },
+            },
+            { match: shell(resolve), respond: { stdout: "dev.probe/.MainActivity\n" } },
+            { match: shell(stop), respond: {}, set: { current: "stopped" } },
+            {
+              match: shell(clear),
+              respond: { stdout: "Success\n" },
+              set: { current: "stopped", currentData: "empty" },
+            },
+            { match: shell(start), respond: AM_START.cold, set: { current: "running" } },
+            { match: shell(files), when: { currentData: "empty" }, respond: {} },
+            {
+              match: shell(PIDOF),
+              when: { current: "running" },
+              respond: { stdout: "9001 8235\n" },
+            },
+            { match: shell(PIDOF), when: { current: "stopped" }, respond: { stdout: "9001\n" } },
+            {
+              match: shell(PROCESSES),
+              when: { current: "running" },
+              respond: {
+                stdout:
+                  "  *APP* UID 10213 ProcessRecord{abc 9001:dev.probe/u0a213}\n  *APP* UID 1010213 ProcessRecord{def 8235:dev.probe/u10a213}\n",
+              },
+            },
+            {
+              match: shell(PROCESSES),
+              when: { current: "stopped" },
+              respond: { stdout: "  *APP* UID 10213 ProcessRecord{abc 9001:dev.probe/u0a213}\n" },
+            },
+            {
+              match: shell(FOREGROUND),
+              respond: {
+                stdout:
+                  "  ResumedActivity: ActivityRecord{abc u0 dev.probe/.OtherProfile t2}\n  ResumedActivity: ActivityRecord{def u10 dev.probe/.MainActivity t8}\n",
+              },
+            },
+          ],
+        });
+        const result = await runCli(
+          [
+            "app",
+            command,
+            "dev.probe",
+            ...(command === "start" ? ["--fresh"] : []),
+            ...(json ? ["--json"] : []),
+          ],
+          fake.env,
+        );
+        expect(result.exitCode).toBe(0);
+        const data = (json ? JSON.parse(result.stdout) : decode(result.stdout.trimEnd())) as Record<
+          string,
+          unknown
+        >;
+        if (previous !== undefined) expect(withoutTime(data)).toEqual(withoutTime(previous));
+        previous = data;
+        expect(fake.vars()).toMatchObject({
+          other: "running",
+          otherData: "present",
+          current: command === "start" ? "running" : "stopped",
+        });
+        if (command === "start")
+          expect(data.app).toMatchObject({ pid: 8235, activity: ".MainActivity" });
+        if (command === "stop") expect(data.ok).toMatch(/pid 8235 gone/);
+        if (command === "clear") expect(data.confirmed_by).toEqual(["pm clear", "run-as"]);
+        expectClean(fake);
+        fake.cleanup();
+      }
+    },
+  );
+
+  it.each(["start", "stop", "clear"])(
+    "does not %s a package installed only for another user",
+    async (command) => {
+      const f = device({ [CURRENT_USER]: { stdout: "10\n" }, [PACKAGE]: INSTALLED });
+      const { toon, data } = await both(["app", command, "dev.probe", "--device", SERIAL], f);
+      expect(toon.exitCode).toBe(1);
+      expect(data).toMatchObject({
+        code: "APP_NOT_INSTALLED",
+        help: [`Run \`adb-axi app list --grep probe --device ${SERIAL}\` to find the package`],
+      });
+      expect(shellCommands(f)).toEqual(twice([CURRENT_USER, PACKAGE]));
+      expectClean(f);
+    },
+  );
+
+  it.each([
+    ["WAIT_TIMEOUT", { stdout: "Status: timeout\n" }, false],
+    ["WAIT_TIMEOUT", { delayMs: 5000 }, false],
+    ["STOP_FAILED", AM_START.cold, true],
+    ["APP_DIED_ON_START", AM_START.cold, false],
+    ["REMOTE_EXIT", { stderr: "Permission denied\n", exit: 1 }, false],
+    ["ACTIVITY_NOT_FOUND", AM_START.missingActivity, false],
+  ] as const)(
+    "preserves activity, fresh mode and device for %s",
+    async (code, response, stopFails) => {
+      const f = device({
+        [PACKAGE]: INSTALLED,
+        [FORCE_STOP]: {},
+        [PIDOF]: stopFails ? PROBE_RUNNING : PROBE_STOPPED,
+        [PROCESSES]: stopFails ? PROCESS_RUNNING : {},
+        [FOREGROUND]: LAUNCHER_FRONT,
+        [startOf(".Editor")]: response,
+      });
+      const { toon, data } = await both(
+        [
+          "app",
+          "start",
+          "dev.probe",
+          "--activity",
+          ".Editor",
+          "--fresh",
+          "--device",
+          SERIAL,
+          "--timeout",
+          "1s",
+        ],
+        f,
+      );
+      expect(toon.exitCode).toBe(1);
+      expect(data.code).toBe(code);
+      const help = data.help as string[];
+      expect(help.every((line) => line.includes(`--device ${SERIAL}`))).toBe(true);
+      if (["WAIT_TIMEOUT", "STOP_FAILED"].includes(code))
+        expect(help).toContain(
+          `Run \`adb-axi app start dev.probe/.Editor --fresh --device ${SERIAL} --timeout 30s\` to give it longer`,
+        );
+      if (code === "APP_DIED_ON_START")
+        expect(help).toContain(
+          `Run \`adb-axi app start dev.probe/.Editor --fresh --device ${SERIAL}\` to try a cold start`,
+        );
+      expectClean(f);
+    },
+  );
+
+  it.each([0, 10])(
+    "does not treat another profile's activity or process as user %s liveness",
+    async (userId) => {
+      const other = userId === 0 ? 10 : 0;
+      const start = START.replace("--user 0", `--user ${userId}`);
+      const f = device({
+        [CURRENT_USER]: { stdout: `${userId}\n` },
+        [PACKAGE]: {
+          stdout:
+            "Packages:\n  Package [dev.probe] (abc):\n    appId=10213\n    User 0: installed=true hidden=false\n    User 10: installed=true hidden=false\n",
+        },
+        [start]: AM_START.cold,
+        [PROCESSES]: {
+          stdout: `  *APP* UID ${other * 100000 + 10213} ProcessRecord{abc 9001:dev.probe/u${other}a213}\n`,
+        },
+        [FOREGROUND]: {
+          stdout: `  ResumedActivity: ActivityRecord{abc u${other} dev.probe/.MainActivity t8}\n`,
+        },
+      });
+      const { toon, data } = await both(["app", "start", "dev.probe/.MainActivity"], f);
+      expect(toon.exitCode).toBe(1);
+      expect(data).toMatchObject({
+        code: "APP_DIED_ON_START",
+        last: { state: "stopped", pid: "-", foreground: "-" },
+      });
+      expectClean(f);
+    },
+  );
+
+  it("keeps stop's no-op and force-stop scoped when only another profile is running", async () => {
+    const f = device({
+      [PACKAGE]: INSTALLED,
+      [PIDOF]: { stdout: "9001\n" },
+      [FORCE_STOP]: {},
+      [PROCESSES]: { stdout: "  *APP* UID 1010213 ProcessRecord{abc 9001:dev.probe/u10a213}\n" },
+    });
+    const { toon, data } = await both(["app", "stop", "dev.probe"], f);
+    expect(toon.exitCode).toBe(0);
+    expect(data).toEqual({ ok: "stop dev.probe -> already not running (no-op)" });
+    expect(shellCommands(f)).toEqual(twice([CURRENT_USER, PACKAGE, PIDOF, PROCESSES, FORCE_STOP]));
+    expectClean(f);
+  });
+
+  it.each([
+    [CURRENT_USER, "unknown\n", "reading the current Android user"],
+    [RESOLVE, "unexpected\n", "resolving the launcher activity of dev.probe"],
+  ])("rejects unreadable output from %s without mutating", async (command, stdout, step) => {
+    const f = device({ [PACKAGE]: INSTALLED, [command]: { stdout } });
+    const { toon, data } = await both(["app", "start", "dev.probe", "--fresh"], f);
+    expect(toon.exitCode).toBe(1);
+    expect(data).toMatchObject({ code: "INVALID_OUTPUT", step });
+    expect(shellCommands(f)).not.toContain(FORCE_STOP);
+    expect(shellCommands(f)).not.toContain(START);
+    expectClean(f);
+  });
+
+  it("preserves an explicit activity and environment device in cold-start help", async () => {
+    const f = liveDevice(AM_START.hot, "running");
+    f.env.ANDROID_SERIAL = SERIAL;
+    const { data } = await both(["app", "start", "dev.probe/.MainActivity"], f);
+    expect(data.help).toEqual([
+      `Run \`adb-axi app start dev.probe/.MainActivity --device ${SERIAL} --fresh\` to kill the process and cold-start`,
+    ]);
+    expectClean(f);
   });
 });
 
@@ -724,6 +1137,14 @@ describe("help for the shipped app lifecycle commands", () => {
       .filter((command) => !command.shipped)
       .map((command) => `adb-axi ${command.path.join(" ")}`);
     expect(listed.filter((command) => unshipped.includes(command))).toEqual([]);
+    expect(f.calls()).toEqual([]);
+  });
+
+  it("describes the full-output escape for clear errors", async () => {
+    const f = device({});
+    const clear = await runCli(["app", "clear", "--help"], f.env);
+    expect(clear.exitCode).toBe(0);
+    expect(clear.stdout).toContain("--full");
     expect(f.calls()).toEqual([]);
   });
 

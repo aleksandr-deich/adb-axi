@@ -1,7 +1,8 @@
 import type { AdbClient } from "../../adb/run.js";
 import { parseDumpsysPackage, type PackageInfo } from "../../android/packages.js";
 import { pidof } from "../../android/pidof.js";
-import { readShell, type ReadOptions } from "../../android/read.js";
+import { readProcesses, type ProcessRecord } from "../../android/processes.js";
+import { invalidOutput, readShell, type ReadOptions } from "../../android/read.js";
 import { AdbAxiError } from "../../core/errors.js";
 import { commandLine, runHint } from "../../core/output.js";
 import { poll } from "../../core/poll.js";
@@ -13,6 +14,37 @@ import { readOptions, targetSerial, UNKNOWN } from "./shared.js";
 export interface InstalledPackage {
   info: PackageInfo;
   dump: string;
+  userId: number;
+}
+
+export function lifecycleCommand(context: CommandContext, args: string[]): string[] {
+  const device = context.flags.device ?? context.env.ANDROID_SERIAL;
+  return typeof device === "string" && device !== "" ? [...args, "--device", device] : args;
+}
+
+export async function packageProcesses(
+  context: CommandContext,
+  pkg: string,
+  userId: number,
+): Promise<ProcessRecord[]> {
+  const processes = await readProcesses(
+    context.adb(),
+    targetSerial(context),
+    pkg,
+    readOptions(context),
+  );
+  return processes.filter((process) => Math.floor(process.uid / 100000) === userId);
+}
+
+export async function mainPids(
+  context: CommandContext,
+  pkg: string,
+  userId: number,
+): Promise<number[]> {
+  const pids = await pidof(context.adb(), targetSerial(context), pkg, readOptions(context));
+  if (pids.length === 0) return pids;
+  const processes = await packageProcesses(context, pkg, userId);
+  return pids.filter((pid) => processes.some((process) => process.pid === pid));
 }
 
 /**
@@ -23,6 +55,18 @@ export async function requireInstalled(
   context: CommandContext,
   pkg: string,
 ): Promise<InstalledPackage> {
+  const current = await readShell(
+    context.adb(),
+    targetSerial(context),
+    "am get-current-user",
+    "reading the current Android user",
+    readOptions(context),
+  );
+  const user = current.stdout.trim();
+  if (!/^\d+$/.test(user) || !Number.isSafeInteger(Number(user))) {
+    throw invalidOutput("reading the current Android user", current.stdout);
+  }
+  const userId = Number(user);
   const result = await readShell(
     context.adb(),
     targetSerial(context),
@@ -30,16 +74,21 @@ export async function requireInstalled(
     `reading package ${pkg}`,
     readOptions(context),
   );
-  const info = parseDumpsysPackage(result.stdout, pkg);
+  const info = parseDumpsysPackage(result.stdout, pkg, userId);
   if (info === null || !info.installed) {
     throw new AdbAxiError("APP_NOT_INSTALLED", `${pkg} is not installed on this device`, {
       help: [
-        runHint(["app", "list", "--grep", pkg.split(".").at(-1) ?? pkg], "to find the package"),
-        ...(appInstall.shipped ? [runHint(["app", "install", "<apk>"], "to install it")] : []),
+        runHint(
+          lifecycleCommand(context, ["app", "list", "--grep", pkg.split(".").at(-1) ?? pkg]),
+          "to find the package",
+        ),
+        ...(appInstall.shipped
+          ? [runHint(lifecycleCommand(context, ["app", "install", "<apk>"]), "to install it")]
+          : []),
       ],
     });
   }
-  return { info, dump: result.stdout };
+  return { info, dump: result.stdout, userId };
 }
 
 /** `am force-stop` prints nothing and exits 0 whether or not anything was running. */
@@ -47,9 +96,16 @@ export async function forceStop(
   adb: AdbClient,
   serial: string,
   pkg: string,
+  userId: number,
   options: ReadOptions,
 ): Promise<void> {
-  await readShell(adb, serial, `am force-stop ${pkg}`, `force-stopping ${pkg}`, options);
+  await readShell(
+    adb,
+    serial,
+    `am force-stop --user ${userId} ${pkg}`,
+    `force-stopping ${pkg}`,
+    options,
+  );
 }
 
 export type ExitWait = { gone: true } | { gone: false; last: number[] | null };
@@ -59,17 +115,16 @@ export type ExitWait = { gone: true } | { gone: false; last: number[] | null };
  * off by the deadline ends the wait; the last full observation is the evidence.
  */
 export async function waitForExit(
-  adb: AdbClient,
-  serial: string,
-  pkg: string,
   context: CommandContext,
+  pkg: string,
+  userId: number,
 ): Promise<ExitWait> {
   let last: number[] | null = null;
   const result = await poll({
     timeoutMs: context.deadline.remainingMs(),
     check: async () => {
       try {
-        last = await pidof(adb, serial, pkg, readOptions(context));
+        last = await mainPids(context, pkg, userId);
       } catch (error) {
         if (error instanceof AdbAxiError && error.code === "TIMEOUT") {
           return { done: false, last };
@@ -90,6 +145,7 @@ export interface StopStep {
 
 /** `STOP_FAILED`: the process outlived the step's deadline. */
 export function stopFailed(
+  context: CommandContext,
   pkg: string,
   last: number[] | null,
   timeoutMs: number,
@@ -104,7 +160,10 @@ export function stopFailed(
       fields: { last: { pid } },
       help: [
         runHint([...after.command, "--timeout", "30s"], "to give it longer"),
-        runHint(["app", "info", pkg], "for its pid and foreground state"),
+        runHint(
+          lifecycleCommand(context, ["app", "info", pkg]),
+          "for its pid and foreground state",
+        ),
       ],
     },
   );

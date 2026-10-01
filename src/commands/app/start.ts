@@ -2,13 +2,12 @@ import type { AdbClient } from "../../adb/run.js";
 import { runShell } from "../../adb/shell.js";
 import {
   declaredActivities,
-  launcherActivity,
+  resolveLauncherActivity,
   parseActivityFilters,
 } from "../../android/activities.js";
 import { parseAmStart, wasRecreated, type AmStart } from "../../android/amstart.js";
 import { assertPackageName, type ActivityRecord } from "../../android/component.js";
 import { readForeground } from "../../android/foreground.js";
-import { pidof } from "../../android/pidof.js";
 import { invalidOutput } from "../../android/read.js";
 import { AdbAxiError } from "../../core/errors.js";
 import { okLine, runHint, type Output } from "../../core/output.js";
@@ -16,7 +15,15 @@ import { poll } from "../../core/poll.js";
 import { logsCrash } from "../logs/crash.js";
 import { defineCommand } from "../define.js";
 import type { CommandContext } from "../types.js";
-import { formatDuration, forceStop, requireInstalled, stopFailed, waitForExit } from "./process.js";
+import {
+  formatDuration,
+  forceStop,
+  lifecycleCommand,
+  packageProcesses,
+  requireInstalled,
+  stopFailed,
+  waitForExit,
+} from "./process.js";
 import { readOptions, targetSerial, UNKNOWN } from "./shared.js";
 
 /**
@@ -57,31 +64,38 @@ export const appStart = defineCommand({
     const serial = targetSerial(context);
     const adb = context.adb();
 
-    const { dump } = await requireInstalled(context, pkg);
+    const fresh = context.flags.fresh === true;
+    const command = lifecycleCommand(context, [
+      "app",
+      "start",
+      requested === null ? pkg : `${pkg}/${requested}`,
+      ...(fresh ? ["--fresh"] : []),
+    ]);
+    const { dump, userId } = await requireInstalled(context, pkg);
     const filters = parseActivityFilters(dump);
-    const activity = requested ?? launcherActivity(filters, pkg);
+    const activity =
+      requested ?? (await resolveLauncherActivity(adb, serial, pkg, userId, readOptions(context)));
     if (activity === null) {
-      throw activityNotFound(pkg, null, declaredActivities(filters, pkg));
+      throw activityNotFound(context, pkg, null, declaredActivities(filters, pkg));
     }
 
-    const fresh = context.flags.fresh === true;
     if (fresh) {
-      await forceStop(adb, serial, pkg, readOptions(context));
-      const exit = await waitForExit(adb, serial, pkg, context);
+      await forceStop(adb, serial, pkg, userId, readOptions(context));
+      const exit = await waitForExit(context, pkg, userId);
       if (!exit.gone) {
-        throw stopFailed(pkg, exit.last, context.timeoutMs, {
-          command: ["app", "start", requested === null ? pkg : `${pkg}/${requested}`, "--fresh"],
+        throw stopFailed(context, pkg, exit.last, context.timeoutMs, {
+          command,
           step: "am force-stop",
         });
       }
     }
 
-    const start = await amStart(context, adb, serial, pkg, activity, () =>
+    const start = await amStart(context, adb, serial, pkg, activity, userId, command, () =>
       declaredActivities(filters, pkg),
     );
-    const settled = await settle(context, adb, serial, pkg);
-    if (settled.state === "stopped") throw diedOnStart(pkg, settled);
-    return report(pkg, activity, fresh, start, settled);
+    const settled = await settle(context, adb, serial, pkg, userId);
+    if (settled.state === "stopped") throw diedOnStart(context, pkg, settled, command);
+    return report(context, pkg, activity, fresh, start, settled, command);
   },
 });
 
@@ -93,11 +107,23 @@ function startTarget(context: CommandContext): { pkg: string; activity: string |
   const fromTarget = slash === -1 ? null : raw.slice(slash + 1);
   const fromFlag = typeof context.flags.activity === "string" ? context.flags.activity : null;
   assertPackageName(pkg);
-  if (fromTarget !== null && fromFlag !== null && fromTarget !== fromFlag) {
+  if (fromTarget !== null && fromFlag !== null) {
     throw new AdbAxiError(
       "VALIDATION_ERROR",
       `the activity is given twice, as ${fromTarget} and as --activity ${fromFlag}`,
-      { help: [runHint(["app", "start", `${pkg}/${fromFlag}`], "naming the activity once")] },
+      {
+        help: [
+          runHint(
+            lifecycleCommand(context, [
+              "app",
+              "start",
+              `${pkg}/${fromFlag}`,
+              ...(context.flags.fresh === true ? ["--fresh"] : []),
+            ]),
+            "naming the activity once",
+          ),
+        ],
+      },
     );
   }
   const activity = fromTarget ?? fromFlag;
@@ -119,6 +145,8 @@ async function amStart(
   serial: string,
   pkg: string,
   activity: string,
+  userId: number,
+  command: string[],
   activities: () => string[],
 ): Promise<AmStart> {
   const component = `${pkg}/${activity}`;
@@ -127,7 +155,7 @@ async function amStart(
   let exitCode: number;
   try {
     // Single quotes keep a nested class's `$` away from the device shell.
-    const result = await runShell(adb, serial, `am start -W -n '${component}'`, {
+    const result = await runShell(adb, serial, `am start --user ${userId} -W -n '${component}'`, {
       deadline: context.deadline,
       step,
     });
@@ -135,14 +163,14 @@ async function amStart(
     exitCode = result.exitCode;
   } catch (error) {
     if (error instanceof AdbAxiError && error.code === "TIMEOUT") {
-      throw startTimeout(pkg, context.timeoutMs, { status: "no answer", activity });
+      throw startTimeout(context, pkg, { status: "no answer", activity }, command);
     }
     throw error;
   }
 
   const start = parseAmStart(output);
   if (start.error?.classNotFound === true) {
-    throw activityNotFound(pkg, activity, activities());
+    throw activityNotFound(context, pkg, activity, activities());
   }
   if (start.error !== null || exitCode !== 0) {
     throw new AdbAxiError("REMOTE_EXIT", `${step} failed: the activity manager refused it`, {
@@ -151,15 +179,20 @@ async function amStart(
         exit: exitCode,
         detail: start.error?.detail ?? output.trim().slice(0, 200),
       },
-      help: [runHint(["app", "info", pkg], "to check the package")],
+      help: [runHint(lifecycleCommand(context, ["app", "info", pkg]), "to check the package")],
     });
   }
   if (start.status === null) throw invalidOutput(step, output);
   if (start.status === "timeout") {
-    throw startTimeout(pkg, context.timeoutMs, {
-      status: "timeout",
-      activity: start.activity?.activity ?? activity,
-    });
+    throw startTimeout(
+      context,
+      pkg,
+      {
+        status: "timeout",
+        activity: start.activity?.activity ?? activity,
+      },
+      command,
+    );
   }
   return start;
 }
@@ -181,14 +214,16 @@ async function settle(
   adb: AdbClient,
   serial: string,
   pkg: string,
+  userId: number,
 ): Promise<Seen> {
   const result = await poll<Seen, Seen>({
     timeoutMs: Math.min(SETTLE_MS, context.deadline.remainingMs()),
     check: async () => {
-      const pids = await pidof(adb, serial, pkg, readOptions(context));
-      const front = await readForeground(adb, serial, readOptions(context));
-      const pid = pids[0] ?? UNKNOWN;
-      const state = front?.package === pkg ? "foreground" : pid === UNKNOWN ? "stopped" : "running";
+      const processes = await packageProcesses(context, pkg, userId);
+      const front = await readForeground(adb, serial, { ...readOptions(context), userId });
+      const pid =
+        (processes.find((process) => process.process === pkg) ?? processes[0])?.pid ?? UNKNOWN;
+      const state = pid === UNKNOWN ? "stopped" : front?.package === pkg ? "foreground" : "running";
       const seen: Seen = { state, pid, front };
       return state === "running" ? { done: false, last: seen } : { done: true, value: seen };
     },
@@ -198,11 +233,13 @@ async function settle(
 }
 
 function report(
+  context: CommandContext,
   pkg: string,
   activity: string,
   fresh: boolean,
   start: AmStart,
   settled: Seen,
+  command: string[],
 ): Output {
   const recreated = wasRecreated(start);
   const inFront = settled.state === "foreground";
@@ -220,7 +257,7 @@ function report(
     return {
       ok: okLine("start", pkg, `running, ${settled.front?.package ?? "nothing"} in front`),
       app,
-      help: [runHint(["app", "current"], "to see what is in front")],
+      help: [runHint(lifecycleCommand(context, ["app", "current"]), "to see what is in front")],
     };
   }
   return {
@@ -229,7 +266,7 @@ function report(
     ...(recreated || fresh
       ? {}
       : {
-          help: [runHint(["app", "start", pkg, "--fresh"], "to kill the process and cold-start")],
+          help: [runHint([...command, "--fresh"], "to kill the process and cold-start")],
         }),
   };
 }
@@ -248,6 +285,7 @@ function how(start: AmStart, recreated: boolean): string {
 }
 
 function activityNotFound(
+  context: CommandContext,
   pkg: string,
   activity: string | null,
   activities: readonly string[],
@@ -259,40 +297,60 @@ function activityNotFound(
     fields: { activities: [...activities] },
     help: [
       first === undefined
-        ? runHint(["app", "start", `${pkg}/<activity>`], "naming an activity of the app")
-        : runHint(["app", "start", `${pkg}/${first}`], "to start a listed activity"),
+        ? runHint(
+            lifecycleCommand(context, ["app", "start", `${pkg}/<activity>`]),
+            "naming an activity of the app",
+          )
+        : runHint(
+            lifecycleCommand(context, ["app", "start", `${pkg}/${first}`]),
+            "to start a listed activity",
+          ),
     ],
   });
 }
 
 function startTimeout(
+  context: CommandContext,
   pkg: string,
-  timeoutMs: number,
   last: { status: string; activity: string },
+  command: string[],
 ): AdbAxiError {
   return new AdbAxiError(
     "WAIT_TIMEOUT",
-    `${pkg} did not finish launching within ${formatDuration(timeoutMs)}`,
+    `${pkg} did not finish launching within ${formatDuration(context.timeoutMs)}`,
     {
       fields: { last },
       help: [
-        runHint(["app", "current"], "to see what is in front"),
-        runHint(["app", "start", pkg, "--timeout", "30s"], "to give it longer"),
+        runHint(lifecycleCommand(context, ["app", "current"]), "to see what is in front"),
+        runHint([...command, "--timeout", "30s"], "to give it longer"),
       ],
     },
   );
 }
 
-function diedOnStart(pkg: string, last: Seen): AdbAxiError {
+function diedOnStart(
+  context: CommandContext,
+  pkg: string,
+  last: Seen,
+  command: string[],
+): AdbAxiError {
   return new AdbAxiError("APP_DIED_ON_START", `${pkg} has no process right after its start`, {
     fields: {
       last: { state: last.state, pid: last.pid, foreground: last.front?.package ?? UNKNOWN },
     },
     help: [
       ...(logsCrash.shipped
-        ? [runHint(["logs", "crash", "--pkg", pkg, "--since", "1m"], "for the crash")]
+        ? [
+            runHint(
+              lifecycleCommand(context, ["logs", "crash", "--pkg", pkg, "--since", "1m"]),
+              "for the crash",
+            ),
+          ]
         : []),
-      runHint(["app", "start", pkg, "--fresh"], "to try a cold start"),
+      runHint(
+        context.flags.fresh === true ? command : [...command, "--fresh"],
+        "to try a cold start",
+      ),
     ],
   });
 }

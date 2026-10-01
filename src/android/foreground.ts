@@ -23,11 +23,12 @@ const RESUMED_LINES: readonly RegExp[] = [
  * The resumed (foreground) activity. A launcher in front is an answer like any other app.
  * `null` when nothing is resumed, for example while the screen is off.
  */
-export function parseForeground(stdout: string): ActivityRecord | null {
+export function parseForeground(stdout: string, userId?: number): ActivityRecord | null {
   for (const pattern of RESUMED_LINES) {
-    const line = pattern.exec(stdout)?.[1];
-    const record = line === undefined ? null : parseActivityRecord(line);
-    if (record !== null) return record;
+    for (const match of stdout.matchAll(new RegExp(pattern.source, "gm"))) {
+      const record = parseActivityRecord(match[1] ?? "", userId);
+      if (record !== null) return record;
+    }
   }
   return null;
 }
@@ -35,7 +36,7 @@ export function parseForeground(stdout: string): ActivityRecord | null {
 export async function readForeground(
   adb: AdbClient,
   serial: string,
-  options: ReadOptions,
+  options: ReadOptions & { userId?: number },
 ): Promise<ActivityRecord | null> {
   const result = await readShell(
     adb,
@@ -44,5 +45,5 @@ export async function readForeground(
     "reading the foreground activity",
     options,
   );
-  return parseForeground(result.stdout);
+  return parseForeground(result.stdout, options.userId);
 }

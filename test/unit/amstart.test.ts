@@ -1,11 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import {
-  declaredActivities,
-  launcherActivity,
-  parseActivityFilters,
-} from "../../src/android/activities.js";
+import { declaredActivities, parseActivityFilters } from "../../src/android/activities.js";
 import { parseAmStart, wasRecreated } from "../../src/android/amstart.js";
 import { FIXTURES_DIR } from "../fake-adb/harness.js";
 
@@ -132,9 +128,8 @@ describe("parseAmStart", () => {
 });
 
 describe("activity resolver table", () => {
-  it.each(LEVELS)("finds the probe's launcher activity on %s", (group) => {
+  it.each(LEVELS)("lists the probe's declared activity on %s", (group) => {
     const filters = parseActivityFilters(fixture(group, "dumpsys-package-debug.txt"));
-    expect(launcherActivity(filters, "dev.probe")).toBe(".MainActivity");
     expect(declaredActivities(filters, "dev.probe")).toEqual([".MainActivity"]);
   });
 
@@ -160,17 +155,16 @@ describe("activity resolver table", () => {
       "",
     ].join("\n");
     const filters = parseActivityFilters(dump);
-    expect(launcherActivity(filters, "com.example.notes")).toBe(".MainActivity");
     expect(declaredActivities(filters, "com.example.notes")).toEqual([
       ".EditorActivity",
       ".MainActivity",
     ]);
-    expect(launcherActivity(filters, "com.example.other")).toBeNull();
+    expect(declaredActivities(filters, "com.example.other")).toEqual([]);
   });
 
   it("finds no launcher activity in a dump without the table", () => {
     const filters = parseActivityFilters(fixture("captured/35", "dumpsys-package-absent.txt"));
     expect(filters).toEqual([]);
-    expect(launcherActivity(filters, "dev.probe")).toBeNull();
+    expect(declaredActivities(filters, "dev.probe")).toEqual([]);
   });
 });

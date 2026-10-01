@@ -1,10 +1,11 @@
+import { runShell } from "../../adb/shell.js";
 import { assertPackageName } from "../../android/component.js";
 import { invalidOutput, readShell } from "../../android/read.js";
 import { AdbAxiError } from "../../core/errors.js";
 import { okLine, runHint } from "../../core/output.js";
 import { defineCommand } from "../define.js";
 import type { CommandContext } from "../types.js";
-import { requireInstalled, stopFailed, waitForExit } from "./process.js";
+import { lifecycleCommand, requireInstalled, stopFailed, waitForExit } from "./process.js";
 import { readOptions, targetSerial } from "./shared.js";
 
 /** How many of the files left after a clear the error lists. */
@@ -16,6 +17,13 @@ export const appClear = defineCommand({
   positionals: [
     { name: "pkg", description: "Package name, for example com.example.notes", required: true },
   ],
+  flags: [
+    {
+      name: "--full",
+      type: "boolean",
+      description: "List all files left if data verification fails",
+    },
+  ],
   examples: ["adb-axi app clear com.example.notes"],
   shipped: true,
   run: async (context) => {
@@ -24,24 +32,35 @@ export const appClear = defineCommand({
     const serial = targetSerial(context);
     const adb = context.adb();
 
-    const { info } = await requireInstalled(context, pkg);
+    const { info, userId } = await requireInstalled(context, pkg);
 
     // `pm clear` waits for the system to report the data cleared, then prints `Success`;
     // a refusal prints `Failed` and exits 1 (AOSP `PackageManagerShellCommand.runClear`).
     // Clearing also force-stops the app, which the pid check below verifies.
     const step = `clearing the data of ${pkg}`;
-    const result = await readShell(adb, serial, `pm clear ${pkg}`, step, readOptions(context));
+    const result = await readShell(
+      adb,
+      serial,
+      `pm clear --user ${userId} ${pkg}`,
+      step,
+      readOptions(context),
+    );
     if (result.stdout.trim() !== "Success") throw invalidOutput(step, result.stdout);
 
-    const exit = await waitForExit(adb, serial, pkg, context);
+    const exit = await waitForExit(context, pkg, userId);
     if (!exit.gone) {
-      throw stopFailed(pkg, exit.last, context.timeoutMs, {
-        command: ["app", "clear", pkg],
+      throw stopFailed(context, pkg, exit.last, context.timeoutMs, {
+        command: lifecycleCommand(context, [
+          "app",
+          "clear",
+          pkg,
+          ...(context.flags.full === true ? ["--full"] : []),
+        ]),
         step: "pm clear",
       });
     }
 
-    const listed = info.debuggable && (await checkNoFiles(context, pkg));
+    const listed = info.debuggable && (await checkNoFiles(context, pkg, userId));
     return {
       ok: okLine("clear", pkg, "data cleared, process stopped"),
       confirmed_by: listed ? ["pm clear", "run-as"] : ["pm clear"],
@@ -54,35 +73,43 @@ export const appClear = defineCommand({
  * `files`, ...). An empty `cache` or `code_cache` directory is not data; any file is.
  * Only `run-as` can list them, so a refusal means the files were not listed (`false`).
  */
-async function checkNoFiles(context: CommandContext, pkg: string): Promise<boolean> {
-  let stdout: string;
-  try {
-    const result = await readShell(
-      context.adb(),
-      targetSerial(context),
-      `run-as ${pkg} find . -type f`,
-      `listing the data files of ${pkg}`,
-      readOptions(context),
-    );
-    stdout = result.stdout;
-  } catch (error) {
-    if (error instanceof AdbAxiError && error.code === "REMOTE_EXIT") return false;
-    throw error;
-  }
-  const files = stdout
+async function checkNoFiles(
+  context: CommandContext,
+  pkg: string,
+  userId: number,
+): Promise<boolean> {
+  const result = await runShell(
+    context.adb(),
+    targetSerial(context),
+    `run-as ${pkg} --user ${userId} find . -type f`,
+    { deadline: context.deadline, step: `listing the data files of ${pkg}` },
+  );
+  const files = result.stdout
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter((line) => line !== "")
     .map((line) => line.replace(/^\.\//, ""));
-  if (files.length === 0) return true;
+  if (files.length === 0) return result.exitCode === 0;
+  const full = context.flags.full === true;
   throw new AdbAxiError(
     "CLEAR_FAILED",
     `${pkg} still has ${files.length === 1 ? "1 file" : `${files.length} files`} in its data directory after pm clear`,
     {
-      fields: { left: { count: files.length, files: files.slice(0, LISTED_FILES) } },
+      fields: { left: { count: files.length, files: full ? files : files.slice(0, LISTED_FILES) } },
       help: [
-        runHint(["app", "clear", pkg], "to clear it again"),
-        runHint(["app", "info", pkg], "for its data size"),
+        ...(!full && files.length > LISTED_FILES
+          ? [
+              runHint(
+                lifecycleCommand(context, ["app", "clear", pkg, "--full"]),
+                "to list all remaining files",
+              ),
+            ]
+          : []),
+        runHint(
+          lifecycleCommand(context, ["app", "clear", pkg, ...(full ? ["--full"] : [])]),
+          "to clear it again",
+        ),
+        runHint(lifecycleCommand(context, ["app", "info", pkg]), "for its data size"),
       ],
     },
   );

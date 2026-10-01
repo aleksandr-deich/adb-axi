@@ -1,9 +1,16 @@
 import { assertPackageName } from "../../android/component.js";
-import { pidof } from "../../android/pidof.js";
 import { noop, okLine } from "../../core/output.js";
 import { realClock } from "../../core/poll.js";
 import { defineCommand } from "../define.js";
-import { forceStop, pidLabel, requireInstalled, stopFailed, waitForExit } from "./process.js";
+import {
+  forceStop,
+  lifecycleCommand,
+  mainPids,
+  pidLabel,
+  requireInstalled,
+  stopFailed,
+  waitForExit,
+} from "./process.js";
 import { readOptions, targetSerial } from "./shared.js";
 
 export const appStop = defineCommand({
@@ -20,18 +27,18 @@ export const appStop = defineCommand({
     const serial = targetSerial(context);
     const adb = context.adb();
 
-    await requireInstalled(context, pkg);
-    const before = await pidof(adb, serial, pkg, readOptions(context));
+    const { userId } = await requireInstalled(context, pkg);
+    const before = await mainPids(context, pkg, userId);
     const started = realClock.now();
-    await forceStop(adb, serial, pkg, readOptions(context));
+    await forceStop(adb, serial, pkg, userId, readOptions(context));
     if (before.length === 0) {
       return { ok: okLine("stop", pkg, noop("already not running")) };
     }
 
-    const exit = await waitForExit(adb, serial, pkg, context);
+    const exit = await waitForExit(context, pkg, userId);
     if (!exit.gone) {
-      throw stopFailed(pkg, exit.last, context.timeoutMs, {
-        command: ["app", "stop", pkg],
+      throw stopFailed(context, pkg, exit.last, context.timeoutMs, {
+        command: lifecycleCommand(context, ["app", "stop", pkg]),
         step: "am force-stop",
       });
     }
