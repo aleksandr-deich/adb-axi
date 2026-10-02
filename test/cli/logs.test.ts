@@ -483,7 +483,7 @@ describe("logs", () => {
         },
       });
       const { data } = await both(["logs"], f);
-      expect(data.shown).toBe("50 of 61 lines");
+      expect(data.shown).toBe("50 of 62 lines");
       expect(data.help).toEqual([
         "Run the same command with `--full` to write all 62 lines to a file",
       ]);

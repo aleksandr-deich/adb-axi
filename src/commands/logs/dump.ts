@@ -101,7 +101,7 @@ export const logsDump = defineCommand({
         tag: row.tag,
         message: displayMessage(row),
       })),
-      ...(shown.truncated ? { shown: shownLine(shown) } : {}),
+      ...(shown.truncated ? { shown: shownLine({ ...shown, total: lines.length }) } : {}),
       ...(full
         ? {
             full: writeFullOutput(
