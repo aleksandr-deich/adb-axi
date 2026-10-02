@@ -392,7 +392,7 @@ describe("app start", () => {
       [
         "error: dev.probe.missing is not installed on this device",
         "code: APP_NOT_INSTALLED",
-        "help[1]: Run `adb-axi app list --grep missing` to find the package",
+        "help[2]: Run `adb-axi app list --grep missing` to find the package,Run `adb-axi app install <apk>` to install it",
         "",
       ].join("\n"),
     );
@@ -1248,7 +1248,10 @@ describe("lifecycle review regressions", () => {
       expect(toon.exitCode).toBe(1);
       expect(data).toMatchObject({
         code: "APP_NOT_INSTALLED",
-        help: [`Run \`adb-axi app list --grep probe --device ${SERIAL}\` to find the package`],
+        help: [
+          `Run \`adb-axi app list --grep probe --device ${SERIAL}\` to find the package`,
+          `Run \`adb-axi app install <apk> --device ${SERIAL}\` to install it`,
+        ],
       });
       expect(shellCommands(f)).toEqual(twice([CURRENT_USER, PACKAGE]));
       expectClean(f);
