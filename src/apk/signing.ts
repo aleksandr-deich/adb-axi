@@ -4,7 +4,7 @@ import { ApkError, readU64, type ByteSource } from "./source.js";
 const MAGIC = "APK Sig Block 42";
 /** The block ends with its size (8 bytes) and the magic (16 bytes). */
 const FOOTER_SIZE = 24;
-/** A signing block is a few KB, mostly page-alignment padding; a larger claim is not an APK's. */
+/** Bound host allocation for signing blocks; larger claims leave signer evidence unreadable. */
 const MAX_BLOCK_BYTES = 32 * 1024 * 1024;
 
 const SCHEMES = [

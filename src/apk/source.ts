@@ -1,6 +1,6 @@
 import { closeSync, fstatSync, openSync, readSync } from "node:fs";
 
-/** Bytes of one APK, read at positions so a large file is never loaded whole. */
+/** Positional APK reads; file-backed sources do not require whole-file buffering. */
 export interface ByteSource {
   readonly size: number;
   /** Exactly `length` bytes from `offset`; a range outside the file throws `ApkError`. */

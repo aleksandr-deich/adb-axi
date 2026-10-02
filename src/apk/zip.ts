@@ -9,7 +9,7 @@ const LOCAL_SIGNATURE = 0x04034b50;
 const LOCAL_FIXED_SIZE = 30;
 /** The comment field of the end record is at most 65535 bytes. */
 const MAX_COMMENT = 0xffff;
-/** No real APK has a central directory or an entry we extract beyond this. */
+/** Bound host allocations even when an APK declares malicious directory or entry sizes. */
 const MAX_DIRECTORY_BYTES = 64 * 1024 * 1024;
 export const MAX_ENTRY_BYTES = 64 * 1024 * 1024;
 
