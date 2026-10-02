@@ -628,7 +628,9 @@ describe("logs", () => {
       expect(row).toBeDefined();
       expect(row?.tag?.length).toBeLessThan(tag.length);
       expect(row?.message).toBe("");
-      expect(Buffer.byteLength(`${row?.time},${row?.level},${row?.tag},${row?.message}`)).toBeLessThanOrEqual(4096);
+      expect(
+        Buffer.byteLength(`${row?.time},${row?.level},${row?.tag},${row?.message}`),
+      ).toBeLessThanOrEqual(4096);
       expect(data.shown).toMatch(/^1 of 1 lines, cut at 4096 of \d+ bytes$/);
       const full = await runCli(["logs", "--full"], f.env);
       const path = (decode(full.stdout.trimEnd()) as Record<string, unknown>).full as string;
@@ -651,7 +653,9 @@ describe("logs", () => {
       const row = rowsOf(data)[0];
       expect(row?.message).toBeTruthy();
       expect(row?.tag).toBe("Tag");
-      expect(Buffer.byteLength(`${row?.time},${row?.level},${row?.tag},${row?.message}`)).toBeLessThanOrEqual(4096);
+      expect(
+        Buffer.byteLength(`${row?.time},${row?.level},${row?.tag},${row?.message}`),
+      ).toBeLessThanOrEqual(4096);
       expect(data.shown).toMatch(/^1 of 1 lines, cut at \d+ of \d+ bytes$/);
     });
 
