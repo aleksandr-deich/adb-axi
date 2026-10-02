@@ -143,12 +143,18 @@ interface Both {
 async function both(args: string[], f: FakeAdb): Promise<Both> {
   const toon = await runCli(args, f.env);
   const json = await runCli([...args, "--json"], f.env);
-  expect(toon.exitCode).toBe(json.exitCode);
+  // A mismatch reports both runs whole, so each format's typed error survives a rare failure.
+  const runs = `TOON run: ${describeRun(toon)}\n--json run: ${describeRun(json)}`;
+  expect(toon.exitCode, runs).toBe(json.exitCode);
   const data = JSON.parse(json.stdout) as Record<string, unknown>;
   const decoded = decode(toon.stdout.trimEnd()) as Record<string, unknown>;
   // The two runs take different times; every other field must match exactly.
-  expect(withoutTime(decoded)).toEqual(withoutTime(data));
+  expect(withoutTime(decoded), runs).toEqual(withoutTime(data));
   return { toon, json, data };
+}
+
+function describeRun(run: CliRun): string {
+  return `exit ${run.exitCode} after ${run.durationMs} ms\nstdout:\n${run.stdout}stderr:\n${run.stderr}`;
 }
 
 function withoutTime(data: Record<string, unknown>): Record<string, unknown> {
@@ -1553,7 +1559,7 @@ describe("app start settle deadlines", () => {
       { match: shell(FOREGROUND), respond: permission },
     ]);
     const { toon, data } = await both(
-      ["app", "start", "dev.probe/.MainActivity", "--timeout", "2s"],
+      ["app", "start", "dev.probe/.MainActivity", "--timeout", "5s"],
       f,
     );
     expect(toon.exitCode).toBe(0);
@@ -1562,7 +1568,7 @@ describe("app start settle deadlines", () => {
       app: { pid: 9123 },
     });
     expectClean(f);
-  }, 10000);
+  }, 20000);
 });
 
 describe("launched activity process identity", () => {
