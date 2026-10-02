@@ -1,9 +1,12 @@
 import { decode } from "@toon-format/toon";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { allCommands, REGISTRY } from "../../src/commands/registry.js";
 import { createFakeAdb, type FakeAdb } from "../fake-adb/harness.js";
 import type { Response, Rule } from "../fake-adb/scenario.js";
 import { runCli, type CliRun } from "../helpers/run.js";
+
+// Parity cases run two CLI deadlines sequentially, plus process startup and cleanup.
+vi.setConfig({ testTimeout: 10_000 });
 
 const SERIAL = "emulator-5554";
 const ONE_ONLINE = `List of devices attached\n${SERIAL}          device product:sdk_gphone64_arm64 model:sdk_gphone64_arm64 device:emu64a transport_id:1\n\n`;
@@ -251,14 +254,14 @@ describe("app start", () => {
   it("fails with STOP_FAILED, naming --fresh, when the process outlives the force-stop", async () => {
     const f = device({ [PACKAGE]: INSTALLED, [FORCE_STOP]: {}, [PIDOF]: PROBE_RUNNING });
     const { toon, data } = await both(
-      ["app", "start", "dev.probe", "--fresh", "--timeout", "1s"],
+      ["app", "start", "dev.probe", "--fresh", "--timeout", "3s"],
       f,
     );
     expect(toon.exitCode).toBe(1);
-    expect(toon.durationMs).toBeLessThan(3000);
+    expect(toon.durationMs).toBeLessThan(4000);
     expect(toon.stdout).toBe(
       [
-        "error: dev.probe was still running at the 1 s deadline after am force-stop in `adb-axi app start dev.probe --fresh`",
+        "error: dev.probe was still running at the 3 s deadline after am force-stop in `adb-axi app start dev.probe --fresh`",
         "code: STOP_FAILED",
         "last:",
         "  pid: 8235",
@@ -274,7 +277,7 @@ describe("app start", () => {
   it("names the requested activity in the STOP_FAILED help of --fresh", async () => {
     const f = device({ [PACKAGE]: INSTALLED, [FORCE_STOP]: {}, [PIDOF]: PROBE_RUNNING });
     const { data } = await both(
-      ["app", "start", "dev.probe/.MainActivity", "--fresh", "--timeout", "1s"],
+      ["app", "start", "dev.probe/.MainActivity", "--fresh", "--timeout", "3s"],
       f,
     );
     expect(data).toMatchObject({
@@ -617,12 +620,12 @@ describe("app stop", () => {
 
   it("fails with STOP_FAILED, carrying the pid, when the process outlives the deadline", async () => {
     const f = device({ [PACKAGE]: INSTALLED, [PIDOF]: PROBE_RUNNING, [FORCE_STOP]: {} });
-    const { toon, data } = await both(["app", "stop", "dev.probe", "--timeout", "1s"], f);
+    const { toon, data } = await both(["app", "stop", "dev.probe", "--timeout", "3s"], f);
     expect(toon.exitCode).toBe(1);
-    expect(toon.durationMs).toBeLessThan(3000);
+    expect(toon.durationMs).toBeLessThan(4000);
     expect(toon.stdout).toBe(
       [
-        "error: dev.probe was still running at the 1 s deadline after am force-stop in `adb-axi app stop dev.probe`",
+        "error: dev.probe was still running at the 3 s deadline after am force-stop in `adb-axi app stop dev.probe`",
         "code: STOP_FAILED",
         "last:",
         "  pid: 8235",
@@ -761,11 +764,11 @@ describe("app clear", () => {
       [CLEAR]: { stdoutFile: "captured/35/pm-clear.txt" },
       [PIDOF]: PROBE_RUNNING,
     });
-    const { toon, data } = await both(["app", "clear", "dev.probe", "--timeout", "1s"], f);
+    const { toon, data } = await both(["app", "clear", "dev.probe", "--timeout", "3s"], f);
     expect(toon.exitCode).toBe(1);
     expect(data).toMatchObject({
       error:
-        "dev.probe was still running at the 1 s deadline after pm clear in `adb-axi app clear dev.probe`",
+        "dev.probe was still running at the 3 s deadline after pm clear in `adb-axi app clear dev.probe`",
       code: "STOP_FAILED",
       last: { pid: 8235 },
       help: [
@@ -891,7 +894,7 @@ describe("lifecycle review regressions", () => {
           "dev.probe",
           ...(command === "start" ? ["--activity", ".MainActivity", "--fresh"] : []),
           "--timeout",
-          "1s",
+          "3s",
         ],
         f,
       );
@@ -1259,7 +1262,7 @@ describe("lifecycle review regressions", () => {
           "--device",
           SERIAL,
           "--timeout",
-          "1s",
+          stopFails ? "3s" : "1s",
         ],
         f,
       );
