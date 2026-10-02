@@ -3,7 +3,8 @@ import { parseActivityRecord, type ActivityRecord } from "./component.js";
 import { readShell, type ReadOptions } from "./read.js";
 
 /**
- * Where `dumpsys activity activities` names the resumed activity, first match wins:
+ * Where `dumpsys activity activities` names the resumed activity, the first match for
+ * the requested user (or any user when unscoped) wins:
  * - `  ResumedActivity: `, the top resumed activity, printed by
  *   `ActivityTaskManagerService.dumpActivitiesLocked` on every release from API 29 to 37
  *   (API 29 also prints a display-level ` ResumedActivity:` with no space before the
@@ -21,7 +22,8 @@ const RESUMED_LINES: readonly RegExp[] = [
 
 /**
  * The resumed (foreground) activity. A launcher in front is an answer like any other app.
- * `null` when nothing is resumed, for example while the screen is off.
+ * With `userId`, only that user's records count; omitted means unscoped. `null` when
+ * no matching activity is resumed, for example while the screen is off.
  */
 export function parseForeground(stdout: string, userId?: number): ActivityRecord | null {
   for (const pattern of RESUMED_LINES) {

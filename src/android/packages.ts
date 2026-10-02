@@ -41,13 +41,14 @@ export function parsePackageList(stdout: string): ListedPackage[] {
 export interface PackageInfo {
   package: string;
   /**
-   * A package uninstalled with its data kept (`pm uninstall -k`)
-   * still has a record, with `installed=false`.
+   * Installed for the selected Android user. A package uninstalled with its data kept
+   * (`pm uninstall -k`) still has a record, with `installed=false`.
    */
   installed: boolean;
   versionName: string | null;
   versionCode: number | null;
   debuggable: boolean;
+  /** The selected user's UID, not merely the package's app id. */
   uid: number | null;
   minSdk: number | null;
   targetSdk: number | null;
@@ -60,7 +61,8 @@ export interface PackageInfo {
  *
  * Field names follow AOSP `Settings.dumpPackageLPr`: the app id is `userId=` up to API 30
  * and `appId=` from API 31; flags are `flags=[ DEBUGGABLE HAS_CODE ... ]`; each user has a
- * `User <n>: ... installed=<bool> ...` line.
+ * `User <n>: ... installed=<bool> ...` line. Installation is read for `userId` (default 0)
+ * and is false if that user's line is absent. The UID is `userId * 100000 + appId`.
  */
 export function parsePackageRecords(stdout: string, userId = 0): Map<string, PackageInfo> {
   const records = new Map<string, PackageInfo>();

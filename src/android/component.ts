@@ -53,7 +53,7 @@ export function parseActivityRecord(text: string, userId?: number): ActivityReco
   return parseActivityRecords(text, userId)[0] ?? null;
 }
 
-/** Every activity record in `text`, in the order printed. */
+/** Activity records in printed order, limited to `userId` when supplied. */
 export function parseActivityRecords(text: string, userId?: number): ActivityRecord[] {
   const records: ActivityRecord[] = [];
   for (const match of text.matchAll(ACTIVITY_RECORD)) {

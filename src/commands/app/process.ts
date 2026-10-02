@@ -68,8 +68,9 @@ export async function mainPids(
 }
 
 /**
- * Read `dumpsys package <pkg>` and require the package to be installed: no record, or a
- * record uninstalled with its data kept, is `APP_NOT_INSTALLED`.
+ * Resolve the current Android user once and require installation for that user. No
+ * package record, an absent user record, or an uninstalled record is `APP_NOT_INSTALLED`.
+ * The returned user ID scopes subsequent mutations and observations even if users switch.
  */
 export async function requireInstalled(
   context: CommandContext,
@@ -131,8 +132,10 @@ export async function forceStop(
 export type ExitWait = { gone: true } | { gone: false; last: number[] | null };
 
 /**
- * Poll `pidof` until the package has no process or the command deadline passes. A read cut
- * off by the deadline ends the wait; the last full observation is the evidence.
+ * Poll main PIDs from `pidof`, scoped by kernel-backed `ps` UIDs, until none remain for
+ * the selected user or the command deadline passes. ActivityManager membership is not
+ * exit evidence: its record can disappear before the process dies. A read cut off by
+ * the deadline ends the wait; the last full observation is the evidence.
  */
 export async function waitForExit(
   context: CommandContext,
