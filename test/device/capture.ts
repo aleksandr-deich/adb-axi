@@ -77,6 +77,9 @@ async function run(args: string[], deadlineMs = 30_000): Promise<Run> {
   if (result.kind === "timeout") {
     throw new Error(`adb ${args.join(" ")} passed its ${deadlineMs} ms deadline`);
   }
+  if (result.kind === "output-limit") {
+    throw new Error(`adb ${args.join(" ")} exceeded its output limit`);
+  }
   return {
     argv: ["adb", ...args],
     stdout: result.stdout,
