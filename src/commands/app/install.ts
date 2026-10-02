@@ -18,6 +18,8 @@ import { installFailureError } from "./install-errors.js";
 import { writeInstallRecord, type InstallRecord } from "./install-record.js";
 import { formatVersion, readOptions, targetSerial, UNKNOWN } from "./shared.js";
 
+const MAX_INSTALLED_APK_BYTES = 64 * 1024 * 1024;
+
 export const appInstall = defineCommand({
   path: ["app", "install"],
   summary: "Install an APK, keeping app data, and wait until the new version is live",
@@ -219,6 +221,7 @@ async function decideShortcut(
       ...options,
       step: "reading the installed APK",
       remoteOutput: true,
+      maxOutputBytes: MAX_INSTALLED_APK_BYTES,
     });
     if (bytes.exitCode !== 0)
       return { kind: "skipped", reason: "the installed APK cannot be read" };
@@ -240,6 +243,9 @@ async function decideShortcut(
       ? { kind: "unchanged" }
       : { kind: "skipped", reason: "the APK is signed differently from the installed app" };
   } catch (error) {
+    if (error instanceof AdbAxiError && error.code === "INVALID_OUTPUT") {
+      return { kind: "skipped", reason: "the installed APK evidence exceeds the host read limit" };
+    }
     if (
       error instanceof ApkError ||
       (error instanceof AdbAxiError && error.code === "REMOTE_EXIT")

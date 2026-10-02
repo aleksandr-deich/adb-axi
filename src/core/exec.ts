@@ -10,6 +10,7 @@ export interface ExecOptions {
   cwd?: string;
   /** Bytes written to the child's stdin, which is then closed. Without it stdin is closed at once. */
   input?: string | Uint8Array;
+  maxOutputBytes?: number;
 }
 
 interface ExecCommon {
@@ -24,6 +25,7 @@ export type ExecResult =
   | (ExecCommon & { kind: "exited"; exitCode: number | null; signal: NodeJS.Signals | null })
   /** The deadline passed; the child was killed. Output up to that point is kept. */
   | (ExecCommon & { kind: "timeout" })
+  | (ExecCommon & { kind: "output-limit" })
   /** The child could not be started (for example ENOENT). */
   | (ExecCommon & { kind: "spawn-error"; error: Error });
 
@@ -44,6 +46,8 @@ export function exec(options: ExecOptions): Promise<ExecResult> {
     const stderr: Buffer[] = [];
     let settled = false;
     let timedOut = false;
+    let outputExceeded = false;
+    let outputBytes = 0;
     let drainTimer: NodeJS.Timeout | undefined;
 
     const child = spawn(options.file, [...options.args], {
@@ -79,8 +83,23 @@ export function exec(options: ExecOptions): Promise<ExecResult> {
       Math.max(0, options.deadlineMs),
     );
 
-    child.stdout.on("data", (chunk: Buffer) => stdout.push(chunk));
-    child.stderr.on("data", (chunk: Buffer) => stderr.push(chunk));
+    const collect = (chunks: Buffer[], chunk: Buffer): void => {
+      if (settled || outputExceeded) return;
+      if (
+        options.maxOutputBytes !== undefined &&
+        outputBytes + chunk.length > options.maxOutputBytes
+      ) {
+        outputExceeded = true;
+        stdout.length = 0;
+        stderr.length = 0;
+        child.kill("SIGKILL");
+        return;
+      }
+      outputBytes += chunk.length;
+      chunks.push(chunk);
+    };
+    child.stdout.on("data", (chunk: Buffer) => collect(stdout, chunk));
+    child.stderr.on("data", (chunk: Buffer) => collect(stderr, chunk));
     child.stdin.on("error", () => {
       // The child may exit without reading its input; that is not a failure of the call.
     });
@@ -90,18 +109,22 @@ export function exec(options: ExecOptions): Promise<ExecResult> {
     });
 
     child.on("exit", (exitCode, signal) => {
-      if (timedOut) {
-        finish({ kind: "timeout", ...common() });
+      if (timedOut || outputExceeded) {
+        finish({ kind: timedOut ? "timeout" : "output-limit", ...common() });
         return;
       }
       drainTimer = setTimeout(() => {
-        finish({ kind: "exited", exitCode, signal, ...common() });
+        finish(
+          outputExceeded
+            ? { kind: "output-limit", ...common() }
+            : { kind: "exited", exitCode, signal, ...common() },
+        );
       }, DRAIN_GRACE_MS);
     });
 
     child.on("close", (exitCode: number | null, signal: NodeJS.Signals | null) => {
-      if (timedOut) {
-        finish({ kind: "timeout", ...common() });
+      if (timedOut || outputExceeded) {
+        finish({ kind: timedOut ? "timeout" : "output-limit", ...common() });
         return;
       }
       finish({ kind: "exited", exitCode, signal, ...common() });

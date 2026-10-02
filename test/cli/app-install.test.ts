@@ -1,8 +1,19 @@
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  closeSync,
+  mkdirSync,
+  mkdtempSync,
+  openSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+  writeSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { decode } from "@toon-format/toon";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { readApkFile } from "../../src/apk/index.js";
 import { createFakeAdb, FIXTURES_DIR, type FakeAdb } from "../fake-adb/harness.js";
 import type { Response, Rule } from "../fake-adb/scenario.js";
 import { buildApk, digestOf, withZip64End } from "../helpers/apk-builder.js";
@@ -29,6 +40,7 @@ let APK_CORRUPT: string;
 let APK_ROTATED: string;
 let APK_V31: string;
 let APK_ZIP64: string;
+let APK_OVERSIZED: string;
 let PROBE_APK: string;
 
 beforeAll(() => {
@@ -56,6 +68,20 @@ beforeAll(() => {
     buildApk({ ...notes, signers: { v2: [CERT_A], v3: [CERT_A], v3_1: [CERT_B] } }),
   );
   APK_ZIP64 = write("zip64.apk", withZip64End(buildApk(notes)));
+  const bytes = readFileSync(APK);
+  const directory = bytes.readUInt32LE(bytes.length - 6);
+  const split = directory - Number(bytes.readBigUInt64LE(directory - 24)) - 8;
+  const padding = 65 * 1024 * 1024;
+  const tail = Buffer.from(bytes.subarray(split));
+  tail.writeUInt32LE(directory + padding, tail.length - 6);
+  APK_OVERSIZED = join(apkDir, "oversized.apk");
+  const fd = openSync(APK_OVERSIZED, "w");
+  try {
+    writeSync(fd, bytes.subarray(0, split), 0, split, 0);
+    writeSync(fd, tail, 0, tail.length, split + padding);
+  } finally {
+    closeSync(fd);
+  }
   PROBE_APK = join(FIXTURES_DIR, "apk", "probe-debug.apk");
 });
 afterAll(() => {
@@ -371,6 +397,33 @@ describe("app install", () => {
       }, ["app", "install", APK, "--if-changed"]);
       expect(toon.exitCode).toBe(1);
       expect(data.code).toBe("INSTALL_FAILED_UPDATE_INCOMPATIBLE");
+      expect(calls(fake)).toContain(`install -r ${APK}`);
+      expectClean(fake);
+    });
+
+    it("falls back to installation when current signer evidence exceeds the collection limit", async () => {
+      expect(readApkFile(APK_OVERSIZED)).toMatchObject({
+        package: PKG,
+        versionCode: 57,
+        signers: [digestOf(CERT_A)],
+      });
+      const { toon, data, fake } = await both(
+        () =>
+          world({
+            start: "current",
+            dumps: { current: V57, new: V57 },
+            installedApk: APK_OVERSIZED,
+            rules: [installs(APK)],
+          }),
+        ["app", "install", APK, "--if-changed"],
+      );
+      expect(toon.exitCode).toBe(0);
+      expect(data).toMatchObject({
+        ok: "install com.example.notes -> 1.4.0 (57) with data kept",
+        install: {
+          shortcut: "skipped because the installed APK evidence exceeds the host read limit",
+        },
+      });
       expect(calls(fake)).toContain(`install -r ${APK}`);
       expectClean(fake);
     });

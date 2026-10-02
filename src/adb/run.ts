@@ -11,6 +11,7 @@ export interface AdbCallOptions {
   /** A tighter cap for this one call, below what is left of the command deadline. */
   capMs?: number;
   input?: string | Uint8Array;
+  maxOutputBytes?: number;
   /** On timeout, keep the partial stdout and stderr in the error's fields. */
   keepPartialOutput?: boolean;
   /**
@@ -81,6 +82,7 @@ export class AdbClient {
       deadlineMs: budget,
       ...(this.options.env === undefined ? {} : { env: this.options.env }),
       ...(options.input === undefined ? {} : { input: options.input }),
+      ...(options.maxOutputBytes === undefined ? {} : { maxOutputBytes: options.maxOutputBytes }),
     });
 
     if (result.kind === "spawn-error") {
@@ -100,6 +102,13 @@ export class AdbClient {
           ? `within ${formatDuration(budget)}`
           : `before the ${formatDuration(options.deadline.totalMs)} deadline`;
       throw timeoutError(options.step, limit, partial);
+    }
+
+    if (result.kind === "output-limit") {
+      this.debug(`  output exceeded the collection limit after ${result.durationMs} ms`);
+      throw new AdbAxiError("INVALID_OUTPUT", `${options.step} exceeded the host output limit`, {
+        fields: { step: options.step, limit_bytes: options.maxOutputBytes },
+      });
     }
 
     const exitCode = result.exitCode ?? 128 + signalNumber(result.signal);
