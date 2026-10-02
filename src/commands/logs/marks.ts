@@ -73,7 +73,7 @@ export function readMarks(serial: string, env: NodeJS.ProcessEnv): Map<string, M
 export function writeMark(serial: string, env: NodeJS.ProcessEnv, name: string, mark: Mark): void {
   const marks = readMarks(serial, env);
   marks.set(name, mark);
-  const file: MarksFile = { marks: {} };
+  const file: MarksFile = { marks: Object.create(null) as Record<string, StoredMark> };
   for (const [markName, value] of marks) {
     file.marks[markName] = {
       epoch_ms: value.epochMs,

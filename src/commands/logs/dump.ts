@@ -109,7 +109,7 @@ export const logsDump = defineCommand({
               lines.map((line) => `${formatFullLine(line, now.utcOffsetMinutes)}\n`).join(""),
               (path, content) => {
                 mkdirSync(dirname(path), { recursive: true });
-                writeFileSync(path, content);
+                writeFileSync(path, content, { flag: "wx" });
               },
             ),
           }

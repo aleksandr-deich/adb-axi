@@ -172,6 +172,31 @@ describe("logs mark", () => {
     expectClean(f);
   });
 
+  it("round-trips a reserved property name through marks and both window readers", async () => {
+    const f = devices({
+      serial: A,
+      api: 35,
+      clocks: [MARK_CLOCK, LATER_CLOCK],
+      shell: {
+        [logcatFor(MARK_START)]: { stdout: logLine(1790834111000, 1, "I", "Tag", "ready") },
+      },
+    });
+    const marked = await both(["logs", "mark", "__proto__"], f);
+    expect(marked.toon.exitCode).toBe(0);
+    const saved = JSON.parse(readFileSync(join(f.home, A, "marks.json"), "utf8")) as {
+      marks: Record<string, { epoch_ms: number }>;
+    };
+    expect(Object.hasOwn(saved.marks, "__proto__")).toBe(true);
+    expect(saved.marks["__proto__"]?.epoch_ms).toBe(1790834110420);
+    const dump = await both(["logs", "--since", "__proto__"], f);
+    expect(dump.toon.exitCode).toBe(0);
+    expect(dump.data.window).toBe("__proto__ -> now (30 s), 1 lines scanned");
+    const waited = await both(["wait", "log", "ready", "--since", "__proto__"], f);
+    expect(waited.toon.exitCode).toBe(0);
+    expect(waited.data.match).toMatchObject({ message: "ready" });
+    expectClean(f);
+  });
+
   it("replaces an earlier mark of the same name", async () => {
     const f = devices({ serial: A, api: 35, clocks: [MARK_CLOCK, LATER_CLOCK] });
     await runCli(["logs", "mark", "run"], f.env);
@@ -506,6 +531,30 @@ describe("logs", () => {
       expect(written).toHaveLength(120);
       expect(written[0]).toBe("06:08:20.000 I Tag: line number 0");
       expect(written.at(-1)).toBe("06:08:21.190 I Tag: line number 119");
+    });
+
+    it("gives overlapping --full runs separate files", async () => {
+      const f = devices({
+        serial: A,
+        api: 35,
+        clocks: ["1790835000.000000000 +0000\n"],
+        shell: {
+          [logcatFor("1790834100.000")]: { stdout: logLine(1790834990000, 1, "I", "Tag", "ready") },
+        },
+      });
+      const runs = await Promise.all([
+        runCli(["logs", "--full"], f.env),
+        runCli(["logs", "--full"], f.env),
+      ]);
+      const paths = runs.map((run) => {
+        expect(run.exitCode).toBe(0);
+        return (decode(run.stdout.trimEnd()) as Record<string, unknown>).full as string;
+      });
+      expect(new Set(paths).size).toBe(2);
+      for (const path of paths) {
+        expect(readFileSync(path, "utf8")).toBe("06:09:50.000 I Tag: ready\n");
+      }
+      expectClean(f);
     });
 
     it("writes an empty file and prints its path when --full matches no lines", async () => {
