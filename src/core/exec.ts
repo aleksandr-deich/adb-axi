@@ -98,8 +98,12 @@ export function exec(options: ExecOptions): Promise<ExecResult> {
       outputBytes += chunk.length;
       chunks.push(chunk);
     };
-    child.stdout.on("data", (chunk: Buffer) => collect(stdout, chunk));
-    child.stderr.on("data", (chunk: Buffer) => collect(stderr, chunk));
+    child.stdout.on("data", (chunk: Buffer) => {
+      collect(stdout, chunk);
+    });
+    child.stderr.on("data", (chunk: Buffer) => {
+      collect(stderr, chunk);
+    });
     child.stdin.on("error", () => {
       // The child may exit without reading its input; that is not a failure of the call.
     });

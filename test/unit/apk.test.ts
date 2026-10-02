@@ -139,7 +139,7 @@ describe("the signer digest", () => {
     expect(readApkInfo(bufferSource(apk), 33).signers).toEqual([digestOf(CERT_B)]);
     expect(readApkInfo(bufferSource(apk), 41)).toMatchObject({
       signers: null,
-      signerUnreadable: expect.stringContaining("no applicable signer"),
+      signerUnreadable: expect.stringContaining("no applicable signer") as string,
     });
   });
 
@@ -147,7 +147,7 @@ describe("the signer digest", () => {
     const apk = buildApk({ package: "a.b", signers: { v3: [CERT_A, CERT_B] } });
     expect(readApkInfo(bufferSource(apk), 35)).toMatchObject({
       signers: null,
-      signerUnreadable: expect.stringContaining("overlap"),
+      signerUnreadable: expect.stringContaining("overlap") as string,
     });
   });
 

@@ -200,13 +200,17 @@ async function decideShortcut(
       reason: `the APK signature cannot be read (${info.signerUnreadable ?? "unknown"})`,
     };
   }
+  const evidenceOptions = {
+    ...options,
+    capMs: Math.min(30_000, options.deadline.remainingMs() / 2, options.capMs ?? Infinity),
+  };
   try {
     const paths = await readShell(
       adb,
       serial,
       `pm path ${info.package}`,
       "reading the installed APK path",
-      options,
+      evidenceOptions,
     );
     const files = paths.stdout
       .trim()
@@ -218,7 +222,7 @@ async function decideShortcut(
       return { kind: "skipped", reason: "the installed APK path cannot be established" };
     }
     const bytes = await adb.device(serial, ["exec-out", shellWords(["cat", path])], {
-      ...options,
+      ...evidenceOptions,
       step: "reading the installed APK",
       remoteOutput: true,
       maxOutputBytes: MAX_INSTALLED_APK_BYTES,
@@ -243,6 +247,9 @@ async function decideShortcut(
       ? { kind: "unchanged" }
       : { kind: "skipped", reason: "the APK is signed differently from the installed app" };
   } catch (error) {
+    if (error instanceof AdbAxiError && error.code === "TIMEOUT") {
+      return { kind: "skipped", reason: "reading the installed APK evidence took too long" };
+    }
     if (error instanceof AdbAxiError && error.code === "INVALID_OUTPUT") {
       return { kind: "skipped", reason: "the installed APK evidence exceeds the host read limit" };
     }

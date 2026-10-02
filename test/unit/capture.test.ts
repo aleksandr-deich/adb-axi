@@ -16,6 +16,7 @@ it("fails capture without saving truncated output when exec hits its output limi
   const { writeFileSync } = await import("node:fs");
   vi.mocked(exec).mockResolvedValue({
     kind: "output-limit",
+    pid: undefined,
     stdout: Buffer.from("truncated"),
     stderr: Buffer.alloc(0),
     durationMs: 1,

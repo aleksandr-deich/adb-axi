@@ -445,6 +445,39 @@ describe("app install", () => {
       expectClean(fake);
     });
 
+    it.each(["path", "contents"])(
+      "falls back to installation when installed APK evidence %s takes too long",
+      async (step) => {
+        const { toon, data, fake } = await both(
+          () =>
+            world({
+              start: "current",
+              dumps: { current: V57, new: V57 },
+              installedApk: step === "contents" ? { hang: true } : APK,
+              rules: [
+                ...(step === "path"
+                  ? [{ match: shell(APK_PATH), respond: { hang: true } }]
+                  : []),
+                installs(APK),
+              ],
+            }),
+          ["app", "install", APK, "--if-changed", "--timeout", "4s"],
+        );
+        expect(toon.exitCode).toBe(0);
+        expect(toon.stdout).toContain(
+          "ok: install com.example.notes -> 1.4.0 (57) with data kept",
+        );
+        expect(data).toMatchObject({
+          ok: "install com.example.notes -> 1.4.0 (57) with data kept",
+          install: {
+            shortcut: "skipped because reading the installed APK evidence took too long",
+          },
+        });
+        expect(calls(fake)).toContain(`install -r ${APK}`);
+        expectClean(fake);
+      },
+    );
+
     it("can prove the no-op without any historical record", async () => {
       const { toon, fake } = await both(
         () =>
@@ -1167,7 +1200,7 @@ describe("app uninstall", () => {
     "preserves success despite unwritable cache cleanup: %s keep=%s",
     async (start, keep, outcome) => {
       const fake = world({
-        start: start as string,
+        start,
         dumps: { current: V57, absent: ABSENT, kept: KEPT },
         rules: [
           uninstalls(
@@ -1192,7 +1225,7 @@ describe("app uninstall", () => {
         expect(run.exitCode).toBe(0);
         expect(JSON.parse(run.stdout)).toMatchObject({
           ok: `uninstall ${PKG} -> ${outcome}`,
-          warning: expect.stringContaining("the install record could not be removed"),
+          warning: expect.stringContaining("the install record could not be removed") as string,
         });
         expectClean(fake);
       } finally {
