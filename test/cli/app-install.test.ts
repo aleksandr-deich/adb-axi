@@ -1,17 +1,20 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { decode } from "@toon-format/toon";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { createFakeAdb, FIXTURES_DIR, type FakeAdb } from "../fake-adb/harness.js";
 import type { Response, Rule } from "../fake-adb/scenario.js";
-import { buildApk, digestOf } from "../helpers/apk-builder.js";
+import { buildApk, digestOf, withZip64End } from "../helpers/apk-builder.js";
 import { runCli, type CliRun } from "../helpers/run.js";
 
 const SERIAL = "emulator-5554";
 const PKG = "com.example.notes";
 const ONE_ONLINE = `List of devices attached\n${SERIAL}          device product:sdk_gphone64_arm64 model:sdk_gphone64_arm64 device:emu64a transport_id:1\n\n`;
 const DUMPSYS = `dumpsys package ${PKG}`;
+const SDK = "getprop ro.build.version.sdk";
+const APK_PATH = `pm path ${PKG}`;
+const CAT_APK = "cat /data/app/notes/base.apk";
 const INSTALL_OK = { stdout: "Performing Streamed Install\nSuccess\n" };
 const CERT_A = Buffer.from("certificate A");
 const CERT_B = Buffer.from("certificate B");
@@ -23,6 +26,9 @@ let APK_OTHER_KEY: string; // 1.4.0 (57), signed by B
 let APK_V1_ONLY: string; // 1.4.0 (57), no v2 or v3 signature
 let APK_OLDER: string; // 1.3.0 (50)
 let APK_CORRUPT: string;
+let APK_ROTATED: string;
+let APK_V31: string;
+let APK_ZIP64: string;
 let PROBE_APK: string;
 
 beforeAll(() => {
@@ -41,6 +47,15 @@ beforeAll(() => {
     buildApk({ package: PKG, versionCode: 50, versionName: "1.3.0", signers: { v2: [CERT_A] } }),
   );
   APK_CORRUPT = write("corrupt.apk", Buffer.from("PK this was cut off while it was being copied"));
+  APK_ROTATED = write(
+    "rotated.apk",
+    buildApk({ ...notes, signers: { v2: [CERT_A], v3: [CERT_B] } }),
+  );
+  APK_V31 = write(
+    "v31.apk",
+    buildApk({ ...notes, signers: { v2: [CERT_A], v3: [CERT_A], v3_1: [CERT_B] } }),
+  );
+  APK_ZIP64 = write("zip64.apk", withZip64End(buildApk(notes)));
   PROBE_APK = join(FIXTURES_DIR, "apk", "probe-debug.apk");
 });
 afterAll(() => {
@@ -83,6 +98,8 @@ interface World {
   dumps: Record<string, Response>;
   start: string;
   rules?: Rule[];
+  api?: Response;
+  installedApk?: string | Response;
 }
 
 /** One online emulator whose package state is a variable that installs and uninstalls move. */
@@ -99,6 +116,15 @@ function world(options: World): FakeAdb {
         respond,
       })),
       ...(options.rules ?? []),
+      { match: shell(SDK), respond: options.api ?? { stdout: "35\n" } },
+      { match: shell(APK_PATH), respond: { stdout: "package:/data/app/notes/base.apk\n" } },
+      {
+        match: ["-s", SERIAL, "exec-out", CAT_APK],
+        respond:
+          typeof options.installedApk === "string"
+            ? { stdoutFile: options.installedApk }
+            : (options.installedApk ?? { stderr: "Permission denied\n", exit: 1 }),
+      },
     ],
   });
   fakes.push(fake);
@@ -197,9 +223,12 @@ describe("app install", () => {
       install: { previous: "1.4.0 (56)" },
     });
     // `-r` keeps the data; the device is read before the install and after it.
-    expect(calls(fake)).toEqual(
-      [DUMPSYS, `install -r ${APK}`, DUMPSYS].map((c) => (c === DUMPSYS ? `shell ${c}` : c)),
-    );
+    expect(calls(fake)).toEqual([
+      `shell ${SDK}`,
+      `shell ${DUMPSYS}`,
+      `install -r ${APK}`,
+      `shell ${DUMPSYS}`,
+    ]);
     expectClean(fake);
     expect(toon.stderr).toBe("");
   });
@@ -242,6 +271,7 @@ describe("app install", () => {
         state: { pkg: "absent" },
         rules: [
           { match: ["devices", "-l"], respond: { stdout: ONE_ONLINE } },
+          { match: shell(SDK), respond: { stdout: "35\n" } },
           {
             match: shell("dumpsys package dev.probe"),
             when: { pkg: "absent" },
@@ -288,7 +318,12 @@ describe("app install", () => {
     /** Both runs need the record, which lives in each world's own home. */
     function withRecord(record: Record<string, unknown>, rules: Rule[] = [installs(APK)]) {
       return (): FakeAdb => {
-        const fake = world({ start: "current", dumps: { current: V57, new: V57 }, rules });
+        const fake = world({
+          start: "current",
+          dumps: { current: V57, new: V57 },
+          rules,
+          installedApk: APK,
+        });
         seedRecord(fake, record);
         return fake;
       };
@@ -308,8 +343,158 @@ describe("app install", () => {
       expect(data).toEqual({
         ok: "install com.example.notes -> already installed (same versionCode and signature)",
       });
-      // Only the version read: nothing was sent to install.
-      expect(calls(fake)).toEqual([`shell ${DUMPSYS}`]);
+      expect(calls(fake)).toEqual([
+        `shell ${SDK}`,
+        `shell ${DUMPSYS}`,
+        `shell ${APK_PATH}`,
+        `exec-out ${CAT_APK}`,
+      ]);
+      expectClean(fake);
+    });
+
+    it("does not trust a historical record after an external same-version replacement", async () => {
+      const { toon, data, fake } = await both(() => {
+        const fake = world({
+          start: "current",
+          dumps: { current: V57 },
+          installedApk: APK_OTHER_KEY,
+          rules: [
+            installs(
+              APK,
+              { stdout: "Failure [INSTALL_FAILED_UPDATE_INCOMPATIBLE]\n", exit: 1 },
+              "current",
+            ),
+          ],
+        });
+        seedRecord(fake, sameInstall());
+        return fake;
+      }, ["app", "install", APK, "--if-changed"]);
+      expect(toon.exitCode).toBe(1);
+      expect(data.code).toBe("INSTALL_FAILED_UPDATE_INCOMPATIBLE");
+      expect(calls(fake)).toContain(`install -r ${APK}`);
+      expectClean(fake);
+    });
+
+    it("can prove the no-op without any historical record", async () => {
+      const { toon, fake } = await both(
+        () =>
+          world({
+            start: "current",
+            dumps: { current: V57 },
+            installedApk: APK,
+          }),
+        ["app", "install", APK, "--if-changed"],
+      );
+      expect(toon.exitCode).toBe(0);
+      expect(toon.stdout).toContain("already installed");
+      expect(recordFile(fake)).toBeUndefined();
+      expectClean(fake);
+    });
+
+    it.each([
+      ["v2 on API 27", "27\n", () => APK_ROTATED, () => APK, true],
+      ["v3 on API 28", "28\n", () => APK_ROTATED, () => APK_ROTATED, true],
+      ["different current v3 signer", "28\n", () => APK_ROTATED, () => APK, false],
+      ["v3.1 unsupported on API 35", "35\n", () => APK_V31, () => APK_V31, false],
+      ["v3.1 ignored on API 32", "32\n", () => APK_V31, () => APK, true],
+      ["v2 unsupported on API 23", "23\n", () => APK, () => APK, false],
+      ["unknown API", "unknown\n", () => APK, () => APK, false],
+      ["installed v1 signature", "35\n", () => APK, () => APK_V1_ONLY, false],
+      ["installed unsupported v3.1", "35\n", () => APK, () => APK_V31, false],
+      ["unreadable installed APK", "35\n", () => APK, () => APK_CORRUPT, false],
+      ["installed metadata mismatch", "35\n", () => APK, () => APK_OLDER, false],
+    ] as const)(
+      "uses current target-device evidence: %s",
+      async (_label, sdk, apkFile, installedFile, noop) => {
+        const apk = apkFile();
+        const { toon, data, fake } = await both(
+          () =>
+            world({
+              start: "current",
+              dumps: { current: V57, new: V57 },
+              api: { stdout: sdk },
+              installedApk: installedFile(),
+              rules: [installs(apk)],
+            }),
+          ["app", "install", apk, "--if-changed"],
+        );
+        expect(toon.exitCode).toBe(0);
+        if (noop) {
+          expect(data.ok).toContain("already installed");
+          expect(calls(fake)).not.toContain(`install -r ${apk}`);
+        } else {
+          expect(data.install).toHaveProperty(
+            "shortcut",
+            expect.stringContaining("skipped because"),
+          );
+          expect(calls(fake)).toContain(`install -r ${apk}`);
+        }
+        expectClean(fake);
+      },
+    );
+
+    it.each([
+      ["pm path failure", { stderr: "Permission denied\n", exit: 1 }, false],
+      ["malformed path", { stdout: "not a package path\n" }, false],
+      [
+        "split APK paths",
+        { stdout: "package:/data/app/notes/base.apk\npackage:/data/app/notes/split_config.apk\n" },
+        true,
+      ],
+    ] as const)("handles installed path evidence: %s", async (_label, response, noop) => {
+      const { toon, data, fake } = await both(
+        () =>
+          world({
+            start: "current",
+            dumps: { current: V57, new: V57 },
+            installedApk: APK,
+            rules: [{ match: shell(APK_PATH), respond: response }, installs(APK)],
+          }),
+        ["app", "install", APK, "--if-changed"],
+      );
+      expect(toon.exitCode).toBe(0);
+      if (noop) expect(data.ok).toContain("already installed");
+      else {
+        expect(data.install).toHaveProperty("shortcut", expect.stringContaining("skipped because"));
+        expect(calls(fake)).toContain(`install -r ${APK}`);
+      }
+      expectClean(fake);
+    });
+
+    it("uses the device-applicable signer in the install record", async () => {
+      const { toon, fake } = await both(
+        () =>
+          world({
+            start: "old",
+            dumps: { old: V56, new: V57 },
+            api: { stdout: "27\n" },
+            rules: [installs(APK_ROTATED)],
+          }),
+        ["app", "install", APK_ROTATED],
+      );
+      expect(toon.exitCode).toBe(0);
+      expect(recordFile(fake)).toMatchObject({
+        packages: { [PKG]: { signers: [digestOf(CERT_A)] } },
+      });
+      expectClean(fake);
+    });
+
+    it("installs ZIP64 through the unreadable-APK shortcut fallback", async () => {
+      const { toon, data, fake } = await both(
+        () =>
+          world({
+            start: "current",
+            dumps: { current: V57 },
+            rules: [installs(APK_ZIP64, INSTALL_OK, "current")],
+          }),
+        ["app", "install", APK_ZIP64, "--if-changed"],
+      );
+      expect(toon.exitCode).toBe(0);
+      expect(data.install).toMatchObject({
+        shortcut: "skipped because the APK metadata cannot be read (ZIP64 APKs are not supported)",
+      });
+      expect(calls(fake)).toEqual([`install -r ${APK_ZIP64}`]);
+      expectClean(fake);
     });
 
     it("installs when the device has a different versionCode", async () => {
@@ -345,20 +530,20 @@ describe("app install", () => {
       expect(toon.exitCode).toBe(0);
       expect(data).toMatchObject({
         install: {
-          shortcut: "skipped because the APK is signed differently from the recorded install",
+          shortcut: "skipped because the APK is signed differently from the installed app",
         },
       });
       expect(calls(fake)).toContain(`install -r ${APK_OTHER_KEY}`);
     });
 
-    it("installs and says the shortcut was skipped when nothing records this install", async () => {
+    it("installs and says the shortcut was skipped when the installed APK cannot be read", async () => {
       const { data, fake } = await both(
         () =>
           world({ start: "current", dumps: { current: V57, new: V57 }, rules: [installs(APK)] }),
         ["app", "install", APK, "--if-changed"],
       );
       expect(data).toMatchObject({
-        install: { shortcut: "skipped because no record shows adb-axi installed this version" },
+        install: { shortcut: "skipped because the installed APK cannot be read" },
       });
       expect(calls(fake)).toContain(`install -r ${APK}`);
     });
@@ -449,6 +634,7 @@ describe("app install", () => {
       expect(toon.exitCode).toBe(0);
       expect(data.ok).toBe("install com.example.notes -> 1.4.0 (57) with data wiped");
       expect(calls(fake)).toEqual([
+        `shell ${SDK}`,
         `shell ${DUMPSYS}`,
         `install -r ${APK}`,
         `shell ${DUMPSYS}`,
@@ -492,31 +678,49 @@ describe("app install", () => {
       expect(data).toMatchObject({ code: "REMOTE_EXIT", exit: 1 });
     });
 
-    it("refuses an APK it cannot read before installing anything", async () => {
-      const { toon, data, fake } = await both(
-        () => world({ start: "old", dumps: { old: V56 }, rules: [] }),
-        ["app", "install", APK_CORRUPT, "--clean-data"],
-      );
-      expect(toon.exitCode).toBe(1);
-      expect(data).toMatchObject({
-        code: "INSTALL_FAILED_INVALID_APK",
-        apk: "corrupt.apk",
-        help: [expect.stringContaining("Rebuild the APK")],
-      });
-      expect(calls(fake)).toEqual([]);
-    });
+    it.each([["--clean-data"], ["--clean-data", "--if-changed"]])(
+      "refuses an unreadable APK before a wipe: %s",
+      async (...flags) => {
+        const { toon, data, fake } = await both(
+          () => world({ start: "old", dumps: { old: V56 }, rules: [] }),
+          ["app", "install", APK_CORRUPT, ...flags],
+        );
+        expect(toon.exitCode).toBe(1);
+        expect(data).toMatchObject({
+          code: "INSTALL_FAILED_INVALID_APK",
+          apk: "corrupt.apk",
+          help: [expect.stringContaining("Rebuild the APK")],
+        });
+        expect(calls(fake)).toEqual([]);
+      },
+    );
 
-    it("cannot be combined with --if-changed", async () => {
-      const { toon, data, fake } = await both(make, [
-        "app",
-        "install",
-        APK,
-        "--clean-data",
-        "--if-changed",
+    it("takes precedence over --if-changed even when the same version and signer are installed", async () => {
+      const { toon, data, fake } = await both(
+        () =>
+          world({
+            start: "new",
+            dumps: { new: V57 },
+            installedApk: APK,
+            rules: [
+              installs(APK),
+              { match: shell(`pm clear ${PKG}`), respond: { stdout: "Success\n" } },
+            ],
+          }),
+        ["app", "install", APK, "--clean-data", "--if-changed"],
+      );
+      expect(toon.exitCode).toBe(0);
+      expect(data.ok).toBe("install com.example.notes -> 1.4.0 (57) with data wiped");
+      expect(data.install).not.toHaveProperty("shortcut");
+      expect(calls(fake)).toEqual([
+        `shell ${SDK}`,
+        `shell ${DUMPSYS}`,
+        `install -r ${APK}`,
+        `shell ${DUMPSYS}`,
+        `shell pm clear ${PKG}`,
+        `shell ${DUMPSYS}`,
       ]);
-      expect(toon.exitCode).toBe(2);
-      expect(data).toMatchObject({ code: "VALIDATION_ERROR" });
-      expect(calls(fake)).toEqual([]);
+      expectClean(fake);
     });
   });
 
@@ -538,6 +742,45 @@ describe("app install", () => {
           ],
         });
     };
+
+    it.each([
+      ["UPDATE_INCOMPATIBLE", "signing key"],
+      ["INSUFFICIENT_STORAGE", "Free space"],
+      ["VERSION_DOWNGRADE", "higher versionCode"],
+      ["INVALID_APK", "Rebuild"],
+      ["ALREADY_EXISTS", "Run the same command"],
+      ["DUPLICATE_PACKAGE", "Wait for the other install"],
+      ["OLDER_SDK", "minSdk"],
+      ["NEWER_SDK", "maxSdk"],
+      ["CPU_ABI_INCOMPATIBLE", "ABI"],
+      ["NO_MATCHING_ABIS", "ABI"],
+      ["MISSING_SHARED_LIBRARY", "library"],
+      ["MISSING_FEATURE", "feature"],
+      ["TEST_ONLY", "not test-only"],
+      ["CONFLICTING_PROVIDER", "authority"],
+      ["DUPLICATE_PERMISSION", "Rename the permission"],
+      ["SHARED_USER_INCOMPATIBLE", "Sign the APK"],
+      ["USER_RESTRICTED", "Allow installs over USB"],
+      ["VERIFICATION_FAILURE", "Turn off app verification"],
+      ["VERIFICATION_TIMEOUT", "Run the same command"],
+      ["ABORTED", "Run the same command"],
+      ["INTERNAL_ERROR", "Run the same command"],
+      ["DEXOPT", "Rebuild"],
+      ["MISSING_SPLIT", "full APK"],
+    ])("exposes INSTALL_FAILED_%s with actionable help and format parity", async (suffix, fix) => {
+      const code = `INSTALL_FAILED_${suffix}`;
+      const { toon, data, fake } = await both(
+        refuse(`Failure [${code}: refused by package manager]`),
+        ["app", "install", APK],
+      );
+      expect(toon.exitCode).toBe(1);
+      expect(data).toMatchObject({ code, package: PKG, detail: "refused by package manager" });
+      expect(data.error).toEqual(expect.stringContaining("was not installed because"));
+      expect(Array.isArray(data.help)).toBe(true);
+      expect((data.help as string[]).some((help) => help.includes(fix))).toBe(true);
+      expect(recordFile(fake)).toBeUndefined();
+      expectClean(fake);
+    });
 
     it("maps INSTALL_FAILED_UPDATE_INCOMPATIBLE and warns that uninstalling loses data", async () => {
       const { toon, data, fake } = await both(
@@ -634,8 +877,12 @@ describe("app install", () => {
         APK,
       ]);
       expect(toon.exitCode).toBe(1);
-      expect(data).toMatchObject({ code: "INSTALL_FAILED_UNKNOWN" });
+      expect(data).toMatchObject({
+        code: "INSTALL_FAILED_UNKNOWN",
+        help: [expect.stringContaining("Read `detail`")],
+      });
       expect(data.detail).toContain("Exception occurred");
+      expect(data.error).toEqual(expect.stringContaining("was not installed because"));
     });
 
     it("never says Success for a Failure line even when adb exits 0", async () => {
@@ -814,6 +1061,48 @@ describe("app uninstall", () => {
       "com.example.other",
     ]);
   });
+
+  it.each([
+    ["absent", false, "already not installed (no-op)"],
+    ["current", false, "removed"],
+    ["current", true, "removed with data kept"],
+  ])(
+    "preserves success despite unwritable cache cleanup: %s keep=%s",
+    async (start, keep, outcome) => {
+      const fake = world({
+        start: start as string,
+        dumps: { current: V57, absent: ABSENT, kept: KEPT },
+        rules: [
+          uninstalls(
+            `pm uninstall${keep ? " -k" : ""} ${PKG}`,
+            { stdout: "Success\n" },
+            keep ? "kept" : "absent",
+          ),
+        ],
+      });
+      seedRecord(fake, {
+        packages: {
+          [PKG]: { versionCode: 57, versionName: "1.4.0", signers: null, installedAt: "x" },
+        },
+      });
+      const directory = join(fake.home, SERIAL);
+      chmodSync(directory, 0o555);
+      try {
+        const run = await runCli(
+          ["app", "uninstall", PKG, ...(keep ? ["--keep-data"] : []), "--json"],
+          fake.env,
+        );
+        expect(run.exitCode).toBe(0);
+        expect(JSON.parse(run.stdout)).toMatchObject({
+          ok: `uninstall ${PKG} -> ${outcome}`,
+          warning: expect.stringContaining("the install record could not be removed"),
+        });
+        expectClean(fake);
+      } finally {
+        chmodSync(directory, 0o755);
+      }
+    },
+  );
 
   it("exits 1 with UNINSTALL_FAILED when the package is still installed afterwards", async () => {
     const { toon, data } = await both(

@@ -1,6 +1,6 @@
 import { statSync } from "node:fs";
 import { basename, resolve } from "node:path";
-import { ApkError, readApkFile, type ApkInfo } from "../../apk/index.js";
+import { ApkError, bufferSource, readApkFile, readApkInfo, type ApkInfo } from "../../apk/index.js";
 import type { AdbClient } from "../../adb/run.js";
 import { assertPackageName } from "../../android/component.js";
 import { readPackage, type PackageInfo } from "../../android/packages.js";
@@ -9,13 +9,13 @@ import { invalidOutput, readShell, type ReadOptions } from "../../android/read.j
 import { formatDuration } from "../../core/args.js";
 import { Deadline } from "../../core/deadline.js";
 import { AdbAxiError } from "../../core/errors.js";
-import { okLine, runHint, type Output } from "../../core/output.js";
+import { okLine, runHint, shellWords, type Output } from "../../core/output.js";
 import { MAX_INTERVAL_MS, poll } from "../../core/poll.js";
 import { isErrno } from "../../core/state.js";
 import { defineCommand } from "../define.js";
 import type { CommandContext } from "../types.js";
 import { installFailureError } from "./install-errors.js";
-import { readInstallRecord, writeInstallRecord, type InstallRecord } from "./install-record.js";
+import { writeInstallRecord, type InstallRecord } from "./install-record.js";
 import { formatVersion, readOptions, targetSerial, UNKNOWN } from "./shared.js";
 
 export const appInstall = defineCommand({
@@ -26,7 +26,7 @@ export const appInstall = defineCommand({
     {
       name: "--clean-data",
       type: "boolean",
-      description: "Wipe the app's data as part of the install",
+      description: "Wipe the app's data as part of the install; takes precedence over --if-changed",
     },
     {
       name: "--if-changed",
@@ -50,22 +50,28 @@ async function runInstall(context: CommandContext): Promise<Output> {
   const started = performance.now();
   const clean = context.flags["clean-data"] === true;
   const ifChanged = context.flags["if-changed"] === true;
-  if (clean && ifChanged) {
-    throw new AdbAxiError(
-      "VALIDATION_ERROR",
-      "`--clean-data` and `--if-changed` cannot be combined: one asks for a wipe, the other for no change",
-      { help: [runHint(["app", "install", "<apk>", "--clean-data"], "to wipe the data")] },
-    );
-  }
   const apkPath = apkFile(String(context.positionals.apk));
   const apkName = basename(apkPath);
   const serial = targetSerial(context);
   const options = readOptions(context);
   const adb = context.adb();
 
-  const read = readApk(apkPath);
+  let read = readApk(apkPath);
+  const api = read.ok ? await readApi(adb, serial, options) : null;
+  if (read.ok) {
+    read =
+      api === null
+        ? {
+            ok: true,
+            info: {
+              ...read.info,
+              signers: null,
+              signerUnreadable: "the device API level is unknown",
+            },
+          }
+        : readApk(apkPath, api);
+  }
   if (!read.ok && clean) {
-    // The package to wipe is unknown, and nothing has been installed yet.
     throw new AdbAxiError(
       "INSTALL_FAILED_INVALID_APK",
       `${apkName} was not installed because adb-axi cannot read it to know which package to wipe`,
@@ -75,13 +81,12 @@ async function runInstall(context: CommandContext): Promise<Output> {
       },
     );
   }
-
   const before = read.ok ? await readPackage(adb, serial, read.info.package, options) : null;
   const previous = before?.installed === true ? before : null;
 
   let shortcut: string | undefined;
-  if (ifChanged) {
-    const decision = decideShortcut(read, previous, serial, context.env);
+  if (ifChanged && !clean) {
+    const decision = await decideShortcut(read, previous, adb, serial, api, options);
     if (decision.kind === "unchanged" && read.ok) {
       return {
         ok: okLine(
@@ -154,9 +159,9 @@ function apkFile(argument: string): string {
   return path;
 }
 
-function readApk(path: string): ApkRead {
+function readApk(path: string, api?: number): ApkRead {
   try {
-    return { ok: true, info: readApkFile(path) };
+    return { ok: true, info: readApkFile(path, api) };
   } catch (error) {
     if (error instanceof ApkError) return { ok: false, reason: error.message };
     if (isErrno(error, "EACCES") || isErrno(error, "EISDIR") || isErrno(error, "EIO")) {
@@ -173,42 +178,97 @@ type Shortcut =
   /** The shortcut could not be proven either way, so the install runs without it. */
   | { kind: "skipped"; reason: string };
 
-/**
- * `--if-changed`: the install is skipped only when the device reports the APK's versionCode
- * and the signature adb-axi recorded for that package is the APK's. The device's own
- * signature is not readable through the shell, so the recorded install stands in for it.
- */
-function decideShortcut(
+async function decideShortcut(
   read: ApkRead,
   previous: PackageInfo | null,
+  adb: AdbClient,
   serial: string,
-  env: NodeJS.ProcessEnv,
-): Shortcut {
+  api: number | null,
+  options: ReadOptions,
+): Promise<Shortcut> {
   if (!read.ok)
     return { kind: "skipped", reason: `the APK metadata cannot be read (${read.reason})` };
   const info = read.info;
   if (previous === null || previous.versionCode !== info.versionCode) return { kind: "changed" };
-  if (info.signers === null) {
+  if (api === null) return { kind: "skipped", reason: "the device API level is unknown" };
+  const signers = info.signers;
+  if (signers === null) {
     return {
       kind: "skipped",
       reason: `the APK signature cannot be read (${info.signerUnreadable ?? "unknown"})`,
     };
   }
-  const record = readInstallRecord(serial, info.package, env);
-  if (record === undefined || record.versionCode !== info.versionCode) {
-    return { kind: "skipped", reason: "no record shows adb-axi installed this version" };
+  try {
+    const paths = await readShell(
+      adb,
+      serial,
+      `pm path ${info.package}`,
+      "reading the installed APK path",
+      options,
+    );
+    const files = paths.stdout
+      .trim()
+      .split(/\r?\n/)
+      .map((line) => /^package:(\/[^\r\n]+\.apk)$/.exec(line)?.[1]);
+    const bases = files.filter((path) => path?.endsWith("/base.apk"));
+    const path = bases.length === 1 ? bases[0] : files.length === 1 ? files[0] : undefined;
+    if (path === undefined || files.some((file) => file === undefined)) {
+      return { kind: "skipped", reason: "the installed APK path cannot be established" };
+    }
+    const bytes = await adb.device(serial, ["exec-out", shellWords(["cat", path])], {
+      ...options,
+      step: "reading the installed APK",
+      remoteOutput: true,
+    });
+    if (bytes.exitCode !== 0)
+      return { kind: "skipped", reason: "the installed APK cannot be read" };
+    const installed = readApkInfo(bufferSource(bytes.stdout), api);
+    if (installed.package !== info.package || installed.versionCode !== info.versionCode) {
+      return {
+        kind: "skipped",
+        reason: "the installed APK metadata does not match the device observation",
+      };
+    }
+    if (installed.signers === null) {
+      return {
+        kind: "skipped",
+        reason: `the installed APK signature cannot be read (${installed.signerUnreadable ?? "unknown"})`,
+      };
+    }
+    return installed.signers.length === signers.length &&
+      installed.signers.every((s, i) => s === signers[i])
+      ? { kind: "unchanged" }
+      : { kind: "skipped", reason: "the APK is signed differently from the installed app" };
+  } catch (error) {
+    if (
+      error instanceof ApkError ||
+      (error instanceof AdbAxiError && error.code === "REMOTE_EXIT")
+    ) {
+      return { kind: "skipped", reason: "the installed APK evidence cannot be read" };
+    }
+    throw error;
   }
-  return sameSigners(record.signers, info.signers)
-    ? { kind: "unchanged" }
-    : { kind: "skipped", reason: "the APK is signed differently from the recorded install" };
 }
 
-function sameSigners(recorded: string[] | null, current: string[]): boolean {
-  return (
-    recorded !== null &&
-    recorded.length === current.length &&
-    recorded.every((s, i) => s === current[i])
-  );
+async function readApi(
+  adb: AdbClient,
+  serial: string,
+  options: ReadOptions,
+): Promise<number | null> {
+  try {
+    const result = await readShell(
+      adb,
+      serial,
+      "getprop ro.build.version.sdk",
+      "reading the device API level",
+      options,
+    );
+    const value = result.stdout.trim();
+    return /^[1-9]\d*$/.test(value) && Number.isSafeInteger(Number(value)) ? Number(value) : null;
+  } catch (error) {
+    if (error instanceof AdbAxiError && error.code === "REMOTE_EXIT") return null;
+    throw error;
+  }
 }
 
 async function runAdbInstall(
@@ -315,7 +375,7 @@ async function clearData(
   if (!/^Success\b/m.test(result.stdout)) throw invalidOutput(step, result.stdout);
 }
 
-/** Remember what was installed, for `--if-changed`. A state file that cannot be written is a warning. */
+/** Remember what was installed. A state file that cannot be written is a warning. */
 function saveRecord(serial: string, info: ApkInfo, env: NodeJS.ProcessEnv): string | undefined {
   const record: InstallRecord = {
     versionCode: info.versionCode,
@@ -328,7 +388,7 @@ function saveRecord(serial: string, info: ApkInfo, env: NodeJS.ProcessEnv): stri
     return undefined;
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
-    return `the install was not recorded, so --if-changed will not skip it (${reason})`;
+    return `the install was not recorded (${reason})`;
   }
 }
 

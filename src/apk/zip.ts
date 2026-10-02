@@ -1,11 +1,8 @@
 import { inflateRawSync } from "node:zlib";
-import { ApkError, readU64, type ByteSource } from "./source.js";
+import { ApkError, type ByteSource } from "./source.js";
 
 const EOCD_SIGNATURE = 0x06054b50;
 const EOCD_MIN_SIZE = 22;
-const ZIP64_LOCATOR_SIGNATURE = 0x07064b50;
-const ZIP64_LOCATOR_SIZE = 20;
-const ZIP64_EOCD_SIGNATURE = 0x06064b50;
 const CENTRAL_SIGNATURE = 0x02014b50;
 const CENTRAL_FIXED_SIZE = 46;
 const LOCAL_SIGNATURE = 0x04034b50;
@@ -34,12 +31,17 @@ export interface ZipDirectory {
 export function readZipDirectory(source: ByteSource): ZipDirectory {
   const eocdOffset = findEndRecord(source);
   const eocd = source.read(eocdOffset, EOCD_MIN_SIZE);
-  let count = eocd.readUInt16LE(10);
-  let size = eocd.readUInt32LE(12);
-  let offset = eocd.readUInt32LE(16);
+  const count = eocd.readUInt16LE(10);
+  const size = eocd.readUInt32LE(12);
+  const offset = eocd.readUInt32LE(16);
 
-  if (count === 0xffff || size === 0xffffffff || offset === 0xffffffff) {
-    ({ count, size, offset } = readZip64End(source, eocdOffset));
+  if (
+    eocd.readUInt16LE(8) === 0xffff ||
+    count === 0xffff ||
+    size === 0xffffffff ||
+    offset === 0xffffffff
+  ) {
+    throw new ApkError("ZIP64 APKs are not supported");
   }
   if (size > MAX_DIRECTORY_BYTES || offset + size > eocdOffset) {
     throw new ApkError("the zip central directory is outside the file");
@@ -126,22 +128,4 @@ function findEndRecord(source: ByteSource): number {
     if (at + EOCD_MIN_SIZE + tail.readUInt16LE(at + 20) === tail.length) return tailStart + at;
   }
   throw new ApkError("the file is not a zip (no end of central directory record)");
-}
-
-function readZip64End(
-  source: ByteSource,
-  eocdOffset: number,
-): { count: number; size: number; offset: number } {
-  const locatorAt = eocdOffset - ZIP64_LOCATOR_SIZE;
-  if (locatorAt < 0) throw new ApkError("the zip64 locator is missing");
-  const locator = source.read(locatorAt, ZIP64_LOCATOR_SIZE);
-  if (locator.readUInt32LE(0) !== ZIP64_LOCATOR_SIGNATURE) {
-    throw new ApkError("the zip64 locator is missing");
-  }
-  const recordAt = readU64(locator, 8);
-  const record = source.read(recordAt, 56);
-  if (record.readUInt32LE(0) !== ZIP64_EOCD_SIGNATURE) {
-    throw new ApkError("the zip64 end record is bad");
-  }
-  return { count: readU64(record, 32), size: readU64(record, 40), offset: readU64(record, 48) };
 }

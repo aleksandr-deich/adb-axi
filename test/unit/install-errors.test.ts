@@ -51,7 +51,7 @@ describe("installFailureError", () => {
     ]);
   });
 
-  it("names the APK when its package is unknown, and carries a fix for every code", () => {
+  it("names the APK when its package is unknown, and carries an SDK fix", () => {
     const error = installFailureError(
       { code: "INSTALL_FAILED_OLDER_SDK", message: null },
       { ...context, pkg: undefined },

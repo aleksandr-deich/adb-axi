@@ -99,19 +99,55 @@ describe("the signer digest", () => {
     expect(info(apk)).toMatchObject({ signers: [digestOf(CERT_A)], signerUnreadable: null });
   });
 
-  it("is the v3 certificate when both v2 and v3 are present, and v3.1 over v3", () => {
+  it("selects v2 or v3 for the target API and reports unsupported v3.1", () => {
     const both = buildApk({
       package: "a.b",
       versionCode: 1,
       signers: { v2: [CERT_A], v3: [CERT_B] },
     });
     expect(info(both).signers).toEqual([digestOf(CERT_B)]);
+    expect(readApkInfo(bufferSource(both), 27).signers).toEqual([digestOf(CERT_A)]);
+    expect(readApkInfo(bufferSource(both), 28).signers).toEqual([digestOf(CERT_B)]);
+    expect(readApkInfo(bufferSource(both), 23).signers).toBeNull();
     const rotated = buildApk({
       package: "a.b",
       versionCode: 1,
       signers: { v2: [CERT_A], v3: [CERT_A], v3_1: [CERT_B] },
     });
-    expect(info(rotated).signers).toEqual([digestOf(CERT_B)]);
+    expect(info(rotated)).toMatchObject({
+      signers: null,
+      signerUnreadable: "v3.1 signer selection is unsupported",
+    });
+    expect(readApkInfo(bufferSource(rotated), 32).signers).toEqual([digestOf(CERT_A)]);
+    expect(readApkInfo(bufferSource(rotated), 33).signers).toBeNull();
+  });
+
+  it("selects the v3 signer whose SDK range includes the target", () => {
+    const value = (min: number, max: number, certificate: Buffer) =>
+      signerBlock([certificate], "v3", { min, max }).subarray(4);
+    const signers = Buffer.concat([value(28, 32, CERT_A), value(33, 40, CERT_B)]);
+    const prefix = Buffer.alloc(4);
+    prefix.writeUInt32LE(signers.length);
+    const apk = buildZip(
+      [{ name: "AndroidManifest.xml", data: buildManifest({ package: "a.b" }) }],
+      {
+        beforeDirectory: signingBlock([{ id: SCHEME_V3, value: Buffer.concat([prefix, signers]) }]),
+      },
+    );
+    expect(readApkInfo(bufferSource(apk), 32).signers).toEqual([digestOf(CERT_A)]);
+    expect(readApkInfo(bufferSource(apk), 33).signers).toEqual([digestOf(CERT_B)]);
+    expect(readApkInfo(bufferSource(apk), 41)).toMatchObject({
+      signers: null,
+      signerUnreadable: expect.stringContaining("no applicable signer"),
+    });
+  });
+
+  it("rejects overlapping v3 signer ranges for the target", () => {
+    const apk = buildApk({ package: "a.b", signers: { v3: [CERT_A, CERT_B] } });
+    expect(readApkInfo(bufferSource(apk), 35)).toMatchObject({
+      signers: null,
+      signerUnreadable: expect.stringContaining("overlap"),
+    });
   });
 
   it("lists every signer, sorted", () => {
@@ -177,6 +213,14 @@ describe("a file that is not a readable APK", () => {
     ],
   ])("is an ApkError: %s", (_name, bytes) => {
     expect(() => info(bytes)).toThrow(ApkError);
+  });
+
+  it.each([8, 10, 12, 16])("rejects the ZIP64 end-record marker at offset %s", (offset) => {
+    const apk = buildApk({ package: "a.b" });
+    const end = apk.length - 22;
+    if (offset === 8 || offset === 10) apk.writeUInt16LE(0xffff, end + offset);
+    else apk.writeUInt32LE(0xffffffff, end + offset);
+    expect(() => info(apk)).toThrow(/ZIP64/);
   });
 
   it("is an ApkError when the file is cut short", () => {

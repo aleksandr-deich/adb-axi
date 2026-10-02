@@ -7,11 +7,9 @@ const FOOTER_SIZE = 24;
 /** A signing block is a few KB, mostly page-alignment padding; a larger claim is not an APK's. */
 const MAX_BLOCK_BYTES = 32 * 1024 * 1024;
 
-/** Block ids, newest scheme first: a newer scheme's signer is the one a device trusts. */
 const SCHEMES = [
-  { id: 0x1b93ad61, name: "v3.1" },
-  { id: 0xf05368c0, name: "v3" },
-  { id: 0x7109871a, name: "v2" },
+  { id: 0xf05368c0, name: "v3", minSdk: 28 },
+  { id: 0x7109871a, name: "v2", minSdk: 24 },
 ] as const;
 
 export interface SignerDigests {
@@ -22,7 +20,7 @@ export interface SignerDigests {
 }
 
 /**
- * The signer certificate digests from the APK Signing Block (v2, v3 or v3.1), the value
+ * The signer certificate digests from the APK Signing Block (v2 or v3), the value
  * `apksigner verify --print-certs` prints as "SHA-256 digest". `null` when the APK has no
  * signing block (a v1-only, JAR-signed APK) or none of the schemes read here. It reads
  * whose certificate is in the block; it does not verify the signature.
@@ -30,12 +28,19 @@ export interface SignerDigests {
 export function readSignerDigests(
   source: ByteSource,
   centralDirectoryOffset: number,
+  api?: number,
 ): SignerDigests | null {
   const block = findSigningBlock(source, centralDirectoryOffset);
   if (block === null) return null;
+  if ((api === undefined || api >= 33) && block.has(0x1b93ad61)) {
+    throw new ApkError("v3.1 signer selection is unsupported");
+  }
   for (const scheme of SCHEMES) {
+    if (api !== undefined && api < scheme.minSdk) continue;
     const value = block.get(scheme.id);
-    if (value !== undefined) return { scheme: scheme.name, sha256: signerDigests(value) };
+    if (value !== undefined) {
+      return { scheme: scheme.name, sha256: signerDigests(value, scheme.name, api) };
+    }
   }
   return null;
 }
@@ -76,20 +81,32 @@ function findSigningBlock(
 /**
  * Walk signers -> signer -> signed data -> certificates, all length-prefixed (APK
  * Signature Scheme v2/v3 specifications), and hash each signer's first certificate. The
- * signed data starts with the digests and then the certificates in both schemes; v3 adds
- * an SDK range after the signed data, which is not read.
+ * signed data starts with the digests and then the certificates in both schemes.
  */
-function signerDigests(value: Buffer): string[] {
+function signerDigests(value: Buffer, scheme: "v2" | "v3", api?: number): string[] {
   try {
     const signers = new Section(value).prefixed();
     const digests = new Set<string>();
     while (!signers.done) {
-      const signedData = signers.prefixed().prefixed();
+      const signer = signers.prefixed();
+      const signedData = signer.prefixed();
       signedData.prefixed();
       const certificate = signedData.prefixed().prefixed().bytes;
+      if (certificate.length === 0) throw new ApkError("the signer certificate is empty");
+      if (scheme === "v3") {
+        const min = signedData.u32();
+        const max = signedData.u32();
+        if (min > max || signer.u32() !== min || signer.u32() !== max) {
+          throw new ApkError("the v3 signer SDK ranges disagree");
+        }
+        if (api !== undefined && (api < min || api > max)) continue;
+      }
+      if (scheme === "v3" && api !== undefined && digests.size > 0) {
+        throw new ApkError("the v3 signer SDK ranges overlap");
+      }
       digests.add(createHash("sha256").update(certificate).digest("hex"));
     }
-    if (digests.size === 0) throw new ApkError("the APK Signing Block has no signer");
+    if (digests.size === 0) throw new ApkError("the APK Signing Block has no applicable signer");
     return [...digests].sort();
   } catch (error) {
     if (error instanceof ApkError) throw error;
@@ -105,6 +122,13 @@ class Section {
 
   get done(): boolean {
     return this.position >= this.bytes.length;
+  }
+
+  u32(): number {
+    if (this.position + 4 > this.bytes.length) throw new ApkError("the signer data is truncated");
+    const value = this.bytes.readUInt32LE(this.position);
+    this.position += 4;
+    return value;
   }
 
   prefixed(): Section {

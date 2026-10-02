@@ -18,10 +18,7 @@ function recordPath(serial: string, env: NodeJS.ProcessEnv): string {
   return join(deviceStateDir(serial, env), "last-install.json");
 }
 
-/**
- * The records of one device, keyed by package. A file that is missing, unreadable or not in
- * this shape is no record: `--if-changed` then installs, which is always safe.
- */
+/** The records of one device, keyed by package. */
 function readRecords(serial: string, env: NodeJS.ProcessEnv): Record<string, InstallRecord> {
   let parsed: unknown;
   try {
@@ -38,14 +35,6 @@ function readRecords(serial: string, env: NodeJS.ProcessEnv): Record<string, Ins
   return valid;
 }
 
-export function readInstallRecord(
-  serial: string,
-  pkg: string,
-  env: NodeJS.ProcessEnv,
-): InstallRecord | undefined {
-  return readRecords(serial, env)[pkg];
-}
-
 export function writeInstallRecord(
   serial: string,
   pkg: string,
@@ -58,11 +47,21 @@ export function writeInstallRecord(
 }
 
 /** Drop a package's record, for example once it is uninstalled. */
-export function forgetInstallRecord(serial: string, pkg: string, env: NodeJS.ProcessEnv): void {
-  const all = readRecords(serial, env);
-  if (!Object.hasOwn(all, pkg)) return;
-  const packages = Object.fromEntries(Object.entries(all).filter(([name]) => name !== pkg));
-  writeJsonAtomic(recordPath(serial, env), { packages } satisfies RecordFile);
+export function forgetInstallRecord(
+  serial: string,
+  pkg: string,
+  env: NodeJS.ProcessEnv,
+): string | undefined {
+  try {
+    const all = readRecords(serial, env);
+    if (!Object.hasOwn(all, pkg)) return undefined;
+    const packages = Object.fromEntries(Object.entries(all).filter(([name]) => name !== pkg));
+    writeJsonAtomic(recordPath(serial, env), { packages } satisfies RecordFile);
+    return undefined;
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    return `the install record could not be removed (${reason})`;
+  }
 }
 
 function isRecord(value: unknown): value is InstallRecord {

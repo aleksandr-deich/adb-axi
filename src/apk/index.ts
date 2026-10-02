@@ -19,7 +19,7 @@ export interface ApkInfo extends ManifestInfo {
  * Throws `ApkError` when the file is not an APK whose manifest can be read; a signer that
  * cannot be read is not an error here, because the install does not depend on it.
  */
-export function readApkInfo(source: ByteSource): ApkInfo {
+export function readApkInfo(source: ByteSource, api?: number): ApkInfo {
   try {
     const { entries, centralDirectoryOffset } = readZipDirectory(source);
     const manifest = entries.get("AndroidManifest.xml");
@@ -27,7 +27,7 @@ export function readApkInfo(source: ByteSource): ApkInfo {
     const info = parseManifest(readZipEntry(source, manifest));
 
     try {
-      const digests = readSignerDigests(source, centralDirectoryOffset);
+      const digests = readSignerDigests(source, centralDirectoryOffset, api);
       return digests === null
         ? { ...info, signers: null, signerUnreadable: "the APK has no v2 or v3 signature" }
         : { ...info, signers: digests.sha256, signerUnreadable: null };
@@ -43,6 +43,6 @@ export function readApkInfo(source: ByteSource): ApkInfo {
   }
 }
 
-export function readApkFile(path: string): ApkInfo {
-  return withFileSource(path, readApkInfo);
+export function readApkFile(path: string, api?: number): ApkInfo {
+  return withFileSource(path, (source) => readApkInfo(source, api));
 }

@@ -217,8 +217,13 @@ export function buildManifest(spec: ManifestSpec): Buffer {
 }
 
 /** An APK Signature Scheme v2 or v3 value: one signer per certificate. */
-export function signerBlock(certificates: Buffer[], scheme: "v2" | "v3"): Buffer {
-  const v3Range = scheme === "v3" ? Buffer.concat([u32(0), u32(0x7fffffff)]) : Buffer.alloc(0);
+export function signerBlock(
+  certificates: Buffer[],
+  scheme: "v2" | "v3",
+  range = { min: 0, max: 0x7fffffff },
+): Buffer {
+  const v3Range =
+    scheme === "v3" ? Buffer.concat([u32(range.min), u32(range.max)]) : Buffer.alloc(0);
   const signers = certificates.map((certificate) => {
     const signedData = prefixed(
       prefixed(), // digests
@@ -353,6 +358,29 @@ export function buildApk(spec: ApkSpec): Buffer {
     ],
     pairs.length === 0 ? {} : { beforeDirectory: signingBlock(pairs) },
   );
+}
+
+export function withZip64End(apk: Buffer): Buffer {
+  const end = apk.subarray(apk.length - 22);
+  const record = Buffer.concat([
+    u32(0x06064b50),
+    u64(44),
+    u16(45),
+    u16(45),
+    u32(0),
+    u32(0),
+    u64(end.readUInt16LE(8)),
+    u64(end.readUInt16LE(10)),
+    u64(end.readUInt32LE(12)),
+    u64(end.readUInt32LE(16)),
+  ]);
+  const locator = Buffer.concat([u32(0x07064b50), u32(0), u64(apk.length - 22), u32(1)]);
+  const classic = Buffer.from(end);
+  classic.writeUInt16LE(0xffff, 8);
+  classic.writeUInt16LE(0xffff, 10);
+  classic.writeUInt32LE(0xffffffff, 12);
+  classic.writeUInt32LE(0xffffffff, 16);
+  return Buffer.concat([apk.subarray(0, apk.length - 22), record, locator, classic]);
 }
 
 /** The digest the parser should report for a stand-in certificate. */

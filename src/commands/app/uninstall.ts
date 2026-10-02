@@ -32,8 +32,11 @@ export const appUninstall = defineCommand({
     // asked for. A record kept by `pm uninstall -k` (`installed=false`) is not installed either.
     const record = await readPackage(adb, serial, pkg, options);
     if (record === null || !record.installed) {
-      forgetInstallRecord(serial, pkg, context.env);
-      return { ok: okLine("uninstall", pkg, noop("already not installed")) };
+      const warning = forgetInstallRecord(serial, pkg, context.env);
+      return {
+        ok: okLine("uninstall", pkg, noop("already not installed")),
+        ...(warning === undefined ? {} : { warning }),
+      };
     }
 
     const result = await runShell(adb, serial, `pm uninstall${keepData ? " -k" : ""} ${pkg}`, {
@@ -63,7 +66,10 @@ export const appUninstall = defineCommand({
       });
     }
 
-    forgetInstallRecord(serial, pkg, context.env);
-    return { ok: okLine("uninstall", pkg, keepData ? "removed with data kept" : "removed") };
+    const warning = forgetInstallRecord(serial, pkg, context.env);
+    return {
+      ok: okLine("uninstall", pkg, keepData ? "removed with data kept" : "removed"),
+      ...(warning === undefined ? {} : { warning }),
+    };
   },
 });
