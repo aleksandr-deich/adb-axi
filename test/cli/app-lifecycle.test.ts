@@ -1635,9 +1635,7 @@ describe("app start settle deadlines", () => {
 });
 
 describe("launched activity process identity", () => {
-  it.each(
-    [0, 10].flatMap((userId) => [true, false].map((alive) => ({ userId, alive }))),
-  )(
+  it.each([0, 10].flatMap((userId) => [true, false].map((alive) => ({ userId, alive }))))(
     "does not adopt am's permission-controller activity, user=$userId, alive=$alive",
     async ({ userId, alive }) => {
       const controller = "com.google.android.permissioncontroller";
