@@ -652,49 +652,6 @@ describe("app stop", () => {
 });
 
 describe("app clear", () => {
-  it.each(
-    [0, 10].flatMap((userId) =>
-      [false, true].map((otherInstalled) => ({ userId, otherInstalled })),
-    ),
-  )(
-    "protects other profiles before clearing, user=$userId, otherInstalled=$otherInstalled",
-    async ({ userId, otherInstalled }) => {
-      const otherUser = userId === 0 ? 10 : 0;
-      const clear = CLEAR.replace("--user 0", `--user ${userId}`);
-      const files = DATA_FILES.replace("--user 0", `--user ${userId}`);
-      const f = device({
-        [CURRENT_USER]: { stdout: `${userId}\n` },
-        [PACKAGE]: {
-          stdout: `Packages:\n  Package [dev.probe] (abc):\n    flags=[ DEBUGGABLE HAS_CODE ]\n    User ${userId}: installed=true hidden=false\n    User ${otherUser}: installed=${otherInstalled} hidden=false\n`,
-        },
-        [clear]: { stdout: "Success\n" },
-        [PIDOF]: PROBE_STOPPED,
-        [files]: {},
-      });
-      const { toon, data } = await both(["app", "clear", "dev.probe", "--device", SERIAL], f);
-      expect(toon.exitCode).toBe(otherInstalled ? 1 : 0);
-      if (otherInstalled) {
-        expect(data).toEqual({
-          error: "Refusing to clear dev.probe: pm clear can stop its copies in other Android users",
-          code: "CLEAR_FAILED",
-          current_user: userId,
-          other_users: [otherUser],
-          help: [
-            `Run \`adb-axi app stop dev.probe --device ${SERIAL}\` to stop only the current user's copy without clearing data`,
-          ],
-        });
-        expect(shellCommands(f)).toEqual(twice([CURRENT_USER, PACKAGE]));
-      } else {
-        expect(data).toEqual({
-          ok: "clear dev.probe -> data cleared, process stopped",
-          confirmed_by: ["pm clear", "run-as"],
-        });
-        expect(shellCommands(f)).toEqual(twice([CURRENT_USER, PACKAGE, clear, PIDOF, files]));
-      }
-      expectClean(f);
-    },
-  );
-
   it("clears the data, verifies with run-as that no file is left, and reports the process stopped", async () => {
     const f = liveDevice(AM_START.hot, "running");
     const { toon, data } = await both(["app", "clear", "dev.probe"], f);
@@ -910,16 +867,16 @@ describe("lifecycle review regressions", () => {
       const clear = CLEAR.replace("--user 0", `--user ${userId}`);
       const start = START.replace("--user 0", `--user ${userId}`);
       const dataFiles = DATA_FILES.replace("--user 0", `--user ${userId}`);
-      const otherInstalled = command !== "clear";
       const f = device({
         [CURRENT_USER]: { stdout: `${userId}\n` },
         [PACKAGE]: {
-          stdout: `Packages:\n  Package [dev.probe] (abc):\n    appId=10213\n    flags=[ DEBUGGABLE HAS_CODE ]\n    User ${userId}: installed=true hidden=false\n    User ${otherUser}: installed=${otherInstalled} hidden=false\n`,
+          stdout:
+            "Packages:\n  Package [dev.probe] (abc):\n    appId=10213\n    flags=[ DEBUGGABLE HAS_CODE ]\n    User 0: installed=true hidden=false\n    User 10: installed=true hidden=false\n",
         },
         [forceStop]: {},
         [clear]: { stdout: "Success\n" },
         [start]: AM_START.cold,
-        [PIDOF]: { stdout: otherInstalled ? "8235 9001\n" : "8235\n" },
+        [PIDOF]: { stdout: "8235 9001\n" },
         [KERNEL_UIDS]: {
           stdout: `  PID   UID\n 8235 ${userId * 100000 + 10213}\n 9001 ${otherUser * 100000 + 10213}\n`,
         },
@@ -1141,7 +1098,7 @@ describe("lifecycle review regressions", () => {
   });
 
   it.each(["start", "stop", "clear"])(
-    "limits %s mutations to current user 10 or refuses unsafe clear",
+    "scopes %s data and observations to current user 10, allowing Android's clear process stop",
     async (command) => {
       let previous: Record<string, unknown> | undefined;
       for (const json of [false, true]) {
@@ -1151,7 +1108,7 @@ describe("lifecycle review regressions", () => {
         const resolve = RESOLVE.replace("--user 0", "--user 10");
         const files = DATA_FILES.replace("--user 0", "--user 10");
         fake = createFakeAdb({
-          description: "Only the current user's process and data change",
+          description: "Current-user data scope with Android's cross-user process stop on clear",
           synthetic: true,
           state: {
             current: "running",
@@ -1179,6 +1136,11 @@ describe("lifecycle review regressions", () => {
             },
             { match: shell(start), respond: AM_START.cold, set: { current: "running" } },
             { match: shell(files), when: { currentData: "empty" }, respond: {} },
+            {
+              match: shell(PIDOF),
+              when: { current: "stopped", other: "stopped" },
+              respond: PROBE_STOPPED,
+            },
             {
               match: shell(PIDOF),
               when: { current: "running" },
@@ -1227,7 +1189,7 @@ describe("lifecycle review regressions", () => {
           ],
           fake.env,
         );
-        expect(result.exitCode).toBe(command === "clear" ? 1 : 0);
+        expect(result.exitCode).toBe(0);
         const data = (json ? JSON.parse(result.stdout) : decode(result.stdout.trimEnd())) as Record<
           string,
           unknown
@@ -1235,24 +1197,17 @@ describe("lifecycle review regressions", () => {
         if (previous !== undefined) expect(withoutTime(data)).toEqual(withoutTime(previous));
         previous = data;
         expect(fake.vars()).toMatchObject({
-          other: "running",
+          other: command === "clear" ? "stopped" : "running",
           otherData: "present",
-          current: command === "stop" ? "stopped" : "running",
-          currentData: "present",
+          current: command === "start" ? "running" : "stopped",
+          currentData: command === "clear" ? "empty" : "present",
         });
         if (command === "start")
           expect(data.app).toMatchObject({ pid: 8235, activity: ".MainActivity" });
         if (command === "stop") expect(data.ok).toMatch(/pid 8235 gone/);
         if (command === "clear") {
-          expect(data).toMatchObject({
-            code: "CLEAR_FAILED",
-            current_user: 10,
-            other_users: [0],
-            help: [
-              "Run `adb-axi app stop dev.probe` to stop only the current user's copy without clearing data",
-            ],
-          });
-          expect(shellCommands(fake)).toEqual([CURRENT_USER, PACKAGE]);
+          expect(data.confirmed_by).toEqual(["pm clear", "run-as"]);
+          expect(shellCommands(fake)).toEqual([CURRENT_USER, PACKAGE, clear, PIDOF, files]);
         }
         expectClean(fake);
         fake.cleanup();
@@ -1993,6 +1948,16 @@ describe("help for the shipped app lifecycle commands", () => {
       .filter((command) => !command.shipped)
       .map((command) => `adb-axi ${command.path.join(" ")}`);
     expect(listed.filter((command) => unshipped.includes(command))).toEqual([]);
+    expect(f.calls()).toEqual([]);
+  });
+
+  it("documents clear's data scope and Android's cross-user process stop", async () => {
+    const f = device({});
+    const { toon, data } = await both(["app", "clear", "--help"], f);
+    expect(toon.exitCode).toBe(0);
+    expect(data.summary).toBe(
+      "Clear the current Android user's app data, verify it is cleared, and report the process stopped. Android also stops the app's running processes for other Android users, leaving their data intact.",
+    );
     expect(f.calls()).toEqual([]);
   });
 

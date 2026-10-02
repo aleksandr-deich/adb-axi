@@ -1,6 +1,5 @@
 import { runShell } from "../../adb/shell.js";
 import { assertPackageName } from "../../android/component.js";
-import { parseDumpsysPackage } from "../../android/packages.js";
 import { invalidOutput, readShell } from "../../android/read.js";
 import { AdbAxiError } from "../../core/errors.js";
 import { okLine, runHint } from "../../core/output.js";
@@ -14,7 +13,8 @@ const LISTED_FILES = 10;
 
 export const appClear = defineCommand({
   path: ["app", "clear"],
-  summary: "Clear an app's data, verify it is cleared, and report the process stopped",
+  summary:
+    "Clear the current Android user's app data, verify it is cleared, and report the process stopped. Android also stops the app's running processes for other Android users, leaving their data intact.",
   positionals: [
     { name: "pkg", description: "Package name, for example com.example.notes", required: true },
   ],
@@ -33,31 +33,7 @@ export const appClear = defineCommand({
     const serial = targetSerial(context);
     const adb = context.adb();
 
-    const { info, dump, userId } = await requireInstalled(context, pkg);
-
-    // Android can force-stop every user's copy even with `pm clear --user`.
-    // Refuse before mutating when that could affect another installed copy.
-    const users = new Set(
-      [...dump.matchAll(/^\s+User (\d+):/gm)].map((match) => Number(match[1])),
-    );
-    const otherUsers = [...users].filter(
-      (user) => user !== userId && parseDumpsysPackage(dump, pkg, user)?.installed === true,
-    );
-    if (otherUsers.length > 0) {
-      throw new AdbAxiError(
-        "CLEAR_FAILED",
-        `Refusing to clear ${pkg}: pm clear can stop its copies in other Android users`,
-        {
-          fields: { current_user: userId, other_users: otherUsers },
-          help: [
-            runHint(
-              lifecycleCommand(context, ["app", "stop", pkg]),
-              "to stop only the current user's copy without clearing data",
-            ),
-          ],
-        },
-      );
-    }
+    const { info, userId } = await requireInstalled(context, pkg);
 
     // `pm clear` waits for the system to report the data cleared, then prints `Success`;
     // a refusal prints `Failed` and exits 1 (AOSP `PackageManagerShellCommand.runClear`).

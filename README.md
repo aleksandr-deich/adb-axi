@@ -4,6 +4,8 @@ An agent-friendly command-line wrapper around adb, following the AXI conventions
 
 It covers the device-state side of Android work: device health, app lifecycle including process-death checks, run-scoped logs and crashes, and app data. UI driving is out of scope.
 
+`adb-axi app clear <pkg>` clears only the current Android user's app data. Android also stops the app's running processes for other Android users, leaving their data intact.
+
 **Status:** in development. Commands ship one slice at a time; `adb-axi --help` lists the ones available in your build.
 
 `app install <apk>` uses `adb install -r` to keep app data, then waits for the package manager to report the APK's versionCode. Its default deadline is 180 seconds; override it with `--timeout <dur>`. `--clean-data` installs, clears data, and verifies the version again, even when combined with `--if-changed`. If the APK metadata cannot be read, `--clean-data` refuses the install because the package to wipe is unknown; otherwise an unreadable APK can still be installed, with output stating that its version was not verified.

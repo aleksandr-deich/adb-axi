@@ -21,7 +21,7 @@ export const ERROR_CATALOGUE = {
   ACTIVITY_NOT_FOUND: "The activity does not exist; existing ones are listed",
   APP_DIED_ON_START: "The process was gone right after start or restore",
   STOP_FAILED: "The process was still present at the deadline after a force-stop or pm clear",
-  CLEAR_FAILED: "Data could not be safely cleared, or files remain after pm clear",
+  CLEAR_FAILED: "Files were still in the app data directory after pm clear; they are listed",
   UNINSTALL_FAILED: "The package was still installed after the uninstall",
   KILL_TIMEOUT: "The process was still alive at the deadline",
   TASK_NOT_IN_RECENTS: "There is no task in recents to restore",
