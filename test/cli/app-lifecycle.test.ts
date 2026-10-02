@@ -1450,9 +1450,13 @@ describe("app start settle deadlines", () => {
     },
   );
 
-  it.each([PROCESSES, FOREGROUND])(
-    "fails when %s expires before any complete observation",
-    async (command) => {
+  it.each(
+    [PROCESSES, FOREGROUND].flatMap((command) =>
+      ["1s", "6s"].map((timeout) => ({ command, timeout })),
+    ),
+  )(
+    "fails when $command expires before any complete observation with timeout=$timeout",
+    async ({ command, timeout }) => {
       const f = device({
         [PACKAGE]: INSTALLED,
         [START]: AM_START.cold,
@@ -1461,11 +1465,13 @@ describe("app start settle deadlines", () => {
         [FOREGROUND]: permission,
         [command]: { delayMs: 5000 },
       });
-      const { toon, data } = await both(
-        ["app", "start", "dev.probe/.MainActivity", "--timeout", "1s"],
+      const { toon, json, data } = await both(
+        ["app", "start", "dev.probe/.MainActivity", "--timeout", timeout],
         f,
       );
       expect(toon.exitCode).toBe(1);
+      expect(toon.durationMs).toBeLessThan(4000);
+      expect(json.durationMs).toBeLessThan(4000);
       expect(data).toMatchObject({
         code: "TIMEOUT",
         step:
@@ -1475,6 +1481,52 @@ describe("app start settle deadlines", () => {
       });
       expect(data).not.toHaveProperty("app");
       expect(data).not.toHaveProperty("ok");
+      expectClean(f);
+    },
+  );
+
+  it.each(["process", "foreground"])(
+    "bounds a stalled later %s read to the settle window rather than the command timeout",
+    async (step) => {
+      const f = deviceWithRules([
+        { match: shell(PACKAGE), respond: INSTALLED },
+        { match: shell(METADATA), respond: activityInfo(".MainActivity", "dev.probe:ui") },
+        { match: shell(START), respond: AM_START.cold, set: { observation: "first" } },
+        {
+          match: shell(PROCESSES),
+          when: { observation: "first" },
+          respond: ui,
+          set: { observation: "first-front" },
+        },
+        {
+          match: shell(FOREGROUND),
+          when: { observation: "first-front" },
+          respond: permission,
+          set: { observation: "later" },
+        },
+        {
+          match: shell(PROCESSES),
+          when: { observation: "later" },
+          respond: step === "process" ? { delayMs: 10000 } : {},
+          set: { observation: "later-front" },
+        },
+        {
+          match: shell(FOREGROUND),
+          when: { observation: "later-front" },
+          respond: { delayMs: 10000 },
+        },
+      ]);
+      const { toon, json, data } = await both(
+        ["app", "start", "dev.probe/.MainActivity", "--timeout", "6s"],
+        f,
+      );
+      expect(toon.exitCode).toBe(0);
+      expect(toon.durationMs).toBeLessThan(4000);
+      expect(json.durationMs).toBeLessThan(4000);
+      expect(data).toMatchObject({
+        ok: "start dev.probe -> running, com.android.permissioncontroller in front",
+        app: { activity: ".MainActivity", pid: 8123 },
+      });
       expectClean(f);
     },
   );

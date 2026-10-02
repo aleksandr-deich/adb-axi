@@ -26,13 +26,9 @@ export async function packageProcesses(
   context: CommandContext,
   pkg: string,
   userId: number,
+  options: ReadOptions,
 ): Promise<ProcessRecord[]> {
-  const processes = await readProcesses(
-    context.adb(),
-    targetSerial(context),
-    pkg,
-    readOptions(context),
-  );
+  const processes = await readProcesses(context.adb(), targetSerial(context), pkg, options);
   return processes.filter((process) => Math.floor(process.uid / 100000) === userId);
 }
 

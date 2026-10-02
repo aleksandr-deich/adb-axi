@@ -15,6 +15,7 @@ import {
 } from "../../android/component.js";
 import { readForeground } from "../../android/foreground.js";
 import { invalidOutput } from "../../android/read.js";
+import { Deadline } from "../../core/deadline.js";
 import { AdbAxiError } from "../../core/errors.js";
 import { okLine, runHint, type Output } from "../../core/output.js";
 import { poll } from "../../core/poll.js";
@@ -232,19 +233,23 @@ async function settle(
   userId: number,
   processName: string,
 ): Promise<Seen> {
+  const deadline =
+    context.deadline.remainingMs() <= SETTLE_MS ? context.deadline : new Deadline(SETTLE_MS);
   let last: Seen | undefined;
   const result = await poll<Seen, Seen>({
-    timeoutMs: Math.min(SETTLE_MS, context.deadline.remainingMs()),
+    timeoutMs: deadline.remainingMs(),
     check: async () => {
-      if (last !== undefined && context.deadline.remainingMs() === 0) {
+      if (last !== undefined && deadline.remainingMs() === 0) {
         return { done: true, value: last };
       }
       try {
-        const processes = await packageProcesses(context, activity.package, userId);
-        if (last !== undefined && context.deadline.remainingMs() === 0) {
+        const processes = await packageProcesses(context, activity.package, userId, {
+          deadline,
+        });
+        if (last !== undefined && deadline.remainingMs() === 0) {
           return { done: true, value: last };
         }
-        const front = await readForeground(adb, serial, { ...readOptions(context), userId });
+        const front = await readForeground(adb, serial, { deadline, userId });
         const pid = processes.find((process) => process.process === processName)?.pid ?? UNKNOWN;
         const inFront =
           front?.package === activity.package &&
