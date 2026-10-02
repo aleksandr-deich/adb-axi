@@ -611,6 +611,50 @@ describe("logs", () => {
       expect(data).not.toHaveProperty("help");
     });
 
+    it("applies a single-row byte cut to the displayed tag but not the full file", async () => {
+      const tag = "T".repeat(5000);
+      const f = devices({
+        serial: A,
+        api: 35,
+        clocks: ["1790835000.000000000 +0000\n"],
+        shell: {
+          [logcatFor("1790834100.000")]: {
+            stdout: logLine(1790834900000, 1, "E", tag, "original message"),
+          },
+        },
+      });
+      const { data } = await both(["logs"], f);
+      const row = rowsOf(data)[0];
+      expect(row).toBeDefined();
+      expect(row?.tag.length).toBeLessThan(tag.length);
+      expect(row?.message).toBe("");
+      expect(Buffer.byteLength(`${row?.time},${row?.level},${row?.tag},${row?.message}`)).toBeLessThanOrEqual(4096);
+      expect(data.shown).toMatch(/^1 of 1 lines, cut at 4096 of \d+ bytes$/);
+      const full = await runCli(["logs", "--full"], f.env);
+      const path = (decode(full.stdout.trimEnd()) as Record<string, unknown>).full as string;
+      expect(readFileSync(path, "utf8")).toContain(`${tag}: original message`);
+    });
+
+    it("applies a single-row byte cut to a multibyte message", async () => {
+      const message = "🧑‍💻".repeat(500);
+      const f = devices({
+        serial: A,
+        api: 35,
+        clocks: ["1790835000.000000000 +0000\n"],
+        shell: {
+          [logcatFor("1790834100.000")]: {
+            stdout: logLine(1790834900000, 1, "E", "Tag", message),
+          },
+        },
+      });
+      const { data } = await both(["logs"], f);
+      const row = rowsOf(data)[0];
+      expect(row?.message).toBeTruthy();
+      expect(row?.tag).toBe("Tag");
+      expect(Buffer.byteLength(`${row?.time},${row?.level},${row?.tag},${row?.message}`)).toBeLessThanOrEqual(4096);
+      expect(data.shown).toMatch(/^1 of 1 lines, cut at \d+ of \d+ bytes$/);
+    });
+
     it("cuts a long message and says how long it was, keeping it whole in the file", async () => {
       const long = "x".repeat(900);
       const f = devices({

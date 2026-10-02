@@ -14,7 +14,8 @@ export const logsMark = defineCommand({
   positionals: [
     {
       name: "name",
-      description: "Mark name; defaults to mark-<HHMMSS> from device time",
+      description:
+        "Mark name; defaults to mark-<HHMMSS> from device time. Take marks one at a time per device: simultaneous logs mark calls can lose one",
       required: false,
     },
   ],

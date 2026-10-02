@@ -87,6 +87,34 @@ export const logsDump = defineCommand({
       { keep: "tail" },
     );
     const visible = rows.slice(rows.length - shown.lines.length);
+    const displayed = visible.map((row) => {
+      const capped = shown.cut === undefined ? undefined : shown.lines[0];
+      const tagStart = `${row.time},${row.level},`.length;
+      const messageStart = tagStart + row.tag.length + 1;
+      const tag = capped === undefined ? row.tag : capped.slice(tagStart, messageStart - 1);
+      return {
+        time: row.time,
+        level: row.level,
+        tag:
+          capped !== undefined && capped.length < messageStart
+            ? Array.from(tag).slice(0, -1).join("")
+            : tag,
+        message: capped === undefined ? displayMessage(row) : capped.slice(messageStart),
+      };
+    });
+    const cutRow = displayed[0];
+    const cutShown =
+      shown.cut === undefined || cutRow === undefined
+        ? shown
+        : {
+            ...shown,
+            cut: {
+              ...shown.cut,
+              shownBytes: Buffer.byteLength(
+                `${cutRow.time},${cutRow.level},${cutRow.tag},${cutRow.message}`,
+              ),
+            },
+          };
 
     const seconds = Math.max(0, Math.round((now.epochMs - window.startMs) / 1000));
     const full = context.flags.full === true;
@@ -95,13 +123,8 @@ export const logsDump = defineCommand({
       window: `${window.label} -> now (${seconds} s), ${scanned.length} lines scanned`,
       ...(scope === undefined ? {} : { scope: describeScope(scope, scanned) }),
       counts,
-      lines: visible.map((row) => ({
-        time: row.time,
-        level: row.level,
-        tag: row.tag,
-        message: displayMessage(row),
-      })),
-      ...(shown.truncated ? { shown: shownLine({ ...shown, total: lines.length }) } : {}),
+      lines: displayed,
+      ...(shown.truncated ? { shown: shownLine({ ...cutShown, total: lines.length }) } : {}),
       ...(full
         ? {
             full: writeFullOutput(
