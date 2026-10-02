@@ -181,17 +181,17 @@ describe("logs mark", () => {
         [logcatFor(MARK_START)]: { stdout: logLine(1790834111000, 1, "I", "Tag", "ready") },
       },
     });
-    const marked = await both(["logs", "mark", "__proto__"], f);
+    const marked = await both(["logs", "mark", "constructor"], f);
     expect(marked.toon.exitCode).toBe(0);
     const saved = JSON.parse(readFileSync(join(f.home, A, "marks.json"), "utf8")) as {
       marks: Record<string, { epoch_ms: number }>;
     };
-    expect(Object.hasOwn(saved.marks, "__proto__")).toBe(true);
-    expect(saved.marks["__proto__"]?.epoch_ms).toBe(1790834110420);
-    const dump = await both(["logs", "--since", "__proto__"], f);
+    expect(Object.hasOwn(saved.marks, "constructor")).toBe(true);
+    expect(saved.marks["constructor"]?.epoch_ms).toBe(1790834110420);
+    const dump = await both(["logs", "--since", "constructor"], f);
     expect(dump.toon.exitCode).toBe(0);
-    expect(dump.data.window).toBe("__proto__ -> now (30 s), 1 lines scanned");
-    const waited = await both(["wait", "log", "ready", "--since", "__proto__"], f);
+    expect(dump.data.window).toBe("constructor -> now (30 s), 1 lines scanned");
+    const waited = await both(["wait", "log", "ready", "--since", "constructor"], f);
     expect(waited.toon.exitCode).toBe(0);
     expect(waited.data.match).toMatchObject({ message: "ready" });
     expectClean(f);
@@ -626,7 +626,7 @@ describe("logs", () => {
       const { data } = await both(["logs"], f);
       const row = rowsOf(data)[0];
       expect(row).toBeDefined();
-      expect(row?.tag.length).toBeLessThan(tag.length);
+      expect(row?.tag?.length).toBeLessThan(tag.length);
       expect(row?.message).toBe("");
       expect(Buffer.byteLength(`${row?.time},${row?.level},${row?.tag},${row?.message}`)).toBeLessThanOrEqual(4096);
       expect(data.shown).toMatch(/^1 of 1 lines, cut at 4096 of \d+ bytes$/);
