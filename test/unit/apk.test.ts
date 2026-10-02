@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { ApkError, bufferSource, readApkFile, readApkInfo } from "../../src/apk/index.js";
+import { MAX_ENTRY_BYTES, readZipEntry } from "../../src/apk/zip.js";
 import { FIXTURES_DIR } from "../fake-adb/harness.js";
 import {
   buildApk,
@@ -198,6 +199,59 @@ describe("the signer digest", () => {
       },
     );
     expect(info(apk).signerUnreadable).toMatch(/Signing Block/);
+  });
+});
+
+describe("ZIP entry read bounds", () => {
+  it.each([0, 8])(
+    "rejects oversized stored and expanded lengths before reading method %s",
+    (method) => {
+      for (const field of ["compressedSize", "uncompressedSize"] as const) {
+        const reads: number[] = [];
+        const source = {
+          size: 1024 * 1024 * 1024,
+          read(_offset: number, length: number): Buffer {
+            reads.push(length);
+            throw new Error("unexpected entry read");
+          },
+        };
+        expect(() =>
+          readZipEntry(source, {
+            name: "AndroidManifest.xml",
+            method,
+            localHeaderOffset: 0,
+            compressedSize: 1024,
+            uncompressedSize: 1024,
+            [field]: MAX_ENTRY_BYTES + 1,
+          }),
+        ).toThrow(ApkError);
+        expect(reads).toEqual([]);
+      }
+    },
+  );
+
+  it.each([0, 8])("rejects an entry payload past EOF before reading method %s", (method) => {
+    const header = Buffer.alloc(30);
+    header.writeUInt32LE(0x04034b50);
+    const reads: number[] = [];
+    const source = {
+      size: header.length,
+      read(_offset: number, length: number): Buffer {
+        reads.push(length);
+        if (reads.length > 1) throw new Error("unexpected payload read");
+        return header;
+      },
+    };
+    expect(() =>
+      readZipEntry(source, {
+        name: "AndroidManifest.xml",
+        method,
+        localHeaderOffset: 0,
+        compressedSize: 1,
+        uncompressedSize: 1,
+      }),
+    ).toThrow(ApkError);
+    expect(reads).toEqual([30]);
   });
 });
 

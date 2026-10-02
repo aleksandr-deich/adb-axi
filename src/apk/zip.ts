@@ -82,7 +82,7 @@ export function readZipDirectory(source: ByteSource): ZipDirectory {
 
 /** The bytes of one entry, inflated when it is deflated. */
 export function readZipEntry(source: ByteSource, entry: ZipEntry): Buffer {
-  if (entry.uncompressedSize > MAX_ENTRY_BYTES) {
+  if (entry.compressedSize > MAX_ENTRY_BYTES || entry.uncompressedSize > MAX_ENTRY_BYTES) {
     throw new ApkError(`${entry.name} is larger than adb-axi reads`);
   }
   const header = source.read(entry.localHeaderOffset, LOCAL_FIXED_SIZE);
@@ -91,6 +91,9 @@ export function readZipEntry(source: ByteSource, entry: ZipEntry): Buffer {
   }
   const dataStart =
     entry.localHeaderOffset + LOCAL_FIXED_SIZE + header.readUInt16LE(26) + header.readUInt16LE(28);
+  if (dataStart + entry.compressedSize > source.size) {
+    throw new ApkError(`the data of ${entry.name} is outside the file`);
+  }
   const stored = source.read(dataStart, entry.compressedSize);
   if (entry.method === 0) return stored;
   if (entry.method !== 8)

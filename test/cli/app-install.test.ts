@@ -82,6 +82,23 @@ beforeAll(() => {
   } finally {
     closeSync(fd);
   }
+  for (const method of [0, 8]) {
+    const malformed = buildApk({ ...notes, deflateManifest: method === 8 });
+    const directory = malformed.readUInt32LE(malformed.length - 6);
+    const tail = Buffer.from(malformed.subarray(directory));
+    const padding = 1024 * 1024 * 1024;
+    tail.writeUInt32LE(512 * 1024 * 1024, 20);
+    tail.writeUInt32LE(1024, 24);
+    tail.writeUInt32LE(directory + padding, tail.length - 6);
+    const path = join(apkDir, `huge-compressed-${method}.apk`);
+    const fd = openSync(path, "w");
+    try {
+      writeSync(fd, malformed.subarray(0, directory), 0, directory, 0);
+      writeSync(fd, tail, 0, tail.length, directory + padding);
+    } finally {
+      closeSync(fd);
+    }
+  }
   PROBE_APK = join(FIXTURES_DIR, "apk", "probe-debug.apk");
 });
 afterAll(() => {
@@ -636,6 +653,33 @@ describe("app install", () => {
       expect(calls(fake)).toContain(`install -r ${APK_V1_ONLY}`);
       expect(recordFile(fake)).toMatchObject({ packages: { [PKG]: { signers: null } } });
     });
+
+    it.each([0, 8])(
+      "safely falls back for a huge declared compressed manifest: method %s",
+      async (method) => {
+        const apk = join(apkDir, `huge-compressed-${method}.apk`);
+        const { toon, data, fake } = await both(
+          () =>
+            world({
+              start: "current",
+              dumps: { current: V57 },
+              rules: [installs(apk, INSTALL_OK, "current")],
+            }),
+          ["app", "install", apk, "--if-changed"],
+        );
+        expect(toon.exitCode).toBe(0);
+        expect(data.ok).toBe(
+          `install huge-compressed-${method}.apk -> installed, version not verified`,
+        );
+        expect(data.install).toMatchObject({
+          shortcut:
+            "skipped because the APK metadata cannot be read (AndroidManifest.xml is larger than adb-axi reads)",
+          detail: "AndroidManifest.xml is larger than adb-axi reads",
+        });
+        expect(calls(fake)).toEqual([`install -r ${apk}`]);
+        expectClean(fake);
+      },
+    );
 
     it("installs a corrupt APK anyway and says the shortcut was skipped", async () => {
       const { toon, data, fake } = await both(
