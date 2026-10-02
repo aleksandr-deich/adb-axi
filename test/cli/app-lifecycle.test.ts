@@ -977,7 +977,7 @@ describe("lifecycle review regressions", () => {
     [
       "another activity of the same app",
       "  ResumedActivity: ActivityRecord{abc u0 dev.probe/.OtherActivity t8}\n",
-      "running",
+      "foreground",
     ],
     [
       "permission dialog",
@@ -1005,7 +1005,9 @@ describe("lifecycle review regressions", () => {
         pid: 8123,
         activity: front.includes("dev.probe/dev.probe.MainActivity")
           ? "dev.probe.MainActivity"
-          : ".MainActivity",
+          : front.includes("dev.probe/.OtherActivity")
+            ? ".OtherActivity"
+            : ".MainActivity",
       });
       expect(data.ok).toContain(`-> ${state}`);
       expect(shellCommands(f)).not.toContain(PIDOF);
