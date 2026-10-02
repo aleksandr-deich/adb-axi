@@ -1196,40 +1196,43 @@ describe("app uninstall", () => {
     ["absent", false, "already not installed (no-op)"],
     ["current", false, "removed"],
     ["current", true, "removed with data kept"],
-  ])("preserves success despite unwritable cache cleanup: %s keep=%s", async (start, keep, outcome) => {
-    const fake = world({
-      start,
-      dumps: { current: V57, absent: ABSENT, kept: KEPT },
-      rules: [
-        uninstalls(
-          `pm uninstall${keep ? " -k" : ""} ${PKG}`,
-          { stdout: "Success\n" },
-          keep ? "kept" : "absent",
-        ),
-      ],
-    });
-    seedRecord(fake, {
-      packages: {
-        [PKG]: { versionCode: 57, versionName: "1.4.0", signers: null, installedAt: "x" },
-      },
-    });
-    const directory = join(fake.home, SERIAL);
-    chmodSync(directory, 0o555);
-    try {
-      const run = await runCli(
-        ["app", "uninstall", PKG, ...(keep ? ["--keep-data"] : []), "--json"],
-        fake.env,
-      );
-      expect(run.exitCode).toBe(0);
-      expect(JSON.parse(run.stdout)).toMatchObject({
-        ok: `uninstall ${PKG} -> ${outcome}`,
-        warning: expect.stringContaining("the install record could not be removed") as string,
+  ])(
+    "preserves success despite unwritable cache cleanup: %s keep=%s",
+    async (start, keep, outcome) => {
+      const fake = world({
+        start,
+        dumps: { current: V57, absent: ABSENT, kept: KEPT },
+        rules: [
+          uninstalls(
+            `pm uninstall${keep ? " -k" : ""} ${PKG}`,
+            { stdout: "Success\n" },
+            keep ? "kept" : "absent",
+          ),
+        ],
       });
-      expectClean(fake);
-    } finally {
-      chmodSync(directory, 0o755);
-    }
-  });
+      seedRecord(fake, {
+        packages: {
+          [PKG]: { versionCode: 57, versionName: "1.4.0", signers: null, installedAt: "x" },
+        },
+      });
+      const directory = join(fake.home, SERIAL);
+      chmodSync(directory, 0o555);
+      try {
+        const run = await runCli(
+          ["app", "uninstall", PKG, ...(keep ? ["--keep-data"] : []), "--json"],
+          fake.env,
+        );
+        expect(run.exitCode).toBe(0);
+        expect(JSON.parse(run.stdout)).toMatchObject({
+          ok: `uninstall ${PKG} -> ${outcome}`,
+          warning: expect.stringContaining("the install record could not be removed") as string,
+        });
+        expectClean(fake);
+      } finally {
+        chmodSync(directory, 0o755);
+      }
+    },
+  );
 
   it("exits 1 with UNINSTALL_FAILED when the package is still installed afterwards", async () => {
     const { toon, data } = await both(
