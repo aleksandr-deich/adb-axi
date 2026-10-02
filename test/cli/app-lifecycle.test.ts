@@ -1727,6 +1727,88 @@ describe("launched activity process identity", () => {
     expectClean(f);
   });
 
+  it.each(
+    [0, 10].flatMap((userId) =>
+      ["dev.probe", "dev.probe:ui"].map((process) => ({ userId, process })),
+    ),
+  )(
+    "reports a singleTop alias started twice as foreground without settling, user=$userId, process=$process",
+    async ({ userId, process }) => {
+      const aliasStart = startOf(".IconAlias").replace("--user 0", `--user ${userId}`);
+      const aliasMetadata = metadataOf(".IconAlias", userId);
+      const targetMetadata = metadataOf(".MainActivity", userId);
+      const other = userId === 0 ? 10 : 0;
+      const f = deviceWithRules([
+        { match: shell(CURRENT_USER), respond: { stdout: `${userId}\n` } },
+        {
+          match: shell(PACKAGE),
+          respond: {
+            stdout:
+              "Packages:\n  Package [dev.probe] (abc):\n    appId=10213\n    User 0: installed=true hidden=false\n    User 10: installed=true hidden=false\n",
+          },
+        },
+        {
+          match: shell(aliasStart),
+          times: 1,
+          respond: {
+            stdout:
+              "Starting: Intent { cmp=dev.probe/.IconAlias }\nStatus: ok\nActivity: dev.probe/.IconAlias\nTotalTime: 40\nWaitTime: 40\nComplete\n",
+          },
+          then: {
+            stdout:
+              "Starting: Intent { cmp=dev.probe/.IconAlias }\nWarning: Activity not started, intent has been delivered to currently running top-most instance.\nStatus: ok\nLaunchState: UNKNOWN (0)\nActivity: dev.probe/.MainActivity\nTotalTime: 0\nWaitTime: 5\nComplete\n",
+          },
+        },
+        { match: shell(aliasMetadata), respond: activityInfo(".IconAlias", process) },
+        { match: shell(targetMetadata), respond: activityInfo(".MainActivity", process) },
+        {
+          match: shell(PROCESSES),
+          respond: {
+            stdout: `  *APP* UID ${userId * 100000 + 10213} ProcessRecord{abc 8111:dev.probe:sync/u${userId}a213}\n  *APP* UID ${other * 100000 + 10213} ProcessRecord{def 9001:${process}/u${other}a213}\n  *APP* UID ${userId * 100000 + 10213} ProcessRecord{fed 8123:${process}/u${userId}a213}\n`,
+          },
+        },
+        {
+          match: shell(FOREGROUND),
+          respond: {
+            stdout: `  ResumedActivity: ActivityRecord{abc u${other} dev.probe/.MainActivity t2}\n  ResumedActivity: ActivityRecord{def u${userId} dev.probe/.IconAlias t8}\n`,
+          },
+        },
+      ]);
+      const args = ["app", "start", "dev.probe/.IconAlias"];
+      const first = await runCli(args, f.env);
+      expect(first.exitCode).toBe(0);
+      expect(decode(first.stdout.trimEnd())).toEqual({
+        ok: "start dev.probe -> foreground (started)",
+        app: {
+          activity: ".IconAlias",
+          pid: 8123,
+          launch: "unknown",
+          recreated: true,
+          took_ms: 40,
+        },
+      });
+      const { toon, data } = await both(args, f);
+      expect(toon.exitCode).toBe(0);
+      expect(data).toEqual({
+        ok: "start dev.probe -> foreground (already on top, intent delivered to it)",
+        app: { activity: ".IconAlias", pid: 8123, launch: "unknown", recreated: false },
+        help: [
+          "Run `adb-axi app start dev.probe/.IconAlias --fresh` to kill the process and cold-start",
+        ],
+      });
+      expect(shellCommands(f)).toEqual([
+        CURRENT_USER,
+        PACKAGE,
+        aliasStart,
+        aliasMetadata,
+        PROCESSES,
+        FOREGROUND,
+        ...twice([CURRENT_USER, PACKAGE, aliasStart, targetMetadata, PROCESSES, FOREGROUND]),
+      ]);
+      expectClean(f);
+    },
+  );
+
   it("uses the explicitly selected activity when am omits Activity", async () => {
     const f = device({
       [PACKAGE]: INSTALLED,

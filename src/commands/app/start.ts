@@ -7,12 +7,7 @@ import {
   readActivityProcessName,
 } from "../../android/activities.js";
 import { parseAmStart, wasRecreated, type AmStart } from "../../android/amstart.js";
-import {
-  activityClassName,
-  assertPackageName,
-  type ActivityRecord,
-  type Component,
-} from "../../android/component.js";
+import { assertPackageName, type ActivityRecord, type Component } from "../../android/component.js";
 import { readForeground } from "../../android/foreground.js";
 import { invalidOutput } from "../../android/read.js";
 import { Deadline } from "../../core/deadline.js";
@@ -251,9 +246,7 @@ async function settle(
         }
         const front = await readForeground(adb, serial, { deadline, userId });
         const pid = processes.find((process) => process.process === processName)?.pid ?? UNKNOWN;
-        const inFront =
-          front?.package === activity.package &&
-          activityClassName(front) === activityClassName(activity);
+        const inFront = front?.package === activity.package;
         const state = pid === UNKNOWN ? "stopped" : inFront ? "foreground" : "running";
         const seen: Seen = { state, pid, front };
         last = seen;
