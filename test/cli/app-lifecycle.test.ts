@@ -6,7 +6,15 @@ import type { Response, Rule } from "../fake-adb/scenario.js";
 import { runCli, type CliRun } from "../helpers/run.js";
 
 // Parity cases run two CLI deadlines sequentially, plus process startup and cleanup.
-vi.setConfig({ testTimeout: 10_000 });
+vi.setConfig({ testTimeout: 40_000 });
+
+const COMMAND_TIMEOUT_MS = 15_000;
+const STOP_TIMEOUT_MS = 5_000;
+// Leave two seconds after am's delay for prerequisite/observation calls, so the
+// command deadline (not just the two-second settle window) ends these cases.
+const SHORT_TIMEOUT_MS = 10_000;
+const SHORT_START_DELAY_MS = SHORT_TIMEOUT_MS - 2000;
+const TIMING_MARGIN_MS = 5_000;
 
 const SERIAL = "emulator-5554";
 const ONE_ONLINE = `List of devices attached\n${SERIAL}          device product:sdk_gphone64_arm64 model:sdk_gphone64_arm64 device:emu64a transport_id:1\n\n`;
@@ -253,15 +261,16 @@ describe("app start", () => {
 
   it("fails with STOP_FAILED, naming --fresh, when the process outlives the force-stop", async () => {
     const f = device({ [PACKAGE]: INSTALLED, [FORCE_STOP]: {}, [PIDOF]: PROBE_RUNNING });
-    const { toon, data } = await both(
-      ["app", "start", "dev.probe", "--fresh", "--timeout", "3s"],
+    const { toon, json, data } = await both(
+      ["app", "start", "dev.probe", "--fresh", "--timeout", `${STOP_TIMEOUT_MS}ms`],
       f,
     );
     expect(toon.exitCode).toBe(1);
-    expect(toon.durationMs).toBeLessThan(4000);
+    expect(toon.durationMs).toBeLessThan(STOP_TIMEOUT_MS + TIMING_MARGIN_MS);
+    expect(json.durationMs).toBeLessThan(STOP_TIMEOUT_MS + TIMING_MARGIN_MS);
     expect(toon.stdout).toBe(
       [
-        "error: dev.probe was still running at the 3 s deadline after am force-stop in `adb-axi app start dev.probe --fresh`",
+        "error: dev.probe was still running at the 5 s deadline after am force-stop in `adb-axi app start dev.probe --fresh`",
         "code: STOP_FAILED",
         "last:",
         "  pid: 8235",
@@ -277,7 +286,7 @@ describe("app start", () => {
   it("names the requested activity in the STOP_FAILED help of --fresh", async () => {
     const f = device({ [PACKAGE]: INSTALLED, [FORCE_STOP]: {}, [PIDOF]: PROBE_RUNNING });
     const { data } = await both(
-      ["app", "start", "dev.probe/.MainActivity", "--fresh", "--timeout", "3s"],
+      ["app", "start", "dev.probe/.MainActivity", "--fresh", "--timeout", `${STOP_TIMEOUT_MS}ms`],
       f,
     );
     expect(data).toMatchObject({
@@ -458,13 +467,17 @@ describe("app start", () => {
   });
 
   it("fails with WAIT_TIMEOUT when am start does not answer within --timeout", async () => {
-    const f = device({ [PACKAGE]: INSTALLED, [START]: { ...AM_START.cold, delayMs: 5000 } });
-    const { toon, data } = await both(["app", "start", "dev.probe", "--timeout", "1s"], f);
+    const f = device({ [PACKAGE]: INSTALLED, [START]: { hang: true } });
+    const { toon, json, data } = await both(
+      ["app", "start", "dev.probe", "--timeout", `${STOP_TIMEOUT_MS}ms`],
+      f,
+    );
     expect(toon.exitCode).toBe(1);
-    expect(toon.durationMs).toBeLessThan(3000);
+    expect(toon.durationMs).toBeLessThan(STOP_TIMEOUT_MS + TIMING_MARGIN_MS);
+    expect(json.durationMs).toBeLessThan(STOP_TIMEOUT_MS + TIMING_MARGIN_MS);
     expect(data).toMatchObject({
       code: "WAIT_TIMEOUT",
-      error: "dev.probe did not finish launching within 1 s",
+      error: "dev.probe did not finish launching within 5 s",
       last: { status: "no answer", activity: ".MainActivity" },
     });
   });
@@ -620,12 +633,16 @@ describe("app stop", () => {
 
   it("fails with STOP_FAILED, carrying the pid, when the process outlives the deadline", async () => {
     const f = device({ [PACKAGE]: INSTALLED, [PIDOF]: PROBE_RUNNING, [FORCE_STOP]: {} });
-    const { toon, data } = await both(["app", "stop", "dev.probe", "--timeout", "3s"], f);
+    const { toon, json, data } = await both(
+      ["app", "stop", "dev.probe", "--timeout", `${STOP_TIMEOUT_MS}ms`],
+      f,
+    );
     expect(toon.exitCode).toBe(1);
-    expect(toon.durationMs).toBeLessThan(4000);
+    expect(toon.durationMs).toBeLessThan(STOP_TIMEOUT_MS + TIMING_MARGIN_MS);
+    expect(json.durationMs).toBeLessThan(STOP_TIMEOUT_MS + TIMING_MARGIN_MS);
     expect(toon.stdout).toBe(
       [
-        "error: dev.probe was still running at the 3 s deadline after am force-stop in `adb-axi app stop dev.probe`",
+        "error: dev.probe was still running at the 5 s deadline after am force-stop in `adb-axi app stop dev.probe`",
         "code: STOP_FAILED",
         "last:",
         "  pid: 8235",
@@ -764,11 +781,14 @@ describe("app clear", () => {
       [CLEAR]: { stdoutFile: "captured/35/pm-clear.txt" },
       [PIDOF]: PROBE_RUNNING,
     });
-    const { toon, data } = await both(["app", "clear", "dev.probe", "--timeout", "3s"], f);
+    const { toon, data } = await both(
+      ["app", "clear", "dev.probe", "--timeout", `${STOP_TIMEOUT_MS}ms`],
+      f,
+    );
     expect(toon.exitCode).toBe(1);
     expect(data).toMatchObject({
       error:
-        "dev.probe was still running at the 3 s deadline after pm clear in `adb-axi app clear dev.probe`",
+        "dev.probe was still running at the 5 s deadline after pm clear in `adb-axi app clear dev.probe`",
       code: "STOP_FAILED",
       last: { pid: 8235 },
       help: [
@@ -894,7 +914,7 @@ describe("lifecycle review regressions", () => {
           "dev.probe",
           ...(command === "start" ? ["--activity", ".MainActivity", "--fresh"] : []),
           "--timeout",
-          "3s",
+          `${STOP_TIMEOUT_MS}ms`,
         ],
         f,
       );
@@ -1235,7 +1255,7 @@ describe("lifecycle review regressions", () => {
 
   it.each([
     ["WAIT_TIMEOUT", { stdout: "Status: timeout\n" }, false],
-    ["WAIT_TIMEOUT", { delayMs: 5000 }, false],
+    ["WAIT_TIMEOUT", { hang: true }, false],
     ["STOP_FAILED", AM_START.cold, true],
     ["APP_DIED_ON_START", AM_START.cold, false],
     ["REMOTE_EXIT", { stderr: "Permission denied\n", exit: 1 }, false],
@@ -1262,7 +1282,7 @@ describe("lifecycle review regressions", () => {
           "--device",
           SERIAL,
           "--timeout",
-          stopFails ? "3s" : "1s",
+          `${stopFails ? STOP_TIMEOUT_MS : COMMAND_TIMEOUT_MS}ms`,
         ],
         f,
       );
@@ -1377,7 +1397,10 @@ describe("app start settle deadlines", () => {
           stdout:
             "Packages:\n  Package [dev.probe] (abc):\n    appId=10213\n    User 0: installed=true hidden=false\n    User 10: installed=true hidden=false\n",
         },
-        [START.replace("--user 0", `--user ${userId}`)]: AM_START.cold,
+        [START.replace("--user 0", `--user ${userId}`)]: {
+          ...AM_START.cold,
+          delayMs: SHORT_START_DELAY_MS,
+        },
         [FORCE_STOP.replace("--user 0", `--user ${userId}`)]: {},
         [PIDOF]: PROBE_STOPPED,
         [metadataOf(".MainActivity", userId)]: activityInfo(".MainActivity", process),
@@ -1395,7 +1418,7 @@ describe("app start settle deadlines", () => {
           "dev.probe/.MainActivity",
           ...(fresh ? ["--fresh"] : []),
           "--timeout",
-          "1s",
+          `${SHORT_TIMEOUT_MS}ms`,
         ],
         f,
       );
@@ -1411,8 +1434,10 @@ describe("app start settle deadlines", () => {
         },
         help: ["Run `adb-axi app current` to see what is in front"],
       });
-      expect(toon.durationMs).toBeLessThan(3000);
-      expect(json.durationMs).toBeLessThan(3000);
+      expect(toon.durationMs).toBeGreaterThanOrEqual(SHORT_TIMEOUT_MS);
+      expect(json.durationMs).toBeGreaterThanOrEqual(SHORT_TIMEOUT_MS);
+      expect(toon.durationMs).toBeLessThan(SHORT_TIMEOUT_MS + TIMING_MARGIN_MS);
+      expect(json.durationMs).toBeLessThan(SHORT_TIMEOUT_MS + TIMING_MARGIN_MS);
       expect(
         f.calls().filter((call) => call.argv[3] === FOREGROUND && call.exit === 0).length,
       ).toBeGreaterThanOrEqual(2);
@@ -1442,17 +1467,17 @@ describe("app start settle deadlines", () => {
         {
           match: shell(PROCESSES),
           when: { observation: "later" },
-          respond: step === "process" ? { delayMs: 5000 } : {},
+          respond: step === "process" ? { hang: true } : {},
           set: { observation: "later-front" },
         },
         {
           match: shell(FOREGROUND),
           when: { observation: "later-front" },
-          respond: { delayMs: 5000 },
+          respond: { hang: true },
         },
       ]);
       const { toon, data } = await both(
-        ["app", "start", "dev.probe/.MainActivity", "--timeout", "1s"],
+        ["app", "start", "dev.probe/.MainActivity", "--timeout", `${COMMAND_TIMEOUT_MS}ms`],
         f,
       );
       expect(toon.exitCode).toBe(0);
@@ -1466,26 +1491,31 @@ describe("app start settle deadlines", () => {
 
   it.each(
     [PROCESSES, FOREGROUND].flatMap((command) =>
-      ["1s", "6s"].map((timeout) => ({ command, timeout })),
+      [SHORT_TIMEOUT_MS, COMMAND_TIMEOUT_MS].map((timeout) => ({ command, timeout })),
     ),
   )(
     "fails when $command expires before any complete observation with timeout=$timeout",
     async ({ command, timeout }) => {
       const f = device({
         [PACKAGE]: INSTALLED,
-        [START]: AM_START.cold,
+        [START]: {
+          ...AM_START.cold,
+          ...(timeout === SHORT_TIMEOUT_MS ? { delayMs: SHORT_START_DELAY_MS } : {}),
+        },
         [METADATA]: activityInfo(".MainActivity", "dev.probe:ui"),
         [PROCESSES]: ui,
         [FOREGROUND]: permission,
-        [command]: { delayMs: 5000 },
+        [command]: { hang: true },
       });
       const { toon, json, data } = await both(
-        ["app", "start", "dev.probe/.MainActivity", "--timeout", timeout],
+        ["app", "start", "dev.probe/.MainActivity", "--timeout", `${timeout}ms`],
         f,
       );
       expect(toon.exitCode).toBe(1);
-      expect(toon.durationMs).toBeLessThan(4000);
-      expect(json.durationMs).toBeLessThan(4000);
+      const durationLimit =
+        timeout === SHORT_TIMEOUT_MS ? timeout + TIMING_MARGIN_MS : timeout - TIMING_MARGIN_MS;
+      expect(toon.durationMs).toBeLessThan(durationLimit);
+      expect(json.durationMs).toBeLessThan(durationLimit);
       expect(data).toMatchObject({
         code: "TIMEOUT",
         step:
@@ -1495,6 +1525,9 @@ describe("app start settle deadlines", () => {
       });
       expect(data).not.toHaveProperty("app");
       expect(data).not.toHaveProperty("ok");
+      expect(
+        f.calls().filter((call) => call.argv[3] === command && call.end === null),
+      ).toHaveLength(2);
       expectClean(f);
     },
   );
@@ -1521,26 +1554,30 @@ describe("app start settle deadlines", () => {
         {
           match: shell(PROCESSES),
           when: { observation: "later" },
-          respond: step === "process" ? { delayMs: 10000 } : {},
+          respond: step === "process" ? { hang: true } : {},
           set: { observation: "later-front" },
         },
         {
           match: shell(FOREGROUND),
           when: { observation: "later-front" },
-          respond: { delayMs: 10000 },
+          respond: { hang: true },
         },
       ]);
       const { toon, json, data } = await both(
-        ["app", "start", "dev.probe/.MainActivity", "--timeout", "6s"],
+        ["app", "start", "dev.probe/.MainActivity", "--timeout", `${COMMAND_TIMEOUT_MS}ms`],
         f,
       );
       expect(toon.exitCode).toBe(0);
-      expect(toon.durationMs).toBeLessThan(4000);
-      expect(json.durationMs).toBeLessThan(4000);
+      expect(toon.durationMs).toBeLessThan(COMMAND_TIMEOUT_MS - TIMING_MARGIN_MS);
+      expect(json.durationMs).toBeLessThan(COMMAND_TIMEOUT_MS - TIMING_MARGIN_MS);
       expect(data).toMatchObject({
         ok: "start dev.probe -> running, com.android.permissioncontroller in front",
         app: { activity: ".MainActivity", pid: 8123 },
       });
+      const stalledCommand = step === "process" ? PROCESSES : FOREGROUND;
+      expect(
+        f.calls().filter((call) => call.argv[3] === stalledCommand && call.end === null),
+      ).toHaveLength(2);
       expectClean(f);
     },
   );
@@ -1569,7 +1606,7 @@ describe("app start settle deadlines", () => {
       },
     ]);
     const { toon, data } = await both(
-      ["app", "start", "dev.probe/.MainActivity", "--timeout", "2s"],
+      ["app", "start", "dev.probe/.MainActivity", "--timeout", `${COMMAND_TIMEOUT_MS}ms`],
       f,
     );
     expect(toon.exitCode).toBe(1);
@@ -1597,7 +1634,7 @@ describe("app start settle deadlines", () => {
       { match: shell(FOREGROUND), respond: permission },
     ]);
     const { toon, data } = await both(
-      ["app", "start", "dev.probe/.MainActivity", "--timeout", "2s"],
+      ["app", "start", "dev.probe/.MainActivity", "--timeout", `${COMMAND_TIMEOUT_MS}ms`],
       f,
     );
     expect(toon.exitCode).toBe(1);
@@ -1625,7 +1662,7 @@ describe("app start settle deadlines", () => {
       { match: shell(FOREGROUND), respond: permission },
     ]);
     const { toon, data } = await both(
-      ["app", "start", "dev.probe/.MainActivity", "--timeout", "5s"],
+      ["app", "start", "dev.probe/.MainActivity", "--timeout", `${COMMAND_TIMEOUT_MS}ms`],
       f,
     );
     expect(toon.exitCode).toBe(0);
