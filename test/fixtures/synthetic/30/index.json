@@ -83,6 +83,22 @@
       "synthetic": true,
       "source": "AOSP platform/external/toybox android-11.0.0_r1 toys/posix/date.c puts_time (%N)",
       "note": "device clock west of UTC"
+    },
+    {
+      "file": "ps-pid-name.txt",
+      "argv": ["adb", "-s", "emulator-5562", "shell", "ps -A -o PID,NAME"],
+      "exitCode": 0,
+      "synthetic": true,
+      "source": "AOSP platform/external/toybox android-11.0.0_r1 toys/posix/ps.c ps_main (-A, -o PID,NAME)",
+      "note": "a PID NAME header, then one row per process: apps named after their package, a second process of the probe, system processes"
+    },
+    {
+      "file": "logcat-epoch-window.txt",
+      "argv": ["adb", "-s", "emulator-5562", "shell", "logcat -d -v epoch -T 1790834110.420"],
+      "exitCode": 0,
+      "synthetic": true,
+      "source": "AOSP platform/system/core android-11.0.0_r1 liblog/logprint.cpp android_log_formatLogLine; platform/frameworks/base android-11.0.0_r1 services/core/java/com/android/server/am/ProcessList.java startProcessLocked (Start proc)",
+      "note": "a window across a probe crash and restart: three probe pids (marked 6011, started 6030, current 6044), a second probe process, another app and system_server lines"
     }
   ]
 }
