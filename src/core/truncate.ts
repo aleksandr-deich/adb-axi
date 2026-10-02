@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { existsSync } from "node:fs";
-import { adbAxiHome, writeFileAtomic } from "./state.js";
+import { adbAxiHome, isErrno, writeFileAtomic } from "./state.js";
 
 /** Default caps for `logs` and `shell` output. */
 export const MAX_LINES = 50;
@@ -107,15 +107,24 @@ function cutToBytes(line: string, maxBytes: number): string {
 
 /**
  * Write complete output for `--full` to `<ADB_AXI_HOME>/out/<stem>.txt` and return the
- * absolute path. An existing file is never overwritten: `-2`, `-3`, ... is appended.
+ * absolute path. Existing paths get a `-2`, `-3`, ... suffix; callers needing safe
+ * concurrent writes must supply an exclusive-create writer (as `logs --full` does).
  */
-export function writeFullOutput(stem: string, content: string): string {
+export function writeFullOutput(
+  stem: string,
+  content: string,
+  write: (path: string, content: string) => void = writeFileAtomic,
+): string {
   const dir = join(adbAxiHome(), "out");
   const safeStem = stem.replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^[.-]+/, "") || "output";
-  let path = join(dir, `${safeStem}.txt`);
-  for (let n = 2; existsSync(path); n++) {
-    path = join(dir, `${safeStem}-${n}.txt`);
+  for (let n = 1; ; n++) {
+    const path = join(dir, `${safeStem}${n === 1 ? "" : `-${n}`}.txt`);
+    if (existsSync(path)) continue;
+    try {
+      write(path, content);
+      return path;
+    } catch (error) {
+      if (!isErrno(error, "EEXIST")) throw error;
+    }
   }
-  writeFileAtomic(path, content);
-  return path;
 }

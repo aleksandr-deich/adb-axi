@@ -1,0 +1,18 @@
+--------- beginning of main
+         1790834110.900  6011  6011 I dev.probe: Resumed MainActivity
+         1790834111.250   517   540 I ActivityManager: Start proc 4400:com.other.app/u0a99 for service {com.other.app/.SyncService}
+         1790834111.300  4400  4400 W OtherApp: sync is slow
+         1790834112.000  6011  6011 D ProbeState: event=inc saved=1 volatile=1 rows=0 restored=false pid=6011
+         1790834114.500   517   540 I ActivityManager: Process dev.probe (pid 6011) has died: fg  TOP
+         1790834114.650   517   540 I ActivityManager: Start proc 6030:dev.probe/u0a213 for activity {dev.probe/dev.probe.MainActivity}
+         1790834114.900  6030  6030 I dev.probe: Late-enabling -Xcheck:jni
+         1790834115.100  6030  6030 W Choreographer: Skipped 31 frames!  The application may be doing too much work on its main thread.
+         1790834115.400  6030  6030 W Choreographer: Skipped 31 frames!  The application may be doing too much work on its main thread.
+         1790834115.700  6030  6030 W Choreographer: Skipped 31 frames!  The application may be doing too much work on its main thread.
+         1790834118.000  6030  6030 E AndroidRuntime: FATAL EXCEPTION: main
+         1790834118.000  6030  6030 E AndroidRuntime: java.lang.IllegalStateException: probe crash requested
+         1790834118.000  6030  6030 E AndroidRuntime: 	at dev.probe.MainActivity.dispatch(MainActivity.kt:67)
+         1790834118.200   517   540 I ActivityManager: Start proc 6044:dev.probe/u0a213 for activity {dev.probe/dev.probe.MainActivity}
+         1790834118.500  6044  6044 I ProbeState: event=start saved=1 volatile=0 rows=0 restored=true pid=6044
+         1790834119.000  6050  6050 D ProbeRemote: remote process ready
+         1790834120.000  4400  4400 E OtherApp: sync failed

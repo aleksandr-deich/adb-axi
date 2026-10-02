@@ -29,3 +29,12 @@ These commands require the package to be installed for the current Android OS us
 - **Clear:** clears only the current Android user's app data. Android also stops the app's running processes for other Android users, leaving their data intact. `confirmed_by` names the verification used: Android's `pm clear` acknowledgement, plus a file check through `run-as` when the app is debuggable and that check succeeds. Remaining files fail verification; `--full` lists all of them rather than the default first ten. Retrying clear with `--full` performs the mutation again.
 
 Use each command's `--help` for flags and defaults. Add `--json` for the same fields as the default TOON output, and put device selection flags after the command, for example `adb-axi app start com.example.notes --device emulator-5554`.
+
+## Logs
+
+`logs mark [name]` stores the device's own clock under a name, per device, so `logs` and `wait log` can cover one run without host and device clock skew shifting the window. Without a name it uses `mark-<HHMMSS>` from device time and prints the name. Take marks one at a time per device: simultaneous `logs mark` calls can lose one. `logs [--since <mark|dur>] [--pkg <pkg>] [--level <V|D|I|W|E>] [--grep <re>] [--full]` prints one bounded dump (every logcat call is `-d`, so it never streams): level counts, repeated lines collapsed in the display, and the last 50 rows or 4 kB. When rows were cut it says `shown: N of M lines` (N displayed rows, M matching lines) and suggests `--full`. `--full` always writes every matching line uncollapsed, with its own timestamp, to a file under `ADB_AXI_HOME/out/` (default `~/.adb-axi/out/`) and prints the path, even when no lines match (an empty file). Without `--since` the dump starts 15 minutes before device time. `wait log "<regex>" [--since <mark|dur>] [--timeout <dur>]` polls until a line matches (default timeout 15 s); without `--since` it only counts lines logged after the wait began.
+
+Known limits of `--pkg`:
+
+- On API 31 and newer it is `logcat --uid`. On API 29 and 30, which have no `--uid`, it is a pid list: the app's current pids, the pids recorded when the window's mark was taken, and the pids ActivityManager names in "Start proc" lines inside the window. The list can miss a process that starts and dies between two reads.
+- Both forms drop lines that other processes log about the app, such as ActivityManager's "Start proc" and "has died" lines and ANR reports from the system server.
