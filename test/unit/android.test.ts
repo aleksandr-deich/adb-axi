@@ -66,6 +66,19 @@ describe("component", () => {
     ]);
   });
 
+  it("filters activity records by Android user without changing unscoped reads", () => {
+    const text =
+      "Activities=[ActivityRecord{abc u0 dev.probe/.Personal t2}, ActivityRecord{def u10 dev.probe/.Work t8}]";
+    expect(parseActivityRecords(text)).toHaveLength(2);
+    expect(parseActivityRecords(text, 0)).toEqual([
+      { package: "dev.probe", activity: ".Personal", component: "dev.probe/.Personal", taskId: 2 },
+    ]);
+    expect(parseActivityRecords(text, 10)).toEqual([
+      { package: "dev.probe", activity: ".Work", component: "dev.probe/.Work", taskId: 8 },
+    ]);
+    expect(parseActivityRecords(text, 11)).toEqual([]);
+  });
+
   it("accepts package names and rejects anything a shell would read as syntax", () => {
     expect(isPackageName("dev.probe")).toBe(true);
     expect(isPackageName("android")).toBe(true);
@@ -197,6 +210,28 @@ describe("parseDumpsysPackage", () => {
     });
   });
 
+  it.each(["appId", "userId"])(
+    "reads installation and uid for the selected user from %s records",
+    (id) => {
+      const text = `Packages:\n  Package [dev.probe] (abc):\n    ${id}=10213\n    User 0: installed=false hidden=false\n    User 10: installed=true hidden=false\n`;
+      expect(parseDumpsysPackage(text, "dev.probe", 0)).toMatchObject({
+        installed: false,
+        uid: 10213,
+      });
+      expect(parseDumpsysPackage(text, "dev.probe", 10)).toMatchObject({
+        installed: true,
+        uid: 1010213,
+      });
+      expect(parseDumpsysPackage(text, "dev.probe", 11)).toMatchObject({
+        installed: false,
+        uid: 1110213,
+      });
+      expect(parseDumpsysPackage(text, "dev.probe")).toEqual(
+        parseDumpsysPackage(text, "dev.probe", 0),
+      );
+    },
+  );
+
   it("ignores hidden system packages, which are not the installed copy", () => {
     const records = parsePackageRecords(synthetic("30", "dumpsys-package-release.txt"));
     expect([...records.keys()]).toEqual(["dev.probe"]);
@@ -223,6 +258,17 @@ describe("parseForeground", () => {
       });
     }
   });
+
+  it.each(["ResumedActivity: ", "Resumed: ", "mResumedActivity: ", "topResumedActivity="])(
+    "scopes %s foreground records to the selected user",
+    (prefix) => {
+      const text = `  ${prefix}ActivityRecord{abc u0 dev.probe/.Personal t2}\n  ${prefix}ActivityRecord{def u10 dev.probe/.Work t8}\n`;
+      expect(parseForeground(text)?.activity).toBe(".Personal");
+      expect(parseForeground(text, 0)?.activity).toBe(".Personal");
+      expect(parseForeground(text, 10)?.activity).toBe(".Work");
+      expect(parseForeground(text, 11)).toBeNull();
+    },
+  );
 
   it("reads the API 29 and 30 layouts (synthetic)", () => {
     expect(

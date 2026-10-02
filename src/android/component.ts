@@ -34,6 +34,10 @@ export function parseComponent(flat: string): Component | null {
   return { package: match[1], activity: match[2], component: `${match[1]}/${match[2]}` };
 }
 
+export function activityClassName(component: Component): string {
+  return component.activity.replace(/^\./, `${component.package}.`);
+}
+
 /** An activity as `ActivityRecord.toString` prints it. */
 export interface ActivityRecord extends Component {
   taskId: number;
@@ -43,18 +47,19 @@ export interface ActivityRecord extends Component {
  * `ActivityRecord{<hash> u<user> <package>/<activity> t<task>}`, with ` f` before the brace
  * while finishing (AOSP `ActivityRecord.toString`, the same from API 29 to 37).
  */
-const ACTIVITY_RECORD = /ActivityRecord\{[0-9a-f]+ u\d+ ([^\s/}]+\/[^\s}]+) t(-?\d+)[^}]*\}/g;
+const ACTIVITY_RECORD = /ActivityRecord\{[0-9a-f]+ u(\d+) ([^\s/}]+\/[^\s}]+) t(-?\d+)[^}]*\}/g;
 
-export function parseActivityRecord(text: string): ActivityRecord | null {
-  return parseActivityRecords(text)[0] ?? null;
+export function parseActivityRecord(text: string, userId?: number): ActivityRecord | null {
+  return parseActivityRecords(text, userId)[0] ?? null;
 }
 
-/** Every activity record in `text`, in the order printed. */
-export function parseActivityRecords(text: string): ActivityRecord[] {
+/** Activity records in printed order, limited to `userId` when supplied. */
+export function parseActivityRecords(text: string, userId?: number): ActivityRecord[] {
   const records: ActivityRecord[] = [];
   for (const match of text.matchAll(ACTIVITY_RECORD)) {
-    const component = parseComponent(match[1] ?? "");
-    if (component !== null) records.push({ ...component, taskId: Number(match[2]) });
+    if (userId !== undefined && Number(match[1]) !== userId) continue;
+    const component = parseComponent(match[2] ?? "");
+    if (component !== null) records.push({ ...component, taskId: Number(match[3]) });
   }
   return records;
 }

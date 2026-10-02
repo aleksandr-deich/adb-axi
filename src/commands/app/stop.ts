@@ -1,4 +1,17 @@
+import { assertPackageName } from "../../android/component.js";
+import { noop, okLine } from "../../core/output.js";
+import { realClock } from "../../core/poll.js";
 import { defineCommand } from "../define.js";
+import {
+  forceStop,
+  lifecycleCommand,
+  mainPids,
+  pidLabel,
+  requireInstalled,
+  stopFailed,
+  waitForExit,
+} from "./process.js";
+import { readOptions, targetSerial } from "./shared.js";
 
 export const appStop = defineCommand({
   path: ["app", "stop"],
@@ -7,4 +20,31 @@ export const appStop = defineCommand({
     { name: "pkg", description: "Package name, for example com.example.notes", required: true },
   ],
   examples: ["adb-axi app stop com.example.notes"],
+  shipped: true,
+  run: async (context) => {
+    const pkg = String(context.positionals.pkg);
+    assertPackageName(pkg);
+    const serial = targetSerial(context);
+    const adb = context.adb();
+
+    const { userId } = await requireInstalled(context, pkg);
+    const before = await mainPids(context, pkg, userId);
+    const started = realClock.now();
+    await forceStop(adb, serial, pkg, userId, readOptions(context));
+    if (before.length === 0) {
+      return { ok: okLine("stop", pkg, noop("already not running")) };
+    }
+
+    const exit = await waitForExit(context, pkg, userId);
+    if (!exit.gone) {
+      throw stopFailed(context, pkg, exit.last, context.timeoutMs, {
+        command: lifecycleCommand(context, ["app", "stop", pkg]),
+        step: "am force-stop",
+      });
+    }
+    const tookMs = Math.round(realClock.now() - started);
+    return {
+      ok: okLine("stop", pkg, `not running (${pidLabel(before)} gone after ${tookMs} ms)`),
+    };
+  },
 });
