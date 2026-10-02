@@ -205,7 +205,8 @@ async function amStart(
       command,
     );
   }
-  return start;
+  // am can report a permission dialog instead of the requested app's activity.
+  return { ...start, activity: start.activity?.package === pkg ? start.activity : null };
 }
 
 /** One look at the started app: its pid and the activity in front. */

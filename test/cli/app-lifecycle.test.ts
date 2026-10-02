@@ -1627,6 +1627,76 @@ describe("app start settle deadlines", () => {
 
 describe("launched activity process identity", () => {
   it.each(
+    [0, 10].flatMap((userId) => [true, false].map((alive) => ({ userId, alive }))),
+  )(
+    "does not adopt am's permission-controller activity, user=$userId, alive=$alive",
+    async ({ userId, alive }) => {
+      const controller = "com.google.android.permissioncontroller";
+      const permissionActivity =
+        "com.android.permissioncontroller.permission.ui.GrantPermissionsActivity";
+      const component = `${controller}/${permissionActivity}`;
+      const foreignMetadata = `cmd package resolve-activity --user ${userId} -n '${component}'`;
+      const foreignProcesses = `dumpsys activity processes ${controller}`;
+      const otherUser = userId === 0 ? 10 : 0;
+      const f = device({
+        [CURRENT_USER]: { stdout: `${userId}\n` },
+        [PACKAGE]: {
+          stdout:
+            "Packages:\n  Package [dev.probe] (abc):\n    appId=10213\n    User 0: installed=true hidden=false\n    User 10: installed=true hidden=false\n",
+        },
+        [startOf(".UiActivity").replace("--user 0", `--user ${userId}`)]: {
+          stdout: `Starting: Intent { cmp=dev.probe/.UiActivity }\nWarning: Activity not started, intent has been delivered to currently running top-most instance.\nStatus: ok\nLaunchState: UNKNOWN (0)\nActivity: ${component}\nTotalTime: 0\nWaitTime: 5\nComplete\n`,
+        },
+        [metadataOf(".UiActivity", userId)]: activityInfo(".UiActivity", "dev.probe:ui"),
+        [PROCESSES]: {
+          stdout: [
+            `  *APP* UID ${userId * 100000 + 10213} ProcessRecord{abc 8111:dev.probe:sync/u${userId}a213}`,
+            `  *APP* UID ${otherUser * 100000 + 10213} ProcessRecord{def 9001:dev.probe:ui/u${otherUser}a213}`,
+            ...(alive
+              ? [
+                  `  *APP* UID ${userId * 100000 + 10213} ProcessRecord{fed 19758:dev.probe:ui/u${userId}a213}`,
+                ]
+              : []),
+            "",
+          ].join("\n"),
+        },
+        [FOREGROUND]: {
+          stdout: `  ResumedActivity: ActivityRecord{abc u${userId} ${component} t43}\n`,
+        },
+        [foreignMetadata]: {
+          stdout: `ActivityInfo:\n name=${permissionActivity}\n packageName=${controller}\n processName=${controller}\n ApplicationInfo:\n`,
+        },
+        [foreignProcesses]: {
+          stdout: `  *APP* UID ${userId * 100000 + 10250} ProcessRecord{abc 19312:${controller}/u${userId}a250}\n`,
+        },
+      });
+      const { toon, data } = await both(["app", "start", "dev.probe/.UiActivity"], f);
+      expect(toon.exitCode).toBe(alive ? 0 : 1);
+      if (alive) {
+        expect(data).toEqual({
+          ok: `start dev.probe -> running, ${controller} in front`,
+          app: { activity: ".UiActivity", pid: 19758, launch: "unknown", recreated: false },
+          help: ["Run `adb-axi app current` to see what is in front"],
+        });
+      } else {
+        expect(data).toMatchObject({
+          code: "APP_DIED_ON_START",
+          error: "the dev.probe:ui process of dev.probe/.UiActivity is gone right after its start",
+          last: { state: "stopped", pid: "-", foreground: controller },
+        });
+        expect(data).not.toHaveProperty("app");
+      }
+      const calls = shellCommands(f);
+      expect(calls).toContain(metadataOf(".UiActivity", userId));
+      expect(calls).toContain(PROCESSES);
+      expect(calls).not.toContain(foreignMetadata);
+      expect(calls).not.toContain(foreignProcesses);
+      expectClean(f);
+    },
+    10000,
+  );
+
+  it.each(
     [0, 10].flatMap((userId) =>
       [false, true].flatMap((fresh) =>
         ["dev.probe", "dev.probe:ui"].map((process) => ({ userId, fresh, process })),
