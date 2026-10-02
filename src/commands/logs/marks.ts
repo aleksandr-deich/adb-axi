@@ -31,7 +31,7 @@ interface StoredMark {
 }
 
 const MAX_NAME_LENGTH = 64;
-const NAME = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+const NAME = /^[A-Za-z0-9_][A-Za-z0-9._-]*$/;
 
 /**
  * A mark name is a file-name-safe word, and never a duration: `--since` reads both, and

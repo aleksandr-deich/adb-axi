@@ -176,7 +176,7 @@ describe("logs mark", () => {
     const f = devices({
       serial: A,
       api: 35,
-      clocks: [MARK_CLOCK, LATER_CLOCK],
+      clocks: [MARK_CLOCK, MARK_CLOCK, LATER_CLOCK],
       shell: {
         [logcatFor(MARK_START)]: { stdout: logLine(1790834111000, 1, "I", "Tag", "ready") },
       },
