@@ -9,7 +9,9 @@ import { runCli, type CliRun } from "../helpers/run.js";
 vi.setConfig({ testTimeout: 40_000 });
 
 const COMMAND_TIMEOUT_MS = 15_000;
-const STOP_TIMEOUT_MS = 5_000;
+// Deadline-outcome cases still need the normal command budget for device discovery
+// and prerequisite reads on slow runners before reaching the step under test.
+const STOP_TIMEOUT_MS = COMMAND_TIMEOUT_MS;
 // Leave two seconds after am's delay for prerequisite/observation calls, so the
 // command deadline (not just the two-second settle window) ends these cases.
 const SHORT_TIMEOUT_MS = 10_000;
@@ -270,7 +272,7 @@ describe("app start", () => {
     expect(json.durationMs).toBeLessThan(STOP_TIMEOUT_MS + TIMING_MARGIN_MS);
     expect(toon.stdout).toBe(
       [
-        "error: dev.probe was still running at the 5 s deadline after am force-stop in `adb-axi app start dev.probe --fresh`",
+        "error: dev.probe was still running at the 15 s deadline after am force-stop in `adb-axi app start dev.probe --fresh`",
         "code: STOP_FAILED",
         "last:",
         "  pid: 8235",
@@ -477,7 +479,7 @@ describe("app start", () => {
     expect(json.durationMs).toBeLessThan(STOP_TIMEOUT_MS + TIMING_MARGIN_MS);
     expect(data).toMatchObject({
       code: "WAIT_TIMEOUT",
-      error: "dev.probe did not finish launching within 5 s",
+      error: "dev.probe did not finish launching within 15 s",
       last: { status: "no answer", activity: ".MainActivity" },
     });
   });
@@ -642,7 +644,7 @@ describe("app stop", () => {
     expect(json.durationMs).toBeLessThan(STOP_TIMEOUT_MS + TIMING_MARGIN_MS);
     expect(toon.stdout).toBe(
       [
-        "error: dev.probe was still running at the 5 s deadline after am force-stop in `adb-axi app stop dev.probe`",
+        "error: dev.probe was still running at the 15 s deadline after am force-stop in `adb-axi app stop dev.probe`",
         "code: STOP_FAILED",
         "last:",
         "  pid: 8235",
@@ -788,7 +790,7 @@ describe("app clear", () => {
     expect(toon.exitCode).toBe(1);
     expect(data).toMatchObject({
       error:
-        "dev.probe was still running at the 5 s deadline after pm clear in `adb-axi app clear dev.probe`",
+        "dev.probe was still running at the 15 s deadline after pm clear in `adb-axi app clear dev.probe`",
       code: "STOP_FAILED",
       last: { pid: 8235 },
       help: [
@@ -1282,7 +1284,7 @@ describe("lifecycle review regressions", () => {
           "--device",
           SERIAL,
           "--timeout",
-          `${stopFails ? STOP_TIMEOUT_MS : COMMAND_TIMEOUT_MS}ms`,
+          `${COMMAND_TIMEOUT_MS}ms`,
         ],
         f,
       );
