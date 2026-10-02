@@ -455,18 +455,14 @@ describe("app install", () => {
               dumps: { current: V57, new: V57 },
               installedApk: step === "contents" ? { hang: true } : APK,
               rules: [
-                ...(step === "path"
-                  ? [{ match: shell(APK_PATH), respond: { hang: true } }]
-                  : []),
+                ...(step === "path" ? [{ match: shell(APK_PATH), respond: { hang: true } }] : []),
                 installs(APK),
               ],
             }),
           ["app", "install", APK, "--if-changed", "--timeout", "4s"],
         );
         expect(toon.exitCode).toBe(0);
-        expect(toon.stdout).toContain(
-          "ok: install com.example.notes -> 1.4.0 (57) with data kept",
-        );
+        expect(toon.stdout).toContain("ok: install com.example.notes -> 1.4.0 (57) with data kept");
         expect(data).toMatchObject({
           ok: "install com.example.notes -> 1.4.0 (57) with data kept",
           install: {
