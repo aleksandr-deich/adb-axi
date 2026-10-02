@@ -6,6 +6,7 @@ import { belongsTo, parsePs } from "../../src/android/ps.js";
 import { appProcesses, assertMarkName } from "../../src/commands/logs/marks.js";
 import { startedPids } from "../../src/commands/logs/scope.js";
 import { logcatCommand } from "../../src/commands/logs/window.js";
+import { timeoutWindow } from "../../src/commands/wait/log.js";
 import { AdbAxiError } from "../../src/core/errors.js";
 import { FIXTURES_DIR } from "../fake-adb/harness.js";
 
@@ -73,6 +74,15 @@ describe("assertMarkName", () => {
         assertMarkName(name);
       }, name).toThrow(AdbAxiError);
     }
+  });
+});
+
+describe("timeoutWindow", () => {
+  it("covers the entire wait with one second of slack in whole minutes", () => {
+    expect(timeoutWindow(15_000)).toBe("1m");
+    expect(timeoutWindow(59_000)).toBe("1m");
+    expect(timeoutWindow(60_000)).toBe("2m");
+    expect(timeoutWindow(70_000)).toBe("2m");
   });
 });
 

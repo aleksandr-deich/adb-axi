@@ -1,3 +1,5 @@
+import { mkdirSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
 import { assertPackageName } from "../../android/component.js";
 import { readDeviceClock } from "../../android/clock.js";
 import { LOG_LEVELS, atLeast, type LogLevel, type LogLine } from "../../android/logcat.js";
@@ -100,18 +102,22 @@ export const logsDump = defineCommand({
         message: displayMessage(row),
       })),
       ...(shown.truncated ? { shown: shownLine(shown) } : {}),
-      ...(full && rows.length > 0
+      ...(full
         ? {
             full: writeFullOutput(
               `logs-${window.label}-${clockTime(now.epochMs, now.utcOffsetMinutes).slice(0, 8).replaceAll(":", "")}`,
-              rows.map((row) => `${formatFullRow(row)}\n`).join(""),
+              lines.map((line) => `${formatFullLine(line, now.utcOffsetMinutes)}\n`).join(""),
+              (path, content) => {
+                mkdirSync(dirname(path), { recursive: true });
+                writeFileSync(path, content);
+              },
             ),
           }
         : {}),
       ...(shown.truncated && !full
         ? {
             help: [
-              `Run the same command with \`--full\` to write all ${rows.length} lines to a file`,
+              `Run the same command with \`--full\` to write all ${lines.length} lines to a file`,
             ],
           }
         : {}),
@@ -186,8 +192,6 @@ function formatRow(row: Row): string {
   return `${row.time},${row.level},${row.tag},${displayMessage(row)}`;
 }
 
-/** A row in the `--full` file: the whole message, never cut. */
-function formatFullRow(row: Row): string {
-  const repeated = row.repeats > 1 ? ` (repeated ${row.repeats}x)` : "";
-  return `${row.time} ${row.level} ${row.tag}: ${row.message}${repeated}`;
+function formatFullLine(line: LogLine, utcOffsetMinutes: number | null): string {
+  return `${clockTime(line.epochMs, utcOffsetMinutes)} ${line.level} ${line.tag}: ${line.message}`;
 }

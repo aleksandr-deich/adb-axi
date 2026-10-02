@@ -467,6 +467,28 @@ describe("logs", () => {
       expect(data.counts).toEqual({ I: 120 });
     });
 
+    it("counts uncollapsed lines in the --full hint", async () => {
+      const f = devices({
+        serial: A,
+        api: 35,
+        clocks: ["1790835000.000000000 +0000\n"],
+        shell: {
+          [logcatFor("1790834100.000")]: {
+            stdout: [
+              logLine(1790834900000, 1, "I", "Tag", "repeat"),
+              logLine(1790834900100, 1, "I", "Tag", "repeat"),
+              many(60),
+            ].join("\n"),
+          },
+        },
+      });
+      const { data } = await both(["logs"], f);
+      expect(data.shown).toBe("50 of 61 lines");
+      expect(data.help).toEqual([
+        "Run the same command with `--full` to write all 62 lines to a file",
+      ]);
+    });
+
     it("writes every line to a file with --full and prints its path, without the --full help", async () => {
       const f = devices({
         serial: A,
@@ -484,6 +506,47 @@ describe("logs", () => {
       expect(written).toHaveLength(120);
       expect(written[0]).toBe("06:08:20.000 I Tag: line number 0");
       expect(written.at(-1)).toBe("06:08:21.190 I Tag: line number 119");
+    });
+
+    it("writes an empty file and prints its path when --full matches no lines", async () => {
+      const f = devices({
+        serial: A,
+        api: 35,
+        clocks: ["1790835000.000000000 +0000\n"],
+        shell: { [logcatFor("1790834100.000")]: { stdout: "" } },
+      });
+      const toon = await runCli(["logs", "--full"], f.env);
+      const data = decode(toon.stdout.trimEnd()) as Record<string, unknown>;
+      expect(toon.exitCode).toBe(0);
+      expect(rowsOf(data)).toEqual([]);
+      expect(data.counts).toEqual({});
+      expect(data.full).toEqual(expect.stringContaining(join(f.home, "out")));
+      expect(readFileSync(data.full as string, "utf8")).toBe("");
+      expect(toon.stdout).toContain("full:");
+    });
+
+    it("keeps distinct timestamps for identical messages in the --full file", async () => {
+      const f = devices({
+        serial: A,
+        api: 35,
+        clocks: ["1790835000.000000000 +0000\n"],
+        shell: {
+          [logcatFor("1790834100.000")]: {
+            stdout: [
+              logLine(1790834990000, 1, "W", "Tag", "repeat"),
+              logLine(1790834990500, 1, "W", "Tag", "repeat"),
+            ].join("\n"),
+          },
+        },
+      });
+      const toon = await runCli(["logs", "--full"], f.env);
+      const data = decode(toon.stdout.trimEnd()) as Record<string, unknown>;
+      expect(toon.exitCode).toBe(0);
+      expect(rowsOf(data)).toHaveLength(1);
+      expect(rowsOf(data)[0]?.message).toBe("repeat (repeated 2x)");
+      expect(readFileSync(data.full as string, "utf8")).toBe(
+        "06:09:50.000 W Tag: repeat\n06:09:50.500 W Tag: repeat\n",
+      );
     });
 
     it("prints neither shown nor the --full help when nothing was cut", async () => {

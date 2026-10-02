@@ -78,7 +78,12 @@ export const waitLog = defineCommand({
         `no log line matching "${source}" within ${formatDuration(context.timeoutMs)}`,
         {
           fields: { last: latest ?? { lines_scanned: UNKNOWN, newest: UNKNOWN } },
-          help: [runHint(["logs", "--since", since ?? "1m"], "to see what the device logged")],
+          help: [
+            runHint(
+              ["logs", "--since", since ?? timeoutWindow(context.timeoutMs)],
+              "to see what the device logged",
+            ),
+          ],
         },
       );
     }
@@ -107,6 +112,10 @@ function describe(line: LogLine, utcOffsetMinutes: number | null): string {
     `${clockTime(line.epochMs, utcOffsetMinutes)} ${line.level} ${line.tag}: ${line.message}`,
     120,
   );
+}
+
+export function timeoutWindow(timeoutMs: number): string {
+  return `${Math.max(1, Math.ceil((timeoutMs + 1000) / 60_000))}m`;
 }
 
 function formatDuration(ms: number): string {

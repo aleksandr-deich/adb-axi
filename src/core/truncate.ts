@@ -109,13 +109,17 @@ function cutToBytes(line: string, maxBytes: number): string {
  * Write complete output for `--full` to `<ADB_AXI_HOME>/out/<stem>.txt` and return the
  * absolute path. An existing file is never overwritten: `-2`, `-3`, ... is appended.
  */
-export function writeFullOutput(stem: string, content: string): string {
+export function writeFullOutput(
+  stem: string,
+  content: string,
+  write: (path: string, content: string) => void = writeFileAtomic,
+): string {
   const dir = join(adbAxiHome(), "out");
   const safeStem = stem.replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^[.-]+/, "") || "output";
   let path = join(dir, `${safeStem}.txt`);
   for (let n = 2; existsSync(path); n++) {
     path = join(dir, `${safeStem}-${n}.txt`);
   }
-  writeFileAtomic(path, content);
+  write(path, content);
   return path;
 }
