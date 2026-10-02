@@ -69,6 +69,7 @@ describe("device selection through a command (hidden stubs run after resolution)
       error: "emulator-5556 is offline",
       code: "DEVICE_OFFLINE",
       state: "offline",
+      help: ["Run `adb-axi doctor --device emulator-5556` to see why"],
     });
     expect(durationMs).toBeLessThan(2000);
     expect(f.calls().map((call) => call.argv)).toEqual([["devices", "-l"]]);
@@ -77,7 +78,7 @@ describe("device selection through a command (hidden stubs run after resolution)
   it("fails a missing serial with DEVICE_NOT_FOUND instead of hanging", async () => {
     const f = withFake("multi-device.json");
     const { stdout, exitCode, durationMs } = await runCli(
-      ["wait", "boot", "--device", "bogus-9999"],
+      ["shell", "--device", "bogus-9999", "--", "echo", "hi"],
       f.env,
     );
     expect(exitCode).toBe(1);
