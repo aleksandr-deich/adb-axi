@@ -6,7 +6,7 @@ import { parseDuration } from "../../core/args.js";
 import { AdbAxiError } from "../../core/errors.js";
 import { requireMark, type Mark } from "./marks.js";
 
-/** The span of log time a command reads: from `startMs` until the device's now. */
+/** The start of a log read, resolved against the device clock. */
 export interface LogWindow {
   /** Window start on the device clock, in epoch milliseconds. */
   startMs: number;

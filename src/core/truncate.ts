@@ -107,7 +107,8 @@ function cutToBytes(line: string, maxBytes: number): string {
 
 /**
  * Write complete output for `--full` to `<ADB_AXI_HOME>/out/<stem>.txt` and return the
- * absolute path. An existing file is never overwritten: `-2`, `-3`, ... is appended.
+ * absolute path. Existing paths get a `-2`, `-3`, ... suffix; callers needing safe
+ * concurrent writes must supply an exclusive-create writer (as `logs --full` does).
  */
 export function writeFullOutput(
   stem: string,
