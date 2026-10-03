@@ -68,7 +68,7 @@ describe("parseSqliteJson", () => {
     },
   );
 
-  it.each(['[{"a":1}]\n[{"a":2}]\n', '[]\n[]', '[{"a":1}]\n[]'])(
+  it.each(['[{"a":1}]\n[{"a":2}]\n', "[]\n[]", '[{"a":1}]\n[]'])(
     "rejects a second result set in %j",
     (text) => {
       expect(() => parseSqliteJson(text)).toThrow(SqliteJsonError);
