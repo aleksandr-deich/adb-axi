@@ -5,7 +5,7 @@ export type Row = Record<string, Cell>;
 export class SqliteJsonError extends Error {}
 
 /**
- * Parse what `sqlite3 -json` prints: one `[{...},\n{...}]` array per result set, and
+ * Parse what `sqlite3 -json` prints: one `[{...},\n{...}]` array, and
  * nothing at all for a statement that returns no rows. A reader of its own rather than
  * `JSON.parse`, for two reasons that would otherwise lose data silently: a result with
  * two columns of the same name (`SELECT a.id, b.id`) keeps both, the later ones renamed
@@ -15,7 +15,7 @@ export function parseSqliteJson(text: string): Row[] {
   const reader = new Reader(text);
   const rows: Row[] = [];
   reader.skipSpace();
-  while (!reader.done()) {
+  if (!reader.done()) {
     reader.expect("[");
     reader.skipSpace();
     if (reader.peek() === "]") {
@@ -31,6 +31,7 @@ export function parseSqliteJson(text: string): Row[] {
       }
     }
     reader.skipSpace();
+    if (!reader.done()) throw reader.fail("unexpected text after result set");
   }
   return rows;
 }
@@ -101,10 +102,13 @@ class Reader {
     if (token === "null") return null;
     if (token === "true") return true;
     if (token === "false") return false;
-    if (/^-?\d+$/.test(token)) return Number.isSafeInteger(Number(token)) ? Number(token) : token;
-    if (/^-?\d+(\.\d+)?([eE][+-]?\d+)?$/.test(token)) return Number(token);
-    // Not JSON (`Inf`, `NaN`): kept as the text sqlite3 printed.
-    return token;
+    if (/^-?(?:0|[1-9]\d*)$/.test(token))
+      return Number.isSafeInteger(Number(token)) ? Number(token) : token;
+    if (/^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$/.test(token)) {
+      const number = Number(token);
+      if (Number.isFinite(number)) return number;
+    }
+    throw this.fail("invalid JSON value");
   }
 
   private string(): string {

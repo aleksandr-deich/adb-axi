@@ -34,7 +34,7 @@ export const dataDb = defineCommand({
     {
       name: "sql",
       description:
-        "One read-only statement: SELECT, WITH, VALUES, EXPLAIN or PRAGMA. Without it the databases are listed",
+        "One read-only statement: SELECT, WITH, VALUES, EXPLAIN or PRAGMA (64 MB result limit). Without it the databases are listed",
       required: false,
     },
   ],

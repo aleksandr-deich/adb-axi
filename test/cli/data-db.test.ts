@@ -489,6 +489,15 @@ describe("data db: errors", () => {
     expect(Object.keys(data)).toEqual(["error", "code", "detail", "help"]);
   });
 
+  needsSqlite3("refuses writefile in a SELECT without writing to the host", async () => {
+    const path = join(scratchDir(), "leak.txt");
+    const f = deviceWith({ "app.db": makeDb("CREATE TABLE t(v);") });
+    const { toon, data } = await both(f, [PKG, `SELECT writefile('${path}', 'leak')`]);
+    expect(toon.exitCode).toBe(1);
+    expect(data.code).toBe("SQL_ERROR");
+    expect(existsSync(path)).toBe(false);
+  });
+
   needsSqlite3("fails with SQL_ERROR for a database sqlite3 cannot open", async () => {
     const corrupt = join(scratchDir(), "bad.db");
     writeFileSync(
@@ -806,6 +815,13 @@ describe("data db: row cap and --full", () => {
 });
 
 describe("data db: registration", () => {
+  it("documents the 64 MB query result limit in command help", async () => {
+    const f = device([]);
+    const run = await runCli(["data", "db", "--help"], f.env);
+    expect(run.exitCode).toBe(0);
+    expect(run.stdout).toContain("64 MB result limit");
+  });
+
   it("is shipped: listed in `data --help` and in the top-level help", async () => {
     const f = device([]);
     const group = await runCli(["data", "--help"], f.env);

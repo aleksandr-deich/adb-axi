@@ -61,13 +61,19 @@ describe("parseSqliteJson", () => {
     expect(Object.getOwnPropertyDescriptor(row, "__proto__")?.value).toBe(4);
   });
 
-  it("keeps a value that is not JSON as the text sqlite3 printed", () => {
-    expect(parseSqliteJson('[{"x":Inf}]')).toEqual([{ x: "Inf" }]);
-  });
+  it.each(['[{"x":oops}]', '[{"x":Inf}]', '[{"x":NaN}]', '[{"x":01}]', '[{"x":1e999}]'])(
+    "rejects non-JSON values in %j",
+    (text) => {
+      expect(() => parseSqliteJson(text)).toThrow(SqliteJsonError);
+    },
+  );
 
-  it("reads several result sets in a row", () => {
-    expect(parseSqliteJson('[{"a":1}]\n[{"a":2}]\n')).toEqual([{ a: 1 }, { a: 2 }]);
-  });
+  it.each(['[{"a":1}]\n[{"a":2}]\n', '[]\n[]', '[{"a":1}]\n[]'])(
+    "rejects a second result set in %j",
+    (text) => {
+      expect(() => parseSqliteJson(text)).toThrow(SqliteJsonError);
+    },
+  );
 
   it.each(['[{"a":1', '[{"a" 1}]', '{"a":1}', '[{"a":"x]', '[{"a":1}x'])(
     "rejects malformed %j",

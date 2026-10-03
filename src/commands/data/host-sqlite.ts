@@ -35,16 +35,15 @@ export interface QueryRequest {
 }
 
 /**
- * Run one query against the copy with `sqlite3 -readonly -json` and return what it
+ * Run one query against the copy with `sqlite3 -safe -readonly -json` and return what it
  * printed. The SQL goes in on stdin, never as an argument, so text starting with `-`
  * is not read as an option. Nothing the query does can reach the device or the host
- * outside `workDir`: the copy is opened read-only and `assertReadOnlySql` has already
- * kept out the statements that write elsewhere.
+ * outside `workDir`: the copy is opened read-only and safe mode refuses host-file functions.
  */
 export async function runQuery(request: QueryRequest): Promise<string> {
   const result = await exec({
     file: request.sqlite3,
-    args: ["-readonly", "-batch", "-json", request.database],
+    args: ["-safe", "-readonly", "-batch", "-json", request.database],
     deadlineMs: request.deadline.remainingMs(),
     cwd: request.workDir,
     env: { ...request.env, HOME: request.workDir, USERPROFILE: request.workDir },
