@@ -227,6 +227,36 @@ describe("wait boot", () => {
       expect(f.calls().filter((call) => call.argv[0] === "-s")).toEqual([]);
     }, 20_000);
 
+    it.each([
+      ["offline", "offline"],
+      ["recovery", "not online"],
+    ])("reports the last state for offline and %s attachments", async (other, state) => {
+      const f = scenario([listing(devices(line(SERIAL, "offline"), line(TABLET, other)))]);
+      const { toon, data } = await both(["wait", "boot", "--timeout", "1s"], f);
+      expect(toon.exitCode).toBe(1);
+      expect(data).toMatchObject({
+        code: "WAIT_TIMEOUT",
+        last: { state, boot_completed: "-", uptime_s: "-" },
+      });
+      expect(f.unmatched()).toEqual([]);
+    }, 20_000);
+
+    it("names the environment-selected device in the timeout and doctor hint", async () => {
+      const f = scenario([listing(devices())]);
+      const run = await runCli(["wait", "boot", "--timeout", "1s"], {
+        ...f.env,
+        ANDROID_SERIAL: TABLET,
+      });
+      expect(run.exitCode).toBe(1);
+      expect(decode(run.stdout.trimEnd())).toEqual({
+        error: `${TABLET} had not finished booting after 1 s`,
+        code: "WAIT_TIMEOUT",
+        last: { state: "not attached", boot_completed: "-", uptime_s: "-" },
+        help: [`Run \`adb-axi doctor --device ${TABLET}\` to see why`],
+      });
+      expect(f.unmatched()).toEqual([]);
+    }, 20_000);
+
     it("reports a device that never attached, and names the one that was asked for", async () => {
       const f = scenario([listing(devices())]);
       const { toon, data } = await both(["wait", "boot", "--device", TABLET, "--timeout", "2s"], f);

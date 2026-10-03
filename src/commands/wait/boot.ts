@@ -66,7 +66,7 @@ export const waitBoot = defineCommand({
       },
     });
 
-    const who = serial ?? requested;
+    const who = serial ?? requested ?? (context.env.ANDROID_SERIAL || undefined);
     if (!result.ok) {
       throw new AdbAxiError(
         "WAIT_TIMEOUT",
@@ -105,8 +105,16 @@ function observationFromError(
   if (!(error instanceof AdbAxiError)) return undefined;
   const unread = { boot_completed: UNKNOWN, uptime_s: UNKNOWN } as const;
   switch (error.code) {
-    case "DEVICE_NOT_FOUND":
+    case "DEVICE_NOT_FOUND": {
+      const devices = error.fields.devices;
+      if (error.message === "no attached device is online" && Array.isArray(devices)) {
+        const state = devices.every((device: { state: string }) => device.state === "offline")
+          ? "offline"
+          : "not online";
+        return { state, ...unread };
+      }
       return { state: "not attached", ...unread };
+    }
     case "DEVICE_OFFLINE": {
       const state = error.fields.state;
       return { state: typeof state === "string" ? state : "offline", ...unread };
