@@ -52,11 +52,11 @@ describe("device selection through a command (hidden stubs run after resolution)
   it("targets a device by AVD name and by serial", async () => {
     const f = withFake("multi-device.json");
     for (const selector of ["Pixel_Tablet", "emulator-5556"]) {
-      const { stdout, exitCode } = await runCli(["logs", "crash", "--device", selector], f.env);
+      const { stdout, exitCode } = await runCli(["doctor", "ui", "--device", selector], f.env);
       expect(exitCode).toBe(1);
       expect(stdout).toContain("code: NOT_IMPLEMENTED");
     }
-    const viaEnv = await runCli(["logs", "crash"], { ...f.env, ANDROID_SERIAL: "emulator-5554" });
+    const viaEnv = await runCli(["doctor", "ui"], { ...f.env, ANDROID_SERIAL: "emulator-5554" });
     expect(viaEnv.stdout).toContain("code: NOT_IMPLEMENTED");
     expect(f.unmatched()).toEqual([]);
   });
@@ -110,10 +110,10 @@ describe("device selection through a command (hidden stubs run after resolution)
 
   it("prints every adb argv on stderr with --debug, and nothing else", async () => {
     const f = withFake("one-online.json");
-    const { stdout, stderr } = await runCli(["logs", "crash", "--debug"], f.env);
+    const { stdout, stderr } = await runCli(["doctor", "ui", "--debug"], f.env);
     expect(stdout).toContain("NOT_IMPLEMENTED");
     expect(stderr.split("\n")[0]).toBe("debug: adb devices -l");
-    const quiet = await runCli(["logs", "crash"], f.env);
+    const quiet = await runCli(["doctor", "ui"], f.env);
     expect(quiet.stderr).toBe("");
   });
 

@@ -46,6 +46,9 @@ export function logcatCommand(startMs: number, uid?: number): string {
   return uid === undefined ? base : `${base} --uid ${uid}`;
 }
 
+// crash_dump writes the tombstone within seconds of the fatal signal; older signals are outside the window.
+const CRASH_LEAD_IN_MS = 60_000;
+
 /** Every log line of the window that the device printed, in order. */
 export async function readWindowLines(
   adb: AdbClient,
@@ -53,13 +56,17 @@ export async function readWindowLines(
   window: LogWindow,
   options: ReadOptions,
   uid?: number,
+  includeLeadIn = false,
 ): Promise<LogLine[]> {
   const step = "reading the log";
-  const result = await readShell(adb, serial, logcatCommand(window.startMs, uid), step, options);
+  const command = logcatCommand(window.startMs - (includeLeadIn ? CRASH_LEAD_IN_MS : 0), uid);
+  const result = await readShell(adb, serial, command, step, options);
   const parsed = parseLogcat(result.stdout);
   // Text that is no log line at all is never passed off as an empty log.
   if (parsed.lines.length === 0 && parsed.unparsed > 0) throw invalidOutput(step, result.stdout);
-  return parsed.lines.filter((line) => line.epochMs >= window.startMs);
+  return includeLeadIn
+    ? parsed.lines
+    : parsed.lines.filter((line) => line.epochMs >= window.startMs);
 }
 
 /** A regex from the command line; one that does not compile is a usage error. */

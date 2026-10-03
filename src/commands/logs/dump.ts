@@ -10,7 +10,7 @@ import { describeScope, resolveScope, scopePids, type Scope } from "./scope.js";
 import { clockTime, compileRegex, readWindowLines, resolveWindow } from "./window.js";
 
 /** The window of `logs` without `--since`, counted back from the device's now. */
-const DEFAULT_SINCE = "15m";
+export const DEFAULT_SINCE = "15m";
 
 export const logsDump = defineCommand({
   path: ["logs"],
