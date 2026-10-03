@@ -128,17 +128,17 @@ describe("adb-axi bin", () => {
     expect(f.calls()).toEqual([]);
   });
 
-  it("resolves the device, then answers an unshipped command with NOT_IMPLEMENTED", async () => {
+  it("answers an unshipped command with NOT_IMPLEMENTED, never touching adb", async () => {
+    // The home view is the one command this build still registers without shipping it.
     const f = withFake("one-online.json");
-    const { stdout, exitCode } = await runCli(["doctor", "ui"], f.env);
+    const { stdout, exitCode } = await runCli([], f.env);
     expect(exitCode).toBe(1);
     expect(decode(stdout.trimEnd())).toEqual({
-      error: "`adb-axi doctor ui` is not available in this build",
+      error: "The home view is not available in this build",
       code: "NOT_IMPLEMENTED",
       help: ["Run `adb-axi --help` to see the commands this build ships"],
     });
-    expect(f.calls().map((call) => call.argv)).toEqual([["devices", "-l"]]);
-    expect(f.unmatched()).toEqual([]);
+    expect(f.calls()).toEqual([]);
   });
 
   it("keeps unshipped commands out of --help", async () => {

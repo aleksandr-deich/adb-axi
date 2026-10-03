@@ -24,6 +24,7 @@ import {
 } from "./commands/registry.js";
 import type { CommandContext, CommandSpec, GroupSpec, Registry } from "./commands/types.js";
 import { resolveTarget } from "./device/resolve.js";
+import { readHostProcesses, type HostProcessList } from "./host/processes.js";
 import { VERSION } from "./version.js";
 
 export const DESCRIPTION =
@@ -34,6 +35,8 @@ export interface MainOptions {
   registry?: Registry;
   stdout?: { write: (chunk: string) => unknown };
   env?: NodeJS.ProcessEnv;
+  /** The host process list; tests pass a fixed one. */
+  hostProcesses?: HostProcessList;
 }
 
 /** Per-run inputs every resolution step needs. */
@@ -41,6 +44,7 @@ interface Run {
   registry: Registry;
   mode: OutputMode;
   env: NodeJS.ProcessEnv;
+  hostProcesses: HostProcessList;
 }
 
 /** What `resolveContext` hands a handler: output to print as is, or a validated command to run. */
@@ -53,7 +57,12 @@ export async function main(options: MainOptions = {}): Promise<void> {
   const registry = options.registry ?? REGISTRY;
   const stdout = options.stdout ?? process.stdout;
   const { mode, argv } = extractJsonFlag(options.argv ?? process.argv.slice(2));
-  const run: Run = { registry, mode, env: options.env ?? process.env };
+  const run: Run = {
+    registry,
+    mode,
+    env: options.env ?? process.env,
+    hostProcesses: options.hostProcesses ?? readHostProcesses,
+  };
 
   // G1: a flag before the command is rejected with the corrected command line, before
   // anything touches adb. Bare --help and version flags stay with the SDK.
@@ -336,6 +345,7 @@ async function leafInvocation(
       adb,
       target,
       env: run.env,
+      hostProcesses: run.hostProcesses,
       isShipped: (path) => isShippedPath(run.registry, path),
     },
   };

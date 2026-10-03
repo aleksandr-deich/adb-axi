@@ -69,6 +69,7 @@ describe("wait app", () => {
         selectedBy: "flag",
       },
       env: {},
+      hostProcesses: () => Promise.resolve([]),
       isShipped: () => true,
     });
     const waited = result.waited_ms;
