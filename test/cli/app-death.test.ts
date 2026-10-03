@@ -421,6 +421,31 @@ describe("app kill", () => {
     expectClean(fake);
   });
 
+  it("tracks an absolute process name by package UID, even without a main process", async () => {
+    const custom = "com.example.shared.worker";
+    const { toon, data, fake } = await both(["app", "death", "dev.probe", "--timeout", "3s"], () =>
+      probeDevice({
+        phase: "previous",
+        amKillWorks: false,
+        rules: [
+          {
+            match: shell(KERNEL_UIDS),
+            respond: { stdout: `PID UID NAME\n8333 10213 ${custom}\n9000 10214 dev.probe:unrelated\n` },
+          },
+          { match: shell(`pidof ${custom}`), respond: PIDOF_OF(8333) },
+          { match: shell("run-as dev.probe --user 0 kill -9 8333"), respond: {} },
+        ],
+      }),
+    );
+    expect(toon.exitCode).toBe(1);
+    expect(data).toMatchObject({ code: "KILL_TIMEOUT", last: { pid: 8333 }, am_kill_sent: true });
+    expect(shellCommands(fake)).toContain(`pidof ${custom}`);
+    expect(shellCommands(fake)).toContain("run-as dev.probe --user 0 kill -9 8333");
+    expect(shellCommands(fake)).not.toContain("pidof dev.probe:unrelated");
+    expect(shellCommands(fake)).not.toContain(START);
+    expectClean(fake);
+  });
+
   it("fails with TASK_NOT_IN_RECENTS when the process died but its task is gone", async () => {
     const { toon, data, fake } = await both(["app", "kill", "dev.probe"], () =>
       probeDevice({ phase: "previous", recents: RECENTS_GONE }),

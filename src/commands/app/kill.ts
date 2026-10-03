@@ -125,8 +125,10 @@ export async function killProcess(
   const serial = targetSerial(context);
   const { userId } = installed;
   const options = readOptions(context);
+  const uid = installed.info.uid;
+  if (uid === null) throw invalidOutput(`reading package ${pkg}`, installed.dump);
 
-  const before = await packagePids(context, pkg, userId);
+  const before = await packagePids(context, pkg, uid);
   if (before.length === 0) return { killed: false };
 
   const front = await readForeground(adb, serial, { ...options, userId });
@@ -155,6 +157,7 @@ export async function killProcess(
     context,
     pkg,
     userId,
+    uid,
     installed.info.debuggable
       ? Math.min(KILL_WINDOW_MS, context.deadline.remainingMs())
       : context.deadline.remainingMs(),
@@ -162,7 +165,7 @@ export async function killProcess(
   if (!exit.gone && installed.info.debuggable && context.deadline.remainingMs() > 0) {
     await runAsKill(adb, serial, pkg, userId, exit.last?.pids ?? before, context);
     method = "run-as kill";
-    exit = await awaitGone(context, pkg, userId, context.deadline.remainingMs());
+    exit = await awaitGone(context, pkg, userId, uid, context.deadline.remainingMs());
   }
   if (!exit.gone) throw killTimeout(context, pkg, exit.last, true, command);
 
@@ -216,7 +219,7 @@ async function awaitKillable(
 
 type Gone = { gone: true } | { gone: false; last: Seen | undefined };
 
-async function packagePids(context: CommandContext, pkg: string, userId: number): Promise<number[]> {
+async function packagePids(context: CommandContext, pkg: string, uid: number): Promise<number[]> {
   const result = await readShell(
     context.adb(), targetSerial(context), "ps -A -o PID,UID,NAME",
     "reading package process names", readOptions(context),
@@ -231,9 +234,8 @@ async function packagePids(context: CommandContext, pkg: string, userId: number)
     if (!row || !Number.isSafeInteger(Number(row[1])) || !Number.isSafeInteger(Number(row[2]))) {
       throw invalidOutput("reading package process names", result.stdout);
     }
-    const [pid, uid, name] = [Number(row[1]), Number(row[2]), row[3] as string];
-    if (pid <= 0 || Math.floor(uid / 100000) !== userId) continue;
-    if (name !== pkg && !name.startsWith(`${pkg}:`)) continue;
+    const [pid, rowUid, name] = [Number(row[1]), Number(row[2]), row[3] as string];
+    if (pid <= 0 || rowUid !== uid) continue;
     const known = names.get(name) ?? new Set<number>();
     known.add(pid);
     names.set(name, known);
@@ -264,6 +266,7 @@ async function awaitGone(
   context: CommandContext,
   pkg: string,
   userId: number,
+  uid: number,
   windowMs: number,
 ): Promise<Gone> {
   let last: Seen | undefined;
@@ -271,7 +274,7 @@ async function awaitGone(
     timeoutMs: windowMs,
     check: async () => {
       try {
-        const pids = await packagePids(context, pkg, userId);
+        const pids = await packagePids(context, pkg, uid);
         if (pids.length === 0) return { done: true, value: null };
         const processes = await packageProcesses(context, pkg, userId, readOptions(context));
         const main = processes.find((process) => process.pid === pids[0]);
