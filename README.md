@@ -34,6 +34,8 @@ Use each command's `--help` for flags and defaults. Add `--json` for the same fi
 
 `logs mark [name]` stores the device's own clock under a name, per device, so `logs` and `wait log` can cover one run without host and device clock skew shifting the window. Without a name it uses `mark-<HHMMSS>` from device time and prints the name. Take marks one at a time per device: simultaneous `logs mark` calls can lose one. `logs [--since <mark|dur>] [--pkg <pkg>] [--level <V|D|I|W|E>] [--grep <re>] [--full]` prints one bounded dump (every logcat call is `-d`, so it never streams): level counts, repeated lines collapsed in the display, and the last 50 rows or 4 kB. When rows were cut it says `shown: N of M lines` (N displayed rows, M matching lines) and suggests `--full`. `--full` always writes every matching line uncollapsed, with its own timestamp, to a file under `ADB_AXI_HOME/out/` (default `~/.adb-axi/out/`) and prints the path, even when no lines match (an empty file). Without `--since` the dump starts 15 minutes before device time. `wait log "<regex>" [--since <mark|dur>] [--timeout <dur>]` polls until a line matches (default timeout 15 s); without `--since` it only counts lines logged after the wait began.
 
+The late-first-line note is unavailable with `--pkg` on API 31+ because `logcat --uid` filters the scan at the device.
+
 Known limits of `--pkg`:
 
 - On API 31 and newer it is `logcat --uid`. On API 29 and 30, which have no `--uid`, it is a pid list: the app's current pids, the pids recorded when the window's mark was taken, and the pids ActivityManager names in "Start proc" lines inside the window. The list can miss a process that starts and dies between two reads.

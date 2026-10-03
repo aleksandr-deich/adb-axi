@@ -316,6 +316,59 @@ describe("logs", () => {
     expectClean(f);
   });
 
+  it.each([true, false])(
+    "uses unfiltered scan before API 30 pid scoping (early system line: %s)",
+    async (earlySystemLine) => {
+      const f = devices({
+        serial: A,
+        api: 30,
+        clocks: ["1790835000.000000000 +0000\n"],
+        shell: {
+          [PACKAGE_DUMP]: PROBE_DUMP_30,
+          [PS]: { stdout: "PID NAME\n  2 dev.probe\n" },
+          [logcatFor("1790834700.000")]: {
+            stdout: [
+              ...(earlySystemLine ? [logLine(1790834701000, 1, "I", "System", "earlier")] : []),
+              logLine(1790834950000, 2, "W", "Probe", "wanted"),
+            ].join("\n"),
+          },
+        },
+      });
+      const { toon, data } = await both(["logs", "--since", "5m", "--pkg", "dev.probe"], f);
+      expect(toon.exitCode).toBe(0);
+      expect(rowsOf(data)).toHaveLength(1);
+      if (earlySystemLine) expect(data).not.toHaveProperty("note");
+      else
+        expect(data.note).toBe(
+          "first log line in this window is at 06:09:10.000, after the window start; the device log buffer may have dropped earlier lines",
+        );
+      expectClean(f);
+    },
+  );
+
+  it("omits the note when API 31+ logcat has already filtered by uid", async () => {
+    const f = devices({
+      serial: A,
+      api: 35,
+      clocks: ["1790835000.000000000 +0000\n"],
+      shell: {
+        [PACKAGE_DUMP]: PROBE_DUMP_35,
+        [logcatFor("1790834700.000", 10213)]: {
+          stdout: logLine(1790834950000, 2, "W", "Probe", "wanted"),
+        },
+      },
+    });
+    const { toon, data } = await both(["logs", "--since", "5m", "--pkg", "dev.probe"], f);
+    expect(toon.exitCode).toBe(0);
+    expect(rowsOf(data)).toHaveLength(1);
+    expect(data).not.toHaveProperty("note");
+    expect(logcatCommands(f)).toEqual([
+      logcatFor("1790834700.000", 10213),
+      logcatFor("1790834700.000", 10213),
+    ]);
+    expectClean(f);
+  });
+
   it("does not note an empty scanned window", async () => {
     const f = devices({
       serial: A,

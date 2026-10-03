@@ -121,7 +121,7 @@ export const logsDump = defineCommand({
     const counts = countLevels(lines);
     return {
       window: `${window.label} -> now (${seconds} s), ${scanned.length} lines scanned`,
-      ...(scanned[0] !== undefined && scanned[0].epochMs - window.startMs > 2000
+      ...(scope?.kind !== "uid" && scanned[0] !== undefined && scanned[0].epochMs - window.startMs > 2000
         ? {
             note: `first log line in this window is at ${clockTime(scanned[0].epochMs, now.utcOffsetMinutes)}, after the window start; the device log buffer may have dropped earlier lines`,
           }
