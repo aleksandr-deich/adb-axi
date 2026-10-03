@@ -273,7 +273,7 @@ function logcatFor(start: string, uid?: number): string {
 }
 
 describe("logs", () => {
-  it("notes a truncated duration window before grep filtering", async () => {
+  it("notes a late first scanned line even when grep hides it", async () => {
     const f = devices({
       serial: A,
       api: 35,
@@ -287,13 +287,51 @@ describe("logs", () => {
     const { toon, data } = await both(["logs", "--since", "5m", "--grep", "absent"], f);
     expect(toon.exitCode).toBe(0);
     expect(data).toMatchObject({
-      note: "logcat buffer starts at 06:09:10.000, after the window start",
+      note: "first log line in this window is at 06:09:10.000, after the window start; the device log buffer may have dropped earlier lines",
       lines: [],
     });
     expectClean(f);
   });
+  it("does not note a late returned line when an earlier scanned line is filtered out", async () => {
+    const f = devices({
+      serial: A,
+      api: 30,
+      clocks: ["1790835000.000000000 +0000\n"],
+      shell: {
+        [logcatFor("1790834700.000")]: {
+          stdout: [
+            logLine(1790834701000, 1, "D", "Tag", "unrelated"),
+            logLine(1790834950000, 2, "W", "Tag", "wanted"),
+          ].join("\n"),
+        },
+      },
+    });
+    const { toon, data } = await both(
+      ["logs", "--since", "5m", "--level", "W", "--grep", "wanted"],
+      f,
+    );
+    expect(toon.exitCode).toBe(0);
+    expect(rowsOf(data)).toHaveLength(1);
+    expect(data).not.toHaveProperty("note");
+    expectClean(f);
+  });
+
+  it("does not note an empty scanned window", async () => {
+    const f = devices({
+      serial: A,
+      api: 35,
+      clocks: ["1790835000.000000000 +0000\n"],
+      shell: { [logcatFor("1790834700.000")]: { stdout: "" } },
+    });
+    const { toon, data } = await both(["logs", "--since", "5m"], f);
+    expect(toon.exitCode).toBe(0);
+    expect(data.lines).toEqual([]);
+    expect(data).not.toHaveProperty("note");
+    expectClean(f);
+  });
+
   it.each([2000, 2001])(
-    "notes a missing window start only beyond the 2s tolerance (%s ms)",
+    "notes a late first scanned line only beyond the 2s tolerance (%s ms)",
     async (gap) => {
       const f = devices({
         serial: A,
@@ -309,7 +347,9 @@ describe("logs", () => {
       const { toon, data } = await both(["logs", "--since", "m"], f);
       expect(toon.exitCode).toBe(0);
       if (gap > 2000) {
-        expect(data.note).toBe("logcat buffer starts at 22:55:12.421, after the window start");
+        expect(data.note).toBe(
+          "first log line in this window is at 22:55:12.421, after the window start; the device log buffer may have dropped earlier lines",
+        );
       } else expect(data).not.toHaveProperty("note");
       expectClean(f);
     },

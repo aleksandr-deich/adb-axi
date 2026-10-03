@@ -123,7 +123,7 @@ export const logsDump = defineCommand({
       window: `${window.label} -> now (${seconds} s), ${scanned.length} lines scanned`,
       ...(scanned[0] !== undefined && scanned[0].epochMs - window.startMs > 2000
         ? {
-            note: `logcat buffer starts at ${clockTime(scanned[0].epochMs, now.utcOffsetMinutes)}, after the window start`,
+            note: `first log line in this window is at ${clockTime(scanned[0].epochMs, now.utcOffsetMinutes)}, after the window start; the device log buffer may have dropped earlier lines`,
           }
         : {}),
       ...(scope === undefined ? {} : { scope: describeScope(scope, scanned) }),

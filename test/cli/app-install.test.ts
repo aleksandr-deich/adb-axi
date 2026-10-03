@@ -282,7 +282,10 @@ describe("app install", () => {
       ["app", "install", APK],
     );
     expect(toon.exitCode).toBe(0);
-    expect(data).toMatchObject({ install: { previous: "not installed" } });
+    expect(data).toMatchObject({
+      ok: "install com.example.notes -> 1.4.0 (57) (fresh install)",
+      install: { previous: "not installed" },
+    });
   });
 
   it("treats a package kept after `uninstall -k` as not installed", async () => {
@@ -290,7 +293,10 @@ describe("app install", () => {
       () => world({ start: "kept", dumps: { kept: KEPT, new: V57 }, rules: [installs(APK)] }),
       ["app", "install", APK],
     );
-    expect(data).toMatchObject({ install: { previous: "not installed" } });
+    expect(data).toMatchObject({
+      ok: "install com.example.notes -> 1.4.0 (57) with data kept",
+      install: { previous: "not installed" },
+    });
   });
 
   it("records the installed versionCode and signer digest per serial", async () => {

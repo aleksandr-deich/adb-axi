@@ -129,7 +129,7 @@ async function runInstall(context: CommandContext): Promise<Output> {
     ok: okLine(
       "install",
       info.package,
-      `${formatVersion(info.versionName, info.versionCode)} ${clean ? "with data wiped" : previous === null ? "(fresh install)" : "with data kept"}`,
+      `${formatVersion(info.versionName, info.versionCode)} ${clean ? "with data wiped" : before === null ? "(fresh install)" : "with data kept"}`,
     ),
     install: {
       previous:
