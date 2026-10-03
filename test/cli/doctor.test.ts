@@ -3,12 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { decode } from "@toon-format/toon";
 import { afterEach, describe, expect, it } from "vitest";
-import { main } from "../../src/cli.js";
-import { defineGroup } from "../../src/commands/define.js";
-import { doctorReport } from "../../src/commands/doctor/report.js";
-import { doctorUi } from "../../src/commands/doctor/ui.js";
 import { isShippedPath, REGISTRY } from "../../src/commands/registry.js";
-import type { Registry } from "../../src/commands/types.js";
 import { createFakeAdb, type FakeAdb } from "../fake-adb/harness.js";
 import type { Response, Rule } from "../fake-adb/scenario.js";
 import { runCli, type CliRun } from "../helpers/run.js";
@@ -701,8 +696,9 @@ describe("doctor", () => {
         status: "failed",
         detail: "UiAutomation is held by com.example.notes.test",
       });
-      // `doctor ui` is not shipped yet, so it is never named; nothing shipped ends the run either.
-      expect(JSON.stringify(data.help ?? [])).not.toContain("doctor ui");
+      expect(data.help).toEqual([
+        `Run \`adb-axi doctor ui --device ${SERIAL}\` to see what holds UiAutomation`,
+      ]);
       expectHelpShipped(data.help);
     });
 
@@ -823,42 +819,8 @@ describe("doctor", () => {
   });
 
   describe("help lines", () => {
-    it("names doctor ui when it ships, and never doctor --fix", async () => {
-      const component = "com.example.notes.test/androidx.test.runner.AndroidJUnitRunner";
-      const f = scenario({ probes: { processes: { stdout: instrumentation(component) } } });
-      const shippedUi = { ...doctorUi, shipped: true };
-      const registry: Registry = {
-        ...REGISTRY,
-        entries: {
-          ...REGISTRY.entries,
-          doctor: defineGroup({
-            name: "doctor",
-            summary: "Health checks",
-            defaultCommand: doctorReport,
-            subcommands: [shippedUi],
-          }),
-        },
-      };
-      let out = "";
-      process.exitCode = undefined;
-      await main({
-        argv: ["doctor", "--json"],
-        registry,
-        env: f.env,
-        stdout: { write: (chunk: string) => (out += chunk) },
-      });
-      const exit = process.exitCode;
-      process.exitCode = undefined;
-      expect(exit).toBe(1);
-      const data = JSON.parse(out) as Report["data"];
-      expect(data.help).toEqual([
-        `Run \`adb-axi doctor ui --device ${SERIAL}\` to see what holds UiAutomation`,
-      ]);
-      expect(JSON.stringify(data)).not.toContain("--fix");
-    });
-
-    it("never names doctor ui or --fix while doctor ui is a hidden stub, and only shipped commands", async () => {
-      expect(isShippedPath(REGISTRY, ["doctor", "ui"])).toBe(false);
+    it("points at doctor ui, never at doctor --fix, and names only shipped commands", async () => {
+      expect(isShippedPath(REGISTRY, ["doctor", "ui"])).toBe(true);
       const component = "com.example.notes.test/androidx.test.runner.AndroidJUnitRunner";
       const everythingWrong = scenario({
         probes: {
@@ -873,7 +835,9 @@ describe("doctor", () => {
       const { data } = await doctor(everythingWrong);
       expect(data.summary).toBe("9 run, 3 ok, 2 warn, 4 failed");
       const text = JSON.stringify(data);
-      expect(text).not.toContain("doctor ui");
+      expect(data.help).toContain(
+        `Run \`adb-axi doctor ui --device ${SERIAL}\` to see what holds UiAutomation`,
+      );
       expect(text).not.toContain("--fix");
       expect(data.help?.length).toBeGreaterThan(3);
       expectHelpShipped(data.help);
@@ -881,30 +845,23 @@ describe("doctor", () => {
   });
 
   describe("registration", () => {
-    it("is listed in help, while doctor ui and --fix stay out of every help screen", async () => {
+    it("is listed in help with doctor ui as its subcommand, and never offers doctor --fix", async () => {
       const f = scenario();
       const top = await runCli(["--help"], f.env);
-      expect(top.stdout).toContain("adb-axi doctor");
-      expect(top.stdout).not.toContain("doctor ui");
+      expect(top.stdout).toContain("adb-axi doctor,");
+      expect(top.stdout).toContain("adb-axi doctor ui,");
       expect(top.stdout).not.toContain("--fix");
 
       const help = await runCli(["doctor", "--help"], f.env);
       expect(help.exitCode).toBe(0);
       expect(help.stdout).toContain("command: adb-axi doctor");
-      expect(help.stdout).toContain("subcommands: []");
+      expect(help.stdout).toContain("subcommands[1]{command,summary}:\n  adb-axi doctor ui,");
       expect(help.stdout).not.toContain("--fix");
-      expect(help.stdout).not.toContain("doctor ui");
       expect(f.calls()).toEqual([]);
     });
 
-    it("keeps doctor ui a hidden stub that never touches a device", async () => {
+    it("leaves --fix to doctor ui: the report refuses it before touching a device", async () => {
       const f = scenario();
-      const run = await runCli(["doctor", "ui"], f.env);
-      expect(run.exitCode).toBe(1);
-      expect(decode(run.stdout.trimEnd())).toMatchObject({ code: "NOT_IMPLEMENTED" });
-      const fix = await runCli(["doctor", "ui", "--fix"], f.env);
-      expect(decode(fix.stdout.trimEnd())).toMatchObject({ code: "NOT_IMPLEMENTED" });
-      // `--fix` belongs to doctor ui, not to the report.
       const report = await runCli(["doctor", "--fix"], f.env);
       expect(report.exitCode).toBe(2);
       expect(decode(report.stdout.trimEnd())).toMatchObject({ code: "VALIDATION_ERROR" });

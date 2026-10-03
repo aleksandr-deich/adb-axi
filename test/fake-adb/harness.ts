@@ -48,6 +48,8 @@ export interface FakeAdb {
   unmatched(): FakeCall[];
   /** Current values of the scenario's state variables. */
   vars(): Record<string, string>;
+  /** Put the state variables back to the scenario's initial values, as for a fresh device. */
+  resetVars(): void;
   cleanup(): void;
 }
 
@@ -116,8 +118,11 @@ export function createFakeAdb(scenario: Scenario | string, options: FakeAdbOptio
     calls,
     unmatched: () => calls().filter((call) => call.unmatched),
     vars: () => readVars(statePath, scenarioPath),
+    resetVars: () => {
+      rmSync(statePath, { force: true });
+    },
     cleanup: () => {
-      rmSync(dir, { recursive: true, force: true });
+      rmSync(dir, { recursive: true, force: true, maxRetries: 3, retryDelay: 50 });
     },
   };
 }

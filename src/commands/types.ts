@@ -3,6 +3,7 @@ import type { FlagSpec, FlagValue, PositionalSpec } from "../core/args.js";
 import type { Deadline } from "../core/deadline.js";
 import type { Output, OutputMode } from "../core/output.js";
 import type { Target } from "../device/resolve.js";
+import type { HostProcessList } from "../host/processes.js";
 
 /** Everything a command handler receives once its arguments are validated. */
 export interface CommandContext {
@@ -20,6 +21,8 @@ export interface CommandContext {
   /** The resolved device for commands with `device: "target"`, checked online. */
   target: Target | undefined;
   env: NodeJS.ProcessEnv;
+  /** The host's process list, for commands that check which host tools are running. */
+  hostProcesses: HostProcessList;
   /** Whether `adb-axi <path>` ships in this build, so help lines never name one that does not. */
   isShipped: (path: readonly string[]) => boolean;
 }

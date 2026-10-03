@@ -4,7 +4,8 @@ import { join } from "node:path";
 import { decode } from "@toon-format/toon";
 import { afterEach, describe, expect, it } from "vitest";
 import { isProcessAlive } from "../../src/core/exec.js";
-import { createFakeAdb, type FakeAdb } from "../fake-adb/harness.js";
+import { createFakeAdb, SCENARIOS_DIR, type FakeAdb } from "../fake-adb/harness.js";
+import type { Rule, Scenario } from "../fake-adb/scenario.js";
 import { runCli } from "../helpers/run.js";
 
 const MARGIN_MS = 750;
@@ -15,10 +16,21 @@ afterEach(() => {
   fake = undefined;
 });
 
-function withFake(scenario: string): FakeAdb {
-  fake = createFakeAdb(scenario);
+function withFake(scenario: string, extraRules: Rule[] = []): FakeAdb {
+  if (extraRules.length === 0) {
+    fake = createFakeAdb(scenario);
+    return fake;
+  }
+  const base = JSON.parse(readFileSync(join(SCENARIOS_DIR, scenario), "utf8")) as Scenario;
+  fake = createFakeAdb({ ...base, rules: [...base.rules, ...extraRules] });
   return fake;
 }
+
+/** `adb -s <serial> shell 'echo hi'` answered on each online emulator. */
+const ECHO_RULES: Rule[] = ["emulator-5554", "emulator-5556"].map((serial) => ({
+  match: ["-s", serial, "shell", "echo hi"],
+  respond: { stdout: `hi from ${serial}\n` },
+}));
 
 /** Device calls after the device list, which must all carry `-s <serial>`. */
 function deviceCalls(f: FakeAdb): string[][] {
@@ -28,7 +40,7 @@ function deviceCalls(f: FakeAdb): string[][] {
     .filter((argv) => argv[0] !== "devices");
 }
 
-describe("device selection through a command (hidden stubs run after resolution)", () => {
+describe("device selection through a command", () => {
   it("fails with DEVICE_AMBIGUOUS when two devices are online and none is selected", async () => {
     const f = withFake("multi-device.json");
     const toon = await runCli(["logs", "--pkg", "com.example.notes"], f.env);
@@ -50,14 +62,20 @@ describe("device selection through a command (hidden stubs run after resolution)
   });
 
   it("targets a device by AVD name and by serial", async () => {
-    const f = withFake("multi-device.json");
+    const f = withFake("multi-device.json", ECHO_RULES);
     for (const selector of ["Pixel_Tablet", "emulator-5556"]) {
-      const { stdout, exitCode } = await runCli(["doctor", "ui", "--device", selector], f.env);
-      expect(exitCode).toBe(1);
-      expect(stdout).toContain("code: NOT_IMPLEMENTED");
+      const { stdout, exitCode } = await runCli(
+        ["shell", "--device", selector, "--", "echo hi"],
+        f.env,
+      );
+      expect(exitCode).toBe(0);
+      expect(stdout).toContain("hi from emulator-5556");
     }
-    const viaEnv = await runCli(["doctor", "ui"], { ...f.env, ANDROID_SERIAL: "emulator-5554" });
-    expect(viaEnv.stdout).toContain("code: NOT_IMPLEMENTED");
+    const viaEnv = await runCli(["shell", "--", "echo hi"], {
+      ...f.env,
+      ANDROID_SERIAL: "emulator-5554",
+    });
+    expect(viaEnv.stdout).toContain("hi from emulator-5554");
     expect(f.unmatched()).toEqual([]);
   });
 
@@ -110,11 +128,12 @@ describe("device selection through a command (hidden stubs run after resolution)
   });
 
   it("prints every adb argv on stderr with --debug, and nothing else", async () => {
-    const f = withFake("one-online.json");
-    const { stdout, stderr } = await runCli(["doctor", "ui", "--debug"], f.env);
-    expect(stdout).toContain("NOT_IMPLEMENTED");
+    const f = withFake("one-online.json", ECHO_RULES);
+    const { stdout, stderr } = await runCli(["shell", "--debug", "--", "echo hi"], f.env);
+    expect(stdout).toContain("hi from emulator-5554");
     expect(stderr.split("\n")[0]).toBe("debug: adb devices -l");
-    const quiet = await runCli(["doctor", "ui"], f.env);
+    expect(stderr).toContain("debug: adb -s emulator-5554 shell 'echo hi'");
+    const quiet = await runCli(["shell", "--", "echo hi"], f.env);
     expect(quiet.stderr).toBe("");
   });
 

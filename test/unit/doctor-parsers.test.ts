@@ -90,6 +90,7 @@ describe("parseInstrumentations", () => {
         package: "com.example.notes.test",
         component: RUNNER,
         uiAutomation: true,
+        processes: [],
       },
     ]);
   });
