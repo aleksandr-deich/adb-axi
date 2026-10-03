@@ -73,7 +73,7 @@ function device(options: {
         ? []
         : [
             {
-              match: ["-s", SERIAL, "shell", "logcat -d -v epoch"],
+              match: ["-s", SERIAL, "shell", { re: "^logcat -d -v epoch -T [0-9]+\\.[0-9]{3}$" }],
               respond: options.window,
             },
           ]),
@@ -158,7 +158,11 @@ describe("logs crash", () => {
         "help[1]: Run the same command with `--full` to write the whole trace to a file",
       );
       // The bounded dump includes lead-in for native crash signals, without a uid filter.
-      expect(logcatCommands(f)).toEqual(["logcat -d -v epoch", "logcat -d -v epoch"]);
+      const start = c.api === "35" ? "1790834240.000" : "1790834110.000";
+      expect(logcatCommands(f)).toEqual([
+        `logcat -d -v epoch -T ${start}`,
+        `logcat -d -v epoch -T ${start}`,
+      ]);
       expectClean(f);
     });
 
@@ -378,6 +382,10 @@ describe("logs crash", () => {
       });
       const { data } = await crashSince(f, "--pkg", "dev.probe");
       expect(data).toEqual({ crashes: "0 since before-run (40 s, 3 lines scanned)" });
+      expect(logcatCommands(f)).toEqual([
+        "logcat -d -v epoch -T 1790834240.000",
+        "logcat -d -v epoch -T 1790834240.000",
+      ]);
       expectClean(f);
     });
 
@@ -519,8 +527,16 @@ describe("logs crash", () => {
       });
       const seconds = await both(["logs", "crash", "--since", "30s"], f);
       expect(seconds.data.crashes).toBe("0 since 30s ago (30 s, 0 lines scanned)");
+      expect(logcatCommands(f)).toEqual([
+        "logcat -d -v epoch -T 1790834910.250",
+        "logcat -d -v epoch -T 1790834910.250",
+      ]);
       const fallback = await both(["logs", "crash"], f);
       expect(fallback.data.crashes).toBe("0 since 15m ago (900 s, 0 lines scanned)");
+      expect(logcatCommands(f).slice(2)).toEqual([
+        "logcat -d -v epoch -T 1790834040.250",
+        "logcat -d -v epoch -T 1790834040.250",
+      ]);
       expectClean(f);
     });
 
