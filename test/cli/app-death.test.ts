@@ -776,6 +776,29 @@ describe("app death", () => {
     expectClean(fake);
   });
 
+  it("does not compare another app's text after restore", async () => {
+    const { toon, data, fake } = await both(["app", "death", "dev.probe", "--compare"], () =>
+      probeDevice({
+        phase: "front",
+        rules: [
+          { match: shell(FOREGROUND), when: { app: "restored" }, respond: LAUNCHER_FRONT },
+          snapshotRule({ stdout: SNAPSHOT_BEFORE }, { stdout: SNAPSHOT_AFTER }),
+        ],
+      }),
+    );
+    expect(toon.exitCode).toBe(1);
+    expect(normalized(data)).toEqual({
+      error: "dev.probe was killed and restored, but the visible-text comparison could not run: dev.probe was not in front after the restore",
+      code: "COMPARE_UNAVAILABLE",
+      death: diedAndRestored,
+      help: ["Run `adb-axi app death dev.probe` to repeat the check without --compare"],
+    });
+    expect(fake.calls().filter((call) => call.tool === "agent-device")).toHaveLength(1);
+    expect(shellCommands(fake)).toContain(AM_KILL);
+    expect(shellCommands(fake)).toContain(START);
+    expectClean(fake);
+  });
+
   it("fails with COMPARE_UNAVAILABLE, exit 1, when agent-device is not installed, after the kill and restore ran", async () => {
     const { toon, data, fake } = await both(["app", "death", "dev.probe", "--compare"], () =>
       withoutAgentDevice(probeDevice({ phase: "front" })),

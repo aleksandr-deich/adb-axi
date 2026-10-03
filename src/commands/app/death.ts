@@ -60,6 +60,11 @@ export const appDeath = defineCommand({
     const death = deathRecord(killed, restored);
     const ok = okLine("death", pkg, deathState(pkg, killed, restored.front));
     if (before === undefined) return { ok, death };
+    if (restored.front !== pkg) {
+      throw compareUnavailable(context, pkg, killed, death, {
+        reason: `${pkg} was not in front after the restore`,
+      });
+    }
 
     const after = before.ok ? await takeSnapshot(context) : before;
     if (!before.ok || !after.ok) {
