@@ -31,7 +31,10 @@ describe("parseInstrumentations pids", () => {
         package: "a.one",
         component: "a.one/.Runner",
         uiAutomation: true,
-        pids: [9021, 9033],
+        processes: [
+          { pid: 9021, package: "a.one" },
+          { pid: 9033, package: "a.one" },
+        ],
       },
     ]);
   });
@@ -103,7 +106,7 @@ describe("classifyHolders", () => {
     package: component.split("/")[0] ?? "",
     component,
     uiAutomation: true,
-    pids: [pid],
+    processes: [{ pid, package: component.split("/")[0] ?? "" }],
   });
   const evidence = (overrides: Partial<Evidence>): Evidence => ({
     serial: SERIAL,
@@ -112,6 +115,7 @@ describe("classifyHolders", () => {
     wedgedPids: new Set(),
     host: [],
     forwards: [],
+    serials: new Set([SERIAL, "USB-A", "USB-B"]),
     selfPid: 99_999,
     ...overrides,
   });
@@ -160,12 +164,14 @@ describe("classifyHolders", () => {
     expect(one({ instrumentations: [RUNNER], host: host({ pid: 4100, args }) }).state).toBe("live");
   });
 
-  it("does not count a client that names another emulator", () => {
+  it.each([
+    "adb --device emulator-5556 shell am instrument -w x/.R",
+    "adb -s USB-B shell am instrument -w x/.R",
+    "adb --serial=USB-B shell am instrument -w x/.R",
+    "adb --device USB-B shell am instrument -w x/.R",
+  ])("does not count a client explicitly targeting another serial: %s", (args) => {
     expect(
-      one({
-        instrumentations: [RUNNER],
-        host: host({ pid: 4100, args: "adb --device emulator-5556 shell am instrument -w x/.R" }),
-      }).state,
+      one({ serial: "USB-A", instrumentations: [RUNNER], host: host({ pid: 4100, args }) }).state,
     ).toBe("leaked");
   });
 

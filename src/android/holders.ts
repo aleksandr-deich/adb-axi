@@ -14,15 +14,15 @@ export interface Holder {
   component: string;
   /** Whether the instrumentation was started with a UiAutomation connection (`am instrument` does). */
   uiAutomation: boolean;
-  /** The pids of the processes it runs in (`mRunningProcesses`); empty when none are printed. */
-  pids: number[];
+  /** The processes it runs in (`mRunningProcesses`); empty when none are printed. */
+  processes: { pid: number; package: string }[];
 }
 
 const HEADER =
   /^\s*Instrumentation #\d+: ActiveInstrumentation\{\S+ \{([^/\s}]+)\/([^\s}]+)\}( FINISHED)? \d+ procs\}\s*$/;
 
 /** `#0: ProcessRecord{9d1c2aa 9021:com.example.notes/u0a214}` under `mRunningProcesses:`. */
-const RUNNING_PROCESS = /^\s+#\d+: ProcessRecord\{[0-9a-f]+ (\d+):/;
+const RUNNING_PROCESS = /^\s+#\d+: ProcessRecord\{[0-9a-f]+ (\d+):([a-zA-Z_][\w]*(?:\.[a-zA-Z_][\w]*)*)(?::[\w.]+)?\//;
 
 /**
  * The live instrumentations in `dumpsys activity processes`. The section is printed by
@@ -56,7 +56,7 @@ export function parseInstrumentations(dump: string): Holder[] {
           package: header[1],
           component: `${header[1]}/${header[2]}`,
           uiAutomation: false,
-          pids: [],
+          processes: [],
         },
         finished: header[3] !== undefined,
       };
@@ -70,8 +70,8 @@ export function parseInstrumentations(dump: string): Holder[] {
       continue;
     }
     const running = inProcesses ? RUNNING_PROCESS.exec(line) : null;
-    if (current && running?.[1] !== undefined) {
-      current.holder.pids.push(Number(running[1]));
+    if (current && running?.[1] !== undefined && running[2] !== undefined) {
+      current.holder.processes.push({ pid: Number(running[1]), package: running[2] });
       continue;
     }
     inProcesses = false;

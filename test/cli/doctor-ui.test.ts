@@ -24,6 +24,7 @@ interface Instrumentation {
   component: string;
   pid: number;
   uiAutomation?: boolean;
+  processPackage?: string;
 }
 
 /**
@@ -34,14 +35,15 @@ interface Instrumentation {
 function dumpsys(...instrumentations: Instrumentation[]): Response {
   const lines = ["ACTIVITY MANAGER RUNNING PROCESSES (dumpsys activity processes)"];
   if (instrumentations.length > 0) lines.push("  Active instrumentation:");
-  instrumentations.forEach(({ component, pid, uiAutomation }, index) => {
+  instrumentations.forEach(({ component, pid, uiAutomation, processPackage }, index) => {
     const [pkg = ""] = component.split("/");
+    const target = processPackage ?? pkg;
     lines.push(
       `    Instrumentation #${index}: ActiveInstrumentation{4be1f0${index} {${component}} 1 procs}`,
       `      mClass=ComponentInfo{${component}} mFinished=false`,
       "      mRunningProcesses:",
-      `        #0: ProcessRecord{9d1c2a${index} ${pid}:${pkg}/u0a21${index}}`,
-      `      mTargetProcesses=[ProcessRecord{9d1c2a${index} ${pid}:${pkg}/u0a21${index}}]`,
+      `        #0: ProcessRecord{9d1c2a${index} ${pid}:${target}/u0a21${index}}`,
+      `      mTargetProcesses=[ProcessRecord{9d1c2a${index} ${pid}:${target}/u0a21${index}}]`,
       ...(uiAutomation === false
         ? []
         : [`      mUiAutomationConnection=android.app.UiAutomationConnection@5a7c3f${index}`]),
@@ -106,6 +108,7 @@ interface Setup {
   /** Rules tried before the defaults, for state-driven `--fix` runs. */
   rules?: Rule[];
   state?: Record<string, string>;
+  devices?: string;
 }
 
 let fake: FakeAdb | undefined;
@@ -127,7 +130,7 @@ function scenario(setup: Setup = {}): FakeAdb {
     ...(setup.state === undefined ? {} : { state: setup.state }),
     rules: [
       ...(setup.rules ?? []),
-      { match: ["devices", "-l"], respond: { stdout: DEVICES } },
+      { match: ["devices", "-l"], respond: { stdout: setup.devices ?? DEVICES } },
       { match: shell(SHELL.dumpsys), respond: setup.dumpsys ?? dumpsys() },
       { match: shell(SHELL.ps), respond: setup.ps ?? ps() },
       { match: shell(SHELL.logcat), respond: setup.logcat ?? NO_WEDGE },
@@ -347,6 +350,32 @@ describe("doctor ui", () => {
       ]);
     });
 
+    it("names both force-stop targets in the leaked instrumentation help", async () => {
+      const f = scenario({ dumpsys: dumpsys({ component: RUNNER, pid: 9021, processPackage: "com.example.notes" }) });
+      const { exitCode, data } = await cli(f, ["doctor", "ui"]);
+      expect(exitCode).toBe(1);
+      expect(data.help).toEqual([
+        `Run \`adb-axi doctor ui --fix --device ${SERIAL}\` to force-stop com.example.notes.test and force-stop com.example.notes`,
+      ]);
+    });
+
+    it("treats a host client on another physical device as unrelated", async () => {
+      const f = scenario({
+        devices: `List of devices attached\nUSB-A device\nUSB-B device\n`,
+        dumpsys: dumpsys({ component: RUNNER, pid: 9021 }),
+      });
+      const { exitCode, data } = await cli(
+        f,
+        ["doctor", "ui", "--device", "USB-A"],
+        [...HOST_NOISE, { pid: 6162, args: `adb -s USB-B shell am instrument -w ${RUNNER}` }],
+      );
+      expect(exitCode).toBe(1);
+      expect(data.holders).toEqual([
+        { pid: 9021, holder: "com.example.notes.test (am instrument)", state: "leaked", why: "no host client" },
+      ]);
+      expect(f.unmatched()).toEqual([]);
+    });
+
     it("ignores an instrumentation without a UiAutomation connection", async () => {
       const f = scenario({
         dumpsys: dumpsys({ component: RUNNER, pid: 9021, uiAutomation: false }),
@@ -485,6 +514,33 @@ describe("doctor ui", () => {
           },
         ],
       });
+      expectAddressed(f);
+    });
+
+    it("stops both the runner and target app process for a leaked test instrumentation", async () => {
+      const f = scenario({
+        state: { runner: "running", target: "running" },
+        rules: [
+          { match: shell("am force-stop com.example.notes.test"), set: { runner: "gone" }, respond: {} },
+          { match: shell("am force-stop com.example.notes"), set: { target: "gone" }, respond: {} },
+          { match: shell(SHELL.dumpsys), when: { target: "running" }, respond: dumpsys({ component: RUNNER, pid: 9021, processPackage: "com.example.notes" }) },
+        ],
+      });
+      const { exitCode, data } = await cli(f, ["doctor", "ui", "--fix"]);
+      expect(exitCode).toBe(0);
+      expect(data).toEqual({
+        ok: `doctor ui ${SERIAL} -> uiautomation free (1 cleared)`,
+        cleared: [{
+          pid: 9021,
+          holder: "com.example.notes.test (am instrument)",
+          was: "leaked",
+          action: "am force-stop com.example.notes.test; am force-stop com.example.notes",
+        }],
+      });
+      expect(shellCalls(f).filter((command) => command.startsWith("am force-stop"))).toEqual([
+        "am force-stop com.example.notes.test", "am force-stop com.example.notes",
+        "am force-stop com.example.notes.test", "am force-stop com.example.notes",
+      ]);
       expectAddressed(f);
     });
 

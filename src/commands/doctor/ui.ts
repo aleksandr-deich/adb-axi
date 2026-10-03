@@ -7,6 +7,7 @@ import {
 } from "../../android/holders.js";
 import { runShell } from "../../adb/shell.js";
 import { AdbAxiError } from "../../core/errors.js";
+import { listDevices } from "../../device/list.js";
 import { noop, okLine, runHint, type Output } from "../../core/output.js";
 import { poll } from "../../core/poll.js";
 import { UNKNOWN, readOptions, targetSerial } from "../app/shared.js";
@@ -26,7 +27,7 @@ export const doctorUi = defineCommand({
       name: "--fix",
       type: "boolean",
       description:
-        "Clear leaked and wedged holders, then check again: kill for app_process servers, am force-stop for instrumentations (which also stops that package's app processes). Live ones are never touched",
+        "Clear leaked and wedged holders, then check again: kill app_process servers; force-stop instrumentation runners and their target app packages (stopping their app processes). Live ones are never touched",
     },
   ],
   examples: ["adb-axi doctor ui", "adb-axi doctor ui --fix"],
@@ -46,10 +47,11 @@ async function inspect(context: CommandContext): Promise<ClassifiedHolder[]> {
   const found = findHolders(instrumentations, servers);
   if (found.length === 0) return [];
 
-  const [wedgedPids, host, forwards] = await Promise.all([
+  const [wedgedPids, host, forwards, devices] = await Promise.all([
     readWedgedPids(adb, serial, reads),
     context.hostProcesses(Math.min(context.deadline.remainingMs(), CHECK_CAP_MS)),
     found.some((holder) => holder.kind === "server") ? readForwards(context) : [],
+    listDevices(adb, context.deadline),
   ]);
   return classifyHolders({
     serial,
@@ -58,6 +60,7 @@ async function inspect(context: CommandContext): Promise<ClassifiedHolder[]> {
     wedgedPids,
     host,
     forwards,
+    serials: new Set(devices.map((device) => device.serial)),
     selfPid: process.pid,
   });
 }
@@ -92,18 +95,19 @@ function rows(holders: readonly ClassifiedHolder[]): Record<string, unknown>[] {
   }));
 }
 
-/** What `--fix` does to a leaked or wedged holder, as a device shell command. */
-function clearCommand(holder: ClassifiedHolder): string {
-  return holder.found.kind === "server"
-    ? `kill ${holder.found.pid}`
-    : `am force-stop ${holder.found.package}`;
+function clearCommands(holder: ClassifiedHolder): string[] {
+  if (holder.found.kind === "server") return [`kill ${holder.found.pid}`];
+  const packages = new Set([
+    holder.found.package,
+    ...holder.found.processes.map((process) => process.package),
+  ]);
+  return [...packages].map((pkg) => `am force-stop ${pkg}`);
 }
 
-/** The same, in words for a help line. */
 function clearWords(holder: ClassifiedHolder): string {
   return holder.found.kind === "server"
     ? `kill pid ${holder.found.pid}`
-    : `force-stop ${holder.found.package}`;
+    : joinWords(clearCommands(holder).map((command) => command.replace("am ", "")));
 }
 
 function sameHolder(a: ClassifiedHolder, b: ClassifiedHolder): boolean {
@@ -157,10 +161,12 @@ async function fix(context: CommandContext): Promise<Output> {
   const targets = before.filter((holder) => !isLive(holder));
   for (const holder of targets) {
     // A failed kill shows in the re-check, which is what decides the outcome.
-    await runShell(context.adb(), serial, clearCommand(holder), {
-      deadline: context.deadline,
-      step: `clearing ${holder.label}`,
-    });
+    for (const command of clearCommands(holder)) {
+      await runShell(context.adb(), serial, command, {
+        deadline: context.deadline,
+        step: `clearing ${holder.label}`,
+      });
+    }
   }
   const after = targets.length === 0 ? before : await recheck(context, targets);
 
@@ -170,7 +176,7 @@ async function fix(context: CommandContext): Promise<Output> {
       pid: pidCell(holder),
       holder: holder.label,
       was: holder.state,
-      action: clearCommand(holder),
+      action: clearCommands(holder).join("; "),
     }));
   const clearedField = cleared.length > 0 ? { cleared } : {};
 

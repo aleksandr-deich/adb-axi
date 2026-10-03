@@ -129,6 +129,7 @@ export interface Evidence {
   wedgedPids: ReadonlySet<number>;
   host: readonly HostProcess[] | null;
   forwards: readonly Forward[] | null;
+  serials: ReadonlySet<string>;
   /** adb-axi's own pid, never a client. */
   selfPid: number;
 }
@@ -141,21 +142,10 @@ export function findHolders(
   return [...instrumentations, ...servers].filter((found) => toolOf(found) !== undefined);
 }
 
-/**
- * The serial a host command line names with `-s`, `--serial` or `--device`, if any. A tool
- * may name the device by an AVD name, so only an `emulator-<port>` serial counts here.
- */
-function namedEmulator(process: HostProcess): string | undefined {
-  const match = /(?:^|\s)(?:-s|--serial|--device)(?:\s+|=)(emulator-\d+)(?=\s|$)/.exec(
-    process.args,
-  );
-  return match?.[1];
-}
-
-/** Whether a host process may be driving the target. Undeterminable counts as yes. */
-function mayTarget(process: HostProcess, serial: string): boolean {
-  const named = namedEmulator(process);
-  return named === undefined || named === serial;
+/** Whether a host process may be driving the target. Unknown names may be AVDs. */
+function mayTarget(process: HostProcess, serial: string, serials: ReadonlySet<string>): boolean {
+  const named = /(?:^|\s)(?:-s|--serial|--device)(?:\s+|=)(\S+)/.exec(process.args)?.[1];
+  return named === undefined || named === serial || (!/^emulator-\d+$/.test(named) && !serials.has(named));
 }
 
 /**
@@ -171,7 +161,7 @@ export function classifyHolders(evidence: Evidence): ClassifiedHolder[] {
 }
 
 function classify(found: Found, tool: Tool, evidence: Evidence): ClassifiedHolder {
-  const pids = found.kind === "server" ? [found.pid] : found.pids;
+  const pids = found.kind === "server" ? [found.pid] : found.processes.map((process) => process.pid);
   const label = tool.label(found);
   const live = (why: string, client: HostProcess | undefined): ClassifiedHolder => ({
     found,
@@ -188,7 +178,7 @@ function classify(found: Found, tool: Tool, evidence: Evidence): ClassifiedHolde
     (process) =>
       process.pid !== evidence.selfPid &&
       tool.client(process) &&
-      mayTarget(process, evidence.serial),
+      mayTarget(process, evidence.serial, evidence.serials),
   );
   let forwarded = true;
   if (tool.forwardRemote !== undefined) {
