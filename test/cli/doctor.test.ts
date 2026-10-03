@@ -414,7 +414,7 @@ describe("doctor", () => {
       });
       const run = await runCli(["doctor"], f.env);
       expect(run.exitCode).toBe(0);
-      const data = decode(run.stdout.trimEnd()) as Report["data"];
+      const data = decode(run.stdout.trimEnd()) as unknown as Report["data"];
       expect(data.target).toBe(SERIAL);
       expect(data.checks.find((row) => row.check === "device")?.detail).toBe(`${SERIAL} online`);
       expect(f.calls().filter((call) => call.argv[0] === "devices")).toHaveLength(1);
