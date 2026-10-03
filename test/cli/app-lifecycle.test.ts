@@ -502,13 +502,11 @@ describe("app start", () => {
         "  state: stopped",
         '  pid: "-"',
         "  foreground: com.google.android.apps.nexuslauncher",
-        "help[1]: Run `adb-axi app start dev.probe --fresh` to try a cold start",
+        "help[2]: Run `adb-axi logs crash --pkg dev.probe --since 1m` for the crash,Run `adb-axi app start dev.probe --fresh` to try a cold start",
         "",
       ].join("\n"),
     );
     expect(data).toMatchObject({ code: "APP_DIED_ON_START" });
-    // `logs crash` is not shipped yet, so no help line names it.
-    expect(toon.stdout).not.toContain("logs crash");
     expectClean(f);
   });
 
@@ -1299,10 +1297,14 @@ describe("lifecycle review regressions", () => {
         expect(help).toContain(
           `Run \`adb-axi app start dev.probe/.Editor --fresh --device ${SERIAL} --timeout 30s\` to give it longer`,
         );
-      if (code === "APP_DIED_ON_START")
+      if (code === "APP_DIED_ON_START") {
         expect(help).toContain(
           `Run \`adb-axi app start dev.probe/.Editor --fresh --device ${SERIAL}\` to try a cold start`,
         );
+        expect(help).toContain(
+          `Run \`adb-axi logs crash --pkg dev.probe --since 1m --device ${SERIAL}\` for the crash`,
+        );
+      }
       expectClean(f);
     },
   );
