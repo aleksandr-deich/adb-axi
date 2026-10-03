@@ -164,9 +164,9 @@ describe("wait boot", () => {
       error: `${SERIAL} had not finished booting after 1 s`,
       last: { state: "not attached", boot_completed: "-", uptime_s: "-" },
     });
-    expect(
-      f.calls().filter((call) => call.argv[2] === "shell" && call.argv[1] === TABLET),
-    ).toEqual([]);
+    expect(f.calls().filter((call) => call.argv[2] === "shell" && call.argv[1] === TABLET)).toEqual(
+      [],
+    );
     expect(f.unmatched()).toEqual([]);
   }, 20_000);
 
@@ -232,16 +232,20 @@ describe("wait boot", () => {
     it.each([
       ["offline", "offline"],
       ["recovery", "not online"],
-    ])("reports the last state for offline and %s attachments", async (other, state) => {
-      const f = scenario([listing(devices(line(SERIAL, "offline"), line(TABLET, other)))]);
-      const { toon, data } = await both(["wait", "boot", "--timeout", "1s"], f);
-      expect(toon.exitCode).toBe(1);
-      expect(data).toMatchObject({
-        code: "WAIT_TIMEOUT",
-        last: { state, boot_completed: "-", uptime_s: "-" },
-      });
-      expect(f.unmatched()).toEqual([]);
-    }, 20_000);
+    ])(
+      "reports the last state for offline and %s attachments",
+      async (other, state) => {
+        const f = scenario([listing(devices(line(SERIAL, "offline"), line(TABLET, other)))]);
+        const { toon, data } = await both(["wait", "boot", "--timeout", "1s"], f);
+        expect(toon.exitCode).toBe(1);
+        expect(data).toMatchObject({
+          code: "WAIT_TIMEOUT",
+          last: { state, boot_completed: "-", uptime_s: "-" },
+        });
+        expect(f.unmatched()).toEqual([]);
+      },
+      20_000,
+    );
 
     it("names the environment-selected device in the timeout and doctor hint", async () => {
       const f = scenario([listing(devices())]);

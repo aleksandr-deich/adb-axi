@@ -729,7 +729,8 @@ describe("doctor", () => {
         expect(rows.instrumentation).toEqual({
           check: "instrumentation",
           status: "warn",
-          detail: "could not read it: looking for running instrumentations printed output adb-axi cannot read",
+          detail:
+            "could not read it: looking for running instrumentations printed output adb-axi cannot read",
         });
       },
     );
