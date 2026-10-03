@@ -53,10 +53,11 @@ export const logsCrash = defineCommand({
     const window = resolveWindow(serial, context.env, since, now);
     // The scan is never narrowed to the app: its ANR is printed by system_server and its
     // tombstone by crash_dump, which a uid or pid filter would drop.
-    const scanned = await readWindowLines(adb, serial, window, options);
-    const crashes = parseCrashes(scanned).filter(
-      (crash) => pkg === undefined || crashBelongsTo(crash, pkg),
+    const lines = await readWindowLines(adb, serial, window, options, undefined, true);
+    const crashes = parseCrashes(lines).filter(
+      (crash) => crash.epochMs >= window.startMs && (pkg === undefined || crashBelongsTo(crash, pkg)),
     );
+    const scanned = lines.filter((line) => line.epochMs >= window.startMs);
 
     const seconds = Math.max(0, Math.round((now.epochMs - window.startMs) / 1000));
     const full = context.flags.full === true;

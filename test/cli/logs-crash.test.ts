@@ -13,8 +13,6 @@ const CLOCK = "date '+%s.%N %z'";
 /** The device clock when the mark is taken, and when the window is read (+0200). */
 const MARK_CLOCK = "1790834300.000000000 +0200\n";
 const LATER_CLOCK = "1790834340.000000000 +0200\n";
-const MARK_START = "1790834300.000";
-
 let fake: FakeAdb | undefined;
 afterEach(() => {
   fake?.cleanup();
@@ -37,8 +35,6 @@ function logLine(
   return `${String(seconds).padStart(19)}.${millis} ${String(pid).padStart(5)} ${String(pid).padStart(5)} ${level} ${tag.padEnd(8)}: ${message}`;
 }
 
-const logcatFor = (start: string): string => `logcat -d -v epoch -T ${start}`;
-
 /**
  * One online emulator. Marks and reads are answered by the clock list (the last answer
  * repeats) and the window by `window`, both as the device would print them.
@@ -47,7 +43,6 @@ function device(options: {
   api?: number;
   clocks?: string[];
   window?: Response;
-  start?: string;
   /** Device epoch seconds of the mark; the window is read 40 s later. Sets `clocks` and `start`. */
   markAt?: number;
   scenarioRules?: Rule[];
@@ -58,8 +53,6 @@ function device(options: {
     options.markAt === undefined
       ? (options.clocks ?? [MARK_CLOCK, LATER_CLOCK])
       : [`${options.markAt}.000000000 +0200\n`, `${options.markAt + 40}.000000000 +0200\n`];
-  const start =
-    options.markAt === undefined ? (options.start ?? MARK_START) : `${options.markAt}.000`;
   fake = createFakeAdb({
     description: "Online emulator with a log window holding crashes",
     synthetic: true,
@@ -80,7 +73,7 @@ function device(options: {
         ? []
         : [
             {
-              match: ["-s", SERIAL, "shell", logcatFor(start)],
+              match: ["-s", SERIAL, "shell", "logcat -d -v epoch"],
               respond: options.window,
             },
           ]),
@@ -164,10 +157,8 @@ describe("logs crash", () => {
       expect(toon.stdout).toContain(
         "help[1]: Run the same command with `--full` to write the whole trace to a file",
       );
-      // One bounded dump from the mark. It is never narrowed to the app (no --uid), so the
-      // system_server ANR and the crash_dump tombstone of the app are still in it.
-      const start = `${c.api === "35" ? 1790834300 : 1790834170}.000`;
-      expect(logcatCommands(f)).toEqual([logcatFor(start), logcatFor(start)]);
+      // The bounded dump includes lead-in for native crash signals, without a uid filter.
+      expect(logcatCommands(f)).toEqual(["logcat -d -v epoch", "logcat -d -v epoch"]);
       expectClean(f);
     });
 
@@ -362,6 +353,38 @@ describe("logs crash", () => {
       expect(data).toEqual({ crashes: "0 since before-run (40 s, 4 lines scanned)" });
     });
 
+    it("excludes a native crash raised before the mark even when its tombstone follows", async () => {
+      const f = device({
+        window: {
+          stdout: [
+            logLine(1790834299900, 9386, "F", "libc", "Fatal signal 11 (SIGSEGV) in tid 9386 (dev.probe), pid 9386 (dev.probe)"),
+            logLine(1790834300200, 9409, "F", "DEBUG", "*** *** *** ***"),
+            logLine(1790834300200, 9409, "F", "DEBUG", "pid: 9386, tid: 9386, name: probe  >>> dev.probe <<<"),
+            logLine(1790834300200, 9409, "F", "DEBUG", "signal 11 (SIGSEGV), code 0 (SI_USER)"),
+          ].join("\n"),
+        },
+      });
+      const { data } = await crashSince(f, "--pkg", "dev.probe");
+      expect(data).toEqual({ crashes: "0 since before-run (40 s, 3 lines scanned)" });
+      expectClean(f);
+    });
+
+    it("keeps a tombstone in the window when its pid was reused by another process", async () => {
+      const f = device({
+        window: {
+          stdout: [
+            logLine(1790834299900, 9386, "F", "libc", "Fatal signal 11 (SIGSEGV) in tid 9386 (dev.other), pid 9386 (dev.other)"),
+            logLine(1790834300200, 9409, "F", "DEBUG", "*** *** *** ***"),
+            logLine(1790834300200, 9409, "F", "DEBUG", "pid: 9386, tid: 9386, name: probe  >>> dev.probe <<<"),
+            logLine(1790834300200, 9409, "F", "DEBUG", "signal 11 (SIGSEGV), code 0 (SI_USER)"),
+          ].join("\n"),
+        },
+      });
+      const { data } = await crashSince(f, "--pkg", "dev.probe");
+      expect(data.crashes).toBe("1 since before-run (40 s, 3 lines scanned)");
+      expect(data.crash).toMatchObject({ kind: "native", at: "2026-10-01 07:58:20.200" });
+    });
+
     it("counts a crash at or after the mark", async () => {
       const f = device({
         window: {
@@ -408,13 +431,7 @@ describe("logs crash", () => {
       const f = device({
         clocks: ["1790835000.250000000 +0000\n"],
         window: { stdout: "" },
-        start: "1790834970.250",
-        scenarioRules: [
-          {
-            match: ["-s", SERIAL, "shell", logcatFor("1790834100.250")],
-            respond: { stdout: "" },
-          },
-        ],
+
       });
       const seconds = await both(["logs", "crash", "--since", "30s"], f);
       expect(seconds.data.crashes).toBe("0 since 30s ago (30 s, 0 lines scanned)");
@@ -538,6 +555,25 @@ describe("logs crash", () => {
       expect(written).toContain(
         "ANR in dev.probe (dev.probe/.MainActivity)\nPID: 9448\nReason: Input dispatching",
       );
+    });
+
+    it("keeps unrelated system-server activity out of an ANR's full trace", async () => {
+      const f = device({
+        window: {
+          stdout: [
+            logLine(1790834310000, 552, "E", "ActivityManager", "ANR in dev.probe"),
+            logLine(1790834310000, 552, "E", "ActivityManager", "PID: 123"),
+            logLine(1790834310000, 552, "E", "ActivityManager", "Reason: blocked"),
+            logLine(1790834310001, 552, "E", "ActivityManager", "Reason: unrelated"),
+          ].join("\n"),
+        },
+      });
+      await runCli(["logs", "mark", "before-run"], f.env);
+      const run = await runCli(["logs", "crash", "--since", "before-run", "--pkg", "dev.probe", "--full", "--json"], f.env);
+      const data = JSON.parse(run.stdout) as Record<string, unknown>;
+      expect(data.crash).toMatchObject({ message: "blocked" });
+      expect(readFileSync(data.full as string, "utf8")).toContain("Reason: blocked");
+      expect(readFileSync(data.full as string, "utf8")).not.toContain("Reason: unrelated");
     });
 
     it("writes an empty file and prints its path when there is no crash", async () => {

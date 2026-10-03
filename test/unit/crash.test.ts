@@ -133,6 +133,29 @@ describe("parseCrashes on captured output", () => {
   });
 });
 
+describe("ANR report boundaries", () => {
+  it("excludes later activity from the same system-server thread", () => {
+    const crash = one([
+      line(0, 552, "E", "ActivityManager", "ANR in dev.probe"),
+      line(0, 552, "E", "ActivityManager", "PID: 123"),
+      line(0, 552, "E", "ActivityManager", "Reason: first"),
+      line(1, 552, "E", "ActivityManager", "PID: 999"),
+      line(1, 552, "E", "ActivityManager", "Reason: unrelated"),
+    ]);
+    expect(crash).toMatchObject({ pid: 123, message: "first" });
+    expect(crash.trace).toEqual(["ANR in dev.probe", "PID: 123", "Reason: first"]);
+  });
+
+  it("closes a report when its thread logs a different priority", () => {
+    const crash = one([
+      line(0, 552, "E", "ActivityManager", "ANR in dev.probe"),
+      line(0, 552, "D", "ActivityManager", "Completed ANR of dev.probe"),
+      line(0, 552, "E", "ActivityManager", "Reason: unrelated"),
+    ]);
+    expect(crash.trace).toEqual(["ANR in dev.probe"]);
+  });
+});
+
 describe("matching by package name", () => {
   const probe = (process: string): Crash =>
     one([
@@ -370,6 +393,33 @@ describe("native crash blocks", () => {
       appFrame: "notes_crash+20 (libnotes.so)",
       frames: 3,
     });
+  });
+
+  it("does not assign an earlier process's signal to a reused pid", () => {
+    const debug = (ms: number, message: string): LogLine => line(ms, 9409, "F", "DEBUG", message);
+    const crashes = parseCrashes([
+      line(0, 9386, "F", "libc", "Fatal signal 11 (SIGSEGV) in tid 9386 (dev.other), pid 9386 (dev.other)"),
+      debug(200, "*** *** *** ***"),
+      debug(200, "pid: 9386, tid: 9386, name: other  >>> dev.other <<<"),
+      debug(200, "signal 11 (SIGSEGV), code 0 (SI_USER)"),
+      debug(500, "*** *** *** ***"),
+      debug(500, "pid: 9386, tid: 9386, name: probe  >>> dev.probe <<<"),
+      debug(500, "signal 11 (SIGSEGV), code 0 (SI_USER)"),
+    ]);
+    expect(crashes.map((crash) => [crash.process, crash.epochMs])).toEqual([
+      ["dev.other", 1790834000000],
+      ["dev.probe", 1790834000500],
+    ]);
+  });
+
+  it("does not pair a distant signal with a tombstone of a reused process", () => {
+    const crash = one([
+      line(0, 9386, "F", "libc", "Fatal signal 11 (SIGSEGV) in tid 9386 (dev.probe), pid 9386 (dev.probe)"),
+      line(20_000, 9409, "F", "DEBUG", "*** *** *** ***"),
+      line(20_000, 9409, "F", "DEBUG", "pid: 9386, tid: 9386, name: probe  >>> dev.probe <<<"),
+      line(20_000, 9409, "F", "DEBUG", "signal 11 (SIGSEGV), code 0 (SI_USER)"),
+    ]);
+    expect(crash.epochMs).toBe(1790834020000);
   });
 
   it("names a symbol-less app frame by its file and address", () => {

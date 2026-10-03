@@ -46,7 +46,7 @@ export function parseCrashes(lines: readonly LogLine[]): Crash[] {
   const java = new Map<number, Block>();
   const anr = new Map<string, Block>();
   const native = new Map<number, Block>();
-  const signals: { pid: number; epochMs: number }[] = [];
+  const signals: { pid: number; process: string; signal: string; epochMs: number }[] = [];
 
   const closeJava = (pid: number): void => {
     const block = java.get(pid);
@@ -75,13 +75,19 @@ export function parseCrashes(lines: readonly LogLine[]): Crash[] {
       } else {
         java.get(line.pid)?.rest.push(line.message);
       }
-    } else if (line.tag === "ActivityManager" && line.level === "E") {
+    } else if (line.tag === "ActivityManager") {
       const key = `${line.pid}:${line.tid}`;
-      if (ANR_START.test(line.message)) {
+      const block = anr.get(key);
+      if (block !== undefined && (line.level !== "E" || line.epochMs !== block.start.epochMs)) {
         closeAnr(key);
-        anr.set(key, { order: order++, start: line, rest: [] });
-      } else {
-        anr.get(key)?.rest.push(line.message);
+      }
+      if (line.level === "E") {
+        if (ANR_START.test(line.message)) {
+          closeAnr(key);
+          anr.set(key, { order: order++, start: line, rest: [] });
+        } else {
+          anr.get(key)?.rest.push(line.message);
+        }
       }
     } else if (line.tag === "DEBUG" && line.level === "F") {
       if (TOMBSTONE_START.test(line.message)) {
@@ -90,8 +96,11 @@ export function parseCrashes(lines: readonly LogLine[]): Crash[] {
       } else {
         native.get(line.pid)?.rest.push(line.message);
       }
-    } else if (line.tag === "libc" && line.level === "F" && FATAL_SIGNAL.test(line.message)) {
-      signals.push({ pid: line.pid, epochMs: line.epochMs });
+    } else if (line.tag === "libc" && line.level === "F") {
+      const raised = FATAL_SIGNAL.exec(line.message);
+      if (raised?.[1] !== undefined && raised[2] !== undefined && raised[3] !== undefined) {
+        signals.push({ pid: Number(raised[2]), process: raised[3], signal: raised[1], epochMs: line.epochMs });
+      }
     }
   }
   for (const pid of [...java.keys()]) closeJava(pid);
@@ -186,7 +195,7 @@ function buildAnr(block: Block): Crash {
 }
 
 const TOMBSTONE_START = /^\*\*\* \*\*\* \*\*\*/;
-const FATAL_SIGNAL = /^Fatal signal \d+ \(/;
+const FATAL_SIGNAL = /^Fatal signal \d+ \((\w+)\).*\bpid (\d+) \(([^)]+)\)/;
 const TOMBSTONE_PID = /^pid: (\d+),(?: ppid: \d+,)? tid: \d+, name: .*?\s+>>> (.+) <<<\s*$/;
 const TOMBSTONE_CMDLINE = /^Cmdline: (\S+)/;
 const TOMBSTONE_SIGNAL = /^signal \d+ \((\w+)\)/;
@@ -194,7 +203,10 @@ const BACKTRACE_FRAME =
   /^\s*#\d+ pc ([0-9a-fA-F]+)\s+(\[[^\]]*\]|\S+)(?:\s+\(offset [^)]*\))?(?:\s+\((.*)\))?\s*$/;
 const BUILD_ID = /\s+\(BuildId: [^)]*\)\s*$/;
 
-function buildNative(block: Block, signals: readonly { pid: number; epochMs: number }[]): Crash {
+function buildNative(
+  block: Block,
+  signals: { pid: number; process: string; signal: string; epochMs: number }[],
+): Crash {
   const messages = [block.start.message, ...block.rest];
   let process = "-";
   let pid: number | null = null;
@@ -222,10 +234,15 @@ function buildNative(block: Block, signals: readonly { pid: number; epochMs: num
       frames.push({ path: frame[2], pc: frame[1], symbol: frame[3] });
     }
   }
-  // The crashing process printed its own line a moment before crash_dump wrote the summary.
-  const raised = signals.findLast(
-    (entry) => entry.pid === pid && entry.epochMs <= block.start.epochMs,
+  const raisedIndex = signals.findLastIndex(
+    (entry) =>
+      entry.pid === pid &&
+      entry.process === process &&
+      entry.signal === signalName &&
+      entry.epochMs <= block.start.epochMs &&
+      block.start.epochMs - entry.epochMs <= 10_000,
   );
+  const raised = raisedIndex < 0 ? undefined : signals.splice(raisedIndex, 1)[0];
   const app = frames.find((frame) => frame.path.includes("/data/app/"));
   const file = (path: string): string => path.replace(/\]$/, "").replace(/^.*\//, "");
   return {

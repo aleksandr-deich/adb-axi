@@ -53,13 +53,15 @@ export async function readWindowLines(
   window: LogWindow,
   options: ReadOptions,
   uid?: number,
+  includeLeadIn = false,
 ): Promise<LogLine[]> {
   const step = "reading the log";
-  const result = await readShell(adb, serial, logcatCommand(window.startMs, uid), step, options);
+  const command = includeLeadIn ? "logcat -d -v epoch" : logcatCommand(window.startMs, uid);
+  const result = await readShell(adb, serial, command, step, options);
   const parsed = parseLogcat(result.stdout);
   // Text that is no log line at all is never passed off as an empty log.
   if (parsed.lines.length === 0 && parsed.unparsed > 0) throw invalidOutput(step, result.stdout);
-  return parsed.lines.filter((line) => line.epochMs >= window.startMs);
+  return includeLeadIn ? parsed.lines : parsed.lines.filter((line) => line.epochMs >= window.startMs);
 }
 
 /** A regex from the command line; one that does not compile is a usage error. */
