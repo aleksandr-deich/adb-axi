@@ -20,7 +20,8 @@ export const logsDump = defineCommand({
       name: "--since",
       type: "string",
       valueName: "<mark|dur>",
-      description: `Window start: a log mark name, or a duration back from now such as 30s (default 15m)`,
+      description: "Window start: a log mark name, or a duration back from now such as 30s",
+      default: DEFAULT_SINCE,
     },
     {
       name: "--pkg",

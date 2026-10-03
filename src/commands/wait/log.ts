@@ -26,11 +26,14 @@ export const waitLog = defineCommand({
       name: "--since",
       type: "string",
       valueName: "<mark|dur>",
-      description:
-        "Window start: a log mark name, or a duration back from now such as 30s (default: now)",
+      description: "Window start: a log mark name, or a duration back from now such as 30s",
+      default: "now",
     },
   ],
-  examples: ["adb-axi wait log 'Displayed com.example.notes' --since before-start"],
+  examples: [
+    "adb-axi wait log 'Displayed com.example.notes' --since before-start",
+    "adb-axi wait log 'Room|Migration' --timeout 30s",
+  ],
   shipped: true,
   run: async (context) => {
     const source = String(context.positionals.regex);

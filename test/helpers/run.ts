@@ -1,5 +1,6 @@
 import { resolve } from "node:path";
 import { exec, type ExecResult } from "../../src/core/exec.js";
+import { unrunnableCommands } from "./help-lines.js";
 
 export const ROOT = resolve(import.meta.dirname, "..", "..");
 export const BIN_PATH = resolve(ROOT, "dist", "bin", "adb-axi.js");
@@ -26,8 +27,16 @@ export async function runCli(
   if (result.kind !== "exited") {
     throw new Error(`adb-axi ${args.join(" ")} did not exit: ${result.kind}`);
   }
+  const stdout = result.stdout.toString("utf8");
+  // 6.3: every command line any output suggests must run on this build, in every CLI test.
+  const unrunnable = unrunnableCommands(stdout);
+  if (unrunnable.length > 0) {
+    throw new Error(
+      `adb-axi ${args.join(" ")} suggested commands this build cannot run: ${unrunnable.join(", ")}`,
+    );
+  }
   return {
-    stdout: result.stdout.toString("utf8"),
+    stdout,
     stderr: result.stderr.toString("utf8"),
     exitCode: result.exitCode,
     durationMs: result.durationMs,

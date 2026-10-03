@@ -14,7 +14,10 @@ export const appInfo = defineCommand({
   positionals: [
     { name: "pkg", description: "Package name, for example com.example.notes", required: true },
   ],
-  examples: ["adb-axi app info com.example.notes"],
+  examples: [
+    "adb-axi app info com.example.notes",
+    "adb-axi app info com.example.notes --device Pixel_Tablet --json",
+  ],
   shipped: true,
   run: async (context) => {
     const pkg = String(context.positionals.pkg);

@@ -25,7 +25,7 @@ export const appClear = defineCommand({
       description: "List all files left if data verification fails",
     },
   ],
-  examples: ["adb-axi app clear com.example.notes"],
+  examples: ["adb-axi app clear com.example.notes", "adb-axi app clear com.example.notes --full"],
   shipped: true,
   run: async (context) => {
     const pkg = String(context.positionals.pkg);

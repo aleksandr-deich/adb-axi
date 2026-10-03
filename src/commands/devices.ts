@@ -8,7 +8,7 @@ import { defineCommand } from "./define.js";
 import type { CommandContext } from "./types.js";
 
 /** States listed without `--all`. Everything else (recovery, sideload, ...) is unusual. */
-const USUAL_STATES = new Set([ONLINE, "offline", "unauthorized", "no permissions"]);
+export const USUAL_STATES = new Set([ONLINE, "offline", "unauthorized", "no permissions"]);
 
 /** Errors of one device's own reads; they leave its facts unknown instead of failing the list. */
 const PER_DEVICE_CODES = new Set([
@@ -40,7 +40,7 @@ export const devices = defineCommand({
   run: runDevices,
 });
 
-interface Row {
+export interface Row {
   device: AttachedDevice;
   facts: DeviceFacts;
   extra: Partial<Record<ExtraField, string>>;
@@ -77,7 +77,7 @@ async function runDevices(context: CommandContext): Promise<Output> {
  * else is asked; the AVD name and the extra columns are separate reads, and one failing
  * leaves only its own columns unknown.
  */
-async function readRow(
+export async function readRow(
   adb: AdbClient,
   device: AttachedDevice,
   fields: readonly ExtraField[],
@@ -113,7 +113,10 @@ async function readRow(
   };
 }
 
-function deviceRow(row: Row, fields: readonly ExtraField[]): Record<string, string | number> {
+export function deviceRow(
+  row: Row,
+  fields: readonly ExtraField[],
+): Record<string, string | number> {
   const { device, facts } = row;
   const base = {
     serial: device.serial,

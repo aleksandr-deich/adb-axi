@@ -26,7 +26,10 @@ export const appRestore = defineCommand({
   positionals: [
     { name: "pkg", description: "Package name, for example com.example.notes", required: true },
   ],
-  examples: ["adb-axi app restore com.example.notes"],
+  examples: [
+    "adb-axi app restore com.example.notes",
+    "adb-axi app restore com.example.notes --timeout 30s",
+  ],
   shipped: true,
   run: async (context) => {
     const pkg = String(context.positionals.pkg);

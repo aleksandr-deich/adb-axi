@@ -19,7 +19,10 @@ export const appStop = defineCommand({
   positionals: [
     { name: "pkg", description: "Package name, for example com.example.notes", required: true },
   ],
-  examples: ["adb-axi app stop com.example.notes"],
+  examples: [
+    "adb-axi app stop com.example.notes",
+    "adb-axi app stop com.example.notes --device emulator-5556",
+  ],
   shipped: true,
   run: async (context) => {
     const pkg = String(context.positionals.pkg);

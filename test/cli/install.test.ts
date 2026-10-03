@@ -1,0 +1,106 @@
+import { cpSync, mkdirSync, mkdtempSync, readdirSync, rmSync, symlinkSync } from "node:fs";
+import { join } from "node:path";
+import { decode } from "@toon-format/toon";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { exec } from "../../src/core/exec.js";
+import { VERSION } from "../../src/version.js";
+import { createFakeAdb } from "../fake-adb/harness.js";
+import { ROOT } from "../helpers/run.js";
+
+/**
+ * What ships is what is tested: the package is packed into a tarball, installed into a
+ * temporary global prefix the way `npm install -g adb-axi` installs it, and run from there.
+ */
+
+let dir: string;
+let bin: string;
+let files: string[];
+
+async function run(
+  file: string,
+  args: string[],
+  options: { cwd?: string; env?: NodeJS.ProcessEnv },
+) {
+  const result = await exec({ file, args, deadlineMs: 180_000, ...options });
+  if (result.kind !== "exited")
+    throw new Error(`${file} ${args.join(" ")} did not exit: ${result.kind}`);
+  const stdout = result.stdout.toString("utf8");
+  const stderr = result.stderr.toString("utf8");
+  expect(result.exitCode, `${file} ${args.join(" ")}\n${stderr}`).toBe(0);
+  return { stdout, stderr };
+}
+
+beforeAll(async () => {
+  dir = mkdtempSync(join(ROOT, ".adb-axi-install-"));
+  const source = join(dir, "source");
+  mkdirSync(source);
+  for (const path of [
+    "bin",
+    "src",
+    "package.json",
+    "tsconfig.json",
+    "tsconfig.build.json",
+    "LICENSE",
+    "README.md",
+  ]) {
+    cpSync(join(ROOT, path), join(source, path), { recursive: true });
+  }
+  symlinkSync(join(ROOT, "node_modules"), join(source, "node_modules"), "dir");
+  await run("npm", ["pack", "--pack-destination", dir], { cwd: source });
+  const tarball = readdirSync(dir).find((name) => name.endsWith(".tgz"));
+  if (tarball === undefined) throw new Error(`npm pack wrote no tarball to ${dir}`);
+  const { stdout } = await run("tar", ["-tzf", join(dir, tarball)], { cwd: dir });
+  files = stdout.trimEnd().split("\n");
+  const prefix = join(dir, "prefix");
+  await run(
+    "npm",
+    ["install", "--global", "--prefix", prefix, "--no-audit", "--no-fund", join(dir, tarball)],
+    { cwd: dir },
+  );
+  bin = join(prefix, "bin", "adb-axi");
+}, 240_000);
+
+afterAll(() => {
+  rmSync(dir, { recursive: true, force: true });
+});
+
+describe("the installed package", () => {
+  it("contains only the published files", () => {
+    expect(files).toEqual(
+      expect.arrayContaining([
+        "package/package.json",
+        "package/README.md",
+        "package/LICENSE",
+        "package/dist/bin/adb-axi.js",
+      ]),
+    );
+    expect(files.length).toBeGreaterThan(4);
+    for (const file of files) {
+      expect(
+        file === "package/package.json" ||
+          file === "package/README.md" ||
+          file === "package/LICENSE" ||
+          file.startsWith("package/dist/"),
+        file,
+      ).toBe(true);
+    }
+  });
+
+  it("prints its version", async () => {
+    const { stdout } = await run(bin, ["--version"], { cwd: dir });
+    expect(stdout).toBe(`${VERSION}\n`);
+  });
+
+  it("shows the home view", async () => {
+    const fake = createFakeAdb("devices-empty.json");
+    try {
+      const { stdout } = await run(bin, [], { cwd: dir, env: fake.env });
+      const home = decode(stdout.trimEnd()) as Record<string, unknown>;
+      expect(home.bin).toMatch(/\/prefix\/bin\/adb-axi$/);
+      expect(home).toMatchObject({ count: "0 attached, 0 online", devices: [], target: "-" });
+      expect(fake.unmatched()).toEqual([]);
+    } finally {
+      fake.cleanup();
+    }
+  });
+});

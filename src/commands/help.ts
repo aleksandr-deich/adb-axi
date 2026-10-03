@@ -16,7 +16,9 @@ export function topLevelHelp(registry: Registry): Output {
   return {
     usage: `${BIN} <command> [subcommand] [args] [flags]`,
     commands,
-    global_flags: [...GLOBAL_FLAGS, HELP_FLAG].map(flagRow),
+    global_flags: [...GLOBAL_FLAGS, HELP_FLAG].map((flag) =>
+      flagRow(flag.name === "--timeout" ? { ...flag, default: "per command" } : flag),
+    ),
     help: [runHint(["<command>", "--help"], "for its arguments, flags and examples")],
   };
 }

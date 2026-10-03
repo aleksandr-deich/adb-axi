@@ -54,6 +54,7 @@ export const GLOBAL_FLAGS: readonly FlagSpec[] = [
     type: "string",
     valueName: "<serial|avd>",
     description: "Target device by serial or AVD name",
+    default: "$ANDROID_SERIAL, else the only online device",
   },
   {
     name: "--timeout",

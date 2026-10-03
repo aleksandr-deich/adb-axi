@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { allCommands, REGISTRY } from "../../src/commands/registry.js";
 import { commandHelp, groupHelp, topLevelHelp } from "../../src/commands/help.js";
 import type { CommandSpec, GroupSpec } from "../../src/commands/types.js";
+import { unrunnableCommands, V02_PATTERNS } from "../helpers/help-lines.js";
 
 /** Every v0.1 command and subcommand (PRD 6.1), as paths after `adb-axi`. */
 const V01_COMMANDS = [
@@ -28,17 +29,6 @@ const V01_COMMANDS = [
   "data db",
   "shell",
   "update",
-];
-
-/** v0.2 verbs that no help line may name before v0.2 ships them (6.3). */
-const V02_PATTERNS = [
-  /adb-axi lease\b/,
-  /adb-axi config\b/,
-  /adb-axi fwd\b/,
-  /adb-axi rev\b/,
-  /adb-axi data prefs\b/,
-  /adb-axi doctor --fix\b/,
-  /adb-axi setup\b/,
 ];
 
 const paths = (): string[] => allCommands(REGISTRY).map((command) => command.path.join(" "));
@@ -82,6 +72,41 @@ describe("command registry", () => {
     for (const text of strings) {
       for (const pattern of V02_PATTERNS) expect(text).not.toMatch(pattern);
     }
+  });
+
+  it("tells a runnable help line from one this build cannot run", () => {
+    expect(
+      unrunnableCommands([
+        "Run `adb-axi logs crash --since before-save` to see it",
+        "Run `adb-axi app <subcommand> --help`",
+        "Run `adb-axi <command> --device <serial or avd>`",
+        "Run `adb-axi shell --device emulator-5554 -- 'ime reset'`",
+      ]),
+    ).toEqual([]);
+    expect(
+      unrunnableCommands({
+        help: [
+          "Run `adb-axi doctor --fix`",
+          "Run `adb-axi lease acquire`",
+          "`adb-axi logs --bogus`",
+        ],
+      }),
+    ).toEqual(["adb-axi doctor --fix", "adb-axi lease acquire", "adb-axi logs --bogus"]);
+  });
+
+  it("names only commands and flags this build ships, in every help string and example", () => {
+    const groups = Object.values(REGISTRY.entries).filter(
+      (entry): entry is GroupSpec => entry.kind === "group",
+    );
+    const help = [
+      ...[REGISTRY.home, ...allCommands(REGISTRY)].flatMap((command) => [
+        ...helpStrings(command),
+        ...command.examples.map((example) => `\`${example}\``),
+      ]),
+      topLevelHelp(REGISTRY),
+      ...groups.map(groupHelp),
+    ];
+    expect(unrunnableCommands(help)).toEqual([]);
   });
 
   it("shows only shipped commands in top-level and group help", () => {
