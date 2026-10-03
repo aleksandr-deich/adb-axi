@@ -1,5 +1,4 @@
-import { mkdtempSync, readdirSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { cpSync, mkdirSync, mkdtempSync, readdirSync, rmSync, symlinkSync } from "node:fs";
 import { join } from "node:path";
 import { decode } from "@toon-format/toon";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -32,8 +31,22 @@ async function run(
 }
 
 beforeAll(async () => {
-  dir = mkdtempSync(join(tmpdir(), "adb-axi-install-"));
-  await run("npm", ["pack", "--pack-destination", dir], { cwd: ROOT });
+  dir = mkdtempSync(join(ROOT, ".adb-axi-install-"));
+  const source = join(dir, "source");
+  mkdirSync(source);
+  for (const path of [
+    "bin",
+    "src",
+    "package.json",
+    "tsconfig.json",
+    "tsconfig.build.json",
+    "LICENSE",
+    "README.md",
+  ]) {
+    cpSync(join(ROOT, path), join(source, path), { recursive: true });
+  }
+  symlinkSync(join(ROOT, "node_modules"), join(source, "node_modules"), "dir");
+  await run("npm", ["pack", "--pack-destination", dir], { cwd: source });
   const tarball = readdirSync(dir).find((name) => name.endsWith(".tgz"));
   if (tarball === undefined) throw new Error(`npm pack wrote no tarball to ${dir}`);
   const { stdout } = await run("tar", ["-tzf", join(dir, tarball)], { cwd: dir });

@@ -6,7 +6,7 @@ import type { ReadOptions } from "../android/read.js";
 import { AdbAxiError } from "../core/errors.js";
 import { runHint, type Output } from "../core/output.js";
 import { listDevices, ONLINE } from "../device/list.js";
-import { resolveTarget, type Target } from "../device/resolve.js";
+import { resolveTarget } from "../device/resolve.js";
 import { UNKNOWN } from "./app/shared.js";
 import { defineCommand } from "./define.js";
 import { deviceRow, readRow, type Row } from "./devices.js";
@@ -44,7 +44,23 @@ async function runHome(context: CommandContext): Promise<Output> {
   const adb = context.adb();
   const attached = await listDevices(adb, context.deadline);
   const options = { deadline: context.deadline, env: context.env };
-  const rows = await Promise.all(attached.map((device) => readRow(adb, device, [], options)));
+  const rowsPromise = Promise.all(attached.map((device) => readRow(adb, device, [], options)));
+  const selection = resolveTarget({
+    adb,
+    deadline: context.deadline,
+    env: context.env,
+    devices: attached,
+    requested: undefined,
+    commandArgs: ["<command>"],
+    isShipped: context.isShipped,
+  }).then(
+    async (target) => ({ target, state: await readTargetState(adb, target.serial, context) }),
+    (error: unknown) => {
+      if (!(error instanceof AdbAxiError) || !SELECTION_CODES.has(error.code)) throw error;
+      return { error };
+    },
+  );
+  const [rows, selected] = await Promise.all([rowsPromise, selection]);
   const online = rows.filter((row) => row.device.state === ONLINE).length;
 
   const base: Output = {
@@ -52,35 +68,23 @@ async function runHome(context: CommandContext): Promise<Output> {
     devices: rows.map((row) => deviceRow(row, [])),
   };
 
-  let target: Target;
-  try {
-    target = await resolveTarget({
-      adb,
-      deadline: context.deadline,
-      env: context.env,
-      devices: attached,
-      requested: undefined,
-      commandArgs: ["<command>"],
-      isShipped: context.isShipped,
-    });
-  } catch (error) {
-    if (!(error instanceof AdbAxiError) || !SELECTION_CODES.has(error.code)) throw error;
+  if (selected.error !== undefined) {
     const help = [
       ...(attached.length === 0
         ? ["Start an emulator or connect a device, then run `adb-axi` again"]
-        : error.help),
+        : selected.error.help),
       // A target named by ANDROID_SERIAL already has its own hint in the error's help.
       ...stuckHints(rows, context.env.ANDROID_SERIAL, context),
     ];
     return {
       ...base,
       target: UNKNOWN,
-      target_note: error.message,
+      target_note: selected.error.message,
       ...withHelp(help),
     };
   }
 
-  const state = await readTargetState(adb, target.serial, context);
+  const { target, state } = selected;
   const help = [
     ...stuckHints(rows, target.serial, context),
     ...(state.crashCount > 0

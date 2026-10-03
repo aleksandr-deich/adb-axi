@@ -161,6 +161,34 @@ describe("adb-axi (home view)", () => {
     expect(fake.unmatched()).toEqual([]);
   });
 
+  it("reads the selected device before an unrelated inventory read times out", async () => {
+    const f = device(
+      { foreground: PROBE_FRONT, clock: { stdout: NOW }, logcat: { stdout: "" } },
+      {
+        lines: "other-device device transport_id:2\n",
+        rules: [
+          {
+            match: ["-s", "other-device", "shell", { re: "echo @sdk; .*" }],
+            respond: { hang: true },
+          },
+        ],
+      },
+    );
+    const run = await runCli(["--timeout", "2s", "--json"], {
+      ...f.env,
+      ANDROID_SERIAL: SERIAL,
+    });
+    expect(run.exitCode).toBe(0);
+    expect(JSON.parse(run.stdout)).toMatchObject({
+      count: "2 attached, 2 online",
+      target: SERIAL,
+      foreground: "dev.probe/.MainActivity",
+      crashes: "0 in the last 15m (no log mark yet)",
+    });
+    expect(f.calls().some((call) => call.argv[1] === "other-device" && call.end === null)).toBe(true);
+    expect(f.unmatched()).toEqual([]);
+  });
+
   it("includes an attached recovery device when none is online", async () => {
     fake = createFakeAdb({
       description: "One device in recovery",
