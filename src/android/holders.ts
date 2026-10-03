@@ -1,5 +1,5 @@
 import type { AdbClient } from "../adb/run.js";
-import { readShell, type ReadOptions } from "./read.js";
+import { invalidOutput, readShell, type ReadOptions } from "./read.js";
 
 /**
  * A process or instrumentation on the device that may own the single UiAutomation
@@ -78,5 +78,8 @@ export async function probeHolders(
     "looking for running instrumentations",
     options,
   );
+  if (!/^ACTIVITY MANAGER RUNNING PROCESSES\b/m.test(result.stdout)) {
+    throw invalidOutput("looking for running instrumentations", result.stdout);
+  }
   return parseInstrumentations(result.stdout);
 }

@@ -47,6 +47,7 @@ const STOCK_IME = "com.google.android.inputmethod.latin/com.android.inputmethod.
 function instrumentation(component: string, options: { uiAutomation?: boolean } = {}): string {
   const [pkg = ""] = component.split("/");
   return [
+    "ACTIVITY MANAGER RUNNING PROCESSES (dumpsys activity processes)",
     "  Active instrumentation:",
     `    Instrumentation #0: ActiveInstrumentation{4be1f09 {${component}} 1 procs}`,
     `      mClass=ComponentInfo{${component}} mFinished=false`,
@@ -249,7 +250,6 @@ describe("doctor", () => {
     expect(sent).toEqual(
       [
         "devices -l",
-        "devices -l",
         "version",
         "emu avd name",
         ...Object.values(SHELL).map((command) => `shell ${command}`),
@@ -403,6 +403,22 @@ describe("doctor", () => {
       });
       expect(data.target).toBe(SERIAL);
       expect(data.checks).toHaveLength(9);
+    });
+
+    it("reports and selects from the same device snapshot", async () => {
+      const f = scenario({
+        rules: [
+          { match: ["devices", "-l"], respond: { stdout: list(ONLINE_LINE) }, times: 1 },
+          { match: ["devices", "-l"], respond: { stdout: list(TABLET_LINE) } },
+        ],
+      });
+      const run = await runCli(["doctor"], f.env);
+      expect(run.exitCode).toBe(0);
+      const data = decode(run.stdout.trimEnd()) as Report["data"];
+      expect(data.target).toBe(SERIAL);
+      expect(data.checks.find((row) => row.check === "device")?.detail).toBe(`${SERIAL} online`);
+      expect(f.calls().filter((call) => call.argv[0] === "devices")).toHaveLength(1);
+      expectAddressed(f);
     });
 
     it("runs the remaining checks on the device chosen with --device", async () => {
@@ -703,6 +719,20 @@ describe("doctor", () => {
         detail: "com.example.notes.test runs an instrumentation",
       });
     });
+
+    it.each(["", "dumpsys: service activity unavailable\n"])(
+      "warns when the process dump has no header: %j",
+      async (stdout) => {
+        const f = scenario({ probes: { processes: { stdout } } });
+        const { toon, rows } = await doctor(f);
+        expect(toon.exitCode).toBe(0);
+        expect(rows.instrumentation).toEqual({
+          check: "instrumentation",
+          status: "warn",
+          detail: "could not read it: looking for running instrumentations printed output adb-axi cannot read",
+        });
+      },
+    );
 
     it("warns when the process list cannot be read", async () => {
       const f = scenario({ probes: { processes: { exit: 1, stderr: "Can't find service\n" } } });

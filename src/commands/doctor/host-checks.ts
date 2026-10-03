@@ -170,6 +170,7 @@ export async function checkDevice(
       adb: context.adb(),
       deadline: context.deadline,
       env: context.env,
+      devices,
       requested: typeof requested === "string" ? requested : undefined,
       commandArgs: ["doctor"],
       isShipped: context.isShipped,
