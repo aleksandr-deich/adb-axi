@@ -14,6 +14,7 @@ import { join } from "node:path";
 import { decode } from "@toon-format/toon";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { readApkFile } from "../../src/apk/index.js";
+import { isShippedPath, REGISTRY } from "../../src/commands/registry.js";
 import { createFakeAdb, FIXTURES_DIR, type FakeAdb } from "../fake-adb/harness.js";
 import type { Response, Rule } from "../fake-adb/scenario.js";
 import { buildApk, digestOf, withZip64End } from "../helpers/apk-builder.js";
@@ -940,7 +941,7 @@ describe("app install", () => {
       expect(recordFile(fake)).toBeUndefined();
     });
 
-    it("maps INSTALL_FAILED_INSUFFICIENT_STORAGE, and does not point at doctor before it ships", async () => {
+    it("maps INSTALL_FAILED_INSUFFICIENT_STORAGE, and points at doctor only because it ships", async () => {
       const { toon, data } = await both(refuse("Failure [INSTALL_FAILED_INSUFFICIENT_STORAGE]"), [
         "app",
         "install",
@@ -949,7 +950,9 @@ describe("app install", () => {
       expect(toon.exitCode).toBe(1);
       expect(data).toMatchObject({ code: "INSTALL_FAILED_INSUFFICIENT_STORAGE", package: PKG });
       expect(JSON.stringify(data.help)).toContain("Free space");
-      expect(JSON.stringify(data.help)).not.toContain("doctor");
+      expect(JSON.stringify(data.help).includes("doctor")).toBe(
+        isShippedPath(REGISTRY, ["doctor"]),
+      );
     });
 
     it("maps INSTALL_FAILED_VERSION_DOWNGRADE with the installed and APK versions", async () => {

@@ -16,6 +16,7 @@ export interface ResolveOptions {
   adb: AdbClient;
   deadline: Deadline;
   env: NodeJS.ProcessEnv;
+  devices?: readonly AttachedDevice[];
   /** `--device` / `-s`: a serial or an AVD name. */
   requested: string | undefined;
   /** The command as typed, without any device flag, for help lines (`["logs", "--pkg", "x"]`). */
@@ -30,7 +31,7 @@ export interface ResolveOptions {
  * target's state is checked before any work so nothing can block on a missing device.
  */
 export async function resolveTarget(options: ResolveOptions): Promise<Target> {
-  const devices = await listDevices(options.adb, options.deadline);
+  const devices = options.devices ?? (await listDevices(options.adb, options.deadline));
   const fromEnv = options.env.ANDROID_SERIAL;
   const wanted = options.requested ?? (fromEnv === "" ? undefined : fromEnv);
   if (wanted !== undefined) {

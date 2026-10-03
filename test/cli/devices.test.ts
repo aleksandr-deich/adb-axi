@@ -39,7 +39,7 @@ describe("devices", () => {
         emulator-5556,Pixel_Tablet,device,36,tablet
         emulator-5558,Pixel_Fold,offline,"-","-"
         ZY22ABCDEFG,"-",unauthorized,"-","-"
-      help[1]: Run \`adb-axi <command> --device Pixel_10_Pro_XL\` to target one by AVD name
+      help[2]: Run \`adb-axi <command> --device Pixel_10_Pro_XL\` to target one by AVD name,Run \`adb-axi doctor --device emulator-5558\` to see why it is offline
       "
     `);
     expect(json.devices).toEqual([
@@ -67,7 +67,8 @@ describe("devices", () => {
     expect(toon.stdout).toContain('0123456789ABCDEF,"-",recovery,"-","-"');
     expect(json.count).toBe("5 attached, 2 online");
     expect(json).not.toHaveProperty("other_states");
-    expect(json).not.toHaveProperty("help.1");
+    // Only the AVD-name hint and the doctor hint for the offline device; nothing about --all.
+    expect(json.help).toHaveLength(2);
     expect(f.unmatched()).toEqual([]);
   });
 
