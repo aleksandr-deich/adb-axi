@@ -9,7 +9,7 @@ import { listDevices, ONLINE } from "../device/list.js";
 import { resolveTarget, type Target } from "../device/resolve.js";
 import { UNKNOWN } from "./app/shared.js";
 import { defineCommand } from "./define.js";
-import { deviceRow, readRow, USUAL_STATES, type Row } from "./devices.js";
+import { deviceRow, readRow, type Row } from "./devices.js";
 import { DEFAULT_SINCE } from "./logs/dump.js";
 import { readMarks } from "./logs/marks.js";
 import { clockTime, readWindowLines, resolveWindow } from "./logs/window.js";
@@ -43,13 +43,12 @@ export const home = defineCommand({
 async function runHome(context: CommandContext): Promise<Output> {
   const adb = context.adb();
   const attached = await listDevices(adb, context.deadline);
-  const listed = attached.filter((device) => USUAL_STATES.has(device.state));
   const options = { deadline: context.deadline, env: context.env };
-  const rows = await Promise.all(listed.map((device) => readRow(adb, device, [], options)));
+  const rows = await Promise.all(attached.map((device) => readRow(adb, device, [], options)));
   const online = rows.filter((row) => row.device.state === ONLINE).length;
 
   const base: Output = {
-    count: `${listed.length} attached, ${online} online`,
+    count: `${attached.length} attached, ${online} online`,
     devices: rows.map((row) => deviceRow(row, [])),
   };
 

@@ -15,6 +15,7 @@ import { ROOT } from "../helpers/run.js";
 
 let dir: string;
 let bin: string;
+let files: string[];
 
 async function run(
   file: string,
@@ -32,10 +33,11 @@ async function run(
 
 beforeAll(async () => {
   dir = mkdtempSync(join(tmpdir(), "adb-axi-install-"));
-  // --ignore-scripts: the gate has already built dist, so prepack need not run again.
-  await run("npm", ["pack", "--ignore-scripts", "--pack-destination", dir], { cwd: ROOT });
+  await run("npm", ["pack", "--pack-destination", dir], { cwd: ROOT });
   const tarball = readdirSync(dir).find((name) => name.endsWith(".tgz"));
   if (tarball === undefined) throw new Error(`npm pack wrote no tarball to ${dir}`);
+  const { stdout } = await run("tar", ["-tzf", join(dir, tarball)], { cwd: dir });
+  files = stdout.trimEnd().split("\n");
   const prefix = join(dir, "prefix");
   await run(
     "npm",
@@ -50,6 +52,27 @@ afterAll(() => {
 });
 
 describe("the installed package", () => {
+  it("contains only the published files", () => {
+    expect(files).toEqual(
+      expect.arrayContaining([
+        "package/package.json",
+        "package/README.md",
+        "package/LICENSE",
+        "package/dist/bin/adb-axi.js",
+      ]),
+    );
+    expect(files.length).toBeGreaterThan(4);
+    for (const file of files) {
+      expect(
+        file === "package/package.json" ||
+          file === "package/README.md" ||
+          file === "package/LICENSE" ||
+          file.startsWith("package/dist/"),
+        file,
+      ).toBe(true);
+    }
+  });
+
   it("prints its version", async () => {
     const { stdout } = await run(bin, ["--version"], { cwd: dir });
     expect(stdout).toBe(`${VERSION}\n`);

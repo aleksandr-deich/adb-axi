@@ -29,7 +29,9 @@ type Selection =
   /** Lists every device; no selection is needed. */
   | "list"
   /** Waits for the device to come up, so an offline device is waited out. */
-  | "wait";
+  | "wait"
+  /** Does not use adb; exercise only shared flag validation and help. */
+  | "none";
 
 interface Case {
   /** The command line after `adb-axi`. */
@@ -64,10 +66,8 @@ const CASES: Case[] = [
   { args: ["logs", "crash"], selection: "target" },
   { args: ["data", "db", PKG], selection: "target" },
   { args: ["shell", "--", "id"], selection: "target" },
+  { args: ["update"], selection: "none" },
 ];
-
-/** Commands that never reach adb, so the device rules do not apply to them. */
-const NO_ADB = ["update"];
 
 const name = (c: Case): string => (c.args.length === 0 ? "(home)" : commandWords(c.args));
 
@@ -188,10 +188,7 @@ describe("conformance sweep", () => {
     const shipped = allCommands(REGISTRY)
       .filter((command) => command.shipped)
       .map((command) => command.path.join(" "));
-    const covered = [
-      ...CASES.filter((c) => c.args.length > 0).map((c) => commandWords(c.args)),
-      ...NO_ADB,
-    ];
+    const covered = CASES.filter((c) => c.args.length > 0).map((c) => commandWords(c.args));
     expect(covered.sort()).toEqual(shipped.sort());
     expect(REGISTRY.home.shipped).toBe(true);
   });
@@ -203,81 +200,87 @@ describe("conformance sweep", () => {
   });
 
   describe.each(CASES)("adb-axi $args", (c) => {
-    it("fails at once with DEVICE_AMBIGUOUS when two devices are online and none is selected", async () => {
-      const f = multiDevice();
-      const { toon, data } = await both(c.args, f);
-      // Two runs, each well inside the 15 s default deadline: nothing waited on a device.
-      expect(toon.durationMs).toBeLessThan(5_000);
-      if (c.selection === "target" || c.selection === "wait") {
-        expectErrorShape(toon, data);
-        expect(data.code).toBe("DEVICE_AMBIGUOUS");
-        expect(data.devices).toEqual([
-          { serial: "emulator-5554", avd: "Pixel_10_Pro_XL", form: "phone" },
-          { serial: "emulator-5556", avd: "Pixel_Tablet", form: "tablet" },
-        ]);
-        // The help line repeats the command as typed, with the device flag it lacks.
-        expect(data.help).toEqual([
-          expect.stringContaining(`--device <serial or avd>`),
-          "Or export ANDROID_SERIAL=<serial> in this shell",
-        ]);
-        expect((data.help as string[])[0]).toContain(`adb-axi ${name(c)}`);
-      } else if (c.selection === "report") {
-        expect(toon.exitCode).toBe(1);
-        const device = (data.checks as { check: string; status: string; detail: string }[]).find(
-          (check) => check.check === "device",
-        );
-        expect(device).toMatchObject({ status: "failed" });
-        expect(device?.detail).toContain("2 devices are online and none is selected");
-      } else {
-        expect(toon.exitCode).toBe(0);
-      }
-      // Only the device list and the facts that describe the candidates were read.
-      for (const call of f.calls()) {
-        const shell = call.argv[2] === "shell" ? (call.argv[3] ?? "") : "";
-        expect(
-          call.argv[0] === "devices" ||
-            call.argv[0] === "version" ||
-            call.argv[2] === "emu" ||
-            shell.startsWith("echo @sdk;"),
-          call.argv.join(" "),
-        ).toBe(true);
-      }
-      expect(f.unmatched()).toEqual([]);
-    });
-
-    it.skipIf(c.args.length === 0)("returns at once when the target is offline", async () => {
-      const f = multiDevice();
-      const args = withDevice(c.args, "emulator-5558");
-      const { toon, data } = await both(
-        c.selection === "wait" ? withFlag(args, "--timeout", "1s") : args,
-        f,
-      );
-      if (c.selection === "target") {
-        expectErrorShape(toon, data);
-        expect(data).toMatchObject({ code: "DEVICE_OFFLINE", state: "offline" });
-        expect(toon.durationMs).toBeLessThan(2_000);
-      } else if (c.selection === "wait") {
-        // A booting device is offline, which `wait boot` waits out until its deadline.
-        expectErrorShape(toon, data);
-        expect(data).toMatchObject({ code: "WAIT_TIMEOUT", last: { state: "offline" } });
-        expect(toon.durationMs).toBeLessThan(1_000 + MARGIN_MS);
-      } else if (c.selection === "report") {
-        expect(toon.exitCode).toBe(1);
-        expect(data.checks).toContainEqual(
-          expect.objectContaining({ check: "device", status: "failed" }),
-        );
+    it.skipIf(c.selection === "none")(
+      "fails at once with DEVICE_AMBIGUOUS when two devices are online and none is selected",
+      async () => {
+        const f = multiDevice();
+        const { toon, data } = await both(c.args, f);
+        // Two runs, each well inside the 15 s default deadline: nothing waited on a device.
         expect(toon.durationMs).toBeLessThan(5_000);
-      } else {
-        expect(toon.exitCode).toBe(0);
-      }
-      // The offline device's shell is never asked anything: such calls would hang.
-      const shellCalls = f
-        .calls()
-        .filter((call) => call.argv[1] === "emulator-5558" && call.argv[2] !== "emu");
-      expect(shellCalls).toEqual([]);
-    });
+        if (c.selection === "target" || c.selection === "wait") {
+          expectErrorShape(toon, data);
+          expect(data.code).toBe("DEVICE_AMBIGUOUS");
+          expect(data.devices).toEqual([
+            { serial: "emulator-5554", avd: "Pixel_10_Pro_XL", form: "phone" },
+            { serial: "emulator-5556", avd: "Pixel_Tablet", form: "tablet" },
+          ]);
+          // The help line repeats the command as typed, with the device flag it lacks.
+          expect(data.help).toEqual([
+            expect.stringContaining(`--device <serial or avd>`),
+            "Or export ANDROID_SERIAL=<serial> in this shell",
+          ]);
+          expect((data.help as string[])[0]).toContain(`adb-axi ${name(c)}`);
+        } else if (c.selection === "report") {
+          expect(toon.exitCode).toBe(1);
+          const device = (data.checks as { check: string; status: string; detail: string }[]).find(
+            (check) => check.check === "device",
+          );
+          expect(device).toMatchObject({ status: "failed" });
+          expect(device?.detail).toContain("2 devices are online and none is selected");
+        } else {
+          expect(toon.exitCode).toBe(0);
+        }
+        // Only the device list and the facts that describe the candidates were read.
+        for (const call of f.calls()) {
+          const shell = call.argv[2] === "shell" ? (call.argv[3] ?? "") : "";
+          expect(
+            call.argv[0] === "devices" ||
+              call.argv[0] === "version" ||
+              call.argv[2] === "emu" ||
+              shell.startsWith("echo @sdk;"),
+            call.argv.join(" "),
+          ).toBe(true);
+        }
+        expect(f.unmatched()).toEqual([]);
+      },
+    );
 
-    it.skipIf(c.args.length === 0)(
+    it.skipIf(c.args.length === 0 || c.selection === "none")(
+      "returns at once when the target is offline",
+      async () => {
+        const f = multiDevice();
+        const args = withDevice(c.args, "emulator-5558");
+        const { toon, data } = await both(
+          c.selection === "wait" ? withFlag(args, "--timeout", "1s") : args,
+          f,
+        );
+        if (c.selection === "target") {
+          expectErrorShape(toon, data);
+          expect(data).toMatchObject({ code: "DEVICE_OFFLINE", state: "offline" });
+          expect(toon.durationMs).toBeLessThan(2_000);
+        } else if (c.selection === "wait") {
+          // A booting device is offline, which `wait boot` waits out until its deadline.
+          expectErrorShape(toon, data);
+          expect(data).toMatchObject({ code: "WAIT_TIMEOUT", last: { state: "offline" } });
+          expect(toon.durationMs).toBeLessThan(1_000 + MARGIN_MS);
+        } else if (c.selection === "report") {
+          expect(toon.exitCode).toBe(1);
+          expect(data.checks).toContainEqual(
+            expect.objectContaining({ check: "device", status: "failed" }),
+          );
+          expect(toon.durationMs).toBeLessThan(5_000);
+        } else {
+          expect(toon.exitCode).toBe(0);
+        }
+        // The offline device's shell is never asked anything: such calls would hang.
+        const shellCalls = f
+          .calls()
+          .filter((call) => call.argv[1] === "emulator-5558" && call.argv[2] !== "emu");
+        expect(shellCalls).toEqual([]);
+      },
+    );
+
+    it.skipIf(c.args.length === 0 || c.selection === "none")(
       "never lets a device call outlive --timeout, and leaves no adb process behind",
       async () => {
         const f = multiDevice();

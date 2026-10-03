@@ -161,6 +161,27 @@ describe("adb-axi (home view)", () => {
     expect(fake.unmatched()).toEqual([]);
   });
 
+  it("includes an attached recovery device when none is online", async () => {
+    fake = createFakeAdb({
+      description: "One device in recovery",
+      synthetic: true,
+      rules: [
+        {
+          match: ["devices", "-l"],
+          respond: { stdout: "List of devices attached\nrecovery-1 recovery transport_id:1\n\n" },
+        },
+      ],
+    });
+    const run = await both(fake);
+    expect(run.exitCode).toBe(0);
+    expect(decode(run.stdout.trimEnd())).toMatchObject({
+      count: "1 attached, 0 online",
+      devices: [{ serial: "recovery-1", state: "recovery", api: "-", form: "-" }],
+      target: "-",
+    });
+    expect(fake.unmatched()).toEqual([]);
+  });
+
   it("reports an ANDROID_SERIAL target that is offline without reading from it", async () => {
     fake = createFakeAdb("multi-device.json");
     const run = await both(fake, { ...fake.env, ANDROID_SERIAL: "emulator-5558" });
