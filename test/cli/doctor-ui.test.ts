@@ -544,6 +544,74 @@ describe("doctor ui", () => {
       expectAddressed(f);
     });
 
+    it("clears an unrelated orphaned instrumentation while protecting a named live run", async () => {
+      const live = { component: "a.live.test/.Runner", pid: 9001, processPackage: "live.app" };
+      const leaked = { component: "b.leaked.test/.Runner", pid: 9002, processPackage: "leaked.app" };
+      const f = scenario({
+        state: { orphan: "running" },
+        rules: [
+          { match: shell("am force-stop b.leaked.test"), respond: {} },
+          { match: shell("am force-stop leaked.app"), set: { orphan: "gone" }, respond: {} },
+          { match: shell(SHELL.dumpsys), when: { orphan: "running" }, respond: dumpsys(live, leaked) },
+        ],
+        dumpsys: dumpsys(live),
+      });
+      const { exitCode, data } = await cli(
+        f,
+        ["doctor", "ui", "--fix"],
+        [...HOST_NOISE, { pid: 6161, args: `adb -s ${SERIAL} shell am instrument -w a.live.test/.Runner` }],
+      );
+      expect(exitCode).toBe(1);
+      expect(data).toEqual({
+        error: "a.live.test (am instrument) is live and --fix left it alone",
+        code: "HOLDER_PROTECTED",
+        cleared: [{ pid: 9002, holder: "b.leaked.test (am instrument)", was: "leaked", action: "am force-stop b.leaked.test; am force-stop leaked.app" }],
+        protected: [{ pid: 9001, holder: "a.live.test (am instrument)", why: "adb shell am instrument pid 6161 on the host" }],
+        help: ["Wait for `adb shell am instrument` (pid 6161) to finish, or stop it"],
+      });
+      expect(shellCalls(f).filter((command) => command.startsWith("am force-stop"))).toEqual([
+        "am force-stop b.leaked.test", "am force-stop leaked.app",
+        "am force-stop b.leaked.test", "am force-stop leaked.app",
+      ]);
+      expectAddressed(f);
+    });
+
+    it.each([
+      [
+        "target process package",
+        { component: "a.live.test/.Runner", pid: 9001, processPackage: "shared.app" },
+        { component: "b.leaked.test/.Runner", pid: 9002, processPackage: "shared.app" },
+        "shared.app",
+      ],
+      [
+        "runner package",
+        { component: "shared.test/.Live", pid: 9001, processPackage: "live.app" },
+        { component: "shared.test/.Leaked", pid: 9002, processPackage: "leaked.app" },
+        "shared.test",
+      ],
+    ])("does not force-stop a %s used by a live holder", async (_name, live, leaked, pkg) => {
+      const f = scenario({ dumpsys: dumpsys(live, leaked) });
+      const { exitCode, data } = await cli(
+        f,
+        ["doctor", "ui", "--fix"],
+        [...HOST_NOISE, { pid: 6161, args: `adb -s ${SERIAL} shell am instrument -w ${live.component}` }],
+      );
+      expect(exitCode).toBe(1);
+      expect(data).toEqual({
+        uiautomation: "busy",
+        holders: [
+          { pid: 9001, holder: `${live.component.split("/")[0]} (am instrument)`, state: "live", why: "adb shell am instrument pid 6161 on the host" },
+          { pid: 9002, holder: `${leaked.component.split("/")[0]} (am instrument)`, state: "leaked", why: "no host client" },
+        ],
+        help: [
+          `Cannot force-stop ${pkg} while used by a live holder; stop the live holder first`,
+          "Wait for `adb shell am instrument` (pid 6161) to finish, or stop it",
+        ],
+      });
+      expect(shellCalls(f).filter((command) => command.startsWith("am force-stop"))).toEqual([]);
+      expectAddressed(f);
+    });
+
     it("clears the leaked holder but refuses the live one with HOLDER_PROTECTED", async () => {
       const f = scenario({
         state: { server: "running" },

@@ -157,9 +157,9 @@ describe("classifyHolders", () => {
   });
 
   it.each([
-    ["an AVD name", "adb -s Pixel_10_Pro_XL shell am instrument -w x/.R"],
-    ["no device at all", "adb shell am instrument -w x/.R"],
-    ["this serial with --serial=", `adb --serial=${SERIAL} shell am instrument -w x/.R`],
+    ["an AVD name", `adb -s Pixel_10_Pro_XL shell am instrument -w ${RUNNER.component}`],
+    ["no device at all", `adb shell am instrument -w ${RUNNER.component}`],
+    ["this serial with --serial=", `adb --serial=${SERIAL} shell am instrument -w ${RUNNER.component}`],
   ])("counts a client that names %s as targeting this device", (_name, args) => {
     expect(one({ instrumentations: [RUNNER], host: host({ pid: 4100, args }) }).state).toBe("live");
   });
@@ -173,6 +173,20 @@ describe("classifyHolders", () => {
     expect(
       one({ serial: "USB-A", instrumentations: [RUNNER], host: host({ pid: 4100, args }) }).state,
     ).toBe("leaked");
+  });
+
+  it("binds a named adb instrumentation client to its component, including relative classes", () => {
+    const live = instrumentation("a.one/.Runner", 100);
+    const leaked = instrumentation("b.two/.Runner", 200);
+    const holders = classifyHolders(evidence({
+      instrumentations: [live, leaked],
+      host: host({ pid: 4100, args: `adb -s ${SERIAL} shell am instrument -w a.one/a.one.Runner` }),
+    }));
+    expect(holders.map((holder) => holder.state)).toEqual(["live", "leaked"]);
+    expect(one({
+      instrumentations: [leaked],
+      host: host({ pid: 4100, args: `adb shell am instrument -w` }),
+    }).state).toBe("live");
   });
 
   it("does not take a Gradle daemon or a non-device task for a running device test", () => {

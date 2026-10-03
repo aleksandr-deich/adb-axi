@@ -148,6 +148,20 @@ function mayTarget(process: HostProcess, serial: string, serials: ReadonlySet<st
   return named === undefined || named === serial || (!/^emulator-\d+$/.test(named) && !serials.has(named));
 }
 
+function componentName(component: string): string {
+  const [pkg = "", cls = ""] = component.split("/");
+  return `${pkg}/${cls.startsWith(".") ? pkg + cls : cls}`;
+}
+
+function mayUseHolder(process: HostProcess, found: Found): boolean {
+  if (found.kind !== "instrumentation" || isConnectedGradle(process)) return true;
+  if (!isAdbShell(process, /\bam instrument\b/)) return true;
+  const args = words(process);
+  const at = args.findIndex((word, index) => word === "am" && args[index + 1] === "instrument");
+  const named = args.slice(at + 2).filter((word) => /^[\w.]+\/[\w.$]+$/.test(word)).at(-1);
+  return named === undefined || componentName(named) === componentName(found.component);
+}
+
 /**
  * Classify every holder. Live: a host client of its tool may be using it, or its liveness
  * could not be read. Wedged: its own pid logged the wedge signature. Leaked: neither.
@@ -178,7 +192,8 @@ function classify(found: Found, tool: Tool, evidence: Evidence): ClassifiedHolde
     (process) =>
       process.pid !== evidence.selfPid &&
       tool.client(process) &&
-      mayTarget(process, evidence.serial, evidence.serials),
+      mayTarget(process, evidence.serial, evidence.serials) &&
+      mayUseHolder(process, found),
   );
   let forwarded = true;
   if (tool.forwardRemote !== undefined) {

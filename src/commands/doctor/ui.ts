@@ -95,13 +95,17 @@ function rows(holders: readonly ClassifiedHolder[]): Record<string, unknown>[] {
   }));
 }
 
-function clearCommands(holder: ClassifiedHolder): string[] {
-  if (holder.found.kind === "server") return [`kill ${holder.found.pid}`];
-  const packages = new Set([
+function holderPackages(holder: ClassifiedHolder): string[] {
+  if (holder.found.kind === "server") return [];
+  return [...new Set([
     holder.found.package,
     ...holder.found.processes.map((process) => process.package),
-  ]);
-  return [...packages].map((pkg) => `am force-stop ${pkg}`);
+  ])];
+}
+
+function clearCommands(holder: ClassifiedHolder): string[] {
+  if (holder.found.kind === "server") return [`kill ${holder.found.pid}`];
+  return holderPackages(holder).map((pkg) => `am force-stop ${pkg}`);
 }
 
 function clearWords(holder: ClassifiedHolder): string {
@@ -158,7 +162,11 @@ async function fix(context: CommandContext): Promise<Output> {
     return { ok: okLine("doctor ui", serial, noop("uiautomation free")) };
   }
 
-  const targets = before.filter((holder) => !isLive(holder));
+  const livePackages = new Set(before.filter(isLive).flatMap(holderPackages));
+  const blocked = before.filter(
+    (holder) => !isLive(holder) && holderPackages(holder).some((pkg) => livePackages.has(pkg)),
+  );
+  const targets = before.filter((holder) => !isLive(holder) && !blocked.includes(holder));
   for (const holder of targets) {
     // A failed kill shows in the re-check, which is what decides the outcome.
     for (const command of clearCommands(holder)) {
@@ -183,11 +191,21 @@ async function fix(context: CommandContext): Promise<Output> {
   const stuck = after.filter((holder) => !isLive(holder));
   if (stuck.length > 0) {
     process.exitCode = 1;
+    const retryable = stuck.filter((holder) => !blocked.some((item) => sameHolder(item, holder)));
+    const blockedPackages = [...new Set(blocked
+      .filter((holder) => stuck.some((item) => sameHolder(item, holder)))
+      .flatMap((holder) => holderPackages(holder).filter((pkg) => livePackages.has(pkg)))];
     return {
       uiautomation: "busy",
       ...clearedField,
       holders: rows(after),
-      help: [fixHint(context, stuck), ...releaseLines(after)],
+      help: [
+        ...(retryable.length > 0 ? [fixHint(context, retryable)] : []),
+        ...(blockedPackages.length > 0
+          ? [`Cannot force-stop ${joinWords(blockedPackages)} while used by a live holder; stop the live holder first`]
+          : []),
+        ...releaseLines(after),
+      ],
     };
   }
 
