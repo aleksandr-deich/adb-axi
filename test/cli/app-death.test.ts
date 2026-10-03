@@ -349,13 +349,13 @@ describe("app kill", () => {
   });
 
   it("fails with KILL_TIMEOUT and the state seen when the app never leaves the front", async () => {
-    const { toon, data, fake } = await both(["app", "kill", "dev.probe", "--timeout", "3s"], () =>
+    const { toon, data, fake } = await both(["app", "kill", "dev.probe", "--timeout", "6s"], () =>
       probeDevice({ phase: "front", homeWorks: false }),
     );
     expect(toon.exitCode).toBe(1);
     expect(data).toEqual({
       error:
-        "dev.probe never reached a state am kill can act on within 3 s (foreground, oom adj 0)",
+        "dev.probe never reached a state am kill can act on within 6 s (foreground, oom adj 0)",
       code: "KILL_TIMEOUT",
       last: { pid: OLD_PID, state: "foreground", adj: 0 },
       am_kill_sent: false,
@@ -370,12 +370,12 @@ describe("app kill", () => {
   });
 
   it("fails with KILL_TIMEOUT when the process outlives am kill", async () => {
-    const { toon, data, fake } = await both(["app", "kill", "dev.probe", "--timeout", "3s"], () =>
+    const { toon, data, fake } = await both(["app", "kill", "dev.probe", "--timeout", "6s"], () =>
       probeDevice({ phase: "previous", package: INSTALLED_RELEASE, amKillWorks: false }),
     );
     expect(toon.exitCode).toBe(1);
     expect(data).toEqual({
-      error: "dev.probe was still alive at the 3 s deadline after am kill (previous, oom adj 700)",
+      error: "dev.probe was still alive at the 6 s deadline after am kill (previous, oom adj 700)",
       code: "KILL_TIMEOUT",
       last: { pid: OLD_PID, state: "previous", adj: 700 },
       am_kill_sent: true,
@@ -978,12 +978,12 @@ describe("app death", () => {
   });
 
   it("fails with KILL_TIMEOUT as app kill does, and never restores", async () => {
-    const { toon, data, fake } = await both(["app", "death", "dev.probe", "--timeout", "3s"], () =>
+    const { toon, data, fake } = await both(["app", "death", "dev.probe", "--timeout", "6s"], () =>
       probeDevice({ phase: "previous", package: INSTALLED_RELEASE, amKillWorks: false }),
     );
     expect(toon.exitCode).toBe(1);
     expect(data).toMatchObject({
-      error: "dev.probe was still alive at the 3 s deadline after am kill (previous, oom adj 700)",
+      error: "dev.probe was still alive at the 6 s deadline after am kill (previous, oom adj 700)",
       code: "KILL_TIMEOUT",
       last: { pid: OLD_PID, state: "previous", adj: 700 },
       am_kill_sent: true,
