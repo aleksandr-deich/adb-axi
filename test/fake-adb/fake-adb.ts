@@ -142,10 +142,42 @@ function withLock<T>(lockPath: string, body: () => T): T {
   const pause = new Int32Array(new SharedArrayBuffer(4));
   for (;;) {
     try {
-      closeSync(openSync(lockPath, "wx"));
+      const fd = openSync(lockPath, "wx");
+      try {
+        writeFileSync(fd, String(process.pid));
+      } finally {
+        closeSync(fd);
+      }
       break;
-    } catch {
-      if (Date.now() > deadline) throw new Error(`fake adb: lock ${lockPath} held for 5 s`);
+    } catch (error) {
+      if (error instanceof Error && "code" in error && error.code !== "EEXIST") throw error;
+      // A deadline can kill a fake process while it owns the lock.
+      let owner: number;
+      try {
+        owner = Number(readFileSync(lockPath, "utf8"));
+      } catch (error) {
+        if (error instanceof Error && "code" in error && error.code === "ENOENT") continue;
+        throw error;
+      }
+      if (Number.isInteger(owner) && owner > 0) {
+        try {
+          process.kill(owner, 0);
+        } catch (error) {
+          if (error instanceof Error && "code" in error && error.code === "ESRCH") {
+            try {
+              unlinkSync(lockPath);
+            } catch (error) {
+              if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) {
+                throw error;
+              }
+            }
+            continue;
+          }
+        }
+      }
+      if (Date.now() > deadline) {
+        throw new Error(`fake adb: lock ${lockPath} held for 5 s`, { cause: error });
+      }
       Atomics.wait(pause, 0, 0, 2);
     }
   }
