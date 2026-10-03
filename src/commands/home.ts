@@ -139,19 +139,21 @@ async function readTargetState(
     }
   };
 
-  const resumed = await settle(() => readForeground(adb, serial, options));
-  const counted = await settle(async () => {
-    const now = await readDeviceClock(adb, serial, options);
-    const mark = latestMark(serial, context.env);
-    const window = resolveWindow(serial, context.env, mark ?? DEFAULT_SINCE, now);
-    const lines = await readWindowLines(adb, serial, window, options, undefined, true);
-    const count = parseCrashes(lines).filter((crash) => crash.epochMs >= window.startMs).length;
-    const label =
-      mark === undefined
-        ? `in the last ${DEFAULT_SINCE} (no log mark yet)`
-        : `since ${clockTime(window.startMs, now.utcOffsetMinutes).slice(0, 8)} (latest mark ${mark})`;
-    return { count, text: `${count} ${label}`, since: mark ?? DEFAULT_SINCE };
-  });
+  const [resumed, counted] = await Promise.all([
+    settle(() => readForeground(adb, serial, options)),
+    settle(async () => {
+      const now = await readDeviceClock(adb, serial, options);
+      const mark = latestMark(serial, context.env);
+      const window = resolveWindow(serial, context.env, mark ?? DEFAULT_SINCE, now);
+      const lines = await readWindowLines(adb, serial, window, options, undefined, true);
+      const count = parseCrashes(lines).filter((crash) => crash.epochMs >= window.startMs).length;
+      const label =
+        mark === undefined
+          ? `in the last ${DEFAULT_SINCE} (no log mark yet)`
+          : `since ${clockTime(window.startMs, now.utcOffsetMinutes).slice(0, 8)} (latest mark ${mark})`;
+      return { count, text: `${count} ${label}`, since: mark ?? DEFAULT_SINCE };
+    }),
+  ]);
 
   return {
     foreground: resumed ? resumed.component : UNKNOWN,

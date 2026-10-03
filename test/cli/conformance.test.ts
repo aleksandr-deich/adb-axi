@@ -130,15 +130,23 @@ interface Both {
   data: Record<string, unknown>;
 }
 
-/** Run a command as TOON and as `--json`, and check the two carry the same data. */
-async function both(args: string[], f: FakeAdb): Promise<Both> {
+/**
+ * Run a command as TOON and as `--json`, and check the two carry the same data. When reads
+ * running in parallel all hang, which one passes the deadline first is a race, so `racy`
+ * runs compare the keys and the code instead of every value.
+ */
+async function both(args: string[], f: FakeAdb, racy = false): Promise<Both> {
   const toon = await runCli(args, f.env);
   const json = await runCli(withJson(args), f.env);
   expect(json.exitCode).toBe(toon.exitCode);
   const data = JSON.parse(json.stdout) as Record<string, unknown>;
-  expect(comparable(decode(toon.stdout.trimEnd()) as Record<string, unknown>)).toEqual(
-    comparable(data),
-  );
+  const decoded = decode(toon.stdout.trimEnd()) as Record<string, unknown>;
+  if (racy) {
+    expect(Object.keys(decoded)).toEqual(Object.keys(data));
+    expect(decoded.code).toBe(data.code);
+  } else {
+    expect(comparable(decoded)).toEqual(comparable(data));
+  }
   // Every command line a help string suggests runs on this build (6.3).
   expect(unrunnableCommands(data)).toEqual([]);
   return { toon, json, data };
@@ -274,7 +282,7 @@ describe("conformance sweep", () => {
       async () => {
         const f = multiDevice();
         const args = withFlag(withDevice(c.args, "emulator-5554"), "--timeout", "1s");
-        const { toon, data } = await both(args, f);
+        const { toon, data } = await both(args, f, true);
         expect(toon.durationMs).toBeLessThan(1_000 + MARGIN_MS);
         if (isError(data)) {
           expectErrorShape(toon, data);

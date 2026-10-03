@@ -125,8 +125,11 @@ export function createFakeAdb(scenario: Scenario | string, options: FakeAdbOptio
     cleanup: () => {
       // A test that runs `main` in process returns as soon as one read fails, while sibling
       // reads may still be running and writing to the call log: stop them first.
-      for (const call of calls()) {
-        if (call.end === null) killQuietly(call.pid);
+      // A second cleanup finds the directory already gone.
+      if (existsSync(logPath)) {
+        for (const call of calls()) {
+          if (call.end === null) killQuietly(call.pid);
+        }
       }
       rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
     },
