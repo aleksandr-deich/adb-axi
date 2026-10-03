@@ -764,6 +764,21 @@ describe("doctor", () => {
       expect(rows.console_token?.detail).toMatch(/^\S*\.emulator_console_auth_token is empty$/);
     });
 
+    it.each(["", "OK\r\n"])(
+      "accepts a successful console response without an AVD name (%j)",
+      async (stdout) => {
+        const f = scenario({ console: { stdout } });
+        const { toon, rows } = await doctor(f);
+        expect(toon.exitCode).toBe(0);
+        expect(rows.console_token).toEqual({
+          check: "console_token",
+          status: "ok",
+          detail: "token present, console answers",
+        });
+        expectAddressed(f);
+      },
+    );
+
     it("fails when the token is there but the console says nothing (a silent emu failure)", async () => {
       const f = scenario({ console: { exit: 1 } });
       const { toon, rows } = await doctor(f);
