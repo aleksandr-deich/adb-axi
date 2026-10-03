@@ -404,19 +404,21 @@ describe("app kill", () => {
 
   it("does not report success while a secondary process survives run-as", async () => {
     const sibling = "pidof dev.probe:remote";
-    const { toon, data, fake } = await both(["app", "kill", "dev.probe", "--timeout", "3s"], () =>
-      probeDevice({
-        phase: "previous",
-        amKillWorks: false,
-        rules: [
-          {
-            match: shell(KERNEL_UIDS),
-            respond: { stdout: "PID UID NAME\n8333 10213 dev.probe:remote\n" },
-          },
-          { match: shell(sibling), respond: PIDOF_OF(8333) },
-          { match: shell("run-as dev.probe --user 0 kill -9 8333"), respond: {} },
-        ],
-      }),
+    const { toon, data, fake } = await both(
+      ["app", "kill", "dev.probe", "--timeout", "8s"],
+      () =>
+        probeDevice({
+          phase: "previous",
+          amKillWorks: false,
+          rules: [
+            {
+              match: shell(KERNEL_UIDS),
+              respond: { stdout: "PID UID NAME\n8333 10213 dev.probe:remote\n" },
+            },
+            { match: shell(sibling), respond: PIDOF_OF(8333) },
+            { match: shell("run-as dev.probe --user 0 kill -9 8333"), respond: {} },
+          ],
+        }),
     );
     expect(toon.exitCode).toBe(1);
     expect(data).toMatchObject({ code: "KILL_TIMEOUT", last: { pid: 8333 }, am_kill_sent: true });
@@ -427,21 +429,23 @@ describe("app kill", () => {
 
   it("tracks an absolute process name by package UID, even without a main process", async () => {
     const custom = "com.example.shared.worker";
-    const { toon, data, fake } = await both(["app", "death", "dev.probe", "--timeout", "3s"], () =>
-      probeDevice({
-        phase: "previous",
-        amKillWorks: false,
-        rules: [
-          {
-            match: shell(KERNEL_UIDS),
-            respond: {
-              stdout: `PID UID NAME\n8333 10213 ${custom}\n9000 10214 dev.probe:unrelated\n`,
+    const { toon, data, fake } = await both(
+      ["app", "death", "dev.probe", "--timeout", "8s"],
+      () =>
+        probeDevice({
+          phase: "previous",
+          amKillWorks: false,
+          rules: [
+            {
+              match: shell(KERNEL_UIDS),
+              respond: {
+                stdout: `PID UID NAME\n8333 10213 ${custom}\n9000 10214 dev.probe:unrelated\n`,
+              },
             },
-          },
-          { match: shell(`pidof ${custom}`), respond: PIDOF_OF(8333) },
-          { match: shell("run-as dev.probe --user 0 kill -9 8333"), respond: {} },
-        ],
-      }),
+            { match: shell(`pidof ${custom}`), respond: PIDOF_OF(8333) },
+            { match: shell("run-as dev.probe --user 0 kill -9 8333"), respond: {} },
+          ],
+        }),
     );
     expect(toon.exitCode).toBe(1);
     expect(data).toMatchObject({ code: "KILL_TIMEOUT", last: { pid: 8333 }, am_kill_sent: true });
