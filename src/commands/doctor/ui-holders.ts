@@ -41,6 +41,14 @@ function runs(process: HostProcess, name: RegExp): boolean {
   return words(process).some((word) => name.test(word.split("/").at(-1) ?? ""));
 }
 
+function runsClient(process: HostProcess, name: string): boolean {
+  if (program(process) === name) return true;
+  if (!/^(?:node|node\.exe|npx|npx\.cmd)$/.test(program(process))) return false;
+  const script = words(process).slice(1).find((word) => !word.startsWith("-"));
+  if (script === undefined) return false;
+  return script.split("/").at(-1) === name || script.split("/").includes(name);
+}
+
 const isAdbShell = (process: HostProcess, command: RegExp): boolean =>
   program(process) === "adb" && words(process).includes("shell") && command.test(process.args);
 
@@ -56,8 +64,7 @@ const pidOf = (process: HostProcess | undefined): string =>
 
 const MOBILECLI: Tool = {
   label: () => "mobilecli DeviceServer (mobile-mcp)",
-  client: (process) =>
-    runs(process, /^(?:mobile-mcp|mobilecli)$/) || /mobile-mcp/.test(process.args),
+  client: (process) => runsClient(process, "mobile-mcp") || runsClient(process, "mobilecli"),
   clientName: () => "mobile-mcp",
   release: (process) => `Close the mobile-mcp session${pidOf(process)} when it is done`,
   forwardRemote: /^localabstract:mobilecli/,
@@ -79,7 +86,7 @@ const ANDROID_CLI: Tool = {
 
 const AGENT_DEVICE: Tool = {
   label: (found) => `${found.kind === "server" ? found.className : found.package} (agent-device)`,
-  client: (process) => runs(process, /^agent-device$/) || /\bagent-device\b/.test(process.args),
+  client: (process) => runsClient(process, "agent-device"),
   clientName: () => "agent-device",
   release: () => "Run `agent-device close` in the worktree that opened the session when it is done",
 };
@@ -130,6 +137,7 @@ export interface Evidence {
   host: readonly HostProcess[] | null;
   forwards: readonly Forward[] | null;
   serials: ReadonlySet<string>;
+  avd: string | null;
   /** adb-axi's own pid, never a client. */
   selfPid: number;
 }
@@ -143,9 +151,13 @@ export function findHolders(
 }
 
 /** Whether a host process may be driving the target. Unknown names may be AVDs. */
-function mayTarget(process: HostProcess, serial: string, serials: ReadonlySet<string>): boolean {
+function mayTarget(process: HostProcess, evidence: Evidence): boolean {
   const named = /(?:^|\s)(?:-s|--serial|--device)(?:\s+|=)(\S+)/.exec(process.args)?.[1];
-  return named === undefined || named === serial || (!/^emulator-\d+$/.test(named) && !serials.has(named));
+  if (named === undefined || named === evidence.serial || named === evidence.avd) return true;
+  if (evidence.serial.startsWith("emulator-") && evidence.avd === null) {
+    return !/^emulator-\d+$/.test(named) && !evidence.serials.has(named);
+  }
+  return false;
 }
 
 function componentName(component: string): string {
@@ -154,7 +166,7 @@ function componentName(component: string): string {
 }
 
 function mayUseHolder(process: HostProcess, found: Found): boolean {
-  if (found.kind !== "instrumentation" || isConnectedGradle(process)) return true;
+  if (found.kind !== "instrumentation") return true;
   if (!isAdbShell(process, /\bam instrument\b/)) return true;
   const args = words(process);
   const at = args.findIndex((word, index) => word === "am" && args[index + 1] === "instrument");
@@ -192,7 +204,7 @@ function classify(found: Found, tool: Tool, evidence: Evidence): ClassifiedHolde
     (process) =>
       process.pid !== evidence.selfPid &&
       tool.client(process) &&
-      mayTarget(process, evidence.serial, evidence.serials) &&
+      mayTarget(process, evidence) &&
       mayUseHolder(process, found),
   );
   let forwarded = true;

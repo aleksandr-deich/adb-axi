@@ -8,6 +8,7 @@ import {
 import { runShell } from "../../adb/shell.js";
 import { AdbAxiError } from "../../core/errors.js";
 import { listDevices } from "../../device/list.js";
+import { avdName } from "../../device/facts.js";
 import { noop, okLine, runHint, type Output } from "../../core/output.js";
 import { poll } from "../../core/poll.js";
 import { UNKNOWN, readOptions, targetSerial } from "../app/shared.js";
@@ -47,11 +48,12 @@ async function inspect(context: CommandContext): Promise<ClassifiedHolder[]> {
   const found = findHolders(instrumentations, servers);
   if (found.length === 0) return [];
 
-  const [wedgedPids, host, forwards, devices] = await Promise.all([
+  const [wedgedPids, host, forwards, devices, avd] = await Promise.all([
     readWedgedPids(adb, serial, reads),
     context.hostProcesses(Math.min(context.deadline.remainingMs(), CHECK_CAP_MS)),
     found.some((holder) => holder.kind === "server") ? readForwards(context) : [],
     listDevices(adb, context.deadline),
+    avdName(adb, serial, null, { deadline: context.deadline, env: context.env }),
   ]);
   return classifyHolders({
     serial,
@@ -61,6 +63,7 @@ async function inspect(context: CommandContext): Promise<ClassifiedHolder[]> {
     host,
     forwards,
     serials: new Set(devices.map((device) => device.serial)),
+    avd,
     selfPid: process.pid,
   });
 }

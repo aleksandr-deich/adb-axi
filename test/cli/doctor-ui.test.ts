@@ -131,6 +131,7 @@ function scenario(setup: Setup = {}): FakeAdb {
     rules: [
       ...(setup.rules ?? []),
       { match: ["devices", "-l"], respond: { stdout: setup.devices ?? DEVICES } },
+      { match: ["-s", SERIAL, "emu", "avd", "name"], respond: { stdout: "Pixel_10_Pro_XL\nOK\n" } },
       { match: shell(SHELL.dumpsys), respond: setup.dumpsys ?? dumpsys() },
       { match: shell(SHELL.ps), respond: setup.ps ?? ps() },
       { match: shell(SHELL.logcat), respond: setup.logcat ?? NO_WEDGE },

@@ -116,6 +116,7 @@ describe("classifyHolders", () => {
     host: [],
     forwards: [],
     serials: new Set([SERIAL, "USB-A", "USB-B"]),
+    avd: "Pixel_10_Pro_XL",
     selfPid: 99_999,
     ...overrides,
   });
@@ -169,10 +170,17 @@ describe("classifyHolders", () => {
     "adb -s USB-B shell am instrument -w x/.R",
     "adb --serial=USB-B shell am instrument -w x/.R",
     "adb --device USB-B shell am instrument -w x/.R",
+    "adb --device unattached-physical-serial shell am instrument -w x/.R",
   ])("does not count a client explicitly targeting another serial: %s", (args) => {
     expect(
-      one({ serial: "USB-A", instrumentations: [RUNNER], host: host({ pid: 4100, args }) }).state,
+      one({ serial: "USB-A", avd: null, instrumentations: [RUNNER], host: host({ pid: 4100, args }) }).state,
     ).toBe("leaked");
+  });
+
+  it("keeps the target AVD name but excludes other explicit serials", () => {
+    const client = (named: string) => host({ pid: 4100, args: `adb --device ${named} shell am instrument -w ${RUNNER.component}` });
+    expect(one({ instrumentations: [RUNNER], host: client("Pixel_10_Pro_XL") }).state).toBe("live");
+    expect(one({ instrumentations: [RUNNER], host: client("other-serial") }).state).toBe("leaked");
   });
 
   it("binds a named adb instrumentation client to its component, including relative classes", () => {
@@ -183,6 +191,11 @@ describe("classifyHolders", () => {
       host: host({ pid: 4100, args: `adb -s ${SERIAL} shell am instrument -w a.one/a.one.Runner` }),
     }));
     expect(holders.map((holder) => holder.state)).toEqual(["live", "leaked"]);
+    const disguised = classifyHolders(evidence({
+      instrumentations: [live, leaked],
+      host: host({ pid: 4101, args: `adb shell am instrument -w b.two/.Runner gradlew connectedDebugAndroidTest` }),
+    }));
+    expect(disguised.map((holder) => holder.state)).toEqual(["leaked", "live"]);
     expect(one({
       instrumentations: [leaked],
       host: host({ pid: 4100, args: `adb shell am instrument -w` }),
@@ -204,6 +217,25 @@ describe("classifyHolders", () => {
         host: host({ pid: 4201, args: "./gradlew :app:connectedDebugAndroidTest" }),
       }),
     ).toEqual({ state: "live", why: "a Gradle connected* task pid 4201 on the host" });
+  });
+
+  it("recognizes mobilecli and agent-device only by executable or node/npx script identity", () => {
+    const mobile: AppProcessServer = { kind: "server", pid: 5443, className: "com.mobilenext.mobilecli.DeviceServer" };
+    const agent = instrumentation("com.callstack.agentdevice.test/.SnapshotInstrumentation", 8120);
+    const classify = (found: AppProcessServer | Holder, args: string) => one({
+      instrumentations: found.kind === "instrumentation" ? [found] : [],
+      servers: found.kind === "server" ? [found] : [],
+      forwards: [{ serial: SERIAL, local: "tcp:12000", remote: "localabstract:mobilecli-server" }],
+      host: host({ pid: 4300, args }),
+    }).state;
+    for (const [found, name] of [[mobile, "mobile-mcp"], [agent, "agent-device"]] as const) {
+      expect(classify(found, `rg ${name} README.md`)).toBe("leaked");
+      expect(classify(found, `node ./scripts/run.js ${name}`)).toBe("leaked");
+      expect(classify(found, `/usr/local/bin/${name} serve`)).toBe("live");
+      expect(classify(found, `node /repo/node_modules/${name}/dist/daemon.js`)).toBe("live");
+      expect(classify(found, `npx -y ${name}`)).toBe("live");
+    }
+    expect(classify(mobile, "node /repo/node_modules/mobilecli/dist/server.js")).toBe("live");
   });
 
   it("recognises a uiautomator run started from the host", () => {
