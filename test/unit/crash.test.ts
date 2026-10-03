@@ -146,6 +146,19 @@ describe("ANR report boundaries", () => {
     expect(crash.trace).toEqual(["ANR in dev.probe", "PID: 123", "Reason: first"]);
   });
 
+  it("rejects unrelated error lines in a partial report at the same timestamp", () => {
+    const crash = one([
+      line(0, 552, "E", "ActivityManager", "ANR in dev.probe"),
+      line(0, 552, "E", "ActivityManager", "PID: 123"),
+      line(0, 552, "E", "ActivityManager", "Reason: first"),
+      line(0, 552, "E", "ActivityManager", "CPU usage from 100ms to -1ms ago:"),
+      line(0, 552, "E", "ActivityManager", "Reason: unrelated"),
+      line(0, 552, "E", "ActivityManager", "PID: 999"),
+    ]);
+    expect(crash).toMatchObject({ pid: 123, message: "first" });
+    expect(crash.trace.at(-1)).toBe("CPU usage from 100ms to -1ms ago:");
+  });
+
   it("stops at the end of the CPU report even when another error shares its timestamp", () => {
     const crash = one([
       line(0, 552, "E", "ActivityManager", "ANR in dev.probe"),
@@ -431,6 +444,23 @@ describe("native crash blocks", () => {
       ["dev.other", 1790834000000],
       ["dev.probe", 1790834000500],
     ]);
+  });
+
+  it("does not carry a pending signal across a restart of the same pid and process", () => {
+    const crash = one([
+      line(
+        0,
+        9386,
+        "F",
+        "libc",
+        "Fatal signal 11 (SIGSEGV) in tid 9386 (dev.probe), pid 9386 (dev.probe)",
+      ),
+      line(100, 552, "I", "ActivityManager", "Start proc 9386:dev.probe/u0a213 for activity"),
+      debug(200, "*** *** *** ***"),
+      debug(200, "pid: 9386, tid: 9386, name: probe  >>> dev.probe <<<"),
+      debug(200, "signal 11 (SIGSEGV), code 0 (SI_USER)"),
+    ]);
+    expect(crash.epochMs).toBe(1790834000200);
   });
 
   it("pairs a delayed tombstone with its signal without a fixed time limit", () => {

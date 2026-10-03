@@ -77,6 +77,12 @@ export function parseCrashes(lines: readonly LogLine[]): Crash[] {
         java.get(line.pid)?.rest.push(line.message);
       }
     } else if (line.tag === "ActivityManager") {
+      const started = /^Start proc (\d+):/.exec(line.message);
+      if (started?.[1] !== undefined) {
+        const reused = Number(started[1]);
+        const pending = signals.findIndex((entry) => entry.pid === reused);
+        if (pending >= 0) signals.splice(pending, 1);
+      }
       const key = `${line.pid}:${line.tid}`;
       const block = anr.get(key);
       if (block !== undefined && (line.level !== "E" || line.epochMs !== block.start.epochMs)) {
@@ -89,12 +95,28 @@ export function parseCrashes(lines: readonly LogLine[]): Crash[] {
         } else {
           const report = anr.get(key);
           if (report !== undefined) {
-            report.rest.push(line.message);
-            if (
-              /^\s*\d+(?:\.\d+)?% TOTAL:/.test(line.message) &&
-              report.rest.filter((message) => message.startsWith("CPU usage from ")).length >= 2
-            )
+            const message = line.message;
+            const inCpu = report.rest.some((part) => part.startsWith("CPU usage from "));
+            const field = /^(PID|Reason|Parent|ErrorId|Frozen|Load):/.exec(message)?.[1];
+            const repeated =
+              field !== undefined && report.rest.some((part) => part.startsWith(`${field}:`));
+            const partOfReport = inCpu
+              ? /^(?:CPU usage from |\s*\d+(?:\.\d+)?% )/.test(message)
+              : field !== undefined ||
+                message === "" ||
+                /^(?:----- (?:Output from|End output from) \/proc\/pressure\/|(?:some|full) avg10=|CPU usage from )/.test(
+                  message,
+                );
+            if (repeated || !partOfReport) {
               closeAnr(key);
+            } else {
+              report.rest.push(message);
+              if (
+                /^\s*\d+(?:\.\d+)?% TOTAL:/.test(message) &&
+                report.rest.filter((part) => part.startsWith("CPU usage from ")).length >= 2
+              )
+                closeAnr(key);
+            }
           }
         }
       }
@@ -108,6 +130,8 @@ export function parseCrashes(lines: readonly LogLine[]): Crash[] {
     } else if (line.tag === "libc" && line.level === "F") {
       const raised = FATAL_SIGNAL.exec(line.message);
       if (raised?.[1] !== undefined && raised[2] !== undefined && raised[3] !== undefined) {
+        const pending = signals.findIndex((entry) => entry.pid === Number(raised[2]));
+        if (pending >= 0) signals.splice(pending, 1);
         signals.push({
           pid: Number(raised[2]),
           process: raised[3],

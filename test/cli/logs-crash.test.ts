@@ -435,6 +435,41 @@ describe("logs crash", () => {
       expect(data.crash).toMatchObject({ kind: "native", at: "2026-10-01 07:58:20.200" });
     });
 
+    it("counts a new native crash after the same pid and package restart", async () => {
+      const f = device({
+        window: {
+          stdout: [
+            logLine(
+              1790834299900,
+              9386,
+              "F",
+              "libc",
+              "Fatal signal 11 (SIGSEGV) in tid 9386 (dev.probe), pid 9386 (dev.probe)",
+            ),
+            logLine(
+              1790834300000,
+              552,
+              "I",
+              "ActivityManager",
+              "Start proc 9386:dev.probe/u0a213 for activity",
+            ),
+            logLine(1790834300200, 9409, "F", "DEBUG", "*** *** *** ***"),
+            logLine(
+              1790834300200,
+              9409,
+              "F",
+              "DEBUG",
+              "pid: 9386, tid: 9386, name: probe  >>> dev.probe <<<",
+            ),
+            logLine(1790834300200, 9409, "F", "DEBUG", "signal 11 (SIGSEGV), code 0 (SI_USER)"),
+          ].join("\n"),
+        },
+      });
+      const { data } = await crashSince(f, "--pkg", "dev.probe");
+      expect(data.crashes).toBe("1 since before-run (40 s, 4 lines scanned)");
+      expect(data.crash).toMatchObject({ kind: "native", at: "2026-10-01 07:58:20.200" });
+    });
+
     it("counts a crash at or after the mark", async () => {
       const f = device({
         window: {
@@ -570,7 +605,9 @@ describe("logs crash", () => {
       expect(path.startsWith(join(f.home, "out"))).toBe(true);
       const written = readFileSync(path, "utf8");
       expect(written.match(/^== java at /gm)).toHaveLength(8);
-      expect(written.startsWith("== java at 2026-10-01 07:58:30.000 in dev.probe (pid 100)\n")).toBe(true);
+      expect(
+        written.startsWith("== java at 2026-10-01 07:58:30.000 in dev.probe (pid 100)\n"),
+      ).toBe(true);
       expect(written).toContain("== java at 2026-10-01 07:58:44.594 in dev.probe (pid 9328)\n");
       // All 22 frames of the captured trace, which the output only counts.
       expect(written).toContain(
@@ -612,7 +649,14 @@ describe("logs crash", () => {
             logLine(1790834310000, 552, "E", "ActivityManager", "ANR in dev.probe"),
             logLine(1790834310000, 552, "E", "ActivityManager", "PID: 123"),
             logLine(1790834310000, 552, "E", "ActivityManager", "Reason: blocked"),
-            logLine(1790834310001, 552, "E", "ActivityManager", "Reason: unrelated"),
+            logLine(
+              1790834310000,
+              552,
+              "E",
+              "ActivityManager",
+              "CPU usage from 100ms to -1ms ago:",
+            ),
+            logLine(1790834310000, 552, "E", "ActivityManager", "Reason: unrelated"),
           ].join("\n"),
         },
       });
