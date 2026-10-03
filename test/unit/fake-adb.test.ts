@@ -201,6 +201,20 @@ describe("fake adb", () => {
     expect(f.calls()[0]?.androidSerial).toBe("emulator-5556");
   });
 
+  it("recovers a state lock left by a killed fake call", async () => {
+    const f = setup({
+      rules: [{ match: ["version"], respond: { stdout: "v\n" } }],
+    });
+    // An exited process cannot release a lock left behind at a command deadline.
+    writeFileSync(`${f.env.FAKE_ADB_STATE}.lock`, "2147483647");
+    const result = await adb(f, ["version"]);
+    expect(result.kind).toBe("exited");
+    if (result.kind !== "exited") return;
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout.toString()).toBe("v\n");
+    expect(f.unmatched()).toEqual([]);
+  });
+
   it("serializes state across concurrent calls", async () => {
     const f = setup({
       rules: [
