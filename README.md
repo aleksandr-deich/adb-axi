@@ -31,7 +31,7 @@ bin: ~/.local/bin/adb-axi
 description: "Truthful, token-efficient adb for agents: devices, app lifecycle, logs and app data"
 count: "1 attached, 1 online"
 devices[1]{serial,avd,state,api,form}:
-  emulator-5554,Pixel_8,device,35,phone
+  emulator-5554,Pixel_10_Pro_XL,device,35,phone
 target: emulator-5554
 foreground: dev.probe/.MainActivity
 crashes: 0 in the last 15m (no log mark yet)
@@ -165,7 +165,7 @@ The manual check: put some state on screen, send the app to the background, let 
 
 ```
 $ adb-axi logs mark before-kill
-ok: "mark before-kill -> 2026-10-01 07:58:30.000 on emulator-5554"
+ok: "mark before-kill -> 2026-10-01 07:58:47.000 on emulator-5554"
 
 # UI step: put the state on screen, for example type into a field
 
@@ -175,7 +175,7 @@ kill:
   pid_before: 8235
   pid_after: null
   backgrounded_first: true
-  cached_after_ms: 924
+  cached_after_ms: 964
   method: am kill
 help[2]: Run `adb-axi app restore dev.probe` to reopen it from recents,Run `adb-axi logs --pkg dev.probe --since 30s` to see what it logged while dying
 
@@ -190,7 +190,7 @@ app:
 # UI step: check the state is back
 
 $ adb-axi logs crash --pkg dev.probe --since before-kill
-crashes: "0 since before-kill (13 s, 601 lines scanned)"
+crashes: "0 since before-kill (13 s, 0 lines scanned)"
 ```
 
 The death is proven by the pid, the restore by `launch: cold` and a new pid, and the crash window covers exactly this run. `app death dev.probe --compare` does the kill, the restore and a before-and-after comparison of the visible text in one call when agent-device is installed.

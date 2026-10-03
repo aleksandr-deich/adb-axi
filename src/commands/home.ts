@@ -68,7 +68,7 @@ async function runHome(context: CommandContext): Promise<Output> {
     devices: rows.map((row) => deviceRow(row, [])),
   };
 
-  if (selected.error !== undefined) {
+  if ("error" in selected) {
     const help = [
       ...(attached.length === 0
         ? ["Start an emulator or connect a device, then run `adb-axi` again"]

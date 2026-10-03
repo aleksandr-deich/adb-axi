@@ -174,18 +174,18 @@ describe("adb-axi (home view)", () => {
         ],
       },
     );
-    const run = await runCli(["--timeout", "2s", "--json"], {
-      ...f.env,
-      ANDROID_SERIAL: SERIAL,
-    });
+    const run = await runCli([], { ...f.env, ANDROID_SERIAL: SERIAL });
     expect(run.exitCode).toBe(0);
-    expect(JSON.parse(run.stdout)).toMatchObject({
+    expect(decode(run.stdout.trimEnd())).toMatchObject({
       count: "2 attached, 2 online",
       target: SERIAL,
       foreground: "dev.probe/.MainActivity",
       crashes: "0 in the last 15m (no log mark yet)",
     });
-    expect(f.calls().some((call) => call.argv[1] === "other-device" && call.end === null)).toBe(true);
+    const other = f.calls().find((call) => call.argv[1] === "other-device");
+    const foreground = f.calls().find((call) => call.argv[3] === FOREGROUND);
+    expect(other?.end).toBeNull();
+    expect(foreground?.start).toBeLessThan((other?.start ?? 0) + 5_000);
     expect(f.unmatched()).toEqual([]);
   });
 
