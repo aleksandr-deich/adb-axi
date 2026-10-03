@@ -282,7 +282,10 @@ describe("app install", () => {
       ["app", "install", APK],
     );
     expect(toon.exitCode).toBe(0);
-    expect(data).toMatchObject({ install: { previous: "not installed" } });
+    expect(data).toMatchObject({
+      ok: "install com.example.notes -> 1.4.0 (57) (fresh install)",
+      install: { previous: "not installed" },
+    });
   });
 
   it("treats a package kept after `uninstall -k` as not installed", async () => {
@@ -290,7 +293,10 @@ describe("app install", () => {
       () => world({ start: "kept", dumps: { kept: KEPT, new: V57 }, rules: [installs(APK)] }),
       ["app", "install", APK],
     );
-    expect(data).toMatchObject({ install: { previous: "not installed" } });
+    expect(data).toMatchObject({
+      ok: "install com.example.notes -> 1.4.0 (57) with data kept",
+      install: { previous: "not installed" },
+    });
   });
 
   it("records the installed versionCode and signer digest per serial", async () => {
@@ -338,7 +344,7 @@ describe("app install", () => {
     const { toon, data, fake } = await both(make, ["app", "install", PROBE_APK]);
     expect(toon.exitCode).toBe(0);
     expect(data).toMatchObject({
-      ok: "install dev.probe -> 1.0 (1) with data kept",
+      ok: "install dev.probe -> 1.0 (1) (fresh install)",
       install: { previous: "not installed" },
     });
     expect(recordFile(fake)).toMatchObject({
@@ -1090,6 +1096,8 @@ describe("app install", () => {
     expect(run.exitCode).toBe(0);
     expect(run.stdout).toContain("--clean-data");
     expect(run.stdout).toContain("--if-changed");
+    expect(run.stdout).toContain("same versionCode and signer");
+    expect(run.stdout).toContain("debug and release variants");
     expect(run.stdout).toContain("180s");
   });
 });

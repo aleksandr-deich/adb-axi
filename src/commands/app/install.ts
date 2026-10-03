@@ -33,7 +33,8 @@ export const appInstall = defineCommand({
     {
       name: "--if-changed",
       type: "boolean",
-      description: "Skip the install when the same versionCode and signature are installed",
+      description:
+        "Skip builds with the same versionCode and signer, including debug and release variants",
     },
   ],
   defaultTimeoutMs: 180_000,
@@ -128,7 +129,7 @@ async function runInstall(context: CommandContext): Promise<Output> {
     ok: okLine(
       "install",
       info.package,
-      `${formatVersion(info.versionName, info.versionCode)} ${clean ? "with data wiped" : "with data kept"}`,
+      `${formatVersion(info.versionName, info.versionCode)} ${clean ? "with data wiped" : before === null ? "(fresh install)" : "with data kept"}`,
     ),
     install: {
       previous:
