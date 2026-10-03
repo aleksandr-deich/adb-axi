@@ -236,6 +236,9 @@ async function packagePids(context: CommandContext, pkg: string, uid: number): P
     }
     const [pid, rowUid, name] = [Number(row[1]), Number(row[2]), row[3] as string];
     if (pid <= 0 || rowUid !== uid) continue;
+    if (!/^[A-Za-z_][A-Za-z0-9_.:-]*$/.test(name)) {
+      throw invalidOutput("reading package process names", result.stdout);
+    }
     const known = names.get(name) ?? new Set<number>();
     known.add(pid);
     names.set(name, known);

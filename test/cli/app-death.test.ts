@@ -446,6 +446,49 @@ describe("app kill", () => {
     expectClean(fake);
   });
 
+  it("rejects an unsafe process name before sending it to the device shell", async () => {
+    const unsafe = "worker;id";
+    const { toon, data, fake } = await both(["app", "kill", "dev.probe"], () =>
+      probeDevice({
+        phase: "previous",
+        rules: [
+          {
+            match: shell(KERNEL_UIDS),
+            respond: { stdout: `PID UID NAME\n8333 10213 ${unsafe}\n` },
+          },
+        ],
+      }),
+    );
+    expect(toon.exitCode).toBe(1);
+    expect(data).toMatchObject({ code: "INVALID_OUTPUT" });
+    expect(shellCommands(fake)).not.toContain(`pidof ${unsafe}`);
+    expect(shellCommands(fake)).not.toContain("id");
+    expect(shellCommands(fake)).not.toContain(AM_KILL);
+    expectClean(fake);
+  });
+
+  it("rejects an unsafe process name after am kill without sending it to the shell", async () => {
+    const unsafe = "worker;id";
+    const { toon, data, fake } = await both(["app", "kill", "dev.probe"], () =>
+      probeDevice({
+        phase: "previous",
+        rules: [
+          {
+            match: shell(KERNEL_UIDS),
+            when: { app: "dead" },
+            respond: { stdout: `PID UID NAME\n8333 10213 ${unsafe}\n` },
+          },
+        ],
+      }),
+    );
+    expect(toon.exitCode).toBe(1);
+    expect(data).toMatchObject({ code: "INVALID_OUTPUT" });
+    expect(shellCommands(fake)).toContain(AM_KILL);
+    expect(shellCommands(fake)).not.toContain(`pidof ${unsafe}`);
+    expect(shellCommands(fake)).not.toContain("id");
+    expectClean(fake);
+  });
+
   it("fails with TASK_NOT_IN_RECENTS when the process died but its task is gone", async () => {
     const { toon, data, fake } = await both(["app", "kill", "dev.probe"], () =>
       probeDevice({ phase: "previous", recents: RECENTS_GONE }),
@@ -795,6 +838,43 @@ describe("app death", () => {
       code: "COMPARE_UNAVAILABLE",
       death: diedAndRestored,
       help: ["Run `adb-axi app death dev.probe` to repeat the check without --compare"],
+    });
+    expect(fake.calls().filter((call) => call.tool === "agent-device")).toHaveLength(2);
+    expectClean(fake);
+  });
+
+  it.each([
+    { nodes: [null] },
+    { nodes: [{ children: [null] }] },
+  ])("rejects malformed snapshot nodes with kill and restore evidence", async (snapshot) => {
+    const { toon, data, fake } = await both(["app", "death", "dev.probe", "--compare"], () =>
+      probeDevice({
+        phase: "front",
+        rules: [snapshotRule({ stdout: JSON.stringify(snapshot) }, { stdout: SNAPSHOT_AFTER })],
+      }),
+    );
+    expect(toon.exitCode).toBe(1);
+    expect(normalized(data)).toEqual({
+      error: "dev.probe was killed and restored, but the visible-text comparison could not run: agent-device snapshot did not contain a UI tree",
+      code: "COMPARE_UNAVAILABLE",
+      death: diedAndRestored,
+      help: ["Run `adb-axi app death dev.probe` to repeat the check without --compare"],
+    });
+    expect(fake.calls().filter((call) => call.tool === "agent-device")).toHaveLength(1);
+    expectClean(fake);
+  });
+
+  it("rejects malformed nodes in the after snapshot", async () => {
+    const { toon, data, fake } = await both(["app", "death", "dev.probe", "--compare"], () =>
+      probeDevice({
+        phase: "front",
+        rules: [snapshotRule({ stdout: SNAPSHOT_BEFORE }, { stdout: '{"nodes":[null]}' })],
+      }),
+    );
+    expect(toon.exitCode).toBe(1);
+    expect(normalized(data)).toMatchObject({
+      code: "COMPARE_UNAVAILABLE",
+      death: diedAndRestored,
     });
     expect(fake.calls().filter((call) => call.tool === "agent-device")).toHaveLength(2);
     expectClean(fake);

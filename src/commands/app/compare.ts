@@ -55,11 +55,25 @@ export async function takeSnapshot(context: CommandContext): Promise<Snapshot> {
     parsed === null ||
     Array.isArray(parsed) ||
     !("nodes" in parsed) ||
-    !Array.isArray(parsed.nodes)
+    !Array.isArray(parsed.nodes) ||
+    !validNodes(parsed.nodes)
   ) {
     return { ok: false, reason: "agent-device snapshot did not contain a UI tree" };
   }
   return { ok: true, text: visibleText(parsed) };
+}
+
+function validNodes(nodes: unknown[]): boolean {
+  return nodes.every((node) => {
+    if (typeof node !== "object" || node === null || Array.isArray(node)) return false;
+    for (const key of ["nodes", "children"]) {
+      if (key in node) {
+        const children = (node as Record<string, unknown>)[key];
+        if (!Array.isArray(children) || !validNodes(children)) return false;
+      }
+    }
+    return true;
+  });
 }
 
 /** Node fields that carry text a user can see. */
