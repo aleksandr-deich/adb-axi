@@ -38,3 +38,12 @@ Known limits of `--pkg`:
 
 - On API 31 and newer it is `logcat --uid`. On API 29 and 30, which have no `--uid`, it is a pid list: the app's current pids, the pids recorded when the window's mark was taken, and the pids ActivityManager names in "Start proc" lines inside the window. The list can miss a process that starts and dies between two reads.
 - Both forms drop lines that other processes log about the app, such as ActivityManager's "Start proc" and "has died" lines and ANR reports from the system server.
+
+## App data
+
+`data db <pkg>` lists a debuggable app's databases (`name`, `size`, `wal`). `data db <pkg> "<sql>" [--db <name>] [--full]` runs one read-only statement (`SELECT`, `WITH`, `VALUES`, `EXPLAIN` or `PRAGMA`) on a host copy of the database and prints the rows. `--db` is required when the app has several databases.
+
+- **Copy:** the database and its `-wal` file are copied with `run-as` and read with the host `sqlite3` (found like adb: `PATH`, then `ANDROID_HOME`, `ANDROID_SDK_ROOT`, `~/Library/Android/sdk`), so rows still only in the WAL are included. The files are copied one at a time while the app runs, so a write made during the copy can be missed.
+- **Read-only:** write statements, `ATTACH`, `VACUUM INTO`, multiple statements and sqlite3 dot-commands are refused before any device call. A `WITH` or `PRAGMA` that attempts a write is rejected by the read-only sqlite3 connection; sqlite3 safe mode blocks host-file functions.
+- **Rows:** the first 50 are printed; when more exist, `shown: 50 of N rows` reports the total. Cells over 500 characters are cut. `--full` writes all rows with uncut cells to `ADB_AXI_HOME/out/` and prints the path, but only if rows or cells were cut. Results larger than 64 MB fail even with `--full`; narrow the query with `WHERE` or `LIMIT`.
+- **Errors:** `APP_NOT_DEBUGGABLE` (`run-as` refused, release builds), `DB_NOT_FOUND` (names the databases that exist), `INVALID_OUTPUT` (invalid copied bytes, unreadable sqlite3 output or a result over 64 MB), `SQL_ERROR` (sqlite3's message), `SQLITE_NOT_FOUND` (no host sqlite3).

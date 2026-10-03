@@ -31,6 +31,7 @@ export const ERROR_CATALOGUE = {
   DB_NOT_FOUND: "No such database; existing ones are listed",
   INVALID_OUTPUT: "Copied bytes are not the expected file",
   SQL_ERROR: "sqlite3 rejected the query",
+  SQLITE_NOT_FOUND: "No host sqlite3 executable in any searched location",
   NOT_IMPLEMENTED: "The command is registered but not available in this build",
   UPDATE_ERROR: "The self-update could not complete",
   INTERNAL_ERROR: "adb-axi hit an unexpected internal failure",
