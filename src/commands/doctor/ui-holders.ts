@@ -44,7 +44,9 @@ function runs(process: HostProcess, name: RegExp): boolean {
 function runsClient(process: HostProcess, name: string): boolean {
   if (program(process) === name) return true;
   if (!/^(?:node|node\.exe|npx|npx\.cmd)$/.test(program(process))) return false;
-  const script = words(process).slice(1).find((word) => !word.startsWith("-"));
+  const script = words(process)
+    .slice(1)
+    .find((word) => !word.startsWith("-"));
   if (script === undefined) return false;
   return script.split("/").at(-1) === name || script.split("/").includes(name);
 }
@@ -170,7 +172,10 @@ function mayUseHolder(process: HostProcess, found: Found): boolean {
   if (!isAdbShell(process, /\bam instrument\b/)) return true;
   const args = words(process);
   const at = args.findIndex((word, index) => word === "am" && args[index + 1] === "instrument");
-  const named = args.slice(at + 2).filter((word) => /^[\w.]+\/[\w.$]+$/.test(word)).at(-1);
+  const named = args
+    .slice(at + 2)
+    .filter((word) => /^[\w.]+\/[\w.$]+$/.test(word))
+    .at(-1);
   return named === undefined || componentName(named) === componentName(found.component);
 }
 

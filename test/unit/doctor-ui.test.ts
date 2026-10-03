@@ -259,7 +259,10 @@ describe("classifyHolders", () => {
         ],
         host: host({ pid: 4300, args }),
       }).state;
-    for (const [found, name] of [[mobile, "mobile-mcp"], [agent, "agent-device"]] as const) {
+    for (const [found, name] of [
+      [mobile, "mobile-mcp"],
+      [agent, "agent-device"],
+    ] as const) {
       expect(classify(found, `rg ${name} README.md`)).toBe("leaked");
       expect(classify(found, `node ./scripts/run.js ${name}`)).toBe("leaked");
       expect(classify(found, `/usr/local/bin/${name} serve`)).toBe("live");
