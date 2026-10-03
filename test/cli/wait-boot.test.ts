@@ -164,7 +164,9 @@ describe("wait boot", () => {
       error: `${SERIAL} had not finished booting after 1 s`,
       last: { state: "not attached", boot_completed: "-", uptime_s: "-" },
     });
-    expect(f.calls().filter((call) => call.argv[2] === "shell" && call.argv[1] === TABLET)).toEqual([]);
+    expect(
+      f.calls().filter((call) => call.argv[2] === "shell" && call.argv[1] === TABLET),
+    ).toEqual([]);
     expect(f.unmatched()).toEqual([]);
   }, 20_000);
 
