@@ -15,7 +15,7 @@ const ONE_ONLINE = `List of devices attached\n${SERIAL}          device product:
 const CURRENT_USER = "am get-current-user";
 const PACKAGE = "dumpsys package dev.probe";
 const PIDOF = "pidof dev.probe";
-const KERNEL_UIDS = "ps -A -o PID,UID";
+const KERNEL_UIDS = "ps -A -o PID,UID,NAME";
 const PROCESSES = "dumpsys activity processes dev.probe";
 const FOREGROUND = "dumpsys activity activities";
 const RECENTS = "dumpsys activity recents";
@@ -68,6 +68,11 @@ const RECENTS_GONE: Response = {
     "",
   ].join("\n"),
 };
+const OTHER_USER_RECENTS: Response = {
+  stdout: captured("dumpsys-activity-recents-after-kill.txt").replace(
+    /userId=0 effectiveUid=u0a213/, "userId=10 effectiveUid=u10a213",
+  ),
+};
 const AM_COLD = fromCapture("am-start-restore-after-kill.txt");
 /** Synthetic: the task came to the front, and the system could not say how the launch went. */
 const AM_UNKNOWN: Response = {
@@ -85,8 +90,8 @@ const AM_TIMEOUT: Response = { stdoutFile: "synthetic/29/am-start-timeout.txt" }
 
 const PIDOF_OF = (pid: number): Response => ({ stdout: `${pid}\n` });
 const PIDOF_GONE: Response = { exit: 1 };
-const UIDS_OF = (pid: number): Response => ({ stdout: `  PID   UID\n ${pid} 10213\n` });
-const UIDS_NONE: Response = { stdout: "  PID   UID\n" };
+const UIDS_OF = (pid: number): Response => ({ stdout: `  PID   UID NAME\n ${pid} 10213 dev.probe\n` });
+const UIDS_NONE: Response = { stdout: "  PID   UID NAME\n" };
 
 /** Where the probe is: in front, just sent home, the previous app, dead, or restored. */
 type Phase = "front" | "leaving" | "previous" | "dead" | "restored";
@@ -295,14 +300,15 @@ describe("app kill", () => {
     expect(shellCommands(fake)).toEqual([
       CURRENT_USER,
       PACKAGE,
-      PIDOF,
       KERNEL_UIDS,
+      PIDOF,
       FOREGROUND,
       HOME,
       PROCESSES,
       PROCESSES,
       PROCESSES,
       AM_KILL,
+      KERNEL_UIDS,
       PIDOF,
       RECENTS,
     ]);
@@ -319,11 +325,12 @@ describe("app kill", () => {
     expect(shellCommands(fake)).toEqual([
       CURRENT_USER,
       PACKAGE,
-      PIDOF,
       KERNEL_UIDS,
+      PIDOF,
       FOREGROUND,
       PROCESSES,
       AM_KILL,
+      KERNEL_UIDS,
       PIDOF,
       RECENTS,
     ]);
@@ -337,7 +344,7 @@ describe("app kill", () => {
     expect(toon.exitCode).toBe(0);
     expect(toon.stdout).toBe("ok: kill dev.probe -> already not running (no-op)\n");
     expect(data).toEqual({ ok: "kill dev.probe -> already not running (no-op)" });
-    expect(shellCommands(fake)).toEqual([CURRENT_USER, PACKAGE, PIDOF]);
+    expect(shellCommands(fake)).toEqual([CURRENT_USER, PACKAGE, KERNEL_UIDS, PIDOF]);
     expectClean(fake);
   });
 
@@ -395,6 +402,25 @@ describe("app kill", () => {
     expectClean(fake);
   });
 
+  it("does not report success while a secondary process survives run-as", async () => {
+    const sibling = "pidof dev.probe:remote";
+    const { toon, data, fake } = await both(["app", "kill", "dev.probe", "--timeout", "3s"], () =>
+      probeDevice({
+        phase: "previous", amKillWorks: false,
+        rules: [
+          { match: shell(KERNEL_UIDS), respond: { stdout: "PID UID NAME\n8333 10213 dev.probe:remote\n" } },
+          { match: shell(sibling), respond: PIDOF_OF(8333) },
+          { match: shell("run-as dev.probe --user 0 kill -9 8333"), respond: {} },
+        ],
+      }),
+    );
+    expect(toon.exitCode).toBe(1);
+    expect(data).toMatchObject({ code: "KILL_TIMEOUT", last: { pid: 8333 }, am_kill_sent: true });
+    expect(shellCommands(fake)).toContain("run-as dev.probe --user 0 kill -9 8333");
+    expect(shellCommands(fake)).not.toContain(START);
+    expectClean(fake);
+  });
+
   it("fails with TASK_NOT_IN_RECENTS when the process died but its task is gone", async () => {
     const { toon, data, fake } = await both(["app", "kill", "dev.probe"], () =>
       probeDevice({ phase: "previous", recents: RECENTS_GONE }),
@@ -407,6 +433,14 @@ describe("app kill", () => {
       kill: { ...killedFront, backgrounded_first: false },
       help: ["Run `adb-axi app start dev.probe` to start it fresh"],
     });
+    expectClean(fake);
+  });
+
+  it("does not claim another user's task was kept", async () => {
+    const { data, fake } = await both(["app", "kill", "dev.probe"], () =>
+      probeDevice({ phase: "previous", recents: OTHER_USER_RECENTS }),
+    );
+    expect(data).toMatchObject({ code: "TASK_NOT_IN_RECENTS" });
     expectClean(fake);
   });
 
@@ -510,6 +544,15 @@ describe("app restore", () => {
       ],
     });
     expect(shellCommands(fake)).toEqual([CURRENT_USER, PACKAGE, RECENTS]);
+    expectClean(fake);
+  });
+
+  it("does not restore another user's task", async () => {
+    const { data, fake } = await both(["app", "restore", "dev.probe"], () =>
+      probeDevice({ phase: "dead", recents: OTHER_USER_RECENTS }),
+    );
+    expect(data).toMatchObject({ code: "TASK_NOT_IN_RECENTS" });
+    expect(shellCommands(fake)).not.toContain(START);
     expectClean(fake);
   });
 

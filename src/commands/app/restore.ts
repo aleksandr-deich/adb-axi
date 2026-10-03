@@ -106,7 +106,7 @@ export async function restoreTask(
   const serial = targetSerial(context);
   const { userId } = installed;
 
-  const task = findTask(await readRecents(adb, serial, readOptions(context)), pkg);
+  const task = findTask(await readRecents(adb, serial, readOptions(context)), pkg, userId);
   if (task === undefined || task.activity === null) throw noTask(context, pkg);
   const component: Component = {
     package: pkg,

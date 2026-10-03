@@ -1,10 +1,11 @@
 import type { AdbClient } from "../../adb/run.js";
 import { runShell } from "../../adb/shell.js";
+import { parsePidof } from "../../android/pidof.js";
 import { readForeground } from "../../android/foreground.js";
 import { assertPackageName } from "../../android/component.js";
 import { amKillCanKill, type Importance, type ProcessRecord } from "../../android/processes.js";
 import { readRecents, findTask } from "../../android/recents.js";
-import { readShell } from "../../android/read.js";
+import { invalidOutput, readShell } from "../../android/read.js";
 import { AdbAxiError } from "../../core/errors.js";
 import { noop, okLine, runHint, type Output } from "../../core/output.js";
 import { poll } from "../../core/poll.js";
@@ -13,7 +14,6 @@ import type { CommandContext } from "../types.js";
 import {
   formatDuration,
   lifecycleCommand,
-  mainPids,
   packageProcesses,
   requireInstalled,
   type InstalledPackage,
@@ -126,11 +126,12 @@ export async function killProcess(
   const { userId } = installed;
   const options = readOptions(context);
 
-  const before = await mainPids(context, pkg, userId);
+  const before = await packagePids(context, pkg, userId);
   if (before.length === 0) return { killed: false };
 
   const front = await readForeground(adb, serial, { ...options, userId });
   const backgroundedFirst = front?.package === pkg;
+  const backgroundedAt = performance.now();
   if (backgroundedFirst) {
     await readShell(
       adb,
@@ -143,6 +144,9 @@ export async function killProcess(
 
   const killable = await awaitKillable(context, pkg, userId);
   if (!killable.ok) throw killTimeout(context, pkg, killable.last, false, command);
+  const cachedAfterMs = backgroundedFirst
+    ? Math.round(performance.now() - backgroundedAt)
+    : killable.waitedMs;
 
   await readShell(adb, serial, `am kill --user ${userId} ${pkg}`, `killing ${pkg}`, options);
 
@@ -165,11 +169,11 @@ export async function killProcess(
   const evidence: KillEvidence = {
     pidBefore: pidValue(before) ?? UNKNOWN,
     backgroundedFirst,
-    cachedAfterMs: killable.waitedMs,
+    cachedAfterMs,
     method,
   };
   const tasks = await readRecents(adb, serial, options);
-  if (findTask(tasks, pkg) === undefined) throw taskGone(context, pkg, evidence);
+  if (findTask(tasks, pkg, userId) === undefined) throw taskGone(context, pkg, evidence);
   return { killed: true, evidence };
 }
 
@@ -212,6 +216,45 @@ async function awaitKillable(
 
 type Gone = { gone: true } | { gone: false; last: Seen | undefined };
 
+async function packagePids(context: CommandContext, pkg: string, userId: number): Promise<number[]> {
+  const result = await readShell(
+    context.adb(), targetSerial(context), "ps -A -o PID,UID,NAME",
+    "reading package process names", readOptions(context),
+  );
+  const lines = result.stdout.trim().split(/\r?\n/);
+  if (lines.shift()?.trim().replace(/\s+/g, " ") !== "PID UID NAME") {
+    throw invalidOutput("reading package process names", result.stdout);
+  }
+  const names = new Map<string, Set<number>>();
+  for (const line of lines) {
+    const row = /^\s*(\d+)\s+(\d+)\s+(\S+)\s*$/.exec(line);
+    if (!row || !Number.isSafeInteger(Number(row[1])) || !Number.isSafeInteger(Number(row[2]))) {
+      throw invalidOutput("reading package process names", result.stdout);
+    }
+    const [pid, uid, name] = [Number(row[1]), Number(row[2]), row[3] as string];
+    if (pid <= 0 || Math.floor(uid / 100000) !== userId) continue;
+    if (name !== pkg && !name.startsWith(`${pkg}:`)) continue;
+    const known = names.get(name) ?? new Set<number>();
+    known.add(pid);
+    names.set(name, known);
+  }
+  const pids: number[] = [];
+  if (!names.has(pkg)) names.set(pkg, new Set());
+  for (const [name, known] of names) {
+    const check = await readShell(
+      context.adb(), targetSerial(context), `pidof ${name}`,
+      `reading the pid of ${name}`, readOptions(context), [0, 1],
+    );
+    const running = parsePidof(check.stdout);
+    if (running === null || (check.exitCode === 1) !== (running.length === 0)) {
+      throw invalidOutput(`reading the pid of ${name}`, check.stdout);
+    }
+    pids.push(...running.filter((pid) => known.has(pid)));
+  }
+  return pids;
+}
+
+
 /**
  * Poll `pidof` (the exit evidence; an ActivityManager record can vanish before its
  * process does) until the main process is gone or `windowMs` passes. A process still
@@ -228,7 +271,7 @@ async function awaitGone(
     timeoutMs: windowMs,
     check: async () => {
       try {
-        const pids = await mainPids(context, pkg, userId);
+        const pids = await packagePids(context, pkg, userId);
         if (pids.length === 0) return { done: true, value: null };
         const processes = await packageProcesses(context, pkg, userId, readOptions(context));
         const main = processes.find((process) => process.pid === pids[0]);

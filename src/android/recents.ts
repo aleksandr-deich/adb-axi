@@ -7,6 +7,7 @@ export interface RecentTask {
   /** Position in the recents list; 0 is the most recent. */
   index: number;
   taskId: number;
+  userId: number | null;
   /** `standard`, `home`, `recents`, ...; `null` when the dump does not say. */
   type: string | null;
   /** The package of the task's root activity. */
@@ -49,6 +50,7 @@ export function parseRecents(stdout: string): RecentTask[] {
       current = {
         index: Number(header[1]),
         taskId: Number(header[2]),
+        userId: null,
         type: /\btype=(\w+)/.exec(header[3] ?? "")?.[1] ?? null,
         package: null,
         activity: null,
@@ -66,6 +68,8 @@ export function parseRecents(stdout: string): RecentTask[] {
       continue;
     }
     const text = line.trim();
+    const user = /\buserId=(\d+)\b/.exec(text);
+    if (user?.[1] !== undefined) current.userId = Number(user[1]);
     const root = /^mActivityComponent=(\S+)$/.exec(text);
     if (root?.[1] !== undefined) {
       const component = parseComponent(root[1]);
@@ -89,9 +93,15 @@ export function parseRecents(stdout: string): RecentTask[] {
 }
 
 /** The most recent standard task of a package: the one `app restore` brings back. */
-export function findTask(tasks: readonly RecentTask[], pkg: string): RecentTask | undefined {
+export function findTask(
+  tasks: readonly RecentTask[],
+  pkg: string,
+  userId: number,
+): RecentTask | undefined {
   return tasks.find(
-    (task) => task.package === pkg && (task.type === null || task.type === "standard"),
+    (task) =>
+      task.package === pkg && task.userId === userId &&
+      (task.type === null || task.type === "standard"),
   );
 }
 

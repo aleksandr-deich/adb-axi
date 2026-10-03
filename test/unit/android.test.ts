@@ -484,9 +484,10 @@ describe("parseLru", () => {
 describe("parseRecents", () => {
   it.each(APIS)("keeps the probe task after the kill on API %s", (api) => {
     const tasks = parseRecents(captured(api, "dumpsys-activity-recents-after-kill.txt"));
-    expect(findTask(tasks, "dev.probe")).toEqual({
+    expect(findTask(tasks, "dev.probe", 0)).toEqual({
       index: 1,
       taskId: PROBE[api].task,
+      userId: 0,
       type: "standard",
       package: "dev.probe",
       activity: ".MainActivity",
@@ -518,11 +519,11 @@ describe("parseRecents", () => {
       [12, "standard", "dev.probe"],
       [9, "standard", "com.example.notes"],
     ]);
-    expect(findTask(tasks, "dev.probe")).toMatchObject({
+    expect(findTask(tasks, "dev.probe", 0)).toMatchObject({
       activity: ".MainActivity",
       rootPid: null,
     });
-    expect(findTask(tasks, "com.example.notes")).toMatchObject({
+    expect(findTask(tasks, "com.example.notes", 0)).toMatchObject({
       activity: ".ui.NotesActivity",
       activities: ["com.example.notes/.ui.NotesActivity", "com.example.notes/.ui.EditorActivity"],
       rootPid: 4470,
@@ -531,7 +532,7 @@ describe("parseRecents", () => {
 
   it("reads Task headers (API 30, synthetic)", () => {
     const tasks = parseRecents(synthetic("30", "dumpsys-activity-recents-after-kill.txt"));
-    expect(findTask(tasks, "dev.probe")).toMatchObject({
+    expect(findTask(tasks, "dev.probe", 0)).toMatchObject({
       index: 1,
       taskId: 14,
       type: "standard",
@@ -541,8 +542,8 @@ describe("parseRecents", () => {
 
   it("finds no task for a package without one, and never a home task", () => {
     const tasks = parseRecents(captured("37", "dumpsys-activity-recents-after-kill.txt"));
-    expect(findTask(tasks, "dev.probe.missing")).toBeUndefined();
-    expect(findTask(tasks, LAUNCHER)).toBeUndefined();
+    expect(findTask(tasks, "dev.probe.missing", 0)).toBeUndefined();
+    expect(findTask(tasks, LAUNCHER, 0)).toBeUndefined();
   });
 });
 
