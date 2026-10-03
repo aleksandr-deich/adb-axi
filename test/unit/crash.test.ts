@@ -146,6 +146,21 @@ describe("ANR report boundaries", () => {
     expect(crash.trace).toEqual(["ANR in dev.probe", "PID: 123", "Reason: first"]);
   });
 
+  it("stops at the end of the CPU report even when another error shares its timestamp", () => {
+    const crash = one([
+      line(0, 552, "E", "ActivityManager", "ANR in dev.probe"),
+      line(0, 552, "E", "ActivityManager", "PID: 123"),
+      line(0, 552, "E", "ActivityManager", "Reason: first"),
+      line(0, 552, "E", "ActivityManager", "CPU usage from 100ms to -1ms ago:"),
+      line(0, 552, "E", "ActivityManager", "30% TOTAL: first"),
+      line(0, 552, "E", "ActivityManager", "CPU usage from 1ms to 2ms later:"),
+      line(0, 552, "E", "ActivityManager", "40% TOTAL: second"),
+      line(0, 552, "E", "ActivityManager", "Reason: unrelated"),
+    ]);
+    expect(crash.trace.at(-1)).toBe("40% TOTAL: second");
+    expect(crash.message).toBe("first");
+  });
+
   it("closes a report when its thread logs a different priority", () => {
     const crash = one([
       line(0, 552, "E", "ActivityManager", "ANR in dev.probe"),
@@ -398,7 +413,13 @@ describe("native crash blocks", () => {
   it("does not assign an earlier process's signal to a reused pid", () => {
     const debug = (ms: number, message: string): LogLine => line(ms, 9409, "F", "DEBUG", message);
     const crashes = parseCrashes([
-      line(0, 9386, "F", "libc", "Fatal signal 11 (SIGSEGV) in tid 9386 (dev.other), pid 9386 (dev.other)"),
+      line(
+        0,
+        9386,
+        "F",
+        "libc",
+        "Fatal signal 11 (SIGSEGV) in tid 9386 (dev.other), pid 9386 (dev.other)",
+      ),
       debug(200, "*** *** *** ***"),
       debug(200, "pid: 9386, tid: 9386, name: other  >>> dev.other <<<"),
       debug(200, "signal 11 (SIGSEGV), code 0 (SI_USER)"),
@@ -412,14 +433,52 @@ describe("native crash blocks", () => {
     ]);
   });
 
-  it("does not pair a distant signal with a tombstone of a reused process", () => {
+  it("pairs a delayed tombstone with its signal without a fixed time limit", () => {
     const crash = one([
-      line(0, 9386, "F", "libc", "Fatal signal 11 (SIGSEGV) in tid 9386 (dev.probe), pid 9386 (dev.probe)"),
-      line(20_000, 9409, "F", "DEBUG", "*** *** *** ***"),
-      line(20_000, 9409, "F", "DEBUG", "pid: 9386, tid: 9386, name: probe  >>> dev.probe <<<"),
-      line(20_000, 9409, "F", "DEBUG", "signal 11 (SIGSEGV), code 0 (SI_USER)"),
+      line(
+        0,
+        9386,
+        "F",
+        "libc",
+        "Fatal signal 11 (SIGSEGV) in tid 9386 (dev.probe), pid 9386 (dev.probe)",
+      ),
+      debug(20_000, "*** *** *** ***"),
+      debug(20_000, "pid: 9386, tid: 9386, name: probe  >>> dev.probe <<<"),
+      debug(20_000, "signal 11 (SIGSEGV), code 0 (SI_USER)"),
     ]);
-    expect(crash.epochMs).toBe(1790834020000);
+    expect(crash.epochMs).toBe(1790834000000);
+  });
+
+  it("does not count a tombstone header before its identity and signal arrive", () => {
+    expect(parseCrashes([debug(0, "*** *** *** ***")])).toEqual([]);
+    expect(
+      parseCrashes([
+        debug(0, "*** *** *** ***"),
+        debug(0, "pid: 9386, tid: 9386, name: probe  >>> dev.probe <<<"),
+      ]),
+    ).toEqual([]);
+  });
+
+  it("sorts by crash time even when native dump output is delayed", () => {
+    const crashes = parseCrashes([
+      line(
+        0,
+        9386,
+        "F",
+        "libc",
+        "Fatal signal 11 (SIGSEGV) in tid 9386 (dev.probe), pid 9386 (dev.probe)",
+      ),
+      runtime(100, 100, "FATAL EXCEPTION: main"),
+      runtime(100, 100, "Process: dev.probe, PID: 100"),
+      runtime(100, 100, "java.lang.IllegalStateException: boom"),
+      debug(200, "*** *** *** ***"),
+      debug(200, "pid: 9386, tid: 9386, name: probe  >>> dev.probe <<<"),
+      debug(200, "signal 11 (SIGSEGV), code 0 (SI_USER)"),
+    ]);
+    expect(crashes.map((crash) => [crash.kind, crash.epochMs])).toEqual([
+      ["native", 1790834000000],
+      ["java", 1790834000100],
+    ]);
   });
 
   it("names a symbol-less app frame by its file and address", () => {

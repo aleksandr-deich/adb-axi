@@ -357,10 +357,22 @@ describe("logs crash", () => {
       const f = device({
         window: {
           stdout: [
-            logLine(1790834299900, 9386, "F", "libc", "Fatal signal 11 (SIGSEGV) in tid 9386 (dev.probe), pid 9386 (dev.probe)"),
-            logLine(1790834300200, 9409, "F", "DEBUG", "*** *** *** ***"),
-            logLine(1790834300200, 9409, "F", "DEBUG", "pid: 9386, tid: 9386, name: probe  >>> dev.probe <<<"),
-            logLine(1790834300200, 9409, "F", "DEBUG", "signal 11 (SIGSEGV), code 0 (SI_USER)"),
+            logLine(
+              1790834299900,
+              9386,
+              "F",
+              "libc",
+              "Fatal signal 11 (SIGSEGV) in tid 9386 (dev.probe), pid 9386 (dev.probe)",
+            ),
+            logLine(1790834320200, 9409, "F", "DEBUG", "*** *** *** ***"),
+            logLine(
+              1790834320200,
+              9409,
+              "F",
+              "DEBUG",
+              "pid: 9386, tid: 9386, name: probe  >>> dev.probe <<<",
+            ),
+            logLine(1790834320200, 9409, "F", "DEBUG", "signal 11 (SIGSEGV), code 0 (SI_USER)"),
           ].join("\n"),
         },
       });
@@ -369,13 +381,51 @@ describe("logs crash", () => {
       expectClean(f);
     });
 
+    it("does not count an incomplete tombstone as a new crash", async () => {
+      const f = device({
+        window: {
+          stdout: [
+            logLine(
+              1790834299900,
+              9386,
+              "F",
+              "libc",
+              "Fatal signal 11 (SIGSEGV) in tid 9386 (dev.probe), pid 9386 (dev.probe)",
+            ),
+            logLine(1790834300200, 9409, "F", "DEBUG", "*** *** *** ***"),
+            logLine(
+              1790834300200,
+              9409,
+              "F",
+              "DEBUG",
+              "pid: 9386, tid: 9386, name: probe  >>> dev.probe <<<",
+            ),
+          ].join("\n"),
+        },
+      });
+      const { data } = await crashSince(f, "--pkg", "dev.probe");
+      expect(data).toEqual({ crashes: "0 since before-run (40 s, 2 lines scanned)" });
+    });
+
     it("keeps a tombstone in the window when its pid was reused by another process", async () => {
       const f = device({
         window: {
           stdout: [
-            logLine(1790834299900, 9386, "F", "libc", "Fatal signal 11 (SIGSEGV) in tid 9386 (dev.other), pid 9386 (dev.other)"),
+            logLine(
+              1790834299900,
+              9386,
+              "F",
+              "libc",
+              "Fatal signal 11 (SIGSEGV) in tid 9386 (dev.other), pid 9386 (dev.other)",
+            ),
             logLine(1790834300200, 9409, "F", "DEBUG", "*** *** *** ***"),
-            logLine(1790834300200, 9409, "F", "DEBUG", "pid: 9386, tid: 9386, name: probe  >>> dev.probe <<<"),
+            logLine(
+              1790834300200,
+              9409,
+              "F",
+              "DEBUG",
+              "pid: 9386, tid: 9386, name: probe  >>> dev.probe <<<",
+            ),
             logLine(1790834300200, 9409, "F", "DEBUG", "signal 11 (SIGSEGV), code 0 (SI_USER)"),
           ].join("\n"),
         },
@@ -431,7 +481,6 @@ describe("logs crash", () => {
       const f = device({
         clocks: ["1790835000.250000000 +0000\n"],
         window: { stdout: "" },
-
       });
       const seconds = await both(["logs", "crash", "--since", "30s"], f);
       expect(seconds.data.crashes).toBe("0 since 30s ago (30 s, 0 lines scanned)");
@@ -521,9 +570,8 @@ describe("logs crash", () => {
       expect(path.startsWith(join(f.home, "out"))).toBe(true);
       const written = readFileSync(path, "utf8");
       expect(written.match(/^== java at /gm)).toHaveLength(8);
-      expect(
-        written.startsWith("== java at 2026-10-01 07:58:44.594 in dev.probe (pid 9328)\n"),
-      ).toBe(true);
+      expect(written.startsWith("== java at 2026-10-01 07:58:30.000 in dev.probe (pid 100)\n")).toBe(true);
+      expect(written).toContain("== java at 2026-10-01 07:58:44.594 in dev.probe (pid 9328)\n");
       // All 22 frames of the captured trace, which the output only counts.
       expect(written).toContain(
         "\tat com.android.internal.os.ZygoteInit.main(ZygoteInit.java:886)\n",
@@ -569,7 +617,10 @@ describe("logs crash", () => {
         },
       });
       await runCli(["logs", "mark", "before-run"], f.env);
-      const run = await runCli(["logs", "crash", "--since", "before-run", "--pkg", "dev.probe", "--full", "--json"], f.env);
+      const run = await runCli(
+        ["logs", "crash", "--since", "before-run", "--pkg", "dev.probe", "--full", "--json"],
+        f.env,
+      );
       const data = JSON.parse(run.stdout) as Record<string, unknown>;
       expect(data.crash).toMatchObject({ message: "blocked" });
       expect(readFileSync(data.full as string, "utf8")).toContain("Reason: blocked");

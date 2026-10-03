@@ -64,7 +64,8 @@ export function parseCrashes(lines: readonly LogLine[]): Crash[] {
     const block = native.get(pid);
     if (block === undefined) return;
     native.delete(pid);
-    found.push({ order: block.order, crash: buildNative(block, signals) });
+    const crash = buildNative(block, signals);
+    if (crash !== null) found.push({ order: block.order, crash });
   };
 
   for (const line of lines) {
@@ -86,7 +87,15 @@ export function parseCrashes(lines: readonly LogLine[]): Crash[] {
           closeAnr(key);
           anr.set(key, { order: order++, start: line, rest: [] });
         } else {
-          anr.get(key)?.rest.push(line.message);
+          const report = anr.get(key);
+          if (report !== undefined) {
+            report.rest.push(line.message);
+            if (
+              /^\s*\d+(?:\.\d+)?% TOTAL:/.test(line.message) &&
+              report.rest.filter((message) => message.startsWith("CPU usage from ")).length >= 2
+            )
+              closeAnr(key);
+          }
         }
       }
     } else if (line.tag === "DEBUG" && line.level === "F") {
@@ -99,14 +108,21 @@ export function parseCrashes(lines: readonly LogLine[]): Crash[] {
     } else if (line.tag === "libc" && line.level === "F") {
       const raised = FATAL_SIGNAL.exec(line.message);
       if (raised?.[1] !== undefined && raised[2] !== undefined && raised[3] !== undefined) {
-        signals.push({ pid: Number(raised[2]), process: raised[3], signal: raised[1], epochMs: line.epochMs });
+        signals.push({
+          pid: Number(raised[2]),
+          process: raised[3],
+          signal: raised[1],
+          epochMs: line.epochMs,
+        });
       }
     }
   }
   for (const pid of [...java.keys()]) closeJava(pid);
   for (const key of [...anr.keys()]) closeAnr(key);
   for (const pid of [...native.keys()]) closeNative(pid);
-  return found.sort((a, b) => a.order - b.order).map((entry) => entry.crash);
+  return found
+    .sort((a, b) => a.crash.epochMs - b.crash.epochMs || a.order - b.order)
+    .map((entry) => entry.crash);
 }
 
 /** Whether the crash happened in a process of the package: by name, never by uid or pid. */
@@ -206,7 +222,7 @@ const BUILD_ID = /\s+\(BuildId: [^)]*\)\s*$/;
 function buildNative(
   block: Block,
   signals: { pid: number; process: string; signal: string; epochMs: number }[],
-): Crash {
+): Crash | null {
   const messages = [block.start.message, ...block.rest];
   let process = "-";
   let pid: number | null = null;
@@ -234,13 +250,13 @@ function buildNative(
       frames.push({ path: frame[2], pc: frame[1], symbol: frame[3] });
     }
   }
+  if (pid === null || signal === undefined || process === "-") return null;
   const raisedIndex = signals.findLastIndex(
     (entry) =>
       entry.pid === pid &&
       entry.process === process &&
       entry.signal === signalName &&
-      entry.epochMs <= block.start.epochMs &&
-      block.start.epochMs - entry.epochMs <= 10_000,
+      entry.epochMs <= block.start.epochMs,
   );
   const raised = raisedIndex < 0 ? undefined : signals.splice(raisedIndex, 1)[0];
   const app = frames.find((frame) => frame.path.includes("/data/app/"));
