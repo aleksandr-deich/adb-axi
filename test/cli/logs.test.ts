@@ -273,6 +273,47 @@ function logcatFor(start: string, uid?: number): string {
 }
 
 describe("logs", () => {
+  it("notes a truncated duration window before grep filtering", async () => {
+    const f = devices({
+      serial: A,
+      api: 35,
+      clocks: ["1790835000.000000000 +0000\n"],
+      shell: {
+        [logcatFor("1790834700.000")]: {
+          stdout: logLine(1790834950000, 1, "I", "Tag", "unrelated"),
+        },
+      },
+    });
+    const { toon, data } = await both(["logs", "--since", "5m", "--grep", "absent"], f);
+    expect(toon.exitCode).toBe(0);
+    expect(data).toMatchObject({
+      note: "logcat buffer starts at 06:09:10.000, after the window start",
+      lines: [],
+    });
+    expectClean(f);
+  });
+  it.each([2000, 2001])(
+    "notes a missing window start only beyond the 2s tolerance (%s ms)",
+    async (gap) => {
+      const f = devices({
+        serial: A,
+        api: 35,
+        clocks: [MARK_CLOCK, LATER_CLOCK],
+        shell: {
+          [logcatFor(MARK_START)]: {
+            stdout: logLine(1790834110420 + gap, 1, "I", "ProbeState", "ready"),
+          },
+        },
+      });
+      await runCli(["logs", "mark", "m"], f.env);
+      const { toon, data } = await both(["logs", "--since", "m"], f);
+      expect(toon.exitCode).toBe(0);
+      if (gap > 2000) {
+        expect(data.note).toBe("logcat buffer starts at 22:55:12.421, after the window start");
+      } else expect(data).not.toHaveProperty("note");
+      expectClean(f);
+    },
+  );
   it("scopes to the app with logcat --uid on API 35 and reports the window, counts and lines", async () => {
     const dump = fixtureText("captured/35/logcat-epoch-uid.txt");
     const parsed = parseLogcat(dump).lines;
@@ -750,6 +791,36 @@ describe("logs", () => {
 });
 
 describe("wait log", () => {
+  it.each([false, true])(
+    "ignores adbd command echoes but matches app logs (app line: %s)",
+    async (appLine) => {
+      const message = "logcat -d -v epoch";
+      const f = devices({
+        serial: A,
+        api: 35,
+        clocks: ["1790835000.000000000 +0000\n"],
+        shell: {
+          [logcatFor("1790835000.000")]: {
+            stdout: [
+              logLine(
+                1790835000100,
+                522,
+                "I",
+                "adbd",
+                `adbd service requested 'shell,v2,TERM=xterm-256color,raw:${logcatFor("1790835000.000")}'`,
+              ),
+              ...(appLine ? [logLine(1790835000200, 1000, "I", "ProbeState", message)] : []),
+            ].join("\n"),
+          },
+        },
+      });
+      const { toon, data } = await both(["wait", "log", message, "--timeout", "1s"], f);
+      expect(toon.exitCode).toBe(appLine ? 0 : 1);
+      if (appLine) expect(data.match).toMatchObject({ tag: "ProbeState", message });
+      else expect(data.code).toBe("WAIT_TIMEOUT");
+      expectClean(f);
+    },
+  );
   it("is done when a line after the window start matches, and prints waited_ms and the line", async () => {
     const f = devices({
       serial: A,

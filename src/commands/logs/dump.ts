@@ -121,6 +121,11 @@ export const logsDump = defineCommand({
     const counts = countLevels(lines);
     return {
       window: `${window.label} -> now (${seconds} s), ${scanned.length} lines scanned`,
+      ...(scanned[0] !== undefined && scanned[0].epochMs - window.startMs > 2000
+        ? {
+            note: `logcat buffer starts at ${clockTime(scanned[0].epochMs, now.utcOffsetMinutes)}, after the window start`,
+          }
+        : {}),
       ...(scope === undefined ? {} : { scope: describeScope(scope, scanned) }),
       counts,
       lines: displayed,

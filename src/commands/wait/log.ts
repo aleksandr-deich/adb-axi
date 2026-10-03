@@ -62,7 +62,13 @@ export const waitLog = defineCommand({
           }
           throw error;
         }
-        const found = lines.find((line) => regex.test(line.message));
+        // adbd echoes our shell commands, including this poll, into the next dump.
+        // Keep those lines in `logs` for diagnostics, but never use them as wait evidence.
+        const found = lines.find(
+          (line) =>
+            !(line.tag === "adbd" && line.message.startsWith("adbd service requested '")) &&
+            regex.test(line.message),
+        );
         const newest = lines.at(-1);
         latest = {
           lines_scanned: lines.length,

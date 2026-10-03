@@ -338,7 +338,7 @@ describe("app install", () => {
     const { toon, data, fake } = await both(make, ["app", "install", PROBE_APK]);
     expect(toon.exitCode).toBe(0);
     expect(data).toMatchObject({
-      ok: "install dev.probe -> 1.0 (1) with data kept",
+      ok: "install dev.probe -> 1.0 (1) (fresh install)",
       install: { previous: "not installed" },
     });
     expect(recordFile(fake)).toMatchObject({
@@ -1090,6 +1090,8 @@ describe("app install", () => {
     expect(run.exitCode).toBe(0);
     expect(run.stdout).toContain("--clean-data");
     expect(run.stdout).toContain("--if-changed");
+    expect(run.stdout).toContain("same versionCode and signer");
+    expect(run.stdout).toContain("debug and release variants");
     expect(run.stdout).toContain("180s");
   });
 });
