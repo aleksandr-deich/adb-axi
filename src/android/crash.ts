@@ -37,8 +37,9 @@ const mainPackage = (process: string): string => process.split(":")[0] ?? proces
  * - Native: the `F DEBUG` tombstone summary that begins with `*** *** ***`, printed by
  *   crash_dump with the crashing process in its `pid: ... >>> <process> <<<` line.
  *
- * A block whose first line is before the window is not seen: its trailing lines belong to
- * no open block.
+ * Parse all supplied lines, including any lead-in before the requested window. Callers
+ * filter the resulting crashes by epochMs; a native crash uses the matching fatal signal's
+ * time when available, otherwise its tombstone header time.
  */
 export function parseCrashes(lines: readonly LogLine[]): Crash[] {
   const found: { order: number; crash: Crash }[] = [];
