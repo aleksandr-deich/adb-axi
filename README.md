@@ -6,6 +6,12 @@ It covers the device-state side of Android work: device health, app lifecycle in
 
 **Status:** in development. Commands ship one slice at a time; `adb-axi --help` lists the ones available in your build.
 
+## Device health and boot
+
+`adb-axi doctor [--device <serial|avd>]` reports on adb, the server, device selection, boot, free space on `/data`, animation scales, the default keyboard, running instrumentations and the emulator console token. Checks that depend on an unavailable device are omitted. Each reported check is `ok`, `warn` or `failed` with a one-line detail; the command exits 1 if any check fails and 0 if there are only warnings. This command reports problems but does not fix them. `doctor ui` is not available in this build.
+
+`adb-axi wait boot [--device <serial|avd>] [--timeout <dur>]` waits for the device to come online and `sys.boot_completed` to become `1` (default timeout 120 s). Once it selects a device, it keeps waiting for that same device even if another comes online. On `WAIT_TIMEOUT`, the error includes `last` with `state`, `boot_completed` and `uptime_s`; unknown readings are `-`. Use `--json` for the same fields as TOON.
+
 `app install <apk>` uses `adb install -r` to keep existing app data. Without `--clean-data`, its success label says `with data kept` when a package record exists (including an uninstalled record with retained data), or `(fresh install)` when no record exists. It then waits for the package manager to report the APK's versionCode. Its default deadline is 180 seconds; override it with `--timeout <dur>`. `--clean-data` installs, clears data, and verifies the version again, even when combined with `--if-changed`. If the APK metadata cannot be read, `--clean-data` refuses the install because the package to wipe is unknown; otherwise an unreadable APK can still be installed, with output stating that its version was not verified.
 
 Without a requested wipe, `--if-changed` skips only when current installed versionCode and target-device signer evidence match the APK. Unreadable, unsupported, oversized, or timed-out signer evidence skips the shortcut, not the ordinary install. Signing-block reads use v2/v3 certificate digests without SDK build tools; they do not verify cryptographic authenticity. Verified installs save per-device history in `last-install.json`, not proof of the current installed signer. A record-write failure is a warning, not an install failure.
