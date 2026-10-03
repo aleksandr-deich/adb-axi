@@ -1,9 +1,4 @@
-import {
-  WEDGE_SIGNATURE,
-  type AppProcessServer,
-  type Forward,
-  type Holder,
-} from "../../android/holders.js";
+import { WEDGE_SIGNATURE, type AppProcessServer, type Forward, type Holder } from "../../android/holders.js";
 import type { HostProcess } from "../../host/processes.js";
 
 export type HolderState = "live" | "leaked" | "wedged";
@@ -187,7 +182,8 @@ export function classifyHolders(evidence: Evidence): ClassifiedHolder[] {
 }
 
 function classify(found: Found, tool: Tool, evidence: Evidence): ClassifiedHolder {
-  const pids = found.kind === "server" ? [found.pid] : found.processes.map((process) => process.pid);
+  const pids =
+    found.kind === "server" ? [found.pid] : found.processes.map((process) => process.pid);
   const label = tool.label(found);
   const live = (why: string, client: HostProcess | undefined): ClassifiedHolder => ({
     found,

@@ -100,10 +100,12 @@ function rows(holders: readonly ClassifiedHolder[]): Record<string, unknown>[] {
 
 function holderPackages(holder: ClassifiedHolder): string[] {
   if (holder.found.kind === "server") return [];
-  return [...new Set([
-    holder.found.package,
-    ...holder.found.processes.map((process) => process.package),
-  ])];
+  return [
+    ...new Set([
+      holder.found.package,
+      ...holder.found.processes.map((process) => process.package),
+    ]),
+  ];
 }
 
 function clearCommands(holder: ClassifiedHolder): string[] {
@@ -195,9 +197,13 @@ async function fix(context: CommandContext): Promise<Output> {
   if (stuck.length > 0) {
     process.exitCode = 1;
     const retryable = stuck.filter((holder) => !blocked.some((item) => sameHolder(item, holder)));
-    const blockedPackages = [...new Set(blocked
-      .filter((holder) => stuck.some((item) => sameHolder(item, holder)))
-      .flatMap((holder) => holderPackages(holder).filter((pkg) => livePackages.has(pkg))))];
+    const blockedPackages = [
+      ...new Set(
+        blocked
+          .filter((holder) => stuck.some((item) => sameHolder(item, holder)))
+          .flatMap((holder) => holderPackages(holder).filter((pkg) => livePackages.has(pkg))),
+      ),
+    ];
     return {
       uiautomation: "busy",
       ...clearedField,
@@ -205,7 +211,9 @@ async function fix(context: CommandContext): Promise<Output> {
       help: [
         ...(retryable.length > 0 ? [fixHint(context, retryable)] : []),
         ...(blockedPackages.length > 0
-          ? [`Cannot force-stop ${joinWords(blockedPackages)} while used by a live holder; stop the live holder first`]
+          ? [
+              `Cannot force-stop ${joinWords(blockedPackages)} while used by a live holder; stop the live holder first`,
+            ]
           : []),
         ...releaseLines(after),
       ],

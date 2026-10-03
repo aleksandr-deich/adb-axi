@@ -160,7 +160,10 @@ describe("classifyHolders", () => {
   it.each([
     ["an AVD name", `adb -s Pixel_10_Pro_XL shell am instrument -w ${RUNNER.component}`],
     ["no device at all", `adb shell am instrument -w ${RUNNER.component}`],
-    ["this serial with --serial=", `adb --serial=${SERIAL} shell am instrument -w ${RUNNER.component}`],
+    [
+      "this serial with --serial=",
+      `adb --serial=${SERIAL} shell am instrument -w ${RUNNER.component}`,
+    ],
   ])("counts a client that names %s as targeting this device", (_name, args) => {
     expect(one({ instrumentations: [RUNNER], host: host({ pid: 4100, args }) }).state).toBe("live");
   });
@@ -173,12 +176,21 @@ describe("classifyHolders", () => {
     "adb --device unattached-physical-serial shell am instrument -w x/.R",
   ])("does not count a client explicitly targeting another serial: %s", (args) => {
     expect(
-      one({ serial: "USB-A", avd: null, instrumentations: [RUNNER], host: host({ pid: 4100, args }) }).state,
+      one({
+        serial: "USB-A",
+        avd: null,
+        instrumentations: [RUNNER],
+        host: host({ pid: 4100, args }),
+      }).state,
     ).toBe("leaked");
   });
 
   it("keeps the target AVD name but excludes other explicit serials", () => {
-    const client = (named: string) => host({ pid: 4100, args: `adb --device ${named} shell am instrument -w ${RUNNER.component}` });
+    const client = (named: string) =>
+      host({
+        pid: 4100,
+        args: `adb --device ${named} shell am instrument -w ${RUNNER.component}`,
+      });
     expect(one({ instrumentations: [RUNNER], host: client("Pixel_10_Pro_XL") }).state).toBe("live");
     expect(one({ instrumentations: [RUNNER], host: client("other-serial") }).state).toBe("leaked");
   });
@@ -186,20 +198,32 @@ describe("classifyHolders", () => {
   it("binds a named adb instrumentation client to its component, including relative classes", () => {
     const live = instrumentation("a.one/.Runner", 100);
     const leaked = instrumentation("b.two/.Runner", 200);
-    const holders = classifyHolders(evidence({
-      instrumentations: [live, leaked],
-      host: host({ pid: 4100, args: `adb -s ${SERIAL} shell am instrument -w a.one/a.one.Runner` }),
-    }));
+    const holders = classifyHolders(
+      evidence({
+        instrumentations: [live, leaked],
+        host: host({
+          pid: 4100,
+          args: `adb -s ${SERIAL} shell am instrument -w a.one/a.one.Runner`,
+        }),
+      }),
+    );
     expect(holders.map((holder) => holder.state)).toEqual(["live", "leaked"]);
-    const disguised = classifyHolders(evidence({
-      instrumentations: [live, leaked],
-      host: host({ pid: 4101, args: `adb shell am instrument -w b.two/.Runner gradlew connectedDebugAndroidTest` }),
-    }));
+    const disguised = classifyHolders(
+      evidence({
+        instrumentations: [live, leaked],
+        host: host({
+          pid: 4101,
+          args: `adb shell am instrument -w b.two/.Runner gradlew connectedDebugAndroidTest`,
+        }),
+      }),
+    );
     expect(disguised.map((holder) => holder.state)).toEqual(["leaked", "live"]);
-    expect(one({
-      instrumentations: [leaked],
-      host: host({ pid: 4100, args: `adb shell am instrument -w` }),
-    }).state).toBe("live");
+    expect(
+      one({
+        instrumentations: [leaked],
+        host: host({ pid: 4100, args: `adb shell am instrument -w` }),
+      }).state,
+    ).toBe("live");
   });
 
   it("does not take a Gradle daemon or a non-device task for a running device test", () => {
@@ -220,14 +244,19 @@ describe("classifyHolders", () => {
   });
 
   it("recognizes mobilecli and agent-device only by executable or node/npx script identity", () => {
-    const mobile: AppProcessServer = { kind: "server", pid: 5443, className: "com.mobilenext.mobilecli.DeviceServer" };
+    const mobile: AppProcessServer = {
+      kind: "server",
+      pid: 5443,
+      className: "com.mobilenext.mobilecli.DeviceServer",
+    };
     const agent = instrumentation("com.callstack.agentdevice.test/.SnapshotInstrumentation", 8120);
-    const classify = (found: AppProcessServer | Holder, args: string) => one({
-      instrumentations: found.kind === "instrumentation" ? [found] : [],
-      servers: found.kind === "server" ? [found] : [],
-      forwards: [{ serial: SERIAL, local: "tcp:12000", remote: "localabstract:mobilecli-server" }],
-      host: host({ pid: 4300, args }),
-    }).state;
+    const classify = (found: AppProcessServer | Holder, args: string) =>
+      one({
+        instrumentations: found.kind === "instrumentation" ? [found] : [],
+        servers: found.kind === "server" ? [found] : [],
+        forwards: [{ serial: SERIAL, local: "tcp:12000", remote: "localabstract:mobilecli-server" }],
+        host: host({ pid: 4300, args }),
+      }).state;
     for (const [found, name] of [[mobile, "mobile-mcp"], [agent, "agent-device"]] as const) {
       expect(classify(found, `rg ${name} README.md`)).toBe("leaked");
       expect(classify(found, `node ./scripts/run.js ${name}`)).toBe("leaked");

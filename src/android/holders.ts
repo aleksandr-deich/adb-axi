@@ -22,7 +22,8 @@ const HEADER =
   /^\s*Instrumentation #\d+: ActiveInstrumentation\{\S+ \{([^/\s}]+)\/([^\s}]+)\}( FINISHED)? \d+ procs\}\s*$/;
 
 /** `#0: ProcessRecord{9d1c2aa 9021:com.example.notes/u0a214}` under `mRunningProcesses:`. */
-const RUNNING_PROCESS = /^\s+#\d+: ProcessRecord\{[0-9a-f]+ (\d+):([a-zA-Z_][\w]*(?:\.[a-zA-Z_][\w]*)*)(?::[\w.]+)?\//;
+const RUNNING_PROCESS =
+  /^\s+#\d+: ProcessRecord\{[0-9a-f]+ (\d+):([a-zA-Z_][\w]*(?:\.[a-zA-Z_][\w]*)*)(?::[\w.]+)?\//;
 
 /**
  * The live instrumentations in `dumpsys activity processes`. The section is printed by

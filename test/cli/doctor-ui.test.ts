@@ -354,7 +354,9 @@ describe("doctor ui", () => {
     });
 
     it("names both force-stop targets in the leaked instrumentation help", async () => {
-      const f = scenario({ dumpsys: dumpsys({ component: RUNNER, pid: 9021, processPackage: "com.example.notes" }) });
+      const f = scenario({
+        dumpsys: dumpsys({ component: RUNNER, pid: 9021, processPackage: "com.example.notes" }),
+      });
       const { exitCode, data } = await cli(f, ["doctor", "ui"]);
       expect(exitCode).toBe(1);
       expect(data.help).toEqual([
@@ -375,7 +377,12 @@ describe("doctor ui", () => {
       );
       expect(exitCode).toBe(1);
       expect(data.holders).toEqual([
-        { pid: 9021, holder: "com.example.notes.test (am instrument)", state: "leaked", why: "no host client" },
+        {
+          pid: 9021,
+          holder: "com.example.notes.test (am instrument)",
+          state: "leaked",
+          why: "no host client",
+        },
       ]);
       expect(f.unmatched()).toEqual([]);
     });
@@ -525,57 +532,95 @@ describe("doctor ui", () => {
       const f = scenario({
         state: { runner: "running", target: "running" },
         rules: [
-          { match: shell("am force-stop com.example.notes.test"), set: { runner: "gone" }, respond: {} },
+          {
+            match: shell("am force-stop com.example.notes.test"),
+            set: { runner: "gone" },
+            respond: {},
+          },
           { match: shell("am force-stop com.example.notes"), set: { target: "gone" }, respond: {} },
-          { match: shell(SHELL.dumpsys), when: { target: "running" }, respond: dumpsys({ component: RUNNER, pid: 9021, processPackage: "com.example.notes" }) },
+          {
+            match: shell(SHELL.dumpsys),
+            when: { target: "running" },
+            respond: dumpsys({ component: RUNNER, pid: 9021, processPackage: "com.example.notes" }),
+          },
         ],
       });
       const { exitCode, data } = await cli(f, ["doctor", "ui", "--fix"]);
       expect(exitCode).toBe(0);
       expect(data).toEqual({
         ok: `doctor ui ${SERIAL} -> uiautomation free (1 cleared)`,
-        cleared: [{
-          pid: 9021,
-          holder: "com.example.notes.test (am instrument)",
-          was: "leaked",
-          action: "am force-stop com.example.notes.test; am force-stop com.example.notes",
-        }],
+        cleared: [
+          {
+            pid: 9021,
+            holder: "com.example.notes.test (am instrument)",
+            was: "leaked",
+            action: "am force-stop com.example.notes.test; am force-stop com.example.notes",
+          },
+        ],
       });
       expect(shellCalls(f).filter((command) => command.startsWith("am force-stop"))).toEqual([
-        "am force-stop com.example.notes.test", "am force-stop com.example.notes",
-        "am force-stop com.example.notes.test", "am force-stop com.example.notes",
+        "am force-stop com.example.notes.test",
+        "am force-stop com.example.notes",
+        "am force-stop com.example.notes.test",
+        "am force-stop com.example.notes",
       ]);
       expectAddressed(f);
     });
 
     it("clears an unrelated orphaned instrumentation while protecting a named live run", async () => {
       const live = { component: "a.live.test/.Runner", pid: 9001, processPackage: "live.app" };
-      const leaked = { component: "b.leaked.test/.Runner", pid: 9002, processPackage: "leaked.app" };
+      const leaked = {
+        component: "b.leaked.test/.Runner",
+        pid: 9002,
+        processPackage: "leaked.app",
+      };
       const f = scenario({
         state: { orphan: "running" },
         rules: [
           { match: shell("am force-stop b.leaked.test"), respond: {} },
           { match: shell("am force-stop leaked.app"), set: { orphan: "gone" }, respond: {} },
-          { match: shell(SHELL.dumpsys), when: { orphan: "running" }, respond: dumpsys(live, leaked) },
+          {
+            match: shell(SHELL.dumpsys),
+            when: { orphan: "running" },
+            respond: dumpsys(live, leaked),
+          },
         ],
         dumpsys: dumpsys(live),
       });
       const { exitCode, data } = await cli(
         f,
         ["doctor", "ui", "--fix"],
-        [...HOST_NOISE, { pid: 6161, args: `adb -s ${SERIAL} shell am instrument -w a.live.test/.Runner` }],
+        [
+          ...HOST_NOISE,
+          { pid: 6161, args: `adb -s ${SERIAL} shell am instrument -w a.live.test/.Runner` },
+        ],
       );
       expect(exitCode).toBe(1);
       expect(data).toEqual({
         error: "a.live.test (am instrument) is live and --fix left it alone",
         code: "HOLDER_PROTECTED",
-        cleared: [{ pid: 9002, holder: "b.leaked.test (am instrument)", was: "leaked", action: "am force-stop b.leaked.test; am force-stop leaked.app" }],
-        protected: [{ pid: 9001, holder: "a.live.test (am instrument)", why: "adb shell am instrument pid 6161 on the host" }],
+        cleared: [
+          {
+            pid: 9002,
+            holder: "b.leaked.test (am instrument)",
+            was: "leaked",
+            action: "am force-stop b.leaked.test; am force-stop leaked.app",
+          },
+        ],
+        protected: [
+          {
+            pid: 9001,
+            holder: "a.live.test (am instrument)",
+            why: "adb shell am instrument pid 6161 on the host",
+          },
+        ],
         help: ["Wait for `adb shell am instrument` (pid 6161) to finish, or stop it"],
       });
       expect(shellCalls(f).filter((command) => command.startsWith("am force-stop"))).toEqual([
-        "am force-stop b.leaked.test", "am force-stop leaked.app",
-        "am force-stop b.leaked.test", "am force-stop leaked.app",
+        "am force-stop b.leaked.test",
+        "am force-stop leaked.app",
+        "am force-stop b.leaked.test",
+        "am force-stop leaked.app",
       ]);
       expectAddressed(f);
     });
@@ -598,14 +643,27 @@ describe("doctor ui", () => {
       const { exitCode, data } = await cli(
         f,
         ["doctor", "ui", "--fix"],
-        [...HOST_NOISE, { pid: 6161, args: `adb -s ${SERIAL} shell am instrument -w ${live.component}` }],
+        [
+          ...HOST_NOISE,
+          { pid: 6161, args: `adb -s ${SERIAL} shell am instrument -w ${live.component}` },
+        ],
       );
       expect(exitCode).toBe(1);
       expect(data).toEqual({
         uiautomation: "busy",
         holders: [
-          { pid: 9001, holder: `${live.component.split("/")[0]} (am instrument)`, state: "live", why: "adb shell am instrument pid 6161 on the host" },
-          { pid: 9002, holder: `${leaked.component.split("/")[0]} (am instrument)`, state: "leaked", why: "no host client" },
+          {
+            pid: 9001,
+            holder: `${live.component.split("/")[0]} (am instrument)`,
+            state: "live",
+            why: "adb shell am instrument pid 6161 on the host",
+          },
+          {
+            pid: 9002,
+            holder: `${leaked.component.split("/")[0]} (am instrument)`,
+            state: "leaked",
+            why: "no host client",
+          },
         ],
         help: [
           `Cannot force-stop ${pkg} while used by a live holder; stop the live holder first`,
