@@ -61,7 +61,9 @@ export async function readWindowLines(
   const parsed = parseLogcat(result.stdout);
   // Text that is no log line at all is never passed off as an empty log.
   if (parsed.lines.length === 0 && parsed.unparsed > 0) throw invalidOutput(step, result.stdout);
-  return includeLeadIn ? parsed.lines : parsed.lines.filter((line) => line.epochMs >= window.startMs);
+  return includeLeadIn
+    ? parsed.lines
+    : parsed.lines.filter((line) => line.epochMs >= window.startMs);
 }
 
 /** A regex from the command line; one that does not compile is a usage error. */

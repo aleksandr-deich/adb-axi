@@ -55,7 +55,8 @@ export const logsCrash = defineCommand({
     // tombstone by crash_dump, which a uid or pid filter would drop.
     const lines = await readWindowLines(adb, serial, window, options, undefined, true);
     const crashes = parseCrashes(lines).filter(
-      (crash) => crash.epochMs >= window.startMs && (pkg === undefined || crashBelongsTo(crash, pkg)),
+      (crash) =>
+        crash.epochMs >= window.startMs && (pkg === undefined || crashBelongsTo(crash, pkg)),
     );
     const scanned = lines.filter((line) => line.epochMs >= window.startMs);
 
