@@ -130,10 +130,10 @@ describe("adb-axi bin", () => {
 
   it("resolves the device, then answers an unshipped command with NOT_IMPLEMENTED", async () => {
     const f = withFake("one-online.json");
-    const { stdout, exitCode } = await runCli(["app", "kill", "com.example.notes"], f.env);
+    const { stdout, exitCode } = await runCli(["data", "db", "com.example.notes"], f.env);
     expect(exitCode).toBe(1);
     expect(decode(stdout.trimEnd())).toEqual({
-      error: "`adb-axi app kill` is not available in this build",
+      error: "`adb-axi data db` is not available in this build",
       code: "NOT_IMPLEMENTED",
       help: ["Run `adb-axi --help` to see the commands this build ships"],
     });

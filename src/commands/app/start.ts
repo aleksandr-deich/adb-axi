@@ -150,7 +150,7 @@ function startTarget(context: CommandContext): { pkg: string; activity: string |
  * `am start -W -n <pkg>/<activity>`, read from its text. A start that outlives the
  * deadline, or that am itself reports as `Status: timeout` (with exit 0), is `WAIT_TIMEOUT`.
  */
-async function amStart(
+export async function amStart(
   context: CommandContext,
   adb: AdbClient,
   serial: string,
@@ -210,7 +210,7 @@ async function amStart(
 }
 
 /** One look at the started app: its pid and the activity in front. */
-interface Seen {
+export interface Seen {
   state: "foreground" | "running" | "stopped";
   pid: number | "-";
   /** The resumed activity, whichever app it belongs to. */
@@ -221,7 +221,7 @@ interface Seen {
  * Observe the app until it is in front, or its process is gone, for at most `SETTLE_MS`
  * of what is left of the deadline. The first observation usually settles it.
  */
-async function settle(
+export async function settle(
   context: CommandContext,
   adb: AdbClient,
   serial: string,

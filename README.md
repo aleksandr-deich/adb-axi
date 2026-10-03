@@ -19,6 +19,9 @@ adb-axi app start com.example.notes
 adb-axi app start com.example.notes --fresh
 adb-axi app stop com.example.notes
 adb-axi app clear com.example.notes
+adb-axi app kill com.example.notes
+adb-axi app restore com.example.notes
+adb-axi app death com.example.notes [--compare]
 ```
 
 These commands require the package to be installed for the current Android OS user, selected once at the beginning of the operation. Start and stop leave other users' copies alone.
@@ -27,6 +30,10 @@ These commands require the package to be installed for the current Android OS us
 - **Observation:** start checks the launched activity's declared process, including a secondary UI process, not an unrelated surviving service. Any resumed activity of the package counts as foreground; `app.activity` names that resumed activity while `app.pid` identifies the launched activity's process. After launching, observation lasts at most two seconds within the remaining command deadline. If that window expires, the last complete observation is returned, which can report a live app with something else in front; without one, the command fails.
 - **Stop:** force-stops and verifies main-process exit. “Already not running” is an exit-0 no-op when no main PID exists, but still sends the force-stop to end secondary processes.
 - **Clear:** clears only the current Android user's app data. Android also stops the app's running processes for other Android users, leaving their data intact. `confirmed_by` names the verification used: Android's `pm clear` acknowledgement, plus a file check through `run-as` when the app is debuggable and that check succeeds. Remaining files fail verification; `--full` lists all of them rather than the default first ten. Retrying clear with `--full` performs the mutation again.
+
+- **Kill:** simulates Android reclaiming a backgrounded app. An app in front is sent home first (HOME), then its oom adj is polled until `am kill` can act on it (adj 500 or higher; `am kill` silently does nothing to an app in front), then `am kill` runs and `pidof` verifies the main process is gone. `cached_after_ms` is the time from HOME until that point; the app need not reach the `cached` state, which some releases never report. A debuggable app that outlives `am kill` is killed through `run-as`. The task must still be in recents (`TASK_NOT_IN_RECENTS` otherwise). A process that is not running is an exit-0 no-op. `am kill` also ends the app's other background processes; the check covers the main process only.
+- **Restore:** starts the root activity of the app's task in recents with `am start -W -n` and nothing else (no launcher category, flags or `monkey`, which all start a fresh task). `launch` is the system's own launch state, or `unknown`; `new_process` comes from comparing pids before and after, not from the launch state. A process that is still running is brought forward as it is (`new_process: false`).
+- **Death:** `kill` then `restore` under one 30 s deadline, with the pids and launch evidence of both. `--compare` also takes `agent-device snapshot --json` before the kill and after the restore and prints the visible-text diff; without agent-device installed (or when its snapshot fails) the kill and restore still run, and `COMPARE_UNAVAILABLE` carries their evidence. The snapshot reader assumes nodes with `text`, `label` or `value` fields.
 
 Use each command's `--help` for flags and defaults. Add `--json` for the same fields as the default TOON output, and put device selection flags after the command, for example `adb-axi app start com.example.notes --device emulator-5554`.
 

@@ -1,9 +1,12 @@
 import { decode } from "@toon-format/toon";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { allCommands, REGISTRY } from "../../src/commands/registry.js";
 import { createFakeAdb, type FakeAdb } from "../fake-adb/harness.js";
 import type { Response, Rule } from "../fake-adb/scenario.js";
 import { runCli, type CliRun } from "../helpers/run.js";
+
+// Parity cases run the CLI twice, and a loaded runner can take over 5 s for the pair.
+vi.setConfig({ testTimeout: 40_000 });
 
 const SERIAL = "emulator-5554";
 const ONE_ONLINE = `List of devices attached\n${SERIAL}          device product:sdk_gphone64_arm64 model:sdk_gphone64_arm64 device:emu64a transport_id:1\n\n`;
