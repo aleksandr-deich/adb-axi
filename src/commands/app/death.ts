@@ -51,9 +51,10 @@ export const appDeath = defineCommand({
         ...readOptions(context),
         userId: installed.userId,
       });
-      before = front?.package === pkg
-        ? await takeSnapshot(context)
-        : { ok: false, reason: `${pkg} was not in front before the kill` };
+      before =
+        front?.package === pkg
+          ? await takeSnapshot(context)
+          : { ok: false, reason: `${pkg} was not in front before the kill` };
     }
     const killed = await killProcess(context, pkg, installed, command);
     const restored = await afterKill(killed, () => restoreTask(context, pkg, installed, command));

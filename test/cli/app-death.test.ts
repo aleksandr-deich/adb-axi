@@ -406,9 +406,13 @@ describe("app kill", () => {
     const sibling = "pidof dev.probe:remote";
     const { toon, data, fake } = await both(["app", "kill", "dev.probe", "--timeout", "3s"], () =>
       probeDevice({
-        phase: "previous", amKillWorks: false,
+        phase: "previous",
+        amKillWorks: false,
         rules: [
-          { match: shell(KERNEL_UIDS), respond: { stdout: "PID UID NAME\n8333 10213 dev.probe:remote\n" } },
+          {
+            match: shell(KERNEL_UIDS),
+            respond: { stdout: "PID UID NAME\n8333 10213 dev.probe:remote\n" },
+          },
           { match: shell(sibling), respond: PIDOF_OF(8333) },
           { match: shell("run-as dev.probe --user 0 kill -9 8333"), respond: {} },
         ],
@@ -430,7 +434,9 @@ describe("app kill", () => {
         rules: [
           {
             match: shell(KERNEL_UIDS),
-            respond: { stdout: `PID UID NAME\n8333 10213 ${custom}\n9000 10214 dev.probe:unrelated\n` },
+            respond: {
+              stdout: `PID UID NAME\n8333 10213 ${custom}\n9000 10214 dev.probe:unrelated\n`,
+            },
           },
           { match: shell(`pidof ${custom}`), respond: PIDOF_OF(8333) },
           { match: shell("run-as dev.probe --user 0 kill -9 8333"), respond: {} },
@@ -775,7 +781,9 @@ describe("app death", () => {
     const { toon, data, fake } = await both(["app", "death", "dev.probe", "--compare"], () =>
       probeDevice({
         phase: "front",
-        rules: [snapshotRule({ stdout: JSON.stringify({ nodes: [] }) }, { stdout: SNAPSHOT_AFTER })],
+        rules: [
+          snapshotRule({ stdout: JSON.stringify({ nodes: [] }) }, { stdout: SNAPSHOT_AFTER }),
+        ],
       }),
     );
     expect(toon.exitCode).toBe(0);

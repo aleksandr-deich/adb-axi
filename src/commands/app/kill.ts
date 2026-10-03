@@ -221,8 +221,11 @@ type Gone = { gone: true } | { gone: false; last: Seen | undefined };
 
 async function packagePids(context: CommandContext, pkg: string, uid: number): Promise<number[]> {
   const result = await readShell(
-    context.adb(), targetSerial(context), "ps -A -o PID,UID,NAME",
-    "reading package process names", readOptions(context),
+    context.adb(),
+    targetSerial(context),
+    "ps -A -o PID,UID,NAME",
+    "reading package process names",
+    readOptions(context),
   );
   const lines = result.stdout.trim().split(/\r?\n/);
   if (lines.shift()?.trim().replace(/\s+/g, " ") !== "PID UID NAME") {
@@ -247,8 +250,12 @@ async function packagePids(context: CommandContext, pkg: string, uid: number): P
   if (!names.has(pkg)) names.set(pkg, new Set());
   for (const [name, known] of names) {
     const check = await readShell(
-      context.adb(), targetSerial(context), `pidof ${name}`,
-      `reading the pid of ${name}`, readOptions(context), [0, 1],
+      context.adb(),
+      targetSerial(context),
+      `pidof ${name}`,
+      `reading the pid of ${name}`,
+      readOptions(context),
+      [0, 1],
     );
     const running = parsePidof(check.stdout);
     if (running === null || (check.exitCode === 1) !== (running.length === 0)) {
@@ -258,7 +265,6 @@ async function packagePids(context: CommandContext, pkg: string, uid: number): P
   }
   return pids;
 }
-
 
 /**
  * Poll `pidof` (the exit evidence; an ActivityManager record can vanish before its

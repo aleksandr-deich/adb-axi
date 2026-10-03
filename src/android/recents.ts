@@ -100,7 +100,8 @@ export function findTask(
 ): RecentTask | undefined {
   return tasks.find(
     (task) =>
-      task.package === pkg && task.userId === userId &&
+      task.package === pkg &&
+      task.userId === userId &&
       (task.type === null || task.type === "standard"),
   );
 }
