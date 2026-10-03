@@ -197,7 +197,7 @@ async function fix(context: CommandContext): Promise<Output> {
     const retryable = stuck.filter((holder) => !blocked.some((item) => sameHolder(item, holder)));
     const blockedPackages = [...new Set(blocked
       .filter((holder) => stuck.some((item) => sameHolder(item, holder)))
-      .flatMap((holder) => holderPackages(holder).filter((pkg) => livePackages.has(pkg)))];
+      .flatMap((holder) => holderPackages(holder).filter((pkg) => livePackages.has(pkg))))];
     return {
       uiautomation: "busy",
       ...clearedField,

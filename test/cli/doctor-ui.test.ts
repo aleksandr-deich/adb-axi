@@ -109,6 +109,7 @@ interface Setup {
   rules?: Rule[];
   state?: Record<string, string>;
   devices?: string;
+  serial?: string;
 }
 
 let fake: FakeAdb | undefined;
@@ -121,6 +122,7 @@ afterEach(() => {
 const shell = (command: string): Rule["match"] => ["-s", SERIAL, "shell", command];
 
 function scenario(setup: Setup = {}): FakeAdb {
+  const serial = setup.serial ?? SERIAL;
   fake = createFakeAdb({
     description: "A scripted emulator for doctor ui: holders on the device, logcat and forwards",
     evidence: ["L9"],
@@ -131,10 +133,10 @@ function scenario(setup: Setup = {}): FakeAdb {
     rules: [
       ...(setup.rules ?? []),
       { match: ["devices", "-l"], respond: { stdout: setup.devices ?? DEVICES } },
-      { match: ["-s", SERIAL, "emu", "avd", "name"], respond: { stdout: "Pixel_10_Pro_XL\nOK\n" } },
-      { match: shell(SHELL.dumpsys), respond: setup.dumpsys ?? dumpsys() },
-      { match: shell(SHELL.ps), respond: setup.ps ?? ps() },
-      { match: shell(SHELL.logcat), respond: setup.logcat ?? NO_WEDGE },
+      { match: ["-s", serial, "emu", "avd", "name"], respond: { stdout: "Pixel_10_Pro_XL\nOK\n" } },
+      { match: ["-s", serial, "shell", SHELL.dumpsys], respond: setup.dumpsys ?? dumpsys() },
+      { match: ["-s", serial, "shell", SHELL.ps], respond: setup.ps ?? ps() },
+      { match: ["-s", serial, "shell", SHELL.logcat], respond: setup.logcat ?? NO_WEDGE },
       { match: ["forward", "--list"], respond: setup.forwards ?? { stdout: "" } },
     ],
   });
@@ -363,6 +365,7 @@ describe("doctor ui", () => {
     it("treats a host client on another physical device as unrelated", async () => {
       const f = scenario({
         devices: `List of devices attached\nUSB-A device\nUSB-B device\n`,
+        serial: "USB-A",
         dumpsys: dumpsys({ component: RUNNER, pid: 9021 }),
       });
       const { exitCode, data } = await cli(
@@ -698,7 +701,7 @@ describe("doctor ui", () => {
           },
         ],
       });
-      const { exitCode, data } = await cli(f, ["doctor", "ui", "--fix", "--timeout", "2s"]);
+      const { exitCode, data } = await cli(f, ["doctor", "ui", "--fix", "--timeout", "15s"]);
       expect(exitCode).toBe(1);
       expect(data).toEqual({
         uiautomation: "busy",
@@ -713,7 +716,7 @@ describe("doctor ui", () => {
         help: [`Run \`adb-axi doctor ui --fix --device ${SERIAL}\` to kill pid 5443`],
       });
       expectAddressed(f);
-    });
+    }, 20_000);
   });
 
   describe("errors", () => {

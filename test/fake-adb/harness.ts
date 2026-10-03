@@ -122,7 +122,7 @@ export function createFakeAdb(scenario: Scenario | string, options: FakeAdbOptio
       rmSync(statePath, { force: true });
     },
     cleanup: () => {
-      rmSync(dir, { recursive: true, force: true });
+      rmSync(dir, { recursive: true, force: true, maxRetries: 3, retryDelay: 50 });
     },
   };
 }
