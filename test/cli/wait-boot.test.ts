@@ -146,6 +146,28 @@ describe("wait boot", () => {
     expectClean(f);
   });
 
+  it("does not switch to a different device after the selected device disconnects", async () => {
+    const f = scenario([
+      listing(devices(line(SERIAL, "device")), { times: 1 }),
+      listing(devices(line(TABLET, "device"))),
+      {
+        match: ["-s", TABLET, "emu", "avd", "name"],
+        respond: { stdout: "Pixel_Tablet\r\nOK\r\n" },
+      },
+      shell(BOOTING),
+      shell(BOOTED, {}, TABLET),
+    ]);
+    const { toon, data } = await once(["wait", "boot", "--timeout", "1s"], f);
+    expect(toon.exitCode).toBe(1);
+    expect(data).toMatchObject({
+      code: "WAIT_TIMEOUT",
+      error: `${SERIAL} had not finished booting after 1 s`,
+      last: { state: "not attached", boot_completed: "-", uptime_s: "-" },
+    });
+    expect(f.calls().filter((call) => call.argv[2] === "shell" && call.argv[1] === TABLET)).toEqual([]);
+    expect(f.unmatched()).toEqual([]);
+  }, 20_000);
+
   it("resolves the device by AVD name", async () => {
     const f = scenario([
       listing(devices(line(SERIAL, "device"), line(TABLET, "device"))),
