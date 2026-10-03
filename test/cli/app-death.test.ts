@@ -70,7 +70,8 @@ const RECENTS_GONE: Response = {
 };
 const OTHER_USER_RECENTS: Response = {
   stdout: captured("dumpsys-activity-recents-after-kill.txt").replace(
-    /userId=0 effectiveUid=u0a213/, "userId=10 effectiveUid=u10a213",
+    /userId=0 effectiveUid=u0a213/,
+    "userId=10 effectiveUid=u10a213",
   ),
 };
 const AM_COLD = fromCapture("am-start-restore-after-kill.txt");
@@ -90,7 +91,9 @@ const AM_TIMEOUT: Response = { stdoutFile: "synthetic/29/am-start-timeout.txt" }
 
 const PIDOF_OF = (pid: number): Response => ({ stdout: `${pid}\n` });
 const PIDOF_GONE: Response = { exit: 1 };
-const UIDS_OF = (pid: number): Response => ({ stdout: `  PID   UID NAME\n ${pid} 10213 dev.probe\n` });
+const UIDS_OF = (pid: number): Response => ({
+  stdout: `  PID   UID NAME\n ${pid} 10213 dev.probe\n`,
+});
 const UIDS_NONE: Response = { stdout: "  PID   UID NAME\n" };
 
 /** Where the probe is: in front, just sent home, the previous app, dead, or restored. */
@@ -404,21 +407,19 @@ describe("app kill", () => {
 
   it("does not report success while a secondary process survives run-as", async () => {
     const sibling = "pidof dev.probe:remote";
-    const { toon, data, fake } = await both(
-      ["app", "kill", "dev.probe", "--timeout", "8s"],
-      () =>
-        probeDevice({
-          phase: "previous",
-          amKillWorks: false,
-          rules: [
-            {
-              match: shell(KERNEL_UIDS),
-              respond: { stdout: "PID UID NAME\n8333 10213 dev.probe:remote\n" },
-            },
-            { match: shell(sibling), respond: PIDOF_OF(8333) },
-            { match: shell("run-as dev.probe --user 0 kill -9 8333"), respond: {} },
-          ],
-        }),
+    const { toon, data, fake } = await both(["app", "kill", "dev.probe", "--timeout", "8s"], () =>
+      probeDevice({
+        phase: "previous",
+        amKillWorks: false,
+        rules: [
+          {
+            match: shell(KERNEL_UIDS),
+            respond: { stdout: "PID UID NAME\n8333 10213 dev.probe:remote\n" },
+          },
+          { match: shell(sibling), respond: PIDOF_OF(8333) },
+          { match: shell("run-as dev.probe --user 0 kill -9 8333"), respond: {} },
+        ],
+      }),
     );
     expect(toon.exitCode).toBe(1);
     expect(data).toMatchObject({ code: "KILL_TIMEOUT", last: { pid: 8333 }, am_kill_sent: true });
@@ -429,23 +430,21 @@ describe("app kill", () => {
 
   it("tracks an absolute process name by package UID, even without a main process", async () => {
     const custom = "com.example.shared.worker";
-    const { toon, data, fake } = await both(
-      ["app", "death", "dev.probe", "--timeout", "8s"],
-      () =>
-        probeDevice({
-          phase: "previous",
-          amKillWorks: false,
-          rules: [
-            {
-              match: shell(KERNEL_UIDS),
-              respond: {
-                stdout: `PID UID NAME\n8333 10213 ${custom}\n9000 10214 dev.probe:unrelated\n`,
-              },
+    const { toon, data, fake } = await both(["app", "death", "dev.probe", "--timeout", "8s"], () =>
+      probeDevice({
+        phase: "previous",
+        amKillWorks: false,
+        rules: [
+          {
+            match: shell(KERNEL_UIDS),
+            respond: {
+              stdout: `PID UID NAME\n8333 10213 ${custom}\n9000 10214 dev.probe:unrelated\n`,
             },
-            { match: shell(`pidof ${custom}`), respond: PIDOF_OF(8333) },
-            { match: shell("run-as dev.probe --user 0 kill -9 8333"), respond: {} },
-          ],
-        }),
+          },
+          { match: shell(`pidof ${custom}`), respond: PIDOF_OF(8333) },
+          { match: shell("run-as dev.probe --user 0 kill -9 8333"), respond: {} },
+        ],
+      }),
     );
     expect(toon.exitCode).toBe(1);
     expect(data).toMatchObject({ code: "KILL_TIMEOUT", last: { pid: 8333 }, am_kill_sent: true });
@@ -825,7 +824,8 @@ describe("app death", () => {
       );
       expect(toon.exitCode).toBe(1);
       expect(normalized(data)).toEqual({
-        error: "dev.probe was killed and restored, but the visible-text comparison could not run: agent-device snapshot did not contain a UI tree",
+        error:
+          "dev.probe was killed and restored, but the visible-text comparison could not run: agent-device snapshot did not contain a UI tree",
         code: "COMPARE_UNAVAILABLE",
         death: diedAndRestored,
         help: ["Run `adb-axi app death dev.probe` to repeat the check without --compare"],
@@ -846,7 +846,8 @@ describe("app death", () => {
     );
     expect(toon.exitCode).toBe(1);
     expect(normalized(data)).toEqual({
-      error: "dev.probe was killed and restored, but the visible-text comparison could not run: agent-device snapshot did not contain a UI tree",
+      error:
+        "dev.probe was killed and restored, but the visible-text comparison could not run: agent-device snapshot did not contain a UI tree",
       code: "COMPARE_UNAVAILABLE",
       death: diedAndRestored,
       help: ["Run `adb-axi app death dev.probe` to repeat the check without --compare"],
@@ -855,26 +856,27 @@ describe("app death", () => {
     expectClean(fake);
   });
 
-  it.each([
-    { nodes: [null] },
-    { nodes: [{ children: [null] }] },
-  ])("rejects malformed snapshot nodes with kill and restore evidence", async (snapshot) => {
-    const { toon, data, fake } = await both(["app", "death", "dev.probe", "--compare"], () =>
-      probeDevice({
-        phase: "front",
-        rules: [snapshotRule({ stdout: JSON.stringify(snapshot) }, { stdout: SNAPSHOT_AFTER })],
-      }),
-    );
-    expect(toon.exitCode).toBe(1);
-    expect(normalized(data)).toEqual({
-      error: "dev.probe was killed and restored, but the visible-text comparison could not run: agent-device snapshot did not contain a UI tree",
-      code: "COMPARE_UNAVAILABLE",
-      death: diedAndRestored,
-      help: ["Run `adb-axi app death dev.probe` to repeat the check without --compare"],
-    });
-    expect(fake.calls().filter((call) => call.tool === "agent-device")).toHaveLength(1);
-    expectClean(fake);
-  });
+  it.each([{ nodes: [null] }, { nodes: [{ children: [null] }] }])(
+    "rejects malformed snapshot nodes with kill and restore evidence",
+    async (snapshot) => {
+      const { toon, data, fake } = await both(["app", "death", "dev.probe", "--compare"], () =>
+        probeDevice({
+          phase: "front",
+          rules: [snapshotRule({ stdout: JSON.stringify(snapshot) }, { stdout: SNAPSHOT_AFTER })],
+        }),
+      );
+      expect(toon.exitCode).toBe(1);
+      expect(normalized(data)).toEqual({
+        error:
+          "dev.probe was killed and restored, but the visible-text comparison could not run: agent-device snapshot did not contain a UI tree",
+        code: "COMPARE_UNAVAILABLE",
+        death: diedAndRestored,
+        help: ["Run `adb-axi app death dev.probe` to repeat the check without --compare"],
+      });
+      expect(fake.calls().filter((call) => call.tool === "agent-device")).toHaveLength(1);
+      expectClean(fake);
+    },
+  );
 
   it("rejects malformed nodes in the after snapshot", async () => {
     const { toon, data, fake } = await both(["app", "death", "dev.probe", "--compare"], () =>
@@ -898,7 +900,8 @@ describe("app death", () => {
     );
     expect(toon.exitCode).toBe(1);
     expect(normalized(data)).toEqual({
-      error: "dev.probe was killed and restored, but the visible-text comparison could not run: dev.probe was not in front before the kill",
+      error:
+        "dev.probe was killed and restored, but the visible-text comparison could not run: dev.probe was not in front before the kill",
       code: "COMPARE_UNAVAILABLE",
       death: { ...diedAndRestored, cached_after_ms: 0 },
       help: ["Run `adb-axi app death dev.probe` to repeat the check without --compare"],
@@ -921,7 +924,8 @@ describe("app death", () => {
     );
     expect(toon.exitCode).toBe(1);
     expect(normalized(data)).toEqual({
-      error: "dev.probe was killed and restored, but the visible-text comparison could not run: dev.probe was not in front after the restore",
+      error:
+        "dev.probe was killed and restored, but the visible-text comparison could not run: dev.probe was not in front after the restore",
       code: "COMPARE_UNAVAILABLE",
       death: diedAndRestored,
       help: ["Run `adb-axi app death dev.probe` to repeat the check without --compare"],
