@@ -7,6 +7,7 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { delimiter, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -122,7 +123,12 @@ export function createFakeAdb(scenario: Scenario | string, options: FakeAdbOptio
       rmSync(statePath, { force: true });
     },
     cleanup: () => {
-      rmSync(dir, { recursive: true, force: true, maxRetries: 3, retryDelay: 50 });
+      // A test that runs `main` in process returns as soon as one read fails, while sibling
+      // reads may still be running and writing to the call log: stop them first.
+      for (const call of calls()) {
+        if (call.end === null) killQuietly(call.pid);
+      }
+      rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
     },
   };
 }
@@ -163,6 +169,17 @@ function readVars(statePath: string, scenarioPath: string): Record<string, strin
   }
   const scenario = JSON.parse(readFileSync(scenarioPath, "utf8")) as Scenario;
   return { ...(scenario.state ?? {}) };
+}
+
+/** Kill a fake process that is still running; a pid the system has reused is left alone. */
+function killQuietly(pid: number): void {
+  const command = spawnSync("ps", ["-o", "command=", "-p", String(pid)], { encoding: "utf8" });
+  if (!command.stdout.includes(FAKE_SCRIPT)) return;
+  try {
+    process.kill(pid, "SIGKILL");
+  } catch {
+    // Exited in between.
+  }
 }
 
 function shellQuote(value: string): string {

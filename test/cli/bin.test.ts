@@ -128,19 +128,6 @@ describe("adb-axi bin", () => {
     expect(f.calls()).toEqual([]);
   });
 
-  it("answers an unshipped command with NOT_IMPLEMENTED, never touching adb", async () => {
-    // The home view is the one command this build still registers without shipping it.
-    const f = withFake("one-online.json");
-    const { stdout, exitCode } = await runCli([], f.env);
-    expect(exitCode).toBe(1);
-    expect(decode(stdout.trimEnd())).toEqual({
-      error: "The home view is not available in this build",
-      code: "NOT_IMPLEMENTED",
-      help: ["Run `adb-axi --help` to see the commands this build ships"],
-    });
-    expect(f.calls()).toEqual([]);
-  });
-
   it("keeps unshipped commands out of --help", async () => {
     const f = withFake();
     const { stdout, exitCode } = await runCli(["--help"], f.env);
@@ -150,17 +137,26 @@ describe("adb-axi bin", () => {
     const shipped = allCommands(REGISTRY)
       .filter((command) => command.shipped)
       .map((command) => `adb-axi ${command.path.join(" ")}`);
-    expect(help.commands.map((c) => c.command).sort()).toEqual(shipped.sort());
+    expect(help.commands.map((c) => c.command).sort()).toEqual(["adb-axi", ...shipped].sort());
     const json = await runCli(["--json", "--help"], f.env);
     expect(JSON.parse(json.stdout)).toEqual(help);
   });
 
   it("routes bare --json to the home view", async () => {
-    const f = withFake();
+    const f = withFake("devices-empty.json");
     const { stdout, exitCode } = await runCli(["--json"], f.env);
-    // The home view is a stub until it ships; the JSON error proves the route.
-    expect(exitCode).toBe(1);
-    expect(JSON.parse(stdout)).toMatchObject({ code: "NOT_IMPLEMENTED" });
+    expect(exitCode).toBe(0);
+    const home = JSON.parse(stdout) as Record<string, unknown>;
+    expect(Object.keys(home)).toEqual([
+      "bin",
+      "description",
+      "count",
+      "devices",
+      "target",
+      "target_note",
+      "help",
+    ]);
+    expect(home).toMatchObject({ count: "0 attached, 0 online", devices: [], target: "-" });
   });
 
   it("prints progress-free stdout: nothing on stderr for usage errors", async () => {
