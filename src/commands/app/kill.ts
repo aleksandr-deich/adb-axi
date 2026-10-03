@@ -74,10 +74,10 @@ export const appKill = defineCommand({
 
 /** What a kill proved, for the `kill` block of `app kill` and the evidence `app death` keeps. */
 export interface KillEvidence {
-  /** The main process's pid before the kill; several pids print space-separated. */
+  /** Pids found under the package UID before the kill; several print space-separated. */
   pidBefore: number | string;
   backgroundedFirst: boolean;
-  /** Time from the app leaving the front until the system rated it killable by `am kill`. */
+  /** Wait for a killable oom adj, measured from HOME when the app was in front. */
   cachedAfterMs: number;
   method: "am kill" | "run-as kill";
 }
@@ -111,9 +111,9 @@ interface Seen {
 /**
  * The process-death probe (S5, L5). `am kill` silently does nothing to a process the
  * system rates as important, so the sequence is: send an app in front to the background,
- * poll its oom adj until `am kill` can act on it, kill, verify with `pidof` that the main
- * process is gone, and confirm the task stayed in recents. `command` is what hints name
- * to retry. A process that is not running is `killed: false`.
+ * poll its oom adj until `am kill` can act on it, kill, verify with `pidof` that the
+ * observed UID processes are gone, and confirm the task stayed in recents. `command`
+ * is what hints name to retry. A process that is not running is `killed: false`.
  */
 export async function killProcess(
   context: CommandContext,
@@ -268,8 +268,8 @@ async function packagePids(context: CommandContext, pkg: string, uid: number): P
 
 /**
  * Poll `pidof` (the exit evidence; an ActivityManager record can vanish before its
- * process does) until the main process is gone or `windowMs` passes. A process still
- * alive is read once more from ActivityManager so the timeout can name its state.
+ * process does) until the observed UID processes are gone or `windowMs` passes.
+ * A process still alive is read once more from ActivityManager for the timeout state.
  */
 async function awaitGone(
   context: CommandContext,
