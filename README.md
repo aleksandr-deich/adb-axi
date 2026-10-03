@@ -34,7 +34,7 @@ devices[1]{serial,avd,state,api,form}:
   emulator-5554,Pixel_10_Pro_XL,device,35,phone
 target: emulator-5554
 foreground: dev.probe/.MainActivity
-crashes: 0 in the last 15m (no log mark yet)
+crashes: "0 in the last 15m (no log mark yet)"
 help[1]: Run `adb-axi logs --pkg dev.probe --since 1m` for recent app logs
 ```
 
@@ -204,7 +204,7 @@ npm ci
 npm run check   # build, typecheck, lint, format check, tests
 ```
 
-Tests run the built CLI against a scripted fake adb in `test/fake-adb`, so no device or emulator is needed; `test/fixtures/EVIDENCE.md` maps each adb behaviour the fake replays to its tests. `npm run test:device` runs the device suite against a real emulator.
+Tests run the built CLI against a scripted fake adb in `test/fake-adb`, so no device or emulator is needed; `test/fixtures/EVIDENCE.md` maps the recorded evidence cases to their scenarios and tests. `npm run test:device` runs the device suite against a real emulator.
 
 ## License
 
