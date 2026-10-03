@@ -45,7 +45,7 @@ export const waitBoot = defineCommand({
             adb,
             deadline,
             env: context.env,
-            requested,
+            requested: serial ?? requested,
             commandArgs: ["wait", "boot"],
             isShipped: context.isShipped,
           });
