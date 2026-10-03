@@ -728,6 +728,54 @@ describe("app death", () => {
     expectClean(fake);
   });
 
+  it("compares an empty before snapshot with visible text after restore", async () => {
+    const { toon, data, fake } = await both(["app", "death", "dev.probe", "--compare"], () =>
+      probeDevice({
+        phase: "front",
+        rules: [snapshotRule({ stdout: JSON.stringify({ nodes: [] }) }, { stdout: SNAPSHOT_AFTER })],
+      }),
+    );
+    expect(toon.exitCode).toBe(0);
+    expect(normalized(data)).toEqual({
+      ok: "death dev.probe -> killed and restored from recents",
+      death: diedAndRestored,
+      diff: ["+ Counter", "+ saved=3 volatile=0", "+ Save"],
+    });
+    expect(fake.calls().filter((call) => call.tool === "agent-device")).toHaveLength(2);
+    expectClean(fake);
+  });
+
+  it("returns an empty diff when both snapshots have no visible text", async () => {
+    const blank = { stdout: JSON.stringify({ nodes: [] }) };
+    const { toon, data, fake } = await both(["app", "death", "dev.probe", "--compare"], () =>
+      probeDevice({ phase: "front", rules: [snapshotRule(blank, blank)] }),
+    );
+    expect(toon.exitCode).toBe(0);
+    expect(normalized(data)).toEqual({
+      ok: "death dev.probe -> killed and restored from recents",
+      death: diedAndRestored,
+      diff: [],
+    });
+    expectClean(fake);
+  });
+
+  it("does not compare another app's foreground text with the restored app", async () => {
+    const { toon, data, fake } = await both(["app", "death", "dev.probe", "--compare"], () =>
+      probeDevice({ phase: "previous" }),
+    );
+    expect(toon.exitCode).toBe(1);
+    expect(normalized(data)).toEqual({
+      error: "dev.probe was killed and restored, but the visible-text comparison could not run: dev.probe was not in front before the kill",
+      code: "COMPARE_UNAVAILABLE",
+      death: { ...diedAndRestored, cached_after_ms: 0 },
+      help: ["Run `adb-axi app death dev.probe` to repeat the check without --compare"],
+    });
+    expect(fake.calls().filter((call) => call.tool === "agent-device")).toHaveLength(0);
+    expect(shellCommands(fake)).toContain(AM_KILL);
+    expect(shellCommands(fake)).toContain(START);
+    expectClean(fake);
+  });
+
   it("fails with COMPARE_UNAVAILABLE, exit 1, when agent-device is not installed, after the kill and restore ran", async () => {
     const { toon, data, fake } = await both(["app", "death", "dev.probe", "--compare"], () =>
       withoutAgentDevice(probeDevice({ phase: "front" })),

@@ -1,4 +1,5 @@
 import { assertPackageName } from "../../android/component.js";
+import { readForeground } from "../../android/foreground.js";
 import { AdbAxiError } from "../../core/errors.js";
 import { okLine, runHint } from "../../core/output.js";
 import { defineCommand } from "../define.js";
@@ -7,6 +8,7 @@ import { textDiff, takeSnapshot, type Snapshot } from "./compare.js";
 import { killProcess, killRecord, type KillResult } from "./kill.js";
 import { lifecycleCommand, requireInstalled } from "./process.js";
 import { restoreTask, type Restored } from "./restore.js";
+import { readOptions, targetSerial } from "./shared.js";
 
 export const appDeath = defineCommand({
   path: ["app", "death"],
@@ -43,7 +45,16 @@ export const appDeath = defineCommand({
 
     // The kill and the restore run whether or not the comparison can; a snapshot that
     // fails is reported with their evidence once both are done.
-    const before = compare ? await takeSnapshot(context) : undefined;
+    let before: Snapshot | undefined;
+    if (compare) {
+      const front = await readForeground(context.adb(), targetSerial(context), {
+        ...readOptions(context),
+        userId: installed.userId,
+      });
+      before = front?.package === pkg
+        ? await takeSnapshot(context)
+        : { ok: false, reason: `${pkg} was not in front before the kill` };
+    }
     const killed = await killProcess(context, pkg, installed, command);
     const restored = await afterKill(killed, () => restoreTask(context, pkg, installed, command));
     const death = deathRecord(killed, restored);

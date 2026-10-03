@@ -50,10 +50,7 @@ export async function takeSnapshot(context: CommandContext): Promise<Snapshot> {
       detail: stdout.trim().slice(0, 200),
     };
   }
-  const text = visibleText(parsed);
-  return text.length === 0
-    ? { ok: false, reason: "the agent-device snapshot has no visible text" }
-    : { ok: true, text };
+  return { ok: true, text: visibleText(parsed) };
 }
 
 /** Node fields that carry text a user can see. */
