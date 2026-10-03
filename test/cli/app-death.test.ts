@@ -759,6 +759,47 @@ describe("app death", () => {
     expectClean(fake);
   });
 
+  it.each(["null", '"not a tree"', "42"])(
+    "rejects an invalid before snapshot (%s) with kill and restore evidence",
+    async (payload) => {
+      const { toon, data, fake } = await both(["app", "death", "dev.probe", "--compare"], () =>
+        probeDevice({
+          phase: "front",
+          rules: [snapshotRule({ stdout: payload }, { stdout: SNAPSHOT_AFTER })],
+        }),
+      );
+      expect(toon.exitCode).toBe(1);
+      expect(normalized(data)).toEqual({
+        error: "dev.probe was killed and restored, but the visible-text comparison could not run: agent-device snapshot did not contain a UI tree",
+        code: "COMPARE_UNAVAILABLE",
+        death: diedAndRestored,
+        help: ["Run `adb-axi app death dev.probe` to repeat the check without --compare"],
+      });
+      expect(fake.calls().filter((call) => call.tool === "agent-device")).toHaveLength(1);
+      expect(shellCommands(fake)).toContain(AM_KILL);
+      expect(shellCommands(fake)).toContain(START);
+      expectClean(fake);
+    },
+  );
+
+  it("rejects an invalid after snapshot with kill and restore evidence", async () => {
+    const { toon, data, fake } = await both(["app", "death", "dev.probe", "--compare"], () =>
+      probeDevice({
+        phase: "front",
+        rules: [snapshotRule({ stdout: SNAPSHOT_BEFORE }, { stdout: "null" })],
+      }),
+    );
+    expect(toon.exitCode).toBe(1);
+    expect(normalized(data)).toEqual({
+      error: "dev.probe was killed and restored, but the visible-text comparison could not run: agent-device snapshot did not contain a UI tree",
+      code: "COMPARE_UNAVAILABLE",
+      death: diedAndRestored,
+      help: ["Run `adb-axi app death dev.probe` to repeat the check without --compare"],
+    });
+    expect(fake.calls().filter((call) => call.tool === "agent-device")).toHaveLength(2);
+    expectClean(fake);
+  });
+
   it("does not compare another app's foreground text with the restored app", async () => {
     const { toon, data, fake } = await both(["app", "death", "dev.probe", "--compare"], () =>
       probeDevice({ phase: "previous" }),

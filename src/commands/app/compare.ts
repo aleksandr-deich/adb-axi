@@ -50,6 +50,15 @@ export async function takeSnapshot(context: CommandContext): Promise<Snapshot> {
       detail: stdout.trim().slice(0, 200),
     };
   }
+  if (
+    typeof parsed !== "object" ||
+    parsed === null ||
+    Array.isArray(parsed) ||
+    !("nodes" in parsed) ||
+    !Array.isArray(parsed.nodes)
+  ) {
+    return { ok: false, reason: "agent-device snapshot did not contain a UI tree" };
+  }
   return { ok: true, text: visibleText(parsed) };
 }
 
