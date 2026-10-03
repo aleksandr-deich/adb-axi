@@ -100,12 +100,8 @@ function rows(holders: readonly ClassifiedHolder[]): Record<string, unknown>[] {
 
 function holderPackages(holder: ClassifiedHolder): string[] {
   if (holder.found.kind === "server") return [];
-  return [
-    ...new Set([
-      holder.found.package,
-      ...holder.found.processes.map((process) => process.package),
-    ]),
-  ];
+  const packages = [holder.found.package, ...holder.found.processes.map((p) => p.package)];
+  return [...new Set(packages)];
 }
 
 function clearCommands(holder: ClassifiedHolder): string[] {

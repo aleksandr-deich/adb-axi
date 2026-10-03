@@ -1,4 +1,9 @@
-import { WEDGE_SIGNATURE, type AppProcessServer, type Forward, type Holder } from "../../android/holders.js";
+import {
+  WEDGE_SIGNATURE,
+  type AppProcessServer,
+  type Forward,
+  type Holder,
+} from "../../android/holders.js";
 import type { HostProcess } from "../../host/processes.js";
 
 export type HolderState = "live" | "leaked" | "wedged";

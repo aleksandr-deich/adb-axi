@@ -254,7 +254,9 @@ describe("classifyHolders", () => {
       one({
         instrumentations: found.kind === "instrumentation" ? [found] : [],
         servers: found.kind === "server" ? [found] : [],
-        forwards: [{ serial: SERIAL, local: "tcp:12000", remote: "localabstract:mobilecli-server" }],
+        forwards: [
+          { serial: SERIAL, local: "tcp:12000", remote: "localabstract:mobilecli-server" },
+        ],
         host: host({ pid: 4300, args }),
       }).state;
     for (const [found, name] of [[mobile, "mobile-mcp"], [agent, "agent-device"]] as const) {
