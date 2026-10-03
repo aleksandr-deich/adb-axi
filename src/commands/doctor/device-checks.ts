@@ -7,6 +7,7 @@ import { readBoot } from "../../android/boot.js";
 import { readShell } from "../../android/read.js";
 import { runHint } from "../../core/output.js";
 import { formatUptime, formatSize } from "../../device/columns.js";
+import { parseAvdName } from "../../device/facts.js";
 import type { CommandContext } from "../types.js";
 import { CHECK_CAP_MS, homeDir } from "./host-checks.js";
 import { failed, ok, settle, tildePath, warn, type CheckResult } from "./result.js";
@@ -242,7 +243,7 @@ export async function checkConsoleToken(checks: DeviceChecks): Promise<CheckResu
       ...reads(checks),
       step: `checking the emulator console of ${checks.serial}`,
     });
-    if (response.exitCode !== 0) {
+    if (response.exitCode !== 0 || parseAvdName(response.stdout.toString("utf8")) === null) {
       return failed("console_token", "present, but the emulator console did not answer", [
         "Restart the emulator so its console token matches the one on disk",
       ]);

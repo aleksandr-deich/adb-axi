@@ -79,7 +79,7 @@ export function extraValues(
   return values;
 }
 
-function splitSections(stdout: string): Map<string, string[]> {
+export function splitSections(stdout: string): Map<string, string[]> {
   const sections = new Map<string, string[]>();
   let current: string[] | undefined;
   for (const raw of stdout.split(/\r?\n/)) {

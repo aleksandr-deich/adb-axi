@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { parseBoot } from "../../src/android/boot.js";
 import { parseInstrumentations } from "../../src/android/holders.js";
-import { splitSections } from "../../src/android/sections.js";
+import { splitSections } from "../../src/device/columns.js";
 import { parseAvailableBytes } from "../../src/commands/doctor/device-checks.js";
 import { parseAdbVersion } from "../../src/commands/doctor/host-checks.js";
 import { settle, tildePath } from "../../src/commands/doctor/result.js";

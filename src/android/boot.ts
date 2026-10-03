@@ -1,6 +1,6 @@
 import type { AdbClient } from "../adb/run.js";
+import { splitSections } from "../device/columns.js";
 import { invalidOutput, readShell, type ReadOptions } from "./read.js";
-import { splitSections } from "./sections.js";
 
 /** What the device says about its boot: the property and how long it has been up. */
 export interface BootReading {

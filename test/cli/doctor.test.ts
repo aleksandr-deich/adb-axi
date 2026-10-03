@@ -794,16 +794,16 @@ describe("doctor", () => {
       expect(rows.console_token?.detail).toMatch(/^\S*\.emulator_console_auth_token is empty$/);
     });
 
-    it.each(["", "OK\r\n"])(
-      "accepts a successful console response without an AVD name (%j)",
+    it.each(["", "OK\r\n", "KO: authentication required\r\n", "not a name\r\n"])(
+      "fails when the console does not return an AVD name (%j)",
       async (stdout) => {
         const f = scenario({ console: { stdout } });
         const { toon, rows } = await doctor(f);
-        expect(toon.exitCode).toBe(0);
+        expect(toon.exitCode).toBe(1);
         expect(rows.console_token).toEqual({
           check: "console_token",
-          status: "ok",
-          detail: "token present, console answers",
+          status: "failed",
+          detail: "present, but the emulator console did not answer",
         });
         expectAddressed(f);
       },
