@@ -74,7 +74,9 @@ export function runPi({ binary, env, cwd, skills, prompt, output }) {
       fs.writeFileSync(output, error.stdout);
       try {
         error.metrics = parsePi(error.stdout);
-      } catch {}
+      } catch {
+        // Keep the original process failure when output is incomplete or invalid.
+      }
     }
     throw error;
   }
