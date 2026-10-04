@@ -4,8 +4,31 @@ import process from "node:process";
 import { spawnSync } from "node:child_process";
 const config = JSON.parse(fs.readFileSync(process.env.BENCH_TOOLS, "utf8"));
 const [tool, ...args] = process.argv.slice(2);
-const serials = config.devices.map((d) => d.serial);
 const names = config.devices.map((d) => d.name);
+function ownedSerials() {
+  const listing = spawnSync(config.bins.adb, ["devices"], { encoding: "utf8", timeout: 10000 });
+  if (listing.status !== 0) reject("Cannot verify benchmark-owned emulators");
+  const serials = [];
+  for (const line of listing.stdout.split("\n")) {
+    const match = line.match(/^(emulator-\d+)\s+device(?:\s|$)/);
+    if (!match) continue;
+    const serial = match[1];
+    const named = spawnSync(config.bins.adb, ["-s", serial, "emu", "avd", "name"], {
+      encoding: "utf8",
+      timeout: 10000,
+    });
+    let name = named.status === 0 ? named.stdout.split("\n")[0].trim() : "";
+    if (!name) {
+      const property = spawnSync(config.bins.adb, ["-s", serial, "shell", "getprop ro.boot.qemu.avd_name"], {
+        encoding: "utf8",
+        timeout: 10000,
+      });
+      if (property.status === 0) name = property.stdout.trim();
+    }
+    if (names.includes(name)) serials.push(serial);
+  }
+  return serials;
+}
 let binary = config.bins[tool];
 let forwarded = args;
 function reject(message) {
@@ -15,6 +38,7 @@ function reject(message) {
 if (tool === "adb") {
   if (args[0] === "devices") {
     const r = spawnSync(binary, args, { encoding: "utf8", timeout: 10000 });
+    const serials = ownedSerials();
     const stdout =
       "List of devices attached\n" +
       (r.stdout ?? "")
@@ -35,7 +59,7 @@ if (tool === "adb") {
     serial = args[1];
     forwarded = args.slice(2);
   }
-  if (!serials.includes(serial)) reject("Select a benchmark-owned emulator by serial");
+  if (!ownedSerials().includes(serial)) reject("Select a benchmark-owned emulator by serial");
   if (["kill-server", "start-server", "connect", "disconnect", "reconnect"].includes(forwarded[0]))
     reject("Shared server operations are prohibited");
   forwarded = ["-s", serial, ...forwarded];
@@ -46,7 +70,7 @@ if (tool === "adb") {
   } else if (["layout", "screen", "install", "run"].includes(args[0])) {
     const target =
       args.find((a) => a.startsWith("--device="))?.slice(9) ?? args[args.indexOf("--device") + 1];
-    if (!serials.includes(target)) reject("Explicit owned --device required");
+    if (!ownedSerials().includes(target)) reject("Explicit owned --device required");
   } else if (!["help", "docs", "--help", "--version", "-V"].includes(args[0]))
     reject("Unsupported benchmark operation");
 } else if (tool === "adb-axi" || tool === "npx") {

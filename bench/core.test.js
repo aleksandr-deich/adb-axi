@@ -19,6 +19,7 @@ import { parsePi, runPi } from "./pi.js";
 import { checkTask } from "./success.js";
 import { Devices } from "./devices.js";
 import { environment } from "./run.js";
+import task8Reference from "./reference/8.js";
 
 function temporary(fn) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "benchmark-test-"));
@@ -41,6 +42,8 @@ test("eight neutral task definitions point to executable success checks", () => 
 test("dry-run guard, explicit spend authorization and hard cap", () => {
   assert.equal(plan([]).run, false);
   assert.equal(plan([]).runs, 16);
+  assert.deepEqual(plan([]).conditions, ["baseline", "adb-axi"]);
+  assert.throws(() => plan(["--conditions", "baseline"]));
   assert.throws(() => plan(["--run"]));
   assert.throws(() => plan(["run", "--tasks", "1", "--repeats", "1", "--version", "0.1.2"]));
   assert.throws(() => plan(["--run", "tasks", "1", "repeats", "1", "version", "0.1.2"]));
@@ -157,7 +160,7 @@ test("device bridge filters tab and space-separated listings and refuses foreign
     const fakeAdb = path.join(dir, "adb");
     fs.writeFileSync(
       fakeAdb,
-      '#!/bin/sh\necho "List of devices attached"\necho "emulator-5554 device product:phone"\nprintf "emulator-5556\\tdevice\\n"\necho "physical-serial device"\n',
+      '#!/bin/sh\ncase "$*" in\n  devices*) echo "List of devices attached"; echo "emulator-5554 device product:phone"; printf "emulator-5556\\tdevice\\n"; echo "physical-serial device";;\n  *"emulator-5554 emu avd name") echo phone;;\n  *"emulator-5556 emu avd name") echo tablet;;\n  *"physical-serial emu avd name") echo foreign;;\nesac\n',
       { mode: 0o755 },
     );
     const config = path.join(dir, "tools.json");
@@ -189,6 +192,34 @@ test("device bridge filters tab and space-separated listings and refuses foreign
     assert.equal(invoke(["npx", "-y", "adb-axi"]).status, 2);
   }));
 
+test("bridge discovers and accepts only verified owned serials after restart", () =>
+  temporary((dir) => {
+    const fake = path.join(dir, "adb");
+    const android = path.join(dir, "android");
+    const active = path.join(dir, "active");
+    fs.writeFileSync(active, "emulator-5554");
+    fs.writeFileSync(fake, `#!/bin/sh\ncase "$*" in\n  devices) printf 'List of devices attached\\n%s\\tdevice\\nemulator-9998\\tdevice\\n' "$(/bin/cat '${active}')";;\n  *"emulator-9998 emu avd name") echo foreign;;\n  *"emu avd name") echo phone;;\n  *) echo ready;;\nesac\n`, { mode: 0o755 });
+    fs.writeFileSync(android, "#!/bin/sh\necho layout-ready\n", { mode: 0o755 });
+    const config = path.join(dir, "tools.json");
+    fs.writeFileSync(config, JSON.stringify({
+      bins: { adb: fake, android }, devices: [{ name: "phone", serial: "emulator-5554" }],
+      audit: path.join(dir, "audit"), condition: "baseline",
+    }));
+    const invoke = (...args) => spawnSync(process.execPath, [path.join(root, "bench/tool-bridge.js"), ...args], {
+      env: { BENCH_TOOLS: config }, encoding: "utf8",
+    });
+    assert.match(invoke("adb", "devices").stdout, /emulator-5554/);
+    fs.writeFileSync(active, "emulator-5580");
+    const listing = invoke("adb", "devices");
+    assert.equal(listing.status, 0);
+    assert.match(listing.stdout, /emulator-5580/);
+    assert.doesNotMatch(listing.stdout, /emulator-9998|emulator-5554/);
+    assert.equal(invoke("adb", "-s", "emulator-5580", "shell", "id").status, 0);
+    assert.equal(invoke("android", "layout", "--device=emulator-5580").status, 0);
+    assert.equal(invoke("adb", "-s", "emulator-5554", "shell", "id").status, 2);
+    assert.equal(invoke("adb", "-s", "emulator-9998", "shell", "id").status, 2);
+  }));
+
 test("dry-run entry point succeeds without any tools on PATH and rejects incomplete authorization", () => {
   const invoke = (args) =>
     spawnSync(process.execPath, [path.join(root, "bench/run.js"), ...args], {
@@ -198,6 +229,8 @@ test("dry-run entry point succeeds without any tools on PATH and rejects incompl
   const dry = invoke(["--tasks", "1", "--repeats", "1"]);
   assert.equal(dry.status, 0);
   assert.equal(JSON.parse(dry.stdout).runs, 2);
+  assert.deepEqual(JSON.parse(dry.stdout).conditions, ["baseline", "adb-axi"]);
+  assert.equal(invoke(["--tasks", "1", "--conditions", "baseline"]).status, 1);
   assert.equal(invoke(["--run", "--tasks", "1"]).status, 1);
 });
 test("success scripts reject incorrect reports even when device evidence succeeds", async () =>
@@ -252,17 +285,17 @@ test("success scripts reject incorrect reports even when device evidence succeed
     });
   }));
 
-test("shell-based uninstall snapshots the debug database before removal", () =>
+test("treatment's adb transport snapshots the debug database before shell uninstall", () =>
   temporary((dir) => {
     const database = path.join(dir, "probe.db");
     assert.equal(spawnSync("/usr/bin/sqlite3", [database, "CREATE TABLE notes(id INTEGER, text TEXT); INSERT INTO notes VALUES(1, 'probe-1');"]).status, 0);
     const fake = path.join(dir, "adb");
-    fs.writeFileSync(fake, `#!/bin/sh\ncase "$*" in\n  *"run-as dev.probe cat databases/probe.db") exec /bin/cat '${database}';;\n  *"run-as dev.probe cat databases/probe.db-wal") exit 1;;\n  *"shell pm uninstall dev.probe") /bin/rm '${database}'; echo Success;;\nesac\n`, { mode: 0o755 });
+    fs.writeFileSync(fake, `#!/bin/sh\ncase "$*" in\n  devices) printf 'List of devices attached\\nemulator-5554\\tdevice\\n';;\n  *"emu avd name") echo owned;;\n  *"run-as dev.probe cat databases/probe.db") exec /bin/cat '${database}';;\n  *"run-as dev.probe cat databases/probe.db-wal") exit 1;;\n  *"shell pm uninstall dev.probe") /bin/rm '${database}'; echo Success;;\nesac\n`, { mode: 0o755 });
     const audit = path.join(dir, "audit.jsonl");
     const config = path.join(dir, "tools.json");
     fs.writeFileSync(config, JSON.stringify({
       bins: { adb: fake }, devices: [{ serial: "emulator-5554", name: "owned" }],
-      condition: "baseline", task: "4", audit,
+      condition: "adb-axi", task: "4", audit,
     }));
     const result = spawnSync(process.execPath, [path.join(root, "bench/tool-bridge.js"), "adb", "-s", "emulator-5554", "shell", "pm uninstall dev.probe"], {
       env: { BENCH_TOOLS: config, TMPDIR: dir }, encoding: "utf8",
@@ -279,7 +312,7 @@ test("bridge preserves binary exec-out bytes and drains large piped stdout", () 
     const fake = path.join(dir, "fake.mjs");
     fs.writeFileSync(
       fake,
-      `#!${process.execPath}\nimport process from 'node:process';\nimport { Buffer } from 'node:buffer';\nconst b = Buffer.alloc(262144); for(let i=0;i<b.length;i++) b[i]=i%256; process.stdout.write(b);\n`,
+      `#!${process.execPath}\nimport process from 'node:process';\nimport { Buffer } from 'node:buffer';\nif (process.argv[2] === 'devices') process.stdout.write('List of devices attached\\nemulator-5554\\tdevice\\n');\nelse if (process.argv.includes('emu')) process.stdout.write('owned\\n');\nelse { const b = Buffer.alloc(262144); for(let i=0;i<b.length;i++) b[i]=i%256; process.stdout.write(b); }\n`,
       { mode: 0o755 },
     );
     const config = path.join(dir, "tools.json");
@@ -431,7 +464,47 @@ test("recovery and scoring follow the verified AVD onto its new serial", () =>
     });
     assert.equal(result.success, true);
     assert.equal(phone.serial, "emulator-5580");
+    const auditCases = [
+      [
+        { time: 1, tool: "android", args: ["emulator", "stop", "tablet"], status: 0 },
+        { time: 2, tool: "adb", args: ["devices"], status: 0, stdout: "List of devices attached\\nemulator-5554 device\\n" },
+        { time: 3, tool: "android", args: ["emulator", "start", "tablet"], status: 0 },
+      ],
+      [
+        { time: 1, tool: "android", args: ["emulator", "stop", "owned"], status: 0 },
+        { time: 2, tool: "adb", args: ["devices"], status: 0, stdout: "List of devices attached\\n" },
+        { time: 3, tool: "android", args: ["emulator", "start", "tablet"], status: 0 },
+      ],
+    ];
+    for (const entries of auditCases) {
+      fs.writeFileSync(audit, entries.map((c) => JSON.stringify(c)).join("\n"));
+      phone.serial = "emulator-5554";
+      assert.equal(checkTask("8", {
+        devices: d, audit,
+        finalAnswer: JSON.stringify({ unavailableState: "missing", recovered: true }),
+      }).success, false);
+    }
   }));
+
+test("task 8 reference confirms boot on the restarted AVD's new serial", () => {
+  const phone = { name: "phone", serial: "emulator-5554" };
+  let phase = "before";
+  const seen = [];
+  const answer = task8Reference({
+    phone,
+    android: (args) => { phase = args[1] === "stop" ? "stopped" : "restarted"; },
+    adb: (device, args) => {
+      seen.push([device?.serial, ...args]);
+      if (args[0] === "devices") return phase === "stopped" ? "List of devices attached\n" : "List of devices attached\nemulator-5580 device\n";
+      if (args[0] === "emu") return "phone\nOK\n";
+      return "1\n";
+    },
+    wait: (predicate) => assert.equal(predicate(), true),
+  });
+  assert.equal(answer.recovered, true);
+  assert.equal(phone.serial, "emulator-5554");
+  assert.ok(seen.some((call) => call[0] === "emulator-5580" && call[1] === "shell"));
+});
 
 test("bare run cannot authorize spending or reach dependency lookup", () => {
   const r = spawnSync(

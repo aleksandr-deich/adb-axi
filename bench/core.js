@@ -56,14 +56,13 @@ export function plan(argv) {
       version: "version",
       phone: "phone",
       tablet: "tablet",
-      conditions: "conditions",
     };
     if (!keys[key] || !argv[i + 1]) throw new Error(`Unknown or incomplete option: ${argv[i]}`);
     const value = argv[++i];
     seen.add(key);
     opts[keys[key]] = ["repeats", "max-runs"].includes(key)
       ? Number(value)
-      : ["tasks", "conditions"].includes(key)
+      : key === "tasks"
         ? value.split(",")
         : value;
   }
@@ -78,12 +77,6 @@ export function plan(argv) {
     new Set(opts.tasks).size !== opts.tasks.length
   )
     throw new Error("Unknown or duplicate task");
-  if (
-    !opts.conditions.length ||
-    opts.conditions.some((c) => !["baseline", "adb-axi"].includes(c)) ||
-    new Set(opts.conditions).size !== opts.conditions.length
-  )
-    throw new Error("Invalid conditions");
   if (opts.version && !/^\d+\.\d+\.\d+(?:-[a-zA-Z0-9.-]+)?$/.test(opts.version))
     throw new Error("Version must be an exact release version");
   if (

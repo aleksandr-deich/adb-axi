@@ -173,8 +173,15 @@ export function checkTask(id, { devices, finalAnswer, audit }) {
   } else if (id === "8") {
     const stop = calls.find(
       (c) =>
-        ((c.tool === "android" && c.args[0] === "emulator" && c.args[1] === "stop") ||
-          (c.tool === "adb" && c.args.join(" ").includes("emu kill"))) &&
+        ((c.tool === "android" &&
+          c.args[0] === "emulator" &&
+          c.args[1] === "stop" &&
+          c.args.at(-1) === phone.name) ||
+          (c.tool === "adb" &&
+            c.args[0] === "-s" &&
+            c.args[1] === stoppedSerial &&
+            c.args[2] === "emu" &&
+            c.args[3] === "kill")) &&
         c.status === 0,
     );
     const restart = calls.find(
@@ -184,23 +191,27 @@ export function checkTask(id, { devices, finalAnswer, audit }) {
         c.tool === "android" &&
         c.args[0] === "emulator" &&
         c.args[1] === "start" &&
+        c.args.at(-1) === phone.name &&
         c.status === 0,
     );
     checks.stopped = !!stop;
     checks.observed =
       !!stop &&
+      !!restart &&
       calls.some(
         (c) =>
           c.tool === "adb" &&
           c.time >= stop.time &&
-          (!restart || c.time < restart.time) &&
+          c.time < restart.time &&
           ((c.args[0] === "devices" &&
             c.status === 0 &&
             !(c.stdout ?? "").includes(stoppedSerial)) ||
-            /offline|not found|missing|unavailable/i.test(`${c.stdout ?? ""}\n${c.stderr ?? ""}`)),
+            (c.args[0] === "-s" &&
+              c.args[1] === stoppedSerial &&
+              /offline|not found|missing|unavailable/i.test(`${c.stdout ?? ""}\n${c.stderr ?? ""}`))),
       );
     checks.online =
-      recoveredOnline && devices.shell(phone, "getprop sys.boot_completed").trim() === "1";
+      !!restart && recoveredOnline && devices.shell(phone, "getprop sys.boot_completed").trim() === "1";
     checks.report =
       ["offline", "missing", "unavailable"].includes(answer.unavailableState) &&
       answer.recovered === true;

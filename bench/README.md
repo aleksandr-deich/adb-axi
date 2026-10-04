@@ -24,7 +24,7 @@ node bench/run.js --run --tasks 1,2,3,4,5,6,7,8 --repeats 5 --version 0.1.2 --ma
 node bench/run.js summary
 ```
 
-For a later release, use the **same repository commit, model, skill manifests, AVD images and repeat count**, changing only `--version` to the exact published version. Pin the benchmark revision in your report. A new skill revision is a separate experiment: explicitly record the new benchmark commit. `--phone` and `--tablet` override AVD names; `--conditions baseline` or `--conditions adb-axi` select a single condition. Repeats are positive integers; 3-5 is recommended for a full run. Every spending command requires explicit `--run`, `--tasks`, `--repeats`, and `--version`; `--max-runs` is a hard cap (default 80).
+For a later release, use the **same repository commit, model, skill manifests, AVD images and repeat count**, changing only `--version` to the exact published version. Pin the benchmark revision in your report. A new skill revision is a separate experiment: explicitly record the new benchmark commit. `--phone` and `--tablet` override AVD names. Every repeat runs both conditions (2 agent runs per task); repeats are positive integers, with 3-5 recommended for a full run. Every spending command requires explicit `--run`, `--tasks`, `--repeats`, and `--version`; `--max-runs` is a hard cap (default 80).
 
 Use separate results directories by moving the previous `bench/results/` elsewhere before a new experiment. Summary aggregates all record JSON files currently in that directory by task and condition. It reports sums, success rates, and missing metric counts, not statistical significance. Compare versions in separate result sets. Do not treat one verification run as evidence of comparative quality.
 
