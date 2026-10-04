@@ -54,7 +54,7 @@ export const logsCrash = defineCommand({
 
     const now = await readDeviceClock(adb, serial, options);
     await refreshMarks(context);
-    const window = resolveWindow(serial, context.env, since, now);
+    const window = resolveWindow(serial, context.env, since, now, context.marksVerified);
     // The scan is never narrowed to the app: its ANR is printed by system_server and its
     // tombstone by crash_dump, which a uid or pid filter would drop.
     const lines = await readWindowLines(adb, serial, window, options, undefined, true);

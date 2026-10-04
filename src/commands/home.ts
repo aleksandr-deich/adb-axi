@@ -60,6 +60,7 @@ async function runHome(context: CommandContext): Promise<Output> {
     async (target) => {
       const row = await rowPromises.get(target.serial);
       const bootId = row?.facts.bootId ?? null;
+      context.marksVerified = bootId !== null;
       const marksNote = bindMarks(target.serial, context.env, bootId);
       return { target, state: await readTargetState(adb, target.serial, context), marksNote };
     },
@@ -161,7 +162,7 @@ async function readTargetState(
     settle(() => readForeground(adb, serial, options)),
     settle(async () => {
       const now = await readDeviceClock(adb, serial, options);
-      const mark = latestMark(serial, context.env);
+      const mark = context.marksVerified === false ? undefined : latestMark(serial, context.env);
       const window = resolveWindow(serial, context.env, mark ?? DEFAULT_SINCE, now);
       const lines = await readWindowLines(adb, serial, window, options, undefined, true);
       const count = parseCrashes(lines).filter((crash) => crash.epochMs >= window.startMs).length;

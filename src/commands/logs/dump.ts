@@ -78,7 +78,13 @@ export const logsDump = defineCommand({
 
     const now = await readDeviceClock(adb, serial, options);
     await refreshMarks(context);
-    const window = resolveWindow(serial, context.env, since ?? DEFAULT_SINCE, now);
+    const window = resolveWindow(
+      serial,
+      context.env,
+      since ?? DEFAULT_SINCE,
+      now,
+      context.marksVerified,
+    );
     const scope =
       pkg === undefined
         ? undefined

@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { decode } from "@toon-format/toon";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { bindMarks, writeMark } from "../../src/commands/logs/marks.js";
@@ -30,7 +32,7 @@ afterEach(() => {
 
 /** One online emulator, plus `extra` device lines, answering the home view's reads. */
 function device(
-  answers: { foreground?: Response; clock?: Response; logcat?: Response },
+  answers: { foreground?: Response; clock?: Response; logcat?: Response; facts?: Response },
   extra: { lines?: string; rules?: Rule[] } = {},
 ): FakeAdb {
   const shell = (command: string | { re: string }, respond: Response | undefined): Rule[] =>
@@ -45,7 +47,10 @@ function device(
           stdout: `List of devices attached\n${SERIAL}          device product:sdk_gphone64_arm64 transport_id:1\n${extra.lines ?? ""}\n`,
         },
       },
-      { match: ["-s", SERIAL, "shell", { re: "echo @sdk; .*" }], respond: { stdout: FACTS } },
+      {
+        match: ["-s", SERIAL, "shell", { re: "echo @sdk; .*" }],
+        respond: answers.facts ?? { stdout: FACTS },
+      },
       {
         match: ["-s", SERIAL, "emu", "avd", "name"],
         respond: { stdout: "Pixel_10_Pro_XL\r\nOK\r\n" },
@@ -75,6 +80,36 @@ function body(run: CliRun): string {
 }
 
 describe("adb-axi (home view)", () => {
+  it.each(
+    [true, false].flatMap((bound) => [
+      { bound, facts: { stderr: "Can't find service\n", exit: 1 } },
+      { bound, facts: { stdout: FACTS.replace("3f1c8a52-0d7e-4c1b-9b1e-5a3f2d6c7e81", "") } },
+    ]),
+  )(
+    "ignores but preserves unverified $bound marks when facts are missing: $facts",
+    async ({ bound, facts }) => {
+      const f = device({
+        foreground: PROBE_FRONT,
+        clock: { stdout: NOW },
+        logcat: { stdout: "" },
+        facts,
+      });
+      if (bound) bindMarks(SERIAL, f.env, "earlier-boot");
+      writeMark(SERIAL, f.env, "old", {
+        epochMs: 1790834300000,
+        utcOffsetMinutes: 120,
+        processes: [],
+      });
+      const path = join(f.home, SERIAL, "marks.json");
+      const saved = readFileSync(path, "utf8");
+      const result = await both(f);
+      expect(decode(result.stdout.trimEnd())).toMatchObject({
+        crashes: "0 in the last 15m (no log mark yet)",
+        marks_note: "Log marks could not be verified for this boot; stored marks were not used",
+      });
+      expect(readFileSync(path, "utf8")).toBe(saved);
+    },
+  );
   it("shows the devices, the target, its foreground app and the crashes since the latest mark", async () => {
     const f = device({ foreground: PROBE_FRONT, clock: { stdout: NOW }, logcat: JAVA_CRASH });
     bindMarks(SERIAL, f.env, "3f1c8a52-0d7e-4c1b-9b1e-5a3f2d6c7e81");

@@ -65,11 +65,18 @@ export function marksPath(serial: string, env: NodeJS.ProcessEnv): string {
 export async function refreshMarks(context: CommandContext): Promise<void> {
   const target = context.target;
   if (target === undefined) throw new Error("Marks need a resolved device");
-  const facts = await readShellFacts(context.adb(), target.device, {
-    deadline: context.deadline,
-    env: context.env,
-  });
-  const note = bindMarks(target.serial, context.env, facts.bootId);
+  let bootId: string | null = null;
+  try {
+    const facts = await readShellFacts(context.adb(), target.device, {
+      deadline: context.deadline,
+      env: context.env,
+    });
+    bootId = facts.bootId;
+  } catch (error) {
+    if (!(error instanceof AdbAxiError)) throw error;
+  }
+  context.marksVerified = bootId !== null;
+  const note = bindMarks(target.serial, context.env, bootId);
   if (note !== undefined) context.marksNote = note;
 }
 
@@ -79,15 +86,34 @@ export function bindMarks(
   env: NodeJS.ProcessEnv,
   bootId: string | null,
 ): string | undefined {
-  if (bootId === null) return undefined;
   const path = marksPath(serial, env);
   const value = readJson(path);
   if (value !== undefined && !isMarksFile(value))
     throw new Error(`State file ${path} is not a marks file`);
+  if (bootId === null) {
+    return value !== undefined && Object.keys(value.marks).length > 0
+      ? "Log marks could not be verified for this boot; stored marks were not used"
+      : undefined;
+  }
   if (value?.boot_id === bootId) return undefined;
   const dropped = value !== undefined && Object.keys(value.marks).length > 0;
   writeJsonAtomic(path, { boot_id: bootId, marks: {} } satisfies MarksFile);
   return dropped ? "Log marks from a previous device or boot were dropped" : undefined;
+}
+
+/** A named window or a new mark requires proof of the device's current boot. */
+export function assertMarkVerified(serial: string, name: string, verified: boolean): void {
+  if (verified) return;
+  throw new AdbAxiError(
+    "MARK_UNVERIFIED",
+    `log mark ${name} could not be verified for this boot on ${serial}`,
+    {
+      help: [
+        runHint(["logs", "mark", name], "to re-mark once the device's boot ID can be read"),
+        "Or use a duration such as `--since 5m` instead of a stored mark",
+      ],
+    },
+  );
 }
 
 /** Every mark of a device by name; none when the device has never been marked. */

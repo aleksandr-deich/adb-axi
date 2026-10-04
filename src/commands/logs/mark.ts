@@ -5,7 +5,13 @@ import { okLine } from "../../core/output.js";
 import { readShellFacts } from "../../device/facts.js";
 import { readOptions, targetSerial } from "../app/shared.js";
 import { defineCommand } from "../define.js";
-import { appProcesses, assertMarkName, refreshMarks, writeMark } from "./marks.js";
+import {
+  appProcesses,
+  assertMarkName,
+  assertMarkVerified,
+  refreshMarks,
+  writeMark,
+} from "./marks.js";
 import { PID_LIST_BELOW_API } from "./scope.js";
 
 export const logsMark = defineCommand({
@@ -47,6 +53,7 @@ export const logsMark = defineCommand({
     const shown = formatDeviceTime(now.epochMs, now.utcOffsetMinutes);
     const name =
       given === undefined ? `mark-${shown.slice(11, 19).replaceAll(":", "")}` : String(given);
+    assertMarkVerified(serial, name, context.marksVerified !== false);
     writeMark(serial, context.env, name, {
       epochMs: now.epochMs,
       utcOffsetMinutes: now.utcOffsetMinutes,

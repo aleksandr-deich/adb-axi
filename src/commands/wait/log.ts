@@ -48,7 +48,9 @@ export const waitLog = defineCommand({
     const now = await readDeviceClock(adb, serial, options);
     await refreshMarks(context);
     const window =
-      since === undefined ? windowFromNow(now) : resolveWindow(serial, context.env, since, now);
+      since === undefined
+        ? windowFromNow(now)
+        : resolveWindow(serial, context.env, since, now, context.marksVerified);
 
     let latest: Observation | undefined;
     const result = await poll({
