@@ -1,0 +1,7 @@
+{
+  "id": "3",
+  "prompt": "Start the probe and use the crash UI action. Identify the exception type and message causing the crash from device logs. Return your final answer as JSON only with these fields (the quoted type labels describe the values to report): {\"exception\": \"string\", \"message\": \"string\"}.",
+  "setup": "debug",
+  "reset": "clean-both",
+  "success": "bench/tasks/3.js"
+}

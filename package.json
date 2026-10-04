@@ -39,7 +39,7 @@
     "test": "npm run build && vitest run",
     "test:device": "npm run build && vitest run --config vitest.device.config.ts",
     "capture": "tsx test/device/capture.ts",
-    "check": "npm run build && npm run typecheck && npm run lint && npm run format:check && vitest run",
+    "check": "npm run build && npm run typecheck && npm run lint && npm run format:check && vitest run && node --test bench/core.test.js",
     "prepack": "npm run build"
   },
   "dependencies": {
