@@ -1,0 +1,64 @@
+# Real-emulator checks (test/device): adb-axi installed from the packed tarball drives the
+# committed probe app on one emulator per API level. Modeled on android/nowinandroid's
+# androidTest job.
+name: emulator
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: emulator-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  device:
+    name: device (api ${{ matrix.api-level }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    strategy:
+      fail-fast: false
+      matrix:
+        api-level: [30, 35]
+    env:
+      ANDROID_SERIAL: emulator-5554
+    steps:
+      - name: Enable KVM group perms
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          ls /dev/kvm
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install sqlite3
+        run: sudo apt-get update && sudo apt-get install -y sqlite3
+      - run: npm ci
+      - name: Install adb-axi from the packed tarball
+        run: |
+          npm pack --pack-destination "$RUNNER_TEMP"
+          npm install --global --prefix "$RUNNER_TEMP/adb-axi" "$RUNNER_TEMP"/adb-axi-*.tgz
+          echo "ADB_AXI_BIN=$RUNNER_TEMP/adb-axi/bin/adb-axi" >> "$GITHUB_ENV"
+      - name: Run the device checks
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api-level }}
+          arch: x86_64
+          disable-animations: true
+          disk-size: 6000M
+          heap-size: 600M
+          script: npx vitest run --config vitest.device.config.ts
+      - name: Upload transcripts
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: device-transcripts-api-${{ matrix.api-level }}
+          path: test-results/device
+          if-no-files-found: error
