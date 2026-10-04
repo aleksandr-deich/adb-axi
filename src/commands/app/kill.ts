@@ -238,8 +238,8 @@ async function packagePids(context: CommandContext, pkg: string, uid: number): P
     const row = /^\s*(\S+)\s+(\S+)(?:\s+(.+?))?\s*$/.exec(line);
     const rowUid = row?.[2];
     if (rowUid === undefined || !/^\d+$/.test(rowUid) || Number(rowUid) !== uid) continue;
-    const pid = Number(row[1]);
-    const name = row[3];
+    const pid = Number(row?.[1]);
+    const name = row?.[3];
     if (
       !Number.isSafeInteger(pid) ||
       pid <= 0 ||
