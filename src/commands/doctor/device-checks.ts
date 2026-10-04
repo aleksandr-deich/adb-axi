@@ -171,7 +171,10 @@ export async function checkAnimations(checks: DeviceChecks): Promise<CheckResult
     return warn(
       "animations",
       `${shown}, animations can make UI steps flaky`,
-      hint(checks, ["shell"], [], "to turn animations off", ["--", ANIMATIONS_OFF]),
+      hint(checks, ["shell"], [], "to turn animations off (this changes the device's settings)", [
+        "--",
+        ANIMATIONS_OFF,
+      ]),
     );
   });
 }

@@ -460,7 +460,7 @@ describe("app start", () => {
         "last:",
         "  status: timeout",
         "  activity: .MainActivity",
-        "help[2]: Run `adb-axi app current` to see what is in front,Run `adb-axi app start dev.probe --timeout 30s` to give it longer",
+        "help[2]: Run `adb-axi app current` to see what is in front (on a physical phone a system dialog such as Play Protect or a permission request can block the launch),Run `adb-axi app start dev.probe --timeout 30s` to give it longer",
         "",
       ].join("\n"),
     );

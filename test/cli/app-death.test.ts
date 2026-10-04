@@ -92,10 +92,12 @@ const AM_TIMEOUT: Response = { stdoutFile: "synthetic/29/am-start-timeout.txt" }
 
 const PIDOF_OF = (pid: number): Response => ({ stdout: `${pid}\n` });
 const PIDOF_GONE: Response = { exit: 1 };
+/** Synthetic: a phone also lists kernel threads whose names have spaces, as a vendor irq thread does. */
+const KERNEL_THREAD = "  526     0 [irq/511-vendor gpio wakeup]\n";
 const UIDS_OF = (pid: number): Response => ({
-  stdout: `  PID   UID NAME\n ${pid} 10213 dev.probe\n`,
+  stdout: `  PID   UID NAME\n${KERNEL_THREAD} ${pid} 10213 dev.probe\n`,
 });
-const UIDS_NONE: Response = { stdout: "  PID   UID NAME\n" };
+const UIDS_NONE: Response = { stdout: `  PID   UID NAME\n${KERNEL_THREAD}` };
 
 /** Where the probe is: in front, just sent home, the previous app, dead, or restored. */
 type Phase = "front" | "leaving" | "previous" | "dead" | "restored";

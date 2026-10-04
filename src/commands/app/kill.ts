@@ -233,7 +233,9 @@ async function packagePids(context: CommandContext, pkg: string, uid: number): P
   }
   const names = new Map<string, Set<number>>();
   for (const line of lines) {
-    const row = /^\s*(\d+)\s+(\d+)\s+(\S+)\s*$/.exec(line);
+    // NAME is the rest of the row: a kernel thread can carry spaces (`[irq/511-xxx yyy]`).
+    // Only rows of the package UID are validated as process names below.
+    const row = /^\s*(\d+)\s+(\d+)\s+(.+?)\s*$/.exec(line);
     if (!row || !Number.isSafeInteger(Number(row[1])) || !Number.isSafeInteger(Number(row[2]))) {
       throw invalidOutput("reading package process names", result.stdout);
     }

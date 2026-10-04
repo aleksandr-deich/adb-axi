@@ -16,7 +16,13 @@ import { runHint } from "../../core/output.js";
 import { readOptions, targetSerial } from "../app/shared.js";
 import { defineCommand } from "../define.js";
 import { describeScope, resolveScope, scopePids, type Scope } from "./scope.js";
-import { clockTime, compileRegex, readWindowLines, resolveWindow } from "./window.js";
+import {
+  clockTime,
+  compileRegex,
+  readFirstWindowLine,
+  readWindowLines,
+  resolveWindow,
+} from "./window.js";
 
 /** The window of `logs` without `--since`, counted back from the device's now. */
 export const DEFAULT_SINCE = "15m";
@@ -97,6 +103,10 @@ export const logsDump = defineCommand({
       scope?.kind === "uid" ? scope.uid : undefined,
     );
 
+    // A uid-filtered scan starts at the app's first line; the buffer depth needs every app's.
+    const firstLine =
+      scope?.kind === "uid" ? await readFirstWindowLine(adb, serial, window, options) : scanned[0];
+
     const lines = select(scanned, { scope, level, grep });
     const rows = collapse(lines, now.utcOffsetMinutes);
     const shown = capLines(
@@ -141,11 +151,9 @@ export const logsDump = defineCommand({
     const crashed = parseCrashes(lines).length > 0;
     return {
       window: `${window.label} -> now (${seconds} s), ${scanned.length} lines scanned`,
-      ...(scope?.kind !== "uid" &&
-      scanned[0] !== undefined &&
-      scanned[0].epochMs - window.startMs > 2000
+      ...(firstLine !== undefined && firstLine.epochMs - window.startMs > 2000
         ? {
-            note: `first log line in this window is at ${clockTime(scanned[0].epochMs, now.utcOffsetMinutes)}, after the window start; the device log buffer may have dropped earlier lines`,
+            note: `first log line in this window is at ${clockTime(firstLine.epochMs, now.utcOffsetMinutes)}, after the window start; the device log buffer may have dropped earlier lines`,
           }
         : {}),
       ...(scope === undefined ? {} : { scope: describeScope(scope, scanned) }),
