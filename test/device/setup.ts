@@ -36,7 +36,7 @@ export default function setup(project: TestProject): void {
   }
   const bin = process.env.ADB_AXI_BIN ?? installFromTarball();
   const home = mkdtempSync(join(tmpdir(), "adb-axi-device-home-"));
-  const transcripts = resolve(ROOT, process.env.DEVICE_TRANSCRIPTS ?? "test-results/device");
+  const transcripts = resolve(ROOT, "test-results/device");
   rmSync(transcripts, { recursive: true, force: true });
   mkdirSync(transcripts, { recursive: true });
   project.provide("device", { serial, bin, home, transcripts });
