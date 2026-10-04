@@ -88,7 +88,7 @@ State that adb-axi keeps (log marks, install records, cached AVD names) lives pe
 | `adb-axi`                                                    | Devices, the resolved target, its foreground app and recent crashes            |
 | `devices [--all] [--fields <list>]`                          | Every attached device with its AVD name, state, API level and form             |
 | `doctor`                                                     | Host, adb server and target checks for things that break a run                 |
-| `doctor ui [--fix]`                                          | What holds UiAutomation, and clearing resident, leaked or wedged holders        |
+| `doctor ui [--fix]`                                          | What holds UiAutomation, and clearing resident, leaked or wedged holders       |
 | `wait boot`                                                  | Waits until the device is online and has finished booting                      |
 | `wait app <pkg> --state <foreground\|running\|stopped>`      | Waits until an app reaches a state                                             |
 | `wait log <regex> [--since <mark\|dur>]`                     | Waits until a log line matches                                                 |

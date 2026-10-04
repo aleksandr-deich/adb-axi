@@ -432,7 +432,7 @@ describe("logs", () => {
       f,
     );
     expect(toon.exitCode).toBe(0);
-    expect(Object.keys(data)).toEqual(["window", "scope", "counts", "lines", "shown"]);
+    expect(Object.keys(data)).toEqual(["window", "scope", "counts", "lines", "shown", "help"]);
     expect(data.window).toBe(`before-run -> now (28 s), ${parsed.length} lines scanned`);
     expect(data.scope).toBe("dev.probe (uid 10213)");
 
@@ -518,6 +518,7 @@ describe("logs", () => {
     expect(data.counts).toEqual({ E: 3, W: 3, I: 3, D: 2 });
     // The fatal exception is better read as one summary, for the same window and app.
     expect(data.help).toEqual([
+      "Run the same command with `--full` to write all 11 matched lines to a file",
       "Run `adb-axi logs crash --pkg dev.probe --since before-kill` for the crash with its exception and app frame",
     ]);
 

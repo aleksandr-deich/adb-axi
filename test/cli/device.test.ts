@@ -171,12 +171,15 @@ describe("an offline emulator's last-known AVD name", () => {
       rules: [
         {
           match: ["devices", "-l"],
-          respond: { stdout: "List of devices attached\nemulator-5556          device transport_id:2\n\n" },
+          respond: {
+            stdout: "List of devices attached\nemulator-5556          device transport_id:2\n\n",
+          },
         },
         {
           match: ["-s", "emulator-5556", "shell", { re: "echo @sdk; .*" }],
           respond: {
-            stdout: "@sdk\n37\n@boot_completed\n1\n@boot_id\n3f1c8a52-0d7e-4c1b-9b1e-5a3f2d6c7e81\n@size\nPhysical size: 1344x2992\n@density\nPhysical density: 480\n",
+            stdout:
+              "@sdk\n37\n@boot_completed\n1\n@boot_id\n3f1c8a52-0d7e-4c1b-9b1e-5a3f2d6c7e81\n@size\nPhysical size: 1344x2992\n@density\nPhysical density: 480\n",
           },
         },
         {
