@@ -45,6 +45,11 @@ export interface Response {
   /** Wait this long before answering. */
   delayMs?: number;
   /**
+   * Answer as `date '+%s.%N %z'` does, with the host's current time shifted by this many
+   * milliseconds, for a device clock that has to be compared with the host's.
+   */
+  clockOffsetMs?: number;
+  /**
    * Never exit, like adb on a missing device. Prints `- waiting for device -` on stderr
    * unless `stderr` is given; `stdout` is written first, as output produced before the stall.
    */

@@ -6,6 +6,7 @@ import { isErrorCode } from "../../src/core/errors.js";
 import { createFakeAdb, type FakeAdb } from "../fake-adb/harness.js";
 import { unrunnableCommands } from "../helpers/help-lines.js";
 import { runCli, type CliRun } from "../helpers/run.js";
+import { sharedWithToon } from "../helpers/json.js";
 
 /**
  * The conformance sweep: every shipped command, run through the built CLI against the fake
@@ -139,7 +140,7 @@ async function both(args: string[], f: FakeAdb, racy = false): Promise<Both> {
   const toon = await runCli(args, f.env);
   const json = await runCli(withJson(args), f.env);
   expect(json.exitCode).toBe(toon.exitCode);
-  const data = JSON.parse(json.stdout) as Record<string, unknown>;
+  const data = sharedWithToon(JSON.parse(json.stdout) as Record<string, unknown>);
   const decoded = decode(toon.stdout.trimEnd()) as Record<string, unknown>;
   if (racy) {
     expect(Object.keys(decoded)).toEqual(Object.keys(data));

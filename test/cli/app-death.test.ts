@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createFakeAdb, FIXTURES_DIR, type FakeAdb } from "../fake-adb/harness.js";
 import type { Response, Rule } from "../fake-adb/scenario.js";
 import { runCli, type CliRun } from "../helpers/run.js";
+import { sharedWithToon } from "../helpers/json.js";
 
 // Parity cases run two CLI deadlines sequentially, plus process startup and cleanup.
 vi.setConfig({ testTimeout: 40_000 });
@@ -235,7 +236,7 @@ async function both(args: string[], build: () => FakeAdb): Promise<Both> {
   const jsonFake = build();
   const json = await runCli([...args, "--json"], jsonFake.env);
   expect(toon.exitCode).toBe(json.exitCode);
-  const data = JSON.parse(json.stdout) as Record<string, unknown>;
+  const data = sharedWithToon(JSON.parse(json.stdout) as Record<string, unknown>);
   const decoded = decode(toon.stdout.trimEnd()) as Record<string, unknown>;
   expect(normalized(decoded)).toEqual(normalized(data));
   return { toon, json, data, fake };

@@ -4,6 +4,7 @@ import { allCommands, REGISTRY } from "../../src/commands/registry.js";
 import { createFakeAdb, type FakeAdb } from "../fake-adb/harness.js";
 import type { Response, Rule } from "../fake-adb/scenario.js";
 import { runCli, type CliRun } from "../helpers/run.js";
+import { sharedWithToon } from "../helpers/json.js";
 
 // Parity cases run the CLI twice, and a loaded runner can take over 5 s for the pair.
 vi.setConfig({ testTimeout: 40_000 });
@@ -58,7 +59,7 @@ async function both(args: string[], f: FakeAdb): Promise<Both> {
   const toon = await runCli(args, f.env);
   const json = await runCli([...args, "--json"], f.env);
   expect(toon.exitCode).toBe(json.exitCode);
-  const data = JSON.parse(json.stdout) as Record<string, unknown>;
+  const data = sharedWithToon(JSON.parse(json.stdout) as Record<string, unknown>);
   const decoded = decode(toon.stdout.trimEnd()) as Record<string, unknown>;
   // Two runs wait for different times; every other field must match exactly.
   expect(withoutWaitTime(decoded)).toEqual(withoutWaitTime(data));
@@ -222,6 +223,84 @@ describe("app current", () => {
   });
 });
 
+describe("a device that goes away mid-command", () => {
+  const CLOSED = { stderr: "error: closed\n", exit: 1 };
+
+  /** The first listing finds the device online; `after` is what later ones say. */
+  function goingAway(after: string, command: Response = CLOSED): FakeAdb {
+    fake = createFakeAdb({
+      description: "The emulator is killed while a command runs on it",
+      synthetic: true,
+      rules: [
+        {
+          match: ["devices", "-l"],
+          respond: { stdout: ONE_ONLINE },
+          times: 1,
+          then: { stdout: after },
+        },
+        { match: ["-s", SERIAL, "shell", FOREGROUND], respond: command },
+      ],
+    });
+    return fake;
+  }
+
+  /** Both formats, each from a device that is online when the command starts. */
+  async function bothFresh(f: FakeAdb): Promise<Both> {
+    const toon = await runCli(["app", "current"], f.env);
+    f.resetVars();
+    const json = await runCli(["app", "current", "--json"], f.env);
+    const data = sharedWithToon(JSON.parse(json.stdout) as Record<string, unknown>);
+    expect(decode(toon.stdout.trimEnd())).toEqual(data);
+    expect(toon.exitCode).toBe(json.exitCode);
+    return { toon, json, data };
+  }
+
+  it("is DEVICE_OFFLINE with the usual recovery hints when it is offline now", async () => {
+    const f = goingAway(`List of devices attached\n${SERIAL}          offline transport_id:1\n\n`);
+    const { toon, data } = await bothFresh(f);
+    expect(toon.exitCode).toBe(1);
+    expect(data).toEqual({
+      error: `${SERIAL} went offline while reading the foreground activity`,
+      code: "DEVICE_OFFLINE",
+      step: "reading the foreground activity",
+      state: "offline",
+      help: [
+        `Run \`adb-axi wait boot --device ${SERIAL}\` to wait until it is back`,
+        `Run \`adb-axi doctor --device ${SERIAL}\` to see why`,
+      ],
+    });
+    // The command itself is never sent again.
+    expect(shellCommands(f)).toEqual(twice([FOREGROUND]));
+  });
+
+  it("is DEVICE_NOT_FOUND when it is gone from the list", async () => {
+    const f = goingAway("List of devices attached\n\n");
+    const { data } = await bothFresh(f);
+    expect(data).toEqual({
+      error: `${SERIAL} went away while reading the foreground activity`,
+      code: "DEVICE_NOT_FOUND",
+      step: "reading the foreground activity",
+      state: "not attached",
+      help: [
+        "Start the emulator or connect the device, then run the command again",
+        "Run `adb-axi devices` to see what is attached",
+      ],
+    });
+  });
+
+  it("reads adb's silent exit 255 the same way, as the emulator dies", async () => {
+    const f = goingAway("List of devices attached\n\n", { exit: 255 });
+    const { data } = await bothFresh(f);
+    expect(data).toMatchObject({ code: "DEVICE_NOT_FOUND", state: "not attached" });
+  });
+
+  it("keeps the remote failure when the device is still online", async () => {
+    const f = goingAway(ONE_ONLINE);
+    const { data } = await bothFresh(f);
+    expect(data).toMatchObject({ code: "REMOTE_EXIT", exit: 1, stderr: "error: closed" });
+  });
+});
+
 describe("app list", () => {
   it("lists user packages with the count and the total including system packages", async () => {
     const f = packageDevice();
@@ -229,7 +308,7 @@ describe("app list", () => {
     expect(toon.exitCode).toBe(0);
     expect(toon.stdout).toBe(
       [
-        'count: "3 user packages (6 with system, use --all)"',
+        'count: "3 user packages shown, 3 system packages hidden (use --all)"',
         "packages[3]{package,version,debuggable}:",
         "  com.example.notes,1.4.0 (57),true",
         '  com.example.notes.test,"-",true',
@@ -238,7 +317,9 @@ describe("app list", () => {
         "",
       ].join("\n"),
     );
-    expect(data).toMatchObject({ count: "3 user packages (6 with system, use --all)" });
+    expect(data).toMatchObject({
+      count: "3 user packages shown, 3 system packages hidden (use --all)",
+    });
     expect(shellCommands(f)).toEqual(twice([PACKAGES_ALL, PACKAGES_USER, PACKAGE_DUMP]));
     expectClean(f);
   });
@@ -247,7 +328,7 @@ describe("app list", () => {
     const f = packageDevice();
     const { toon, data } = await both(["app", "list", "--all"], f);
     expect(toon.exitCode).toBe(0);
-    expect(data).toMatchObject({ count: "6 packages (3 user)" });
+    expect(data).toMatchObject({ count: "6 packages shown: 3 user, 3 system" });
     expect((data.packages as { package: string }[]).map((p) => p.package)).toEqual([
       "android",
       "com.android.settings",
@@ -264,8 +345,13 @@ describe("app list", () => {
     const f = packageDevice({ user: [] });
     const { toon, data } = await both(["app", "list"], f);
     expect(toon.exitCode).toBe(0);
-    expect(toon.stdout).toBe('count: "0 user packages (3 with system, use --all)"\npackages: []\n');
-    expect(data).toEqual({ count: "0 user packages (3 with system, use --all)", packages: [] });
+    expect(toon.stdout).toBe(
+      'count: "0 user packages shown, 3 system packages hidden (use --all)"\npackages: []\n',
+    );
+    expect(data).toEqual({
+      count: "0 user packages shown, 3 system packages hidden (use --all)",
+      packages: [],
+    });
     // Nothing to describe, so the package dump is never read.
     expect(shellCommands(f)).toEqual(twice([PACKAGES_ALL, PACKAGES_USER]));
   });
@@ -274,20 +360,28 @@ describe("app list", () => {
     const f = packageDevice();
     const { toon, data } = await both(["app", "list", "--grep", "tracker"], f);
     expect(toon.exitCode).toBe(0);
-    expect(data.count).toBe("1 user package (1 with system, use --all)");
+    expect(data.count).toBe("1 user package shown, 0 system packages hidden");
     expect(data.packages).toEqual([
       { package: "com.example.tracker", version: "2.0.1 (9)", debuggable: false },
     ]);
 
     const system = await both(["app", "list", "--grep", "^android$", "--all"], f);
-    expect(system.data.count).toBe("1 package (0 user)");
+    expect(system.data.count).toBe("1 package shown: 0 user, 1 system");
 
     const none = await both(["app", "list", "--grep", "nothing-matches"], f);
     expect(none.data).toEqual({
-      count: "0 user packages (0 with system, use --all)",
+      count: "0 user packages shown, 0 system packages hidden",
       packages: [],
     });
     expectClean(f);
+  });
+
+  it("keeps the selected device in the command it suggests next", async () => {
+    const f = packageDevice();
+    const { data } = await both(["app", "list", "--grep", "tracker", "--device", SERIAL], f);
+    expect(data.help).toEqual([
+      `Run \`adb-axi app info com.example.tracker --device ${SERIAL}\` for its pid, foreground state and data size`,
+    ]);
   });
 
   it("falls back to the listed version code when the dump has no record", async () => {
@@ -424,6 +518,9 @@ describe("app info", () => {
     expect(toon.stdout).toBe("app:\n  package: dev.probe.missing\n  installed: false\n");
     expect(data).toEqual({ app: { package: "dev.probe.missing", installed: false } });
     expect(shellCommands(f)).toEqual(twice(["dumpsys package dev.probe.missing"]));
+    // The help says so, since the lifecycle commands fail with APP_NOT_INSTALLED instead.
+    const help = await runCli(["app", "info", "--help"], f.env);
+    expect(help.stdout).toContain("`installed: false` with exit 0");
   });
 
   it("answers installed: false for a package uninstalled with its data kept", async () => {

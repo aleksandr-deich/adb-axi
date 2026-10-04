@@ -17,6 +17,11 @@ export interface Mark {
    * where `logs --pkg` falls back to a pid list.
    */
   processes: ProcessName[];
+  /**
+   * The host's clock when the mark was taken, so its age can be told even when the device
+   * clock is off. Absent for marks taken before it was recorded.
+   */
+  hostEpochMs?: number;
 }
 
 /** Marks by name, in the on-disk form of `marks.json`. */
@@ -28,6 +33,7 @@ interface StoredMark {
   epoch_ms: number;
   utc_offset_minutes: number | null;
   processes?: ProcessName[];
+  host_epoch_ms?: number;
 }
 
 const MAX_NAME_LENGTH = 64;
@@ -64,6 +70,7 @@ export function readMarks(serial: string, env: NodeJS.ProcessEnv): Map<string, M
       epochMs: stored.epoch_ms,
       utcOffsetMinutes: stored.utc_offset_minutes,
       processes: stored.processes ?? [],
+      ...(stored.host_epoch_ms === undefined ? {} : { hostEpochMs: stored.host_epoch_ms }),
     });
   }
   return marks;
@@ -79,6 +86,7 @@ export function writeMark(serial: string, env: NodeJS.ProcessEnv, name: string, 
       epoch_ms: value.epochMs,
       utc_offset_minutes: value.utcOffsetMinutes,
       ...(value.processes.length === 0 ? {} : { processes: value.processes }),
+      ...(value.hostEpochMs === undefined ? {} : { host_epoch_ms: value.hostEpochMs }),
     };
   }
   writeJsonAtomic(marksPath(serial, env), file);
@@ -90,16 +98,25 @@ export function requireMark(serial: string, env: NodeJS.ProcessEnv, name: string
   const mark = marks.get(name);
   if (mark !== undefined) return mark;
   const names = [...marks.keys()];
+  // `3potatoes` or `1h` was meant as a duration, not as a mark to record under that name.
+  const durationLike = DURATION_LIKE.test(name);
   throw new AdbAxiError("MARK_NOT_FOUND", `no log mark named ${name} on ${serial}`, {
     fields: { marks: names },
     help: [
-      runHint(["logs", "mark", name], "to record it now"),
+      ...(durationLike
+        ? [
+            `\`${name}\` is not a duration either: use a whole number with ms, s or m, for example \`--since 30s\` or \`--since 5m\``,
+          ]
+        : [runHint(["logs", "mark", name], "to record it now")]),
       ...(names.length === 0
         ? []
         : [`Or pass one of the marks listed above, or a duration such as \`5m\``]),
     ],
   });
 }
+
+/** A value that starts like a duration: a number, then perhaps a unit. */
+const DURATION_LIKE = /^\d+(?:\.\d+)?\s*[A-Za-z]*$/;
 
 function isMarksFile(value: unknown): value is MarksFile {
   if (typeof value !== "object" || value === null || !("marks" in value)) return false;
@@ -115,7 +132,8 @@ function isStoredMark(value: unknown): value is StoredMark {
     typeof mark.epoch_ms === "number" &&
     (mark.utc_offset_minutes === null || typeof mark.utc_offset_minutes === "number") &&
     (mark.processes === undefined ||
-      (Array.isArray(mark.processes) && mark.processes.every(isProcessName)))
+      (Array.isArray(mark.processes) && mark.processes.every(isProcessName))) &&
+    (mark.host_epoch_ms === undefined || typeof mark.host_epoch_ms === "number")
   );
 }
 

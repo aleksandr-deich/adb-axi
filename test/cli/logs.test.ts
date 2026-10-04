@@ -6,6 +6,7 @@ import { parseLogcat } from "../../src/android/logcat.js";
 import { FIXTURES_DIR, createFakeAdb, type FakeAdb } from "../fake-adb/harness.js";
 import type { Response, Rule } from "../fake-adb/scenario.js";
 import { runCli, type CliRun } from "../helpers/run.js";
+import { sharedWithToon } from "../helpers/json.js";
 
 const A = "emulator-5554";
 const B = "emulator-5556";
@@ -80,7 +81,7 @@ async function both(args: string[], f: FakeAdb): Promise<Both> {
   const toon = await runCli(args, f.env);
   const json = await runCli([...args, "--json"], f.env);
   expect(toon.exitCode).toBe(json.exitCode);
-  const data = JSON.parse(json.stdout) as Record<string, unknown>;
+  const data = sharedWithToon(JSON.parse(json.stdout) as Record<string, unknown>);
   const decoded = decode(toon.stdout.trimEnd()) as Record<string, unknown>;
   expect(withoutWaitTime(decoded)).toEqual(withoutWaitTime(data));
   return { toon, json, data };
@@ -146,6 +147,7 @@ const rowsOf = (data: Record<string, unknown>): Record<string, string>[] =>
 describe("logs mark", () => {
   it("stores the device clock, not the host clock, and prints it in device local time", async () => {
     const f = devices({ serial: A, api: 35, clocks: [MARK_CLOCK] });
+    const before = Date.now();
     const { toon, data } = await both(["logs", "mark", "before-save"], f);
     expect(toon.exitCode).toBe(0);
     expect(toon.stdout).toBe(
@@ -155,10 +157,15 @@ describe("logs mark", () => {
     const marks = JSON.parse(readFileSync(join(f.home, A, "marks.json"), "utf8")) as {
       marks: Record<string, unknown>;
     };
+    // The host's clock is kept beside it only to tell the mark's age later.
     expect(marks.marks["before-save"]).toEqual({
       epoch_ms: 1790834110420,
       utc_offset_minutes: -420,
+      host_epoch_ms: expect.any(Number) as number,
     });
+    const hostEpochMs = (marks.marks["before-save"] as { host_epoch_ms: number }).host_epoch_ms;
+    expect(hostEpochMs).toBeGreaterThanOrEqual(before);
+    expect(hostEpochMs).toBeLessThanOrEqual(Date.now());
     expect(shellCommands(f)).not.toContain(PS);
     expectClean(f);
   });
@@ -425,7 +432,7 @@ describe("logs", () => {
       f,
     );
     expect(toon.exitCode).toBe(0);
-    expect(Object.keys(data)).toEqual(["window", "scope", "counts", "lines"]);
+    expect(Object.keys(data)).toEqual(["window", "scope", "counts", "lines", "shown", "help"]);
     expect(data.window).toBe(`before-run -> now (28 s), ${parsed.length} lines scanned`);
     expect(data.scope).toBe("dev.probe (uid 10213)");
 
@@ -439,10 +446,15 @@ describe("logs", () => {
       tag: "ziparchive",
       message: expect.stringContaining("Unable to open") as string,
     });
-    // Nothing was cut, so there is no `shown` line and no `--full` help.
-    expect(data).not.toHaveProperty("shown");
-    expect(data).not.toHaveProperty("help");
-    expect(toon.stdout).not.toContain("--full");
+    // Repeats were folded: every row is shown, but the distinct timestamps need `--full`.
+    const shownRows = rowsOf(data).length;
+    expect(data.shown).toEqual({
+      rows: `${shownRows} of ${shownRows}`,
+      lines: `${warnings.length} matched, ${warnings.length - shownRows} folded into repeated rows`,
+    });
+    expect(data.help).toEqual([
+      `Run the same command with \`--full\` to write all ${warnings.length} matched lines to a file`,
+    ]);
     expect(logcatCommands(f)).toEqual([
       logcatFor("1790834222.000", 10213),
       logcatFor("1790834222.000", 10213),
@@ -504,6 +516,11 @@ describe("logs", () => {
       ],
     );
     expect(data.counts).toEqual({ E: 3, W: 3, I: 3, D: 2 });
+    // The fatal exception is better read as one summary, for the same window and app.
+    expect(data.help).toEqual([
+      "Run the same command with `--full` to write all 11 matched lines to a file",
+      "Run `adb-axi logs crash --pkg dev.probe --since before-kill` for the crash with its exception and app frame",
+    ]);
 
     // The fake-adb log: `--uid` never reached the device, and every logcat call was a bounded dump.
     expect(logcatCommands(f).length).toBeGreaterThan(0);
@@ -597,8 +614,12 @@ describe("logs", () => {
       "Skipped 31 frames",
       "Skipped 31 frames",
     ]);
-    // Counts are lines, not rows.
+    // Counts are lines, not rows, and `shown` says the difference is folded repeats.
     expect(data.counts).toEqual({ W: 3, I: 1 });
+    expect(data.shown).toEqual({ rows: "3 of 3", lines: "4 matched, 1 folded into repeated rows" });
+    expect(data.help).toEqual([
+      "Run the same command with `--full` to write all 4 matched lines to a file",
+    ]);
   });
 
   describe("truncation", () => {
@@ -618,11 +639,16 @@ describe("logs", () => {
       expect(rowsOf(data)).toHaveLength(50);
       expect(rowsOf(data)[0]?.message).toBe("line number 70");
       expect(rowsOf(data).at(-1)?.message).toBe("line number 119");
-      expect(data.shown).toBe("50 of 120 lines");
+      expect(data.shown).toEqual({
+        rows: "50 of 120, the oldest 70 left out",
+        lines: "120 matched",
+      });
       expect(data.help).toEqual([
-        "Run the same command with `--full` to write all 120 lines to a file",
+        "Run the same command with `--full` to write all 120 matched lines to a file",
       ]);
-      expect(toon.stdout).toContain("shown: 50 of 120 lines");
+      expect(toon.stdout).toContain(
+        'shown:\n  rows: "50 of 120, the oldest 70 left out"\n  lines: 120 matched\n',
+      );
       expect(data.counts).toEqual({ I: 120 });
     });
 
@@ -642,9 +668,12 @@ describe("logs", () => {
         },
       });
       const { data } = await both(["logs"], f);
-      expect(data.shown).toBe("50 of 62 lines");
+      expect(data.shown).toEqual({
+        rows: "50 of 61, the oldest 11 left out",
+        lines: "62 matched, 1 folded into repeated rows",
+      });
       expect(data.help).toEqual([
-        "Run the same command with `--full` to write all 62 lines to a file",
+        "Run the same command with `--full` to write all 62 matched lines to a file",
       ]);
     });
 
@@ -657,7 +686,10 @@ describe("logs", () => {
       });
       const toon = await runCli(["logs", "--full"], f.env);
       const data = decode(toon.stdout.trimEnd()) as Record<string, unknown>;
-      expect(data.shown).toBe("50 of 120 lines");
+      expect(data.shown).toEqual({
+        rows: "50 of 120, the oldest 70 left out",
+        lines: "120 matched",
+      });
       expect(data).not.toHaveProperty("help");
       const path = data.full as string;
       expect(path.startsWith(join(f.home, "out"))).toBe(true);
@@ -672,9 +704,7 @@ describe("logs", () => {
         serial: A,
         api: 35,
         clocks: ["1790835000.000000000 +0000\n"],
-        shell: {
-          [logcatFor("1790834100.000")]: { stdout: logLine(1790834990000, 1, "I", "Tag", "ready") },
-        },
+        shell: { [logcatFor("1790834100.000")]: { stdout: many(60) } },
       });
       const runs = await Promise.all([
         runCli(["logs", "--full"], f.env),
@@ -686,26 +716,54 @@ describe("logs", () => {
       });
       expect(new Set(paths).size).toBe(2);
       for (const path of paths) {
-        expect(readFileSync(path, "utf8")).toBe("06:09:50.000 I Tag: ready\n");
+        expect(readFileSync(path, "utf8").trimEnd().split("\n")).toHaveLength(60);
       }
       expectClean(f);
     });
 
-    it("writes an empty file and prints its path when --full matches no lines", async () => {
+    it("writes no file with --full when nothing was cut, and says so", async () => {
+      for (const stdout of ["", many(20)]) {
+        const f = devices({
+          serial: A,
+          api: 35,
+          clocks: ["1790835000.000000000 +0000\n"],
+          shell: { [logcatFor("1790834100.000")]: { stdout } },
+        });
+        const { toon, data } = await both(["logs", "--full"], f);
+        expect(toon.exitCode).toBe(0);
+        expect(data.full).toBe("not written: nothing was cut");
+        expect(data).not.toHaveProperty("shown");
+        expect(existsSync(join(f.home, "out"))).toBe(false);
+        f.cleanup();
+      }
+    });
+
+    it("writes the uncollapsed timestamps when folded repeats are the only loss", async () => {
       const f = devices({
         serial: A,
         api: 35,
         clocks: ["1790835000.000000000 +0000\n"],
-        shell: { [logcatFor("1790834100.000")]: { stdout: "" } },
+        shell: {
+          [logcatFor("1790834100.000")]: {
+            stdout: [
+              logLine(1790834890000, 1, "W", "Tag", "repeat"),
+              logLine(1790834890500, 1, "W", "Tag", "repeat"),
+            ].join("\n"),
+          },
+        },
       });
-      const toon = await runCli(["logs", "--full"], f.env);
-      const data = decode(toon.stdout.trimEnd()) as Record<string, unknown>;
-      expect(toon.exitCode).toBe(0);
-      expect(rowsOf(data)).toEqual([]);
-      expect(data.counts).toEqual({});
-      expect(data.full).toEqual(expect.stringContaining(join(f.home, "out")));
-      expect(readFileSync(data.full as string, "utf8")).toBe("");
-      expect(toon.stdout).toContain("full:");
+      const run = await runCli(["logs", "--full"], f.env);
+      expect(run.exitCode).toBe(0);
+      const data = decode(run.stdout.trimEnd()) as Record<string, unknown>;
+      expect(data.shown).toEqual({
+        rows: "1 of 1",
+        lines: "2 matched, 1 folded into repeated rows",
+      });
+      expect(data).not.toHaveProperty("help");
+      expect(readFileSync(data.full as string, "utf8")).toBe(
+        "06:08:10.000 W Tag: repeat\n06:08:10.500 W Tag: repeat\n",
+      );
+      expectClean(f);
     });
 
     it("keeps distinct timestamps for identical messages in the --full file", async () => {
@@ -716,8 +774,9 @@ describe("logs", () => {
         shell: {
           [logcatFor("1790834100.000")]: {
             stdout: [
-              logLine(1790834990000, 1, "W", "Tag", "repeat"),
-              logLine(1790834990500, 1, "W", "Tag", "repeat"),
+              logLine(1790834890000, 1, "W", "Tag", "repeat"),
+              logLine(1790834890500, 1, "W", "Tag", "repeat"),
+              many(60),
             ].join("\n"),
           },
         },
@@ -725,10 +784,12 @@ describe("logs", () => {
       const toon = await runCli(["logs", "--full"], f.env);
       const data = decode(toon.stdout.trimEnd()) as Record<string, unknown>;
       expect(toon.exitCode).toBe(0);
-      expect(rowsOf(data)).toHaveLength(1);
-      expect(rowsOf(data)[0]?.message).toBe("repeat (repeated 2x)");
-      expect(readFileSync(data.full as string, "utf8")).toBe(
-        "06:09:50.000 W Tag: repeat\n06:09:50.500 W Tag: repeat\n",
+      expect(data.shown).toEqual({
+        rows: "50 of 61, the oldest 11 left out",
+        lines: "62 matched, 1 folded into repeated rows",
+      });
+      expect(readFileSync(data.full as string, "utf8")).toMatch(
+        /^06:08:10\.000 W Tag: repeat\n06:08:10\.500 W Tag: repeat\n/,
       );
     });
 
@@ -765,7 +826,11 @@ describe("logs", () => {
       expect(
         Buffer.byteLength(`${row?.time},${row?.level},${row?.tag},${row?.message}`),
       ).toBeLessThanOrEqual(4096);
-      expect(data.shown).toMatch(/^1 of 1 lines, cut at 4096 of \d+ bytes$/);
+      expect(data.shown).toEqual({
+        rows: "1 of 1",
+        lines: "1 matched",
+        cut: expect.stringMatching(/^1 row at 4096 of \d+ bytes$/) as string,
+      });
       const full = await runCli(["logs", "--full"], f.env);
       const path = (decode(full.stdout.trimEnd()) as Record<string, unknown>).full as string;
       expect(readFileSync(path, "utf8")).toContain(`${tag}: original message`);
@@ -790,7 +855,11 @@ describe("logs", () => {
       expect(
         Buffer.byteLength(`${row?.time},${row?.level},${row?.tag},${row?.message}`),
       ).toBeLessThanOrEqual(4096);
-      expect(data.shown).toMatch(/^1 of 1 lines, cut at \d+ of \d+ bytes$/);
+      expect(data.shown).toEqual({
+        rows: "1 of 1",
+        lines: "1 matched",
+        cut: expect.stringMatching(/^1 row at \d+ of \d+ bytes$/) as string,
+      });
     });
 
     it("cuts a long message and says how long it was, keeping it whole in the file", async () => {
@@ -806,6 +875,11 @@ describe("logs", () => {
       const toon = await runCli(["logs", "--full"], f.env);
       const data = decode(toon.stdout.trimEnd()) as Record<string, unknown>;
       expect(rowsOf(data)[0]?.message).toBe(`${"x".repeat(500)}... (truncated, 900 chars total)`);
+      expect(data.shown).toEqual({
+        rows: "1 of 1",
+        lines: "1 matched",
+        cut: "1 message over 500 chars",
+      });
       expect(readFileSync(data.full as string, "utf8")).toContain(long);
     });
   });
@@ -822,6 +896,22 @@ describe("logs", () => {
       help: [
         "Run `adb-axi logs mark nope` to record it now",
         "Or pass one of the marks listed above, or a duration such as `5m`",
+      ],
+    });
+    expect(logcatCommands(f)).toEqual([]);
+  });
+
+  it("keeps the selected device in its help, and says which durations a duration-like value misses", async () => {
+    const f = devices({ serial: A, api: 35 }, { serial: B, api: 35 });
+    const { data } = await both(["logs", "--device", B, "--since", "nope"], f);
+    expect(data.help).toEqual([`Run \`adb-axi logs mark nope --device ${B}\` to record it now`]);
+    const typo = await both(["logs", "--device", B, "--since", "3potatoes"], f);
+    expect(typo.data).toEqual({
+      error: `no log mark named 3potatoes on ${B}`,
+      code: "MARK_NOT_FOUND",
+      marks: [],
+      help: [
+        "`3potatoes` is not a duration either: use a whole number with ms, s or m, for example `--since 30s` or `--since 5m`",
       ],
     });
     expect(logcatCommands(f)).toEqual([]);

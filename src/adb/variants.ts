@@ -43,6 +43,16 @@ function table(prefixes: string): readonly [RegExp, ErrorCode][] {
   ];
 }
 
+/**
+ * adb's own line for a device connection that closed under a call, for example when the
+ * emulator is killed mid-command. On its own it does not say whether the device is gone.
+ */
+const TRANSPORT_CLOSED = /^(?:adb: )?error: (?:closed|protocol fault\b.*)$/m;
+
+export function isTransportClosed(stderr: string): boolean {
+  return TRANSPORT_CLOSED.test(stderr);
+}
+
 export function classifyAdbFailure(text: string): ErrorCode | undefined {
   return classify(VARIANTS, text);
 }

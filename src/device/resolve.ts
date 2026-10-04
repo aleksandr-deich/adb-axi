@@ -2,7 +2,7 @@ import type { AdbClient } from "../adb/run.js";
 import type { Deadline } from "../core/deadline.js";
 import { AdbAxiError } from "../core/errors.js";
 import { runHint } from "../core/output.js";
-import { avdName, readFacts, type DeviceFacts } from "./facts.js";
+import { avdName, lastKnownAvd, lastKnownLabel, readFacts, type DeviceFacts } from "./facts.js";
 import { listDevices, ONLINE, type AttachedDevice } from "./list.js";
 
 export interface Target {
@@ -115,7 +115,47 @@ async function byName(
     );
   }
 
-  const known = new Map(names.map((entry) => [entry.device.serial, entry.avd]));
+  // An emulator that is going down or coming up may not answer on its console. The name
+  // seen on its serial before is then the best evidence, and it is labelled as such.
+  const lastKnown = new Map(
+    names
+      .filter((entry) => entry.device.state !== ONLINE && entry.avd === null)
+      .flatMap((entry) => {
+        const avd = lastKnownAvd(entry.device.serial, options.env);
+        return avd === null ? [] : [[entry.device.serial, avd] as const];
+      }),
+  );
+  // Only a device that cannot take commands is picked by it, and only to say so.
+  const stale = names.filter(
+    (entry) => entry.device.state !== ONLINE && lastKnown.get(entry.device.serial) === wanted,
+  );
+  const [only] = stale;
+  if (stale.length === 1 && only !== undefined) {
+    checkState(only.device, options, wanted);
+  }
+  if (stale.length > 1) {
+    throw new AdbAxiError(
+      "DEVICE_AMBIGUOUS",
+      `${stale.length} unavailable emulators were last known as ${wanted}`,
+      {
+        fields: {
+          devices: stale.map(({ device }) => ({
+            serial: device.serial,
+            avd: lastKnownLabel(wanted),
+            form: "-",
+          })),
+        },
+        help: [runHint(withDevice(options.commandArgs, "<serial>"), "to pick one by serial")],
+      },
+    );
+  }
+
+  const known = new Map(
+    names.map((entry) => {
+      const last = lastKnown.get(entry.device.serial);
+      return [entry.device.serial, entry.avd ?? (last === undefined ? null : lastKnownLabel(last))];
+    }),
+  );
   throw new AdbAxiError(
     "DEVICE_NOT_FOUND",
     `no attached device has the serial or AVD name ${wanted}`,
@@ -148,18 +188,24 @@ function withDevice(commandArgs: readonly string[], value: string): string[] {
   return [...flags, "--device", value, ...rest];
 }
 
-/** Fail unless the device accepts commands. Returns nothing: an online device passes. */
-function checkState(device: AttachedDevice, options: ResolveOptions): void {
+/**
+ * Fail unless the device accepts commands. Returns nothing: an online device passes.
+ * `lastKnownAvd` is the AVD name it was picked by when only its last-known name matched.
+ */
+function checkState(device: AttachedDevice, options: ResolveOptions, lastKnownAvd?: string): void {
   if (device.state === ONLINE) return;
+  const named =
+    lastKnownAvd === undefined ? device.serial : `${device.serial} (last known as ${lastKnownAvd})`;
+  const avdField = lastKnownAvd === undefined ? {} : { avd: lastKnownLabel(lastKnownAvd) };
   const doctor = options.isShipped(["doctor"])
     ? [runHint(["doctor", "--device", device.serial], "to see why")]
     : [];
   if (device.state === "unauthorized" || device.state === "no permissions") {
     throw new AdbAxiError(
       "DEVICE_UNAUTHORIZED",
-      `${device.serial} has not authorized USB debugging from this computer`,
+      `${named} has not authorized USB debugging from this computer`,
       {
-        fields: { state: device.state },
+        fields: { state: device.state, ...avdField },
         help: [
           "Accept the USB debugging prompt on the device, then run the command again",
           ...doctor,
@@ -169,10 +215,10 @@ function checkState(device: AttachedDevice, options: ResolveOptions): void {
   }
   const message =
     device.state === "offline"
-      ? `${device.serial} is offline`
-      : `${device.serial} is in state ${device.state}, not ready for commands`;
+      ? `${named} is offline`
+      : `${named} is in state ${device.state}, not ready for commands`;
   throw new AdbAxiError("DEVICE_OFFLINE", message, {
-    fields: { state: device.state },
+    fields: { state: device.state, ...avdField },
     help: doctor,
   });
 }

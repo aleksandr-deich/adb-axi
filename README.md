@@ -8,7 +8,12 @@ It covers the device-state side of Android work: devices and their health, the a
 
 Requirements: Node 22 or newer, and the Android SDK platform-tools. Devices must run Android 10 (API 29) or newer.
 
-adb-axi is pre-release. The `0.0.1` package on npm is a name placeholder without these commands, so build and install it from this repository:
+```sh
+npm install --global adb-axi
+adb-axi --version
+```
+
+To build and install it from this repository instead:
 
 ```sh
 git clone https://github.com/aleksandr-deich/adb-axi.git
@@ -38,7 +43,7 @@ crashes: "0 in the last 15m (no log mark yet)"
 help[1]: Run `adb-axi logs --pkg dev.probe --since 1m` for recent app logs
 ```
 
-Crashes are counted since the target's latest `logs mark`, or in the last 15 minutes when it has none, and the window is printed. With no device attached it says so (`count: "0 attached, 0 online"`, `target: "-"`) and exits 0. When several devices are online and none is selected, it lists them, shows `target: "-"` with the reason, and does not fail. A device read that fails shows `-` for that field.
+Crashes are counted since the target's latest `logs mark`, or in the last 15 minutes when it has none, and the window is printed with the mark's age by the host clock (`latest mark t1, set 3 d ago`), so a stale mark shows even when the device clock is off. `adb-axi --device <serial|avd>` shows one device's foreground and crashes when several are online. With no device attached it says so (`count: "0 attached, 0 online"`, `target: "-"`) and exits 0. When several devices are online and none is selected, it lists them, shows `target: "-"` with the reason, and does not fail. A device read that fails shows `-` for that field, and the first help line points at `doctor` for that device.
 
 `adb-axi --help` lists every command; `adb-axi <command> --help` gives its arguments, its flags with their defaults, and examples.
 
@@ -62,19 +67,19 @@ devices[2]{serial,avd,form}:
 help[2]: Run `adb-axi logs --pkg com.example.notes --device <serial or avd>`,Or export ANDROID_SERIAL=<serial> in this shell
 ```
 
-The target's state is checked from `adb devices -l` before anything else is sent to it, so nothing can block on adb's `- waiting for device -`: an offline device is `DEVICE_OFFLINE`, an unauthorized one `DEVICE_UNAUTHORIZED`, and a serial or AVD name that is not attached `DEVICE_NOT_FOUND`, all immediately. An AVD name used by two running emulators is `DEVICE_AMBIGUOUS`. Every adb call then names the device explicitly (`adb -s <serial> ...`) with an argument list, never a host shell string.
+The target's state is checked from `adb devices -l` before anything else is sent to it, so nothing can block on adb's `- waiting for device -`: an offline device is `DEVICE_OFFLINE`, an unauthorized one `DEVICE_UNAUTHORIZED`, and a serial or AVD name that is not attached `DEVICE_NOT_FOUND`, all immediately. An AVD name used by two emulators is `DEVICE_AMBIGUOUS`, including when two unavailable emulators match only by their last-known names; the error lists their serials so you can pick one. An unavailable emulator may not tell its AVD name; it then shows the name adb-axi last saw on its serial as `<avd> (last known)`, and selecting it by that name reports its unavailable state (`DEVICE_OFFLINE` or `DEVICE_UNAUTHORIZED`). An online emulator whose console cannot be read is never identified by a cached name. A device that goes away while a command runs on it (adb says `error: closed`) is `DEVICE_OFFLINE` or `DEVICE_NOT_FOUND` from what `adb devices` says right after; the command is never sent again. Every adb call then names the device explicitly (`adb -s <serial> ...`) with an argument list, never a host shell string.
 
-Flags go after the command. `adb-axi -s emulator-5554 logs` exits 2 and prints the corrected command, `adb-axi logs --device emulator-5554`, without touching adb.
+Flags go after the command. `adb-axi -s emulator-5554 logs` exits 2 and prints the corrected command, `adb-axi logs --device emulator-5554`, without touching adb. The home view is the exception: `adb-axi --device emulator-5554` (or `-s`, `--timeout`, `--debug`) works without a command.
 
 State that adb-axi keeps (log marks, install records, cached AVD names) lives per device serial under `~/.adb-axi/<serial>/`, so a phone and a tablet never share it. `--full` output files go to `~/.adb-axi/out/`. Set `ADB_AXI_HOME` to use another directory.
 
 ## Output, errors and deadlines
 
-- **Output.** TOON on stdout; `--json` prints the same data as JSON, field for field, on every command (`adb-axi --json` is the home view). A mutation leads with `ok: <verb> <target> -> <resulting state>`, and one that found the state already true says `(no-op)`. Lists print a count, and an empty result says 0. Next steps come as `help[N]` lines built from the actual target, and only ever name commands and flags this build ships. Progress goes to stderr; `--debug` also prints every adb argv there.
+- **Output.** TOON on stdout; `--json` prints the same results as JSON on every command (`adb-axi --json` is the home view). A mutation leads with `ok: <verb> <target> -> <resulting state>`, and one that found the state already true says `(no-op)`; its JSON also carries `"noop": true` or `false`. Lists print a count, and an empty result says 0. Next steps come as `help[N]` lines built from the actual target, and only ever name commands and flags this build ships; device-scoped suggestions keep the `--device` you passed. Text of several lines, such as `shell` output, prints in TOON as a list with one line per row and in JSON as one string. Progress goes to stderr; `--debug` also prints every adb argv there.
 - **Exit codes.** 0 when the requested state is true, including "already" no-ops and reads that find nothing; 1 when it is not; 2 for a usage error (unknown flag or value, missing argument, a flag before the command), which lists the valid flags.
 - **Errors.** One shape on stdout: `error` (one sentence naming the target), a stable `code`, any structured fields that explain it (`last`, `devices`, `exit`, `stderr`, `detail`), then `help`. Raw adb text never becomes the message; it may appear in `detail`.
-- **Deadlines.** Every command has one deadline that all its device calls share, and a call that passes it is killed: 15 s by default, 180 s for `app install`, 120 s for `wait boot` and 30 s for `app death`. `--timeout <dur>` overrides it (`500ms`, `30s`, `5m`). A step that runs out of time is `TIMEOUT` and names the step; a wait that runs out is `WAIT_TIMEOUT` with the last observation.
-- **Truncation.** `logs` and `shell` print at most 50 lines or 4 kB, and `data db` at most 50 rows, saying how many were shown out of how many; long single fields are cut with their full length. `--full` writes the complete text to a file and prints its path.
+- **Deadlines.** Every command has one deadline that all its device calls share, and a call that passes it is killed: 15 s by default, 180 s for `app install`, 120 s for `wait boot` and 30 s for `app death`. `--timeout <dur>` overrides it (`500ms`, `30s`, `5m`). A step that runs out of time is `TIMEOUT` and names the step; on a device step its help points at `doctor` first, because a hung device does not answer a longer deadline either. A wait that runs out is `WAIT_TIMEOUT` with the last observation. The deadline running out while adb-axi asks the adb server for its devices is also `TIMEOUT`, never `ADB_SERVER_UNREACHABLE`, which is kept for a server that refuses or does not answer within 15 s.
+- **Truncation.** `logs` and `shell` print at most 50 lines or 4 kB, and `data db` at most 50 rows, saying how many were shown out of how many; long single fields are cut with their full length. `--full` writes the complete text to a file and prints its path; `logs` and `data db` write one only when something was cut.
 
 ## Commands
 
@@ -83,7 +88,7 @@ State that adb-axi keeps (log marks, install records, cached AVD names) lives pe
 | `adb-axi`                                                    | Devices, the resolved target, its foreground app and recent crashes            |
 | `devices [--all] [--fields <list>]`                          | Every attached device with its AVD name, state, API level and form             |
 | `doctor`                                                     | Host, adb server and target checks for things that break a run                 |
-| `doctor ui [--fix]`                                          | What holds the device's UiAutomation connection, and clearing leaked holders   |
+| `doctor ui [--fix]`                                          | What holds UiAutomation, and clearing resident, leaked or wedged holders       |
 | `wait boot`                                                  | Waits until the device is online and has finished booting                      |
 | `wait app <pkg> --state <foreground\|running\|stopped>`      | Waits until an app reaches a state                                             |
 | `wait log <regex> [--since <mark\|dur>]`                     | Waits until a log line matches                                                 |
@@ -109,19 +114,19 @@ State that adb-axi keeps (log marks, install records, cached AVD names) lives pe
 
 ### Devices and health
 
-`devices` lists every attached device as `serial, avd, state, api, form`. `avd` comes from the emulator console (`-` for physical devices or when it cannot be read), and `form` is `phone` or `tablet` by the smallest screen width (600 dp and up is a tablet). Devices in unusual states (recovery, sideload) are counted and shown with `--all`. `--fields` adds columns from `boot`, `data_free`, `model`, `abi` and `uptime`.
+`devices` lists every attached device as `serial, avd, state, api, form`. `avd` comes from the emulator console (`-` for physical devices or an unreadable online emulator; unavailable emulators can show a cached name marked `(last known)`), and `form` is `phone` or `tablet` by the smallest screen width (600 dp and up is a tablet). Devices in unusual states (recovery, sideload) are counted and shown with `--all`. `--fields` adds columns from `boot`, `data_free`, `model`, `abi` and `uptime`.
 
-`doctor [--device <serial|avd>]` reports on adb, the server, device selection, boot, free space on `/data`, animation scales, the default keyboard, running instrumentations and the emulator console token. Checks that depend on an unavailable device are omitted. Each check is `ok`, `warn` or `failed` with a one-line detail; the command exits 1 if any check fails and 0 if there are only warnings. It reports problems but does not fix them; when an instrumentation holds UiAutomation, its help points at `doctor ui`.
+`doctor [--device <serial|avd>]` reports on adb, the server, device selection, boot, the device clock (a warning when it is more than a minute from the host's, since log times and marks use it), free space on `/data`, animation scales, the default keyboard, running instrumentations and the emulator console token. Checks that depend on an unavailable device are omitted. Each check is `ok`, `warn` or `failed` with a one-line detail; the command exits 1 if any check fails and 0 if there are only warnings. It reports problems but does not fix them; when an instrumentation holds UiAutomation, its help points at `doctor ui`. The Android CLI's own UI server, which it keeps between `android` commands, is a warning rather than a failure unless it is wedged.
 
-`doctor ui [--fix]` lists what holds the device's single UiAutomation connection: instrumentations started with one (the Android CLI's server, agent-device's snapshot instrumentation, `am instrument` and Gradle `connected*` runs) and known `app_process` servers (mobilecli's `DeviceServer`, `uiautomator`). Each holder is `live` when a host process of its tool may still use it (for mobilecli, only through an `adb forward` to this device), `wedged` when its own pid logged `Cannot call disconnect() while connecting`, and `leaked` otherwise. If the host process list or the adb forwards cannot be read, the affected holders count as `live`. The report exits 0 when UiAutomation is free or held only by live holders, and 1 when a holder is leaked or wedged. `--fix` kills leaked and wedged servers and force-stops instrumentation runner packages and packages hosting their running target processes (which also stops those packages' other app processes). It never force-stops a package also used by a live holder; a holder blocked that way remains, with a help line saying why. After checking again, it exits 0 when UiAutomation is free, exits 1 with the remaining holders when any are leaked or wedged, or fails with `HOLDER_PROTECTED`, naming what would release the live holders, when only live holders remain.
+`doctor ui [--fix]` lists what holds the device's single UiAutomation connection: instrumentations started with one (the Android CLI's server, agent-device's snapshot instrumentation, `am instrument` and Gradle `connected*` runs) and known `app_process` servers (mobilecli's `DeviceServer`, `uiautomator`). Each holder is `live` when a host process of its tool may still use it (for mobilecli, only through an `adb forward` to this device), `wedged` when its own pid logged `Cannot call disconnect() while connecting`, `resident` for the Android CLI's server with no `android` command running (kept on purpose between commands; it only blocks instrumentation tests, such as Gradle `connected*` tasks), and `leaked` otherwise. If the host process list or the adb forwards cannot be read, the affected holders count as `live`. The report exits 0 when UiAutomation is free or held only by live or resident holders, and 1 when a holder is leaked or wedged. `--fix` clears resident Android CLI servers as well as leaked and wedged holders: it kills `app_process` servers and force-stops instrumentation runner packages and packages hosting their running target processes (which also stops those packages' other app processes). It never force-stops a package also used by a live holder; a holder blocked that way remains, with a help line saying why. After checking again, it exits 0 when UiAutomation is free, exits 1 with remaining non-live holders (including resident ones that could not be cleared), or fails with `HOLDER_PROTECTED`, naming what would release the live holders, when only live holders remain.
 
 `wait boot` waits for the device to come online and `sys.boot_completed` to become `1`. A device that is not attached yet or offline is waited out rather than an error. Once it selects a device, it keeps waiting for that same device even if another comes online. On `WAIT_TIMEOUT`, `last` holds `state`, `boot_completed` and `uptime_s`; unknown readings are `-`.
 
 ### Apps
 
-`app current`, `app list` and `app info` read without changing anything. `app list` shows user packages and counts the system ones (`--all` includes them, `--grep` filters by name); `app info` of a package that is not installed answers `installed: false` with exit 0. `wait app <pkg> --state <foreground|running|stopped>` polls until the state is true and prints `waited_ms`.
+`app current`, `app list` and `app info` read without changing anything. `app list` shows user packages and counts the hidden system ones (`--all` includes them, `--grep` filters by name); `app info` of a package that is not installed answers `installed: false` with exit 0. `wait app <pkg> --state <foreground|running|stopped>` polls until the state is true and prints `waited_ms`.
 
-`app install <apk>` uses `adb install -r` to keep existing app data. Without `--clean-data`, its success line says `with data kept` when a package record exists (including an uninstalled record with retained data), or `(fresh install)` when none exists. It then waits for the package manager to report the APK's versionCode. `--clean-data` installs, clears data, and verifies the version again, even with `--if-changed`. If the APK metadata cannot be read, `--clean-data` refuses the install because the package to wipe is unknown; otherwise an unreadable APK can still be installed, and the output says its version was not verified.
+`app install <apk>` uses `adb install -r` to keep existing app data. Without `--clean-data`, its success line says `with data kept` when a package record exists (including an uninstalled record with retained data), or `(fresh install)` when none exists. It then waits for the package manager to report the APK's versionCode, and prints whether the installed app is `debuggable`. When a build of the same version replaces another, `changed` says what the version does not: `debuggable: true -> false`, or a signer that differs from the last install adb-axi recorded. `--clean-data` installs, clears data, and verifies the version again, even with `--if-changed`. If the APK metadata cannot be read, `--clean-data` refuses the install because the package to wipe is unknown; otherwise an unreadable APK can still be installed, and the output says its version was not verified.
 
 Without a requested wipe, `--if-changed` skips only when the installed versionCode and the target device's signer evidence match the APK. Unreadable, unsupported, oversized or timed-out signer evidence skips the shortcut, not the ordinary install. Signing-block reads use v2/v3 certificate digests without SDK build tools; they do not verify cryptographic authenticity. Verified installs save per-device history in `last-install.json`, not proof of the current installed signer. A record-write failure is a warning, not an install failure.
 
@@ -140,7 +145,7 @@ The lifecycle commands require the package to be installed for the current Andro
 
 `logs mark [name]` stores the device's own clock under a name, per device, so `logs`, `logs crash` and `wait log` can cover exactly one run without host and device clock skew shifting the window. Without a name it uses `mark-<HHMMSS>` from device time. Take marks one at a time per device: simultaneous `logs mark` calls can lose one. `--since` takes a mark name or a duration back from now.
 
-`logs` prints one bounded dump (every logcat call is `-d`, so it never streams): level counts, repeated lines collapsed, and the last 50 rows or 4 kB, with `shown: N of M lines` when rows were cut. `--full` writes every matching line uncollapsed, with its own timestamp, to a file and prints the path, even when no lines match. Without `--since` the dump starts 15 minutes back. When the first scanned line is more than two seconds after the window start, `logs` notes that earlier lines may have been dropped by the device log buffer; the device may also simply have been quiet.
+`logs` prints one bounded dump (every logcat call is `-d`, so it never streams): level counts, repeated lines collapsed, and the last 50 rows or 4 kB. When the table differs from the matched lines, `shown` says how: `rows` (how many of the rows are on screen, and how many of the oldest were left out), `lines` (how many lines matched, and how many were folded into repeated rows) and `cut` (messages cut at 500 characters, or a row cut at 4 kB). `--full` writes every matching line uncollapsed, with its own timestamp, to a file and prints the path when rows were omitted, repeats folded, or content cut; otherwise it says `not written: nothing was cut`. A dump that contains a crash points at `logs crash` for the same window. Without `--since` the dump starts 15 minutes back. When the first scanned line is more than two seconds after the window start, `logs` notes that earlier lines may have been dropped by the device log buffer; the device may also simply have been quiet.
 
 `--pkg` follows the app with `logcat --uid` on API 31 and newer. On API 29 and 30, which have no `--uid`, it uses a pid list: the app's current pids, those recorded when the window's mark was taken, and those ActivityManager names in "Start proc" lines inside the window; it can miss a process that starts and dies between two reads. Both forms drop lines that other processes log about the app, such as ActivityManager's "has died" lines and ANR reports, which is why `logs crash` matches by name instead.
 
@@ -157,7 +162,18 @@ The lifecycle commands require the package to be installed for the current Andro
 - **Rows:** the first 50 are printed, with `shown: 50 of N rows` when more exist. Cells over 500 characters are cut. `--full` writes all rows with uncut cells to a file, only when something was cut. Results larger than 64 MB fail even with `--full`.
 - **Errors:** `APP_NOT_DEBUGGABLE` (`run-as` refused, as for release builds), `DB_NOT_FOUND` (names the databases that exist), `INVALID_OUTPUT`, `SQL_ERROR` (sqlite3's message) and `SQLITE_NOT_FOUND`.
 
-`shell -- '<cmd>'` runs one command string in the device shell through `shell_v2`, so the remote exit code is real. A non-zero exit is exit 1 with `code: REMOTE_EXIT`, the remote `exit` and its `stderr`.
+`shell -- '<cmd>'` runs one command string in the device shell through `shell_v2`, so the remote exit code is real. adb-axi's own flags, such as `--device`, go before `--`: everything after it runs on the device. A non-zero exit is exit 1 with `code: REMOTE_EXIT`, the remote `exit` and its `stderr`.
+
+Device settings such as dark mode and display density have no command of their own; `shell` changes them. Read the value first, so you can put it back:
+
+```sh
+adb-axi shell --device emulator-5554 -- 'cmd uimode night; wm density'   # current values
+adb-axi shell --device emulator-5554 -- 'cmd uimode night yes; wm density 560'
+adb-axi shell --device emulator-5554 -- 'cmd uimode night; wm density'   # check the change
+adb-axi shell --device emulator-5554 -- 'cmd uimode night no; wm density reset'
+```
+
+`cmd uimode night` prints `Night mode: yes` or `no`, and `wm density` prints the physical density and any override. Restore the values you read, rather than assuming the defaults (`night no` and `density reset` are the defaults).
 
 ## Walkthrough: does an app survive process death?
 

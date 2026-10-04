@@ -18,6 +18,12 @@ export interface Holder {
   processes: { pid: number; package: string }[];
 }
 
+/**
+ * The Android CLI's UI instrumentation (`android layout`, `android screen`). It stays
+ * resident between `android` commands, which is normal and serves the next one.
+ */
+export const ANDROID_CLI_PACKAGE = "com.android.cli.interact.instrumentation";
+
 const HEADER =
   /^\s*Instrumentation #\d+: ActiveInstrumentation\{\S+ \{([^/\s}]+)\/([^\s}]+)\}( FINISHED)? \d+ procs\}\s*$/;
 

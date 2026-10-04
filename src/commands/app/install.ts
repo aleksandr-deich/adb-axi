@@ -9,13 +9,13 @@ import { invalidOutput, readShell, type ReadOptions } from "../../android/read.j
 import { formatDuration } from "../../core/args.js";
 import { Deadline } from "../../core/deadline.js";
 import { AdbAxiError } from "../../core/errors.js";
-import { okLine, runHint, shellWords, type Output } from "../../core/output.js";
+import { noop, okLine, runHint, shellWords, type Output } from "../../core/output.js";
 import { MAX_INTERVAL_MS, poll } from "../../core/poll.js";
 import { isErrno } from "../../core/state.js";
 import { defineCommand } from "../define.js";
 import type { CommandContext } from "../types.js";
 import { installFailureError } from "./install-errors.js";
-import { writeInstallRecord, type InstallRecord } from "./install-record.js";
+import { readInstallRecord, writeInstallRecord, type InstallRecord } from "./install-record.js";
 import { formatVersion, readOptions, targetSerial, UNKNOWN } from "./shared.js";
 
 const MAX_INSTALLED_APK_BYTES = 64 * 1024 * 1024;
@@ -95,7 +95,7 @@ async function runInstall(context: CommandContext): Promise<Output> {
         ok: okLine(
           "install",
           read.info.package,
-          "already installed (same versionCode and signature)",
+          noop("already installed (same versionCode and signature)"),
         ),
       };
     }
@@ -117,13 +117,26 @@ async function runInstall(context: CommandContext): Promise<Output> {
   }
 
   const info = read.info;
-  await waitForVersion(context, adb, serial, info, options);
+  let installed = await waitForVersion(context, adb, serial, info, options);
   if (clean) {
     await clearData(adb, serial, info.package, options);
     // The package must survive the wipe at the version just installed.
-    await waitForVersion(context, adb, serial, info, options);
+    installed = await waitForVersion(context, adb, serial, info, options);
   }
 
+  // A swap between a debug and a release build keeps the version, so say what did change.
+  const last = readInstallRecord(serial, info.package, context.env);
+  const changed = [
+    ...(previous !== null && previous.debuggable !== installed.debuggable
+      ? [`debuggable: ${previous.debuggable} -> ${installed.debuggable}`]
+      : []),
+    ...(last !== undefined &&
+    last.signers !== null &&
+    info.signers !== null &&
+    !sameSigners(last.signers, info.signers)
+      ? ["signed differently from the last adb-axi install"]
+      : []),
+  ];
   const warning = saveRecord(serial, info, context.env);
   return {
     ok: okLine(
@@ -136,6 +149,8 @@ async function runInstall(context: CommandContext): Promise<Output> {
         previous === null
           ? "not installed"
           : formatVersion(previous.versionName, previous.versionCode),
+      debuggable: installed.debuggable,
+      ...(changed.length === 0 ? {} : { changed }),
       ...(shortcut === undefined ? {} : { shortcut }),
       ...(warning === undefined ? {} : { warning }),
       took_ms: elapsed(started),
@@ -339,7 +354,7 @@ async function waitForVersion(
   serial: string,
   info: ApkInfo,
   options: ReadOptions,
-): Promise<void> {
+): Promise<PackageInfo> {
   assertPackageName(info.package);
   let latest: PackageInfo | null | undefined;
   const result = await poll({
@@ -361,7 +376,7 @@ async function waitForVersion(
         : { done: false, last: latest };
     },
   });
-  if (result.ok) return;
+  if (result.ok) return result.value;
   throw new AdbAxiError(
     "WAIT_TIMEOUT",
     `${info.package} did not report versionCode ${info.versionCode} within ${formatDuration(context.timeoutMs)}`,
@@ -404,6 +419,10 @@ function saveRecord(serial: string, info: ApkInfo, env: NodeJS.ProcessEnv): stri
     const reason = error instanceof Error ? error.message : String(error);
     return `the install was not recorded (${reason})`;
   }
+}
+
+function sameSigners(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && a.every((signer, index) => signer === b[index]);
 }
 
 function elapsed(started: number): number {

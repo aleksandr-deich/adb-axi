@@ -94,13 +94,35 @@ describe("parseDeviceList", () => {
 });
 
 describe("listDevices", () => {
-  it("reports a server that never answers as ADB_SERVER_UNREACHABLE within the deadline", async () => {
+  it("reports a server that never answers within its cap as ADB_SERVER_UNREACHABLE", async () => {
     const { adb } = setup({ rules: [{ match: ["devices", "-l"], respond: { hang: true } }] });
     const started = performance.now();
-    await expect(listDevices(adb, new Deadline(500))).rejects.toMatchObject({
+    await expect(listDevices(adb, new Deadline(10_000), 500)).rejects.toMatchObject({
       code: "ADB_SERVER_UNREACHABLE",
     });
     expect(performance.now() - started).toBeLessThan(500 + 750);
+  });
+
+  it("reports the command deadline running out while listing as TIMEOUT, not the server", async () => {
+    const { adb } = setup({ rules: [{ match: ["devices", "-l"], respond: { hang: true } }] });
+    const started = performance.now();
+    const error = await listDevices(adb, new Deadline(500)).catch((e: unknown) => errorObject(e));
+    expect(error).toEqual({
+      error: "listing devices did not finish before the 500 ms deadline",
+      code: "TIMEOUT",
+      step: "listing devices",
+      help: [
+        "Run the same command with a longer `--timeout`, for example `--timeout 60s`",
+        "If a longer deadline times out too, the adb server is not answering: check that nothing else holds tcp:5037",
+      ],
+    });
+    expect(performance.now() - started).toBeLessThan(500 + 750);
+  });
+
+  it("reports a deadline already spent before the listing as TIMEOUT naming the step", async () => {
+    const { adb } = setup({ rules: [] });
+    const error = await listDevices(adb, new Deadline(0)).catch((e: unknown) => errorObject(e));
+    expect(error).toMatchObject({ code: "TIMEOUT", step: "listing devices" });
   });
 
   it("reports a server that cannot be reached as ADB_SERVER_UNREACHABLE", async () => {

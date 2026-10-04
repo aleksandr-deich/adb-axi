@@ -4,6 +4,7 @@ import { extractJsonFlag, main } from "../../src/cli.js";
 import { defineCommand, defineGroup } from "../../src/commands/define.js";
 import type { Registry } from "../../src/commands/types.js";
 import { okLine } from "../../src/core/output.js";
+import { sharedWithToon } from "../helpers/json.js";
 
 const start = defineCommand({
   path: ["app", "start"],
@@ -106,8 +107,8 @@ describe("dispatch", () => {
     const after = await run(["app", "start", "com.example", "--json"]);
     const before = await run(["--json", "app", "start", "com.example"]);
     expect(after.out).toBe(before.out);
-    expect(JSON.parse(after.out)).toEqual(decode(toon.out.trimEnd()));
-    expect(JSON.parse(after.out)).toMatchObject({ timeout_ms: 15_000 });
+    expect(sharedWithToon(JSON.parse(after.out) as object)).toEqual(decode(toon.out.trimEnd()));
+    expect(JSON.parse(after.out)).toMatchObject({ noop: false, timeout_ms: 15_000 });
   });
 
   it("routes bare --json to the home view with the header", async () => {
@@ -142,10 +143,31 @@ describe("dispatch", () => {
     expect(out).toContain("Run `adb-axi shell --device e-1 -- ls -la`");
   });
 
-  it("rejects a leading flag with no command", async () => {
-    const { out, exit } = await run(["-s", "emulator-5554"]);
+  it("runs the home view for global flags alone", async () => {
+    for (const argv of [
+      ["-s", "emulator-5554"],
+      ["--device=emulator-5554", "--timeout", "5s"],
+    ]) {
+      const { out, exit } = await run(argv);
+      expect(exit).toBe(0);
+      expect(decode(out.trimEnd())).toMatchObject({ devices: [], target: null });
+    }
+    const bad = await run(["--timeout", "soon"]);
+    expect(bad.exit).toBe(2);
+    expect(bad.out).toContain('--timeout value \\"soon\\" is not a duration');
+  });
+
+  it("rejects a command's flag with no command, without saying it goes after one", async () => {
+    const { out, exit } = await run(["--pkg", "x", "-s", "emulator-5554"]);
     expect(exit).toBe(2);
-    expect(out).toContain("Run `adb-axi <command> --device emulator-5554`");
+    expect(decode(out.trimEnd())).toEqual({
+      error: "`--pkg x -s emulator-5554` needs a command to go with",
+      code: "VALIDATION_ERROR",
+      help: [
+        "Run `adb-axi <command> --pkg x --device emulator-5554`",
+        "Run `adb-axi --help` for every command and its summary",
+      ],
+    });
   });
 
   it("lists the command's valid flags for an unknown flag, with its help", async () => {
@@ -168,10 +190,17 @@ describe("dispatch", () => {
       code: "VALIDATION_ERROR",
       commands: ["app"],
       help: [
-        "Run `adb-axi app` if you meant `app`",
+        "Run `adb-axi app` if `ap` was meant to be `app`",
         "Run `adb-axi --help` for every command and its summary",
       ],
     });
+  });
+
+  it("suggests the whole corrected command line for a mistyped command", async () => {
+    const { out } = await run(["aps", "start", "com.example", "--device", "e-1"]);
+    expect((decode(out.trimEnd()) as { help: string[] }).help[0]).toBe(
+      "Run `adb-axi app start com.example --device e-1` if `aps` was meant to be `app`",
+    );
   });
 
   it("prints help for a shipped subcommand and for its group", async () => {
@@ -229,7 +258,7 @@ describe("dispatch", () => {
       code: "VALIDATION_ERROR",
       subcommands: ["start"],
       help: [
-        "Run `adb-axi app start` if you meant `start`",
+        "Run `adb-axi app start x` if `strat` was meant to be `start`",
         "Run `adb-axi app --help` for its subcommands",
       ],
     });

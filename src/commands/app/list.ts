@@ -63,9 +63,11 @@ export const appList = defineCommand({
       };
     });
 
+    // Both forms say what is shown, then the user and system split.
+    const system = everything.length - users.length;
     const count = all
-      ? `${plural(everything.length, "package")} (${users.length} user)`
-      : `${plural(users.length, "user package")} (${everything.length} with system, use --all)`;
+      ? `${plural(everything.length, "package")} shown: ${users.length} user, ${system} system`
+      : `${plural(users.length, "user package")} shown, ${plural(system, "system package")} hidden${system > 0 ? " (use --all)" : ""}`;
     const first = rows[0];
     return {
       count,

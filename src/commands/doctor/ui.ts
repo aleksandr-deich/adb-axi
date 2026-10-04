@@ -9,7 +9,7 @@ import { runShell } from "../../adb/shell.js";
 import { AdbAxiError } from "../../core/errors.js";
 import { listDevices } from "../../device/list.js";
 import { avdName } from "../../device/facts.js";
-import { noop, okLine, runHint, type Output } from "../../core/output.js";
+import { commandLine, noop, okLine, runHint, type Output } from "../../core/output.js";
 import { poll } from "../../core/poll.js";
 import { UNKNOWN, readOptions, targetSerial } from "../app/shared.js";
 import { defineCommand } from "../define.js";
@@ -22,13 +22,14 @@ const SETTLE_MS = 5_000;
 
 export const doctorUi = defineCommand({
   path: ["doctor", "ui"],
-  summary: "Find on-device UiAutomation holders and classify them as live, leaked or wedged",
+  summary:
+    "Find on-device UiAutomation holders and classify them as live, resident, leaked or wedged",
   flags: [
     {
       name: "--fix",
       type: "boolean",
       description:
-        "Clear leaked and wedged holders, then check again: kill app_process servers; force-stop instrumentation runners and their target app packages (stopping their app processes). Live ones are never touched",
+        "Clear resident, leaked and wedged holders, then check again: kill app_process servers; force-stop instrumentation runners and their target app packages (stopping their app processes). Live ones are never touched",
     },
   ],
   examples: ["adb-axi doctor ui", "adb-axi doctor ui --fix"],
@@ -123,6 +124,15 @@ function sameHolder(a: ClassifiedHolder, b: ClassifiedHolder): boolean {
 }
 
 const isLive = (holder: ClassifiedHolder): boolean => holder.state === "live";
+/** Leaked and wedged holders make UiAutomation unusable; a resident one only blocks tests. */
+const isStuck = (holder: ClassifiedHolder): boolean =>
+  holder.state === "leaked" || holder.state === "wedged";
+
+/** What a resident Android CLI server blocks, and how to clear it when that matters. */
+function residentNote(context: CommandContext): string {
+  const fix = commandLine(["doctor", "ui", "--fix", "--device", targetSerial(context)]);
+  return `The Android CLI keeps its UI server between \`android\` commands; that is harmless, but it blocks instrumentation tests (Gradle connected* tasks, \`am instrument\`), so run \`${fix}\` before starting them`;
+}
 
 /** What would release each live holder, without repeats. */
 function releaseLines(holders: readonly ClassifiedHolder[]): string[] {
@@ -144,11 +154,16 @@ function joinWords(parts: readonly string[]): string {
 async function report(context: CommandContext): Promise<Output> {
   const holders = await inspect(context);
   if (holders.length === 0) return { uiautomation: "free" };
-  const stuck = holders.filter((holder) => !isLive(holder));
+  const stuck = holders.filter(isStuck);
+  const resident = holders.filter((holder) => holder.state === "resident");
   // A leaked or wedged holder is the answer, not a failure to answer: the report keeps its
   // shape and the exit code says UiAutomation is not usable.
   if (stuck.length > 0) process.exitCode = 1;
-  const help = [...(stuck.length > 0 ? [fixHint(context, stuck)] : []), ...releaseLines(holders)];
+  const help = [
+    ...(stuck.length > 0 ? [fixHint(context, [...stuck, ...resident])] : []),
+    ...(resident.length > 0 ? [residentNote(context)] : []),
+    ...releaseLines(holders),
+  ];
   return {
     uiautomation: stuck.length > 0 ? "busy" : "in use",
     holders: rows(holders),

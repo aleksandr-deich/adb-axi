@@ -282,9 +282,9 @@ describe("shell_v2 runner (S2)", () => {
       }),
     );
     expect(error.code).toBe("TIMEOUT");
+    // Only what was printed: the empty stdout is no evidence and is left out.
     expect(error.fields).toEqual({
       step: "running the shell command",
-      stdout: "",
       stderr: "- waiting for device -\n",
     });
   });

@@ -19,6 +19,7 @@ const list = (...lines: string[]): string => `List of devices attached\n${lines.
 const SHELL = {
   boot: "echo @boot_completed; getprop sys.boot_completed; echo @uptime; cat /proc/uptime",
   packages: "pm path android",
+  clock: "date '+%s.%N %z'",
   data: "df -k /data",
   animations:
     "settings get global window_animation_scale; settings get global transition_animation_scale; settings get global animator_duration_scale",
@@ -67,6 +68,7 @@ function instrumentation(component: string, options: { uiAutomation?: boolean } 
 const HEALTHY: Record<Probe, Response> = {
   boot: { stdout: "@boot_completed\n1\n@uptime\n1141.19 3978.79\n" },
   packages: { stdout: "package:/system/framework/framework-res.apk\n" },
+  clock: { clockOffsetMs: 0 },
   data: df(3_110_340),
   animations: { stdout: "0\n0\n0\n" },
   ime: { stdout: STOCK_IME },
@@ -198,11 +200,12 @@ function expectHelpShipped(help: readonly string[] | undefined): void {
   }
 }
 
-const NINE = [
+const TEN = [
   "adb",
   "server",
   "device",
   "boot",
+  "clock",
   "data_free",
   "animations",
   "ime",
@@ -211,17 +214,18 @@ const NINE = [
 ];
 
 describe("doctor", () => {
-  it("reports all nine checks ok on a healthy emulator and exits 0", async () => {
+  it("reports all ten checks ok on a healthy emulator and exits 0", async () => {
     const f = scenario();
     const { toon, data, rows } = await doctor(f);
     expect(toon.exitCode).toBe(0);
-    expect(data.checks.map((row) => row.check)).toEqual(NINE);
-    expect(data.summary).toBe("9 run, 9 ok, 0 warn, 0 failed");
+    expect(data.checks.map((row) => row.check)).toEqual(TEN);
+    expect(data.summary).toBe("10 run, 10 ok, 0 warn, 0 failed");
     expect(data.target).toBe(SERIAL);
     expect(rows.adb?.detail).toMatch(/^37\.0\.0 at \S+\/adb$/);
     expect(rows.server?.detail).toBe("tcp:5037");
     expect(rows.device?.detail).toBe(`${SERIAL} online`);
     expect(rows.boot?.detail).toBe("boot finished");
+    expect(rows.clock?.detail).toBe("within a minute of the host");
     expect(rows.data_free?.detail).toBe("3.0G free");
     expect(rows.animations?.detail).toBe("scales 0");
     expect(rows.ime?.detail).toBe("standard keyboard");
@@ -230,7 +234,7 @@ describe("doctor", () => {
     // The report answers the question, so there is nothing left to suggest.
     expect(data.help).toBeUndefined();
     expect(toon.stdout).toMatch(
-      /^summary: "9 run, 9 ok, 0 warn, 0 failed"\ntarget: emulator-5554\nchecks\[9\]\{check,status,detail\}:\n {2}adb,ok,/,
+      /^summary: "10 run, 10 ok, 0 warn, 0 failed"\ntarget: emulator-5554\nchecks\[10\]\{check,status,detail\}:\n {2}adb,ok,/,
     );
     expectAddressed(f);
   });
@@ -257,7 +261,7 @@ describe("doctor", () => {
     const f = scenario({ probes: { data: df(40_000) } });
     const { toon, data } = await doctor(f);
     expect(toon.exitCode).toBe(1);
-    expect(data.summary).toBe("9 run, 8 ok, 0 warn, 1 failed");
+    expect(data.summary).toBe("10 run, 9 ok, 0 warn, 1 failed");
     expect(data).not.toHaveProperty("error");
     expect(data).not.toHaveProperty("code");
   });
@@ -266,7 +270,7 @@ describe("doctor", () => {
     const f = scenario({ probes: { animations: { stdout: "1.0\n1.0\n1.0\n" } } });
     const { toon, data } = await doctor(f);
     expect(toon.exitCode).toBe(0);
-    expect(data.summary).toBe("9 run, 8 ok, 1 warn, 0 failed");
+    expect(data.summary).toBe("10 run, 9 ok, 1 warn, 0 failed");
   });
 
   describe("adb", () => {
@@ -345,7 +349,7 @@ describe("doctor", () => {
         status: "warn",
         detail: "tcp:5037 was not running, adb started it just now",
       });
-      expect(data.checks).toHaveLength(9);
+      expect(data.checks).toHaveLength(10);
     });
 
     it("reports the port of ANDROID_ADB_SERVER_PORT", async () => {
@@ -397,7 +401,7 @@ describe("doctor", () => {
         detail: `${SERIAL} online, ${TABLET} offline`,
       });
       expect(data.target).toBe(SERIAL);
-      expect(data.checks).toHaveLength(9);
+      expect(data.checks).toHaveLength(10);
     });
 
     it("reports and selects from the same device snapshot", async () => {
@@ -676,7 +680,85 @@ describe("doctor", () => {
     });
   });
 
+  describe("clock", () => {
+    it("warns when the device clock is more than a minute from the host's", async () => {
+      const behind = await doctor(
+        scenario({ probes: { clock: { clockOffsetMs: -3 * 86_400_000 } } }),
+      );
+      expect(behind.toon.exitCode).toBe(0);
+      expect(behind.rows.clock).toEqual({
+        check: "clock",
+        status: "warn",
+        detail: "3 d behind the host; log times and log marks use the device clock",
+      });
+      const ahead = await doctor(scenario({ probes: { clock: { clockOffsetMs: 5 * 60_000 } } }));
+      expect(ahead.rows.clock?.detail).toBe(
+        "5 min ahead of the host; log times and log marks use the device clock",
+      );
+    });
+
+    it("is ok within a minute, either way", async () => {
+      const { rows } = await doctor(scenario({ probes: { clock: { clockOffsetMs: -40_000 } } }));
+      expect(rows.clock?.status).toBe("ok");
+    });
+
+    it("warns when the clock cannot be read", async () => {
+      const { rows } = await doctor(scenario({ probes: { clock: { stdout: "Thu Oct  1\n" } } }));
+      expect(rows.clock?.status).toBe("warn");
+      expect(rows.clock?.detail).toMatch(/^could not read it: reading the device clock printed/);
+    });
+  });
+
   describe("instrumentation", () => {
+    const WEDGE_SEARCH = "logcat -d -v epoch -e 'Cannot call disconnect.. while connecting'";
+    const ANDROID_CLI = "com.android.cli.interact.instrumentation/.InstrumentationServer";
+
+    it("warns for the Android CLI's resident UI server, which only blocks instrumentation tests", async () => {
+      const f = scenario({
+        probes: { processes: { stdout: instrumentation(ANDROID_CLI) } },
+        rules: [
+          {
+            match: ["-s", SERIAL, "shell", WEDGE_SEARCH],
+            respond: { stdout: "--------- beginning of main\n" },
+          },
+        ],
+      });
+      const { toon, rows, data } = await doctor(f);
+      expect(toon.exitCode).toBe(0);
+      expect(rows.instrumentation).toEqual({
+        check: "instrumentation",
+        status: "warn",
+        detail:
+          "the Android CLI's UI server holds UiAutomation; harmless, but instrumentation tests cannot start while it runs",
+      });
+      expect(data.help).toEqual([
+        `Run \`adb-axi doctor ui --device ${SERIAL}\` to see what holds UiAutomation`,
+      ]);
+      expectAddressed(f);
+    });
+
+    it("still fails for a wedged Android CLI server", async () => {
+      const f = scenario({
+        probes: { processes: { stdout: instrumentation(ANDROID_CLI) } },
+        rules: [
+          {
+            match: ["-s", SERIAL, "shell", WEDGE_SEARCH],
+            respond: {
+              stdout:
+                "1790834111.087  9021  9038 E InstrumentationServer: java.lang.IllegalStateException: Cannot call disconnect() while connecting UiAutomation@4f2a9c1\n",
+            },
+          },
+        ],
+      });
+      const { toon, rows } = await doctor(f);
+      expect(toon.exitCode).toBe(1);
+      expect(rows.instrumentation).toEqual({
+        check: "instrumentation",
+        status: "failed",
+        detail: "UiAutomation is held by com.android.cli.interact.instrumentation",
+      });
+    });
+
     it("is ok when nothing is instrumented (a real dump)", async () => {
       const { rows } = await doctor(scenario());
       expect(rows.instrumentation).toEqual({
@@ -833,7 +915,7 @@ describe("doctor", () => {
         console: { exit: 1 },
       });
       const { data } = await doctor(everythingWrong);
-      expect(data.summary).toBe("9 run, 3 ok, 2 warn, 4 failed");
+      expect(data.summary).toBe("10 run, 4 ok, 2 warn, 4 failed");
       const text = JSON.stringify(data);
       expect(data.help).toContain(
         `Run \`adb-axi doctor ui --device ${SERIAL}\` to see what holds UiAutomation`,

@@ -29,11 +29,12 @@ These need what one CI emulator does not have. Run them by hand before a release
 
 ### UiAutomation holder (`doctor ui`)
 
-A leaked holder needs the Android CLI. With one emulator (here `emulator-5554`):
+A resident holder needs the Android CLI. With one emulator (here `emulator-5554`):
 
 ```
 android layout --device=emulator-5554 > /dev/null    # leaves com.android.cli.interact.instrumentation resident
-adb-axi doctor ui --device emulator-5554             # busy, names it as leaked, exit 1
+adb-axi doctor ui --device emulator-5554             # in use, names it as resident, says it blocks instrumentation tests, exit 0
+adb-axi doctor --device emulator-5554                # instrumentation: warn, exit 0
 adb-axi doctor ui --fix --device emulator-5554       # clears it, exit 0
 adb-axi doctor ui --device emulator-5554             # uiautomation: free
 android layout --device=emulator-5554 > /dev/null    # works again

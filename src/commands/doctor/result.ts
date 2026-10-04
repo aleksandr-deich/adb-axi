@@ -6,6 +6,7 @@ export const CHECK_NAMES = [
   "server",
   "device",
   "boot",
+  "clock",
   "data_free",
   "animations",
   "ime",

@@ -3,7 +3,15 @@ import { dirname } from "node:path";
 import { assertPackageName } from "../../android/component.js";
 import { readDeviceClock } from "../../android/clock.js";
 import { LOG_LEVELS, atLeast, type LogLevel, type LogLine } from "../../android/logcat.js";
-import { capLines, shownLine, truncateField, writeFullOutput } from "../../core/truncate.js";
+import {
+  capLines,
+  MAX_FIELD_CHARS,
+  truncateField,
+  writeFullOutput,
+  type LineWindow,
+} from "../../core/truncate.js";
+import { parseCrashes } from "../../android/crash.js";
+import { runHint } from "../../core/output.js";
 import { readOptions, targetSerial } from "../app/shared.js";
 import { defineCommand } from "../define.js";
 import { describeScope, resolveScope, scopePids, type Scope } from "./scope.js";
@@ -103,8 +111,12 @@ export const logsDump = defineCommand({
         message: capped === undefined ? displayMessage(row) : capped.slice(messageStart),
       };
     });
+    const seconds = Math.max(0, Math.round((now.epochMs - window.startMs) / 1000));
+    const full = context.flags.full === true;
+    const counts = countLevels(lines);
+    // A row cut at the byte cap is measured as printed, with its tag and message.
     const cutRow = displayed[0];
-    const cutShown =
+    const printed =
       shown.cut === undefined || cutRow === undefined
         ? shown
         : {
@@ -116,10 +128,9 @@ export const logsDump = defineCommand({
               ),
             },
           };
-
-    const seconds = Math.max(0, Math.round((now.epochMs - window.startMs) / 1000));
-    const full = context.flags.full === true;
-    const counts = countLevels(lines);
+    const accounting = account(lines.length, rows, visible, printed);
+    const cut = accounting.lossy;
+    const crashed = parseCrashes(lines).length > 0;
     return {
       window: `${window.label} -> now (${seconds} s), ${scanned.length} lines scanned`,
       ...(scope?.kind !== "uid" &&
@@ -132,29 +143,98 @@ export const logsDump = defineCommand({
       ...(scope === undefined ? {} : { scope: describeScope(scope, scanned) }),
       counts,
       lines: displayed,
-      ...(shown.truncated ? { shown: shownLine({ ...cutShown, total: lines.length }) } : {}),
+      ...(accounting.shown === undefined ? {} : { shown: accounting.shown }),
       ...(full
         ? {
-            full: writeFullOutput(
-              `logs-${window.label}-${clockTime(now.epochMs, now.utcOffsetMinutes).slice(0, 8).replaceAll(":", "")}`,
-              lines.map((line) => `${formatFullLine(line, now.utcOffsetMinutes)}\n`).join(""),
-              (path, content) => {
-                mkdirSync(dirname(path), { recursive: true });
-                writeFileSync(path, content, { flag: "wx" });
-              },
-            ),
+            full: cut
+              ? writeFullOutput(
+                  `logs-${window.label}-${clockTime(now.epochMs, now.utcOffsetMinutes).slice(0, 8).replaceAll(":", "")}`,
+                  lines.map((line) => `${formatFullLine(line, now.utcOffsetMinutes)}\n`).join(""),
+                  (path, content) => {
+                    mkdirSync(dirname(path), { recursive: true });
+                    writeFileSync(path, content, { flag: "wx" });
+                  },
+                )
+              : "not written: nothing was cut",
           }
         : {}),
-      ...(shown.truncated && !full
-        ? {
-            help: [
-              `Run the same command with \`--full\` to write all ${lines.length} lines to a file`,
-            ],
-          }
-        : {}),
+      ...withHelp([
+        ...(cut && !full
+          ? [
+              `Run the same command with \`--full\` to write all ${lines.length} matched lines to a file`,
+            ]
+          : []),
+        // A crash in a plain dump is better read as one summary than as its stack rows.
+        ...(crashed
+          ? [
+              runHint(
+                [
+                  "logs",
+                  "crash",
+                  ...(pkg === undefined ? [] : ["--pkg", pkg]),
+                  "--since",
+                  since ?? DEFAULT_SINCE,
+                ],
+                "for the crash with its exception and app frame",
+              ),
+            ]
+          : []),
+      ]),
     };
   },
 });
+
+/** What `shown` says: how the rows on screen relate to the lines that matched. */
+interface Accounting {
+  shown: { rows: string; lines: string; cut?: string } | undefined;
+  lossy: boolean;
+}
+
+/**
+ * Tell apart the three ways the table can differ from the matched lines: repeats folded
+ * into one row (nothing lost but their times), the oldest rows left out to fit the caps,
+ * and rows whose content was cut. `shown` is printed whenever any of them happened.
+ */
+function account(
+  matched: number,
+  rows: readonly Row[],
+  visible: readonly Row[],
+  window: LineWindow,
+): Accounting {
+  const omitted = rows.length - visible.length;
+  const folded = matched - rows.length;
+  // A row cut at the byte cap is the only row, and its message is not cut on its own.
+  const longMessages =
+    window.cut === undefined
+      ? visible.filter((row) => truncateField(row.message) !== row.message).length
+      : 0;
+  const parts = [
+    ...(longMessages > 0
+      ? [
+          `${longMessages} ${longMessages === 1 ? "message" : "messages"} over ${MAX_FIELD_CHARS} chars`,
+        ]
+      : []),
+    ...(window.cut === undefined
+      ? []
+      : [`1 row at ${window.cut.shownBytes} of ${window.cut.totalBytes} bytes`]),
+  ];
+  const cut = parts.length === 0 ? undefined : parts.join(", ");
+  if (omitted === 0 && folded === 0 && cut === undefined) {
+    return { shown: undefined, lossy: false };
+  }
+  return {
+    shown: {
+      rows: `${visible.length} of ${rows.length}${omitted > 0 ? `, the oldest ${omitted} left out` : ""}`,
+      lines: `${matched} matched${folded > 0 ? `, ${folded} folded into repeated rows` : ""}`,
+      ...(cut === undefined ? {} : { cut }),
+    },
+    lossy: true,
+  };
+}
+
+function withHelp(help: readonly string[]): { help?: string[] } {
+  return help.length > 0 ? { help: [...help] } : {};
+}
 
 interface Filters {
   scope: Scope | undefined;

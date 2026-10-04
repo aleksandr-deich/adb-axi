@@ -1,4 +1,5 @@
 import {
+  ANDROID_CLI_PACKAGE,
   WEDGE_SIGNATURE,
   type AppProcessServer,
   type Forward,
@@ -6,7 +7,11 @@ import {
 } from "../../android/holders.js";
 import type { HostProcess } from "../../host/processes.js";
 
-export type HolderState = "live" | "leaked" | "wedged";
+/**
+ * `resident` is the Android CLI's UI server idling between `android` commands: no host
+ * client, but kept on purpose. It only blocks instrumentation tests.
+ */
+export type HolderState = "live" | "resident" | "leaked" | "wedged";
 
 /** A tool that leaves a UiAutomation holder on the device, and how its host side shows. */
 interface Tool {
@@ -112,7 +117,7 @@ function toolOf(found: Found): Tool | undefined {
     return undefined;
   }
   if (!found.uiAutomation) return undefined;
-  if (found.package === "com.android.cli.interact.instrumentation") return ANDROID_CLI;
+  if (found.package === ANDROID_CLI_PACKAGE) return ANDROID_CLI;
   if (/SnapshotInstrumentation/.test(found.component) || /agentdevice/.test(found.package)) {
     return AGENT_DEVICE;
   }
@@ -181,7 +186,9 @@ function mayUseHolder(process: HostProcess, found: Found): boolean {
 
 /**
  * Classify every holder. Live: a host client of its tool may be using it, or its liveness
- * could not be read. Wedged: its own pid logged the wedge signature. Leaked: neither.
+ * could not be read. Wedged: its own pid logged the wedge signature. Resident: the Android
+ * CLI's server with no `android` command running, as it is kept between commands. Leaked:
+ * none of these.
  * A live holder is never reported as anything else, so `--fix` cannot touch it.
  */
 export function classifyHolders(evidence: Evidence): ClassifiedHolder[] {
@@ -239,5 +246,6 @@ function classify(found: Found, tool: Tool, evidence: Evidence): ClassifiedHolde
     client === undefined
       ? "no host client"
       : `${tool.clientName(client)} runs on the host but no adb forward reaches the server`;
-  return { found, label, pids, state: "leaked", why, release: undefined };
+  const state = tool === ANDROID_CLI && client === undefined ? "resident" : "leaked";
+  return { found, label, pids, state, why, release: undefined };
 }
