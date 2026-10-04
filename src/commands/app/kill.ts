@@ -236,7 +236,8 @@ async function packagePids(context: CommandContext, pkg: string, uid: number): P
     // Foreign rows, including those with an unreadable UID, cannot name this app.
     // NAME is the rest of the row: kernel threads can carry spaces.
     const row = /^\s*(\S+)\s+(\S+)(?:\s+(.+?))?\s*$/.exec(line);
-    if (!row || !/^\d+$/.test(row[2]!) || Number(row[2]) !== uid) continue;
+    const rowUid = row?.[2];
+    if (rowUid === undefined || !/^\d+$/.test(rowUid) || Number(rowUid) !== uid) continue;
     const pid = Number(row[1]);
     const name = row[3];
     if (
