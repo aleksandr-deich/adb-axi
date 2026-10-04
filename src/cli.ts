@@ -122,7 +122,15 @@ async function produce(invocation: Invocation | undefined): Promise<Output> {
     throw new Error("Command dispatched without a resolved invocation");
   }
   if (invocation.kind === "output") return invocation.output;
-  return invocation.context.spec.run(invocation.context);
+  const context = invocation.context;
+  try {
+    const output = await context.spec.run(context);
+    return context.marksNote === undefined ? output : { ...output, marks_note: context.marksNote };
+  } catch (error) {
+    if (error instanceof AdbAxiError && context.marksNote !== undefined)
+      error.fields.marks_note = context.marksNote;
+    throw error;
+  }
 }
 
 async function runDirect(

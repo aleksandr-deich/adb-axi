@@ -27,6 +27,7 @@ export const ERROR_CATALOGUE = {
   TASK_NOT_IN_RECENTS: "There is no task in recents to restore",
   COMPARE_UNAVAILABLE: "The UI comparison could not run; kill and restore evidence is included",
   MARK_NOT_FOUND: "No log mark with that name on this device",
+  MARK_UNVERIFIED: "The current boot could not be verified for a log mark",
   APP_NOT_DEBUGGABLE: "run-as refused, so private app files cannot be read",
   DB_NOT_FOUND: "No such database; existing ones are listed",
   INVALID_OUTPUT: "Copied bytes are not the expected file",

@@ -4,7 +4,7 @@ import { parseLogcat, type LogLine } from "../../android/logcat.js";
 import { invalidOutput, readShell, type ReadOptions } from "../../android/read.js";
 import { parseDuration } from "../../core/args.js";
 import { AdbAxiError } from "../../core/errors.js";
-import { requireMark, type Mark } from "./marks.js";
+import { assertMarkVerified, requireMark, type Mark } from "./marks.js";
 
 /** The start of a log read, resolved against the device clock. */
 export interface LogWindow {
@@ -26,11 +26,13 @@ export function resolveWindow(
   env: NodeJS.ProcessEnv,
   since: string,
   now: DeviceTime,
+  marksVerified = true,
 ): LogWindow {
   const duration = parseDuration(since);
   if (duration !== undefined) {
     return { startMs: now.epochMs - duration, label: `${since} ago`, mark: undefined };
   }
+  assertMarkVerified(serial, since, marksVerified);
   const mark = requireMark(serial, env, since);
   return { startMs: mark.epochMs, label: since, mark };
 }

@@ -1,5 +1,6 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
+import { refreshMarks } from "./marks.js";
 import { readDeviceClock, formatDeviceTime } from "../../android/clock.js";
 import { assertPackageName } from "../../android/component.js";
 import { crashBelongsTo, parseCrashes, type Crash } from "../../android/crash.js";
@@ -52,7 +53,8 @@ export const logsCrash = defineCommand({
     const adb = context.adb();
 
     const now = await readDeviceClock(adb, serial, options);
-    const window = resolveWindow(serial, context.env, since, now);
+    await refreshMarks(context);
+    const window = resolveWindow(serial, context.env, since, now, context.marksVerified);
     // The scan is never narrowed to the app: its ANR is printed by system_server and its
     // tombstone by crash_dump, which a uid or pid filter would drop.
     const lines = await readWindowLines(adb, serial, window, options, undefined, true);

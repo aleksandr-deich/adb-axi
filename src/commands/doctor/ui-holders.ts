@@ -86,7 +86,7 @@ const UIAUTOMATOR: Tool = {
 
 const ANDROID_CLI: Tool = {
   label: (found) => `${found.kind === "server" ? found.className : found.package} (Android CLI)`,
-  client: (process) => program(process) === "android",
+  client: (process) => program(process) === "android" || program(process) === "android-cli",
   clientName: () => "android",
   release: (process) => `Wait for the \`android\` command${pidOf(process)} to finish`,
 };

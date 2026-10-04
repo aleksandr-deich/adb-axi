@@ -10,6 +10,9 @@ import { runHint } from "../../core/output.js";
 import { formatUptime, formatSize } from "../../device/columns.js";
 import { parseAvdName } from "../../device/facts.js";
 import type { CommandContext } from "../types.js";
+import { classifyHolders } from "./ui-holders.js";
+import { avdName } from "../../device/facts.js";
+import { listDevices } from "../../device/list.js";
 import { CHECK_CAP_MS, homeDir } from "./host-checks.js";
 import { failed, ok, settle, tildePath, warn, type CheckResult } from "./result.js";
 
@@ -231,8 +234,34 @@ export async function checkInstrumentation(checks: DeviceChecks): Promise<CheckR
     // stands in the way of instrumentation tests.
     if (holding.every((holder) => holder.package === ANDROID_CLI_PACKAGE)) {
       const wedged = await readWedgedPids(checks.adb, checks.serial, reads(checks));
-      const pids = holding.flatMap((holder) => holder.processes.map((process) => process.pid));
-      if (!pids.some((pid) => wedged.has(pid))) {
+      const [host, devices, avd] = await Promise.all([
+        checks.context.hostProcesses(Math.min(checks.context.deadline.remainingMs(), CHECK_CAP_MS)),
+        listDevices(checks.adb, checks.context.deadline),
+        avdName(checks.adb, checks.serial, null, {
+          deadline: checks.context.deadline,
+          env: checks.context.env,
+        }),
+      ]);
+      const classified = classifyHolders({
+        serial: checks.serial,
+        instrumentations: holding,
+        servers: [],
+        wedgedPids: wedged,
+        host,
+        forwards: [],
+        serials: new Set(devices.map((device) => device.serial)),
+        avd,
+        selfPid: process.pid,
+      });
+      const live = classified.filter((holder) => holder.state === "live");
+      if (live.length > 0) {
+        return warn(
+          "instrumentation",
+          `the Android CLI's UI server holds UiAutomation; ${live.map((holder) => (holder.why.startsWith("liveness unknown") ? holder.why : `in use by ${holder.why}`)).join("; ")}`,
+          next,
+        );
+      }
+      if (classified.every((holder) => holder.state === "resident")) {
         return warn(
           "instrumentation",
           "the Android CLI's UI server holds UiAutomation; harmless, but instrumentation tests cannot start while it runs",

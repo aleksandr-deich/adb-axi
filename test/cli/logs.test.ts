@@ -1,7 +1,8 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { decode } from "@toon-format/toon";
 import { afterEach, describe, expect, it } from "vitest";
+import { bindMarks, writeMark } from "../../src/commands/logs/marks.js";
 import { parseLogcat } from "../../src/android/logcat.js";
 import { FIXTURES_DIR, createFakeAdb, type FakeAdb } from "../fake-adb/harness.js";
 import type { Response, Rule } from "../fake-adb/scenario.js";
@@ -29,6 +30,7 @@ afterEach(() => {
 interface Device {
   serial: string;
   api: number;
+  bootId?: string | null;
   /** Shell commands the device answers, besides facts; the clock is added by `device`. */
   shell?: Record<string, Response>;
   /** Clock answers in order; the last one answers every later call. */
@@ -36,7 +38,7 @@ interface Device {
 }
 
 function deviceRules(device: Device): Rule[] {
-  const facts = `@sdk\n${device.api}\n@boot_completed\n1\n@boot_id\n3f1c8a52-0d7e-4c1b-9b1e-5a3f2d6c7e81\n@size\nPhysical size: 1344x2992\n@density\nPhysical density: 480\n`;
+  const facts = `@sdk\n${device.api}\n@boot_completed\n1\n@boot_id\n${device.bootId === null ? "" : (device.bootId ?? "3f1c8a52-0d7e-4c1b-9b1e-5a3f2d6c7e81")}\n@size\nPhysical size: 1344x2992\n@density\nPhysical density: 480\n`;
   const clocks = device.clocks ?? [LATER_CLOCK];
   return [
     {
@@ -145,6 +147,76 @@ const rowsOf = (data: Record<string, unknown>): Record<string, string>[] =>
   data.lines as Record<string, string>[];
 
 describe("logs mark", () => {
+  it.each([true, false])(
+    "does not use or delete unverified %s marks when the boot ID is unreadable",
+    async (bound) => {
+      const f = devices({
+        serial: A,
+        api: 35,
+        bootId: null,
+        shell: {
+          "logcat -d -v epoch -T 1790833240.000": { stdout: "" },
+        },
+      });
+      if (bound) bindMarks(A, f.env, "earlier-boot");
+      writeMark(A, f.env, "old", { epochMs: 1790834110420, utcOffsetMinutes: -420, processes: [] });
+      const path = join(f.home, A, "marks.json");
+      const saved = readFileSync(path, "utf8");
+      for (const args of [["logs"], ["logs", "crash"], ["wait", "log", "NEVERMATCH"]]) {
+        const result = await runCli([...args, "--since", "old", "--json"], f.env);
+        expect(JSON.parse(result.stdout)).toMatchObject({
+          code: "MARK_UNVERIFIED",
+          error: "log mark old could not be verified for this boot on emulator-5554",
+        });
+        expect(result.exitCode).toBe(1);
+        expect(result.stdout).toContain("logs mark old");
+        expect(result.stdout).toContain("--since 5m");
+        expect(readFileSync(path, "utf8")).toBe(saved);
+      }
+      const duration = await runCli(["logs", "--since", "15m", "--json"], f.env);
+      expect(duration.exitCode).toBe(0);
+      expect(JSON.parse(duration.stdout)).toMatchObject({ counts: { matched: 0 } });
+      const mark = await runCli(["logs", "mark", "new", "--json"], f.env);
+      expect(JSON.parse(mark.stdout) as Record<string, unknown>).toMatchObject({
+        code: "MARK_UNVERIFIED",
+      });
+      expect(readFileSync(path, "utf8")).toBe(saved);
+    },
+  );
+  it("drops marks from an earlier boot of the same serial and explains the reset once", async () => {
+    const f = devices({
+      serial: A,
+      api: 35,
+      clocks: [MARK_CLOCK],
+      shell: {
+        "logcat -d -v epoch -T 1790833210.420": { stdout: "" },
+      },
+    });
+    await runCli(["logs", "mark", "old"], f.env);
+    const path = join(f.home, A, "marks.json");
+    const saved = JSON.parse(readFileSync(path, "utf8")) as Record<string, unknown>;
+    writeFileSync(path, JSON.stringify({ ...saved, boot_id: "previous-boot" }));
+    const first = await runCli(["logs", "--since", "old", "--json"], f.env);
+    expect(JSON.parse(first.stdout)).toMatchObject({
+      code: "MARK_NOT_FOUND",
+      marks: [],
+      marks_note: "Log marks from a previous device or boot were dropped",
+    });
+    const second = await runCli(["logs", "--since", "old", "--json"], f.env);
+    expect(JSON.parse(second.stdout)).not.toHaveProperty("marks_note");
+  });
+
+  it("prints an explicit zero when no log lines match", async () => {
+    const f = devices({
+      serial: A,
+      api: 35,
+      shell: {
+        "logcat -d -v epoch -T 1790833240.000": { stdout: "" },
+      },
+    });
+    const { data } = await both(["logs", "--since", "15m", "--grep", "NEVERMATCH"], f);
+    expect(data.counts).toEqual({ matched: 0 });
+  });
   it("stores the device clock, not the host clock, and prints it in device local time", async () => {
     const f = devices({ serial: A, api: 35, clocks: [MARK_CLOCK] });
     const before = Date.now();
@@ -548,7 +620,11 @@ describe("logs", () => {
     expect(data).not.toHaveProperty("scope");
     expect(rowsOf(data)).toHaveLength(2);
     // No package means no package lookup and no process list.
-    expect(shellCommands(f).filter((c) => !c.startsWith("logcat") && c !== CLOCK)).toHaveLength(0);
+    expect(
+      shellCommands(f).filter(
+        (c) => !c.startsWith("logcat") && c !== CLOCK && !c.startsWith("echo @sdk;"),
+      ),
+    ).toHaveLength(0);
     expectClean(f);
   });
 
@@ -562,7 +638,7 @@ describe("logs", () => {
     const { data } = await both(["logs", "--since", "30s"], f);
     expect(data.window).toBe("30s ago -> now (30 s), 0 lines scanned");
     expect(rowsOf(data)).toEqual([]);
-    expect(data.counts).toEqual({});
+    expect(data.counts).toEqual({ matched: 0 });
     expectClean(f);
   });
 

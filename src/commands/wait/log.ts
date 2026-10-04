@@ -1,3 +1,4 @@
+import { refreshMarks } from "../logs/marks.js";
 import { readDeviceClock } from "../../android/clock.js";
 import type { LogLine } from "../../android/logcat.js";
 import { Deadline } from "../../core/deadline.js";
@@ -45,8 +46,11 @@ export const waitLog = defineCommand({
 
     // Without `--since` the window opens now, so only lines logged during the wait count.
     const now = await readDeviceClock(adb, serial, options);
+    await refreshMarks(context);
     const window =
-      since === undefined ? windowFromNow(now) : resolveWindow(serial, context.env, since, now);
+      since === undefined
+        ? windowFromNow(now)
+        : resolveWindow(serial, context.env, since, now, context.marksVerified);
 
     let latest: Observation | undefined;
     const result = await poll({

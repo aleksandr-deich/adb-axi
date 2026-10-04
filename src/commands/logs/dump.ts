@@ -1,6 +1,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { assertPackageName } from "../../android/component.js";
+import { refreshMarks } from "./marks.js";
 import { readDeviceClock } from "../../android/clock.js";
 import { LOG_LEVELS, atLeast, type LogLevel, type LogLine } from "../../android/logcat.js";
 import {
@@ -76,7 +77,14 @@ export const logsDump = defineCommand({
     if (device === undefined) throw new TypeError("logs ran without a resolved device");
 
     const now = await readDeviceClock(adb, serial, options);
-    const window = resolveWindow(serial, context.env, since ?? DEFAULT_SINCE, now);
+    await refreshMarks(context);
+    const window = resolveWindow(
+      serial,
+      context.env,
+      since ?? DEFAULT_SINCE,
+      now,
+      context.marksVerified,
+    );
     const scope =
       pkg === undefined
         ? undefined
@@ -261,7 +269,7 @@ function countLevels(lines: readonly LogLine[]): Record<string, number> {
     const n = lines.filter((line) => line.level === level).length;
     if (n > 0) counts[level] = n;
   }
-  return counts;
+  return lines.length === 0 ? { matched: 0 } : counts;
 }
 
 /** One line, or a run of identical consecutive lines, as shown in the table. */

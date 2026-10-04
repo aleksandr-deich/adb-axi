@@ -1,4 +1,6 @@
 import { join } from "node:path";
+import { readShellFacts } from "../../device/facts.js";
+import type { CommandContext } from "../types.js";
 import { isPackageName } from "../../android/component.js";
 import type { ProcessName } from "../../android/ps.js";
 import { parseDuration } from "../../core/args.js";
@@ -26,6 +28,7 @@ export interface Mark {
 
 /** Marks by name, in the on-disk form of `marks.json`. */
 interface MarksFile {
+  boot_id?: string;
   marks: Record<string, StoredMark>;
 }
 
@@ -58,6 +61,61 @@ export function marksPath(serial: string, env: NodeJS.ProcessEnv): string {
   return join(deviceStateDir(serial, env), "marks.json");
 }
 
+/** Refresh the boot identity before any mark is stored or used, after validating input. */
+export async function refreshMarks(context: CommandContext): Promise<void> {
+  const target = context.target;
+  if (target === undefined) throw new Error("Marks need a resolved device");
+  let bootId: string | null = null;
+  try {
+    const facts = await readShellFacts(context.adb(), target.device, {
+      deadline: context.deadline,
+      env: context.env,
+    });
+    bootId = facts.bootId;
+  } catch (error) {
+    if (!(error instanceof AdbAxiError)) throw error;
+  }
+  context.marksVerified = bootId !== null;
+  const note = bindMarks(target.serial, context.env, bootId);
+  if (note !== undefined) context.marksNote = note;
+}
+
+/** Bind the serial's marks to the current boot, dropping unbound legacy marks too. */
+export function bindMarks(
+  serial: string,
+  env: NodeJS.ProcessEnv,
+  bootId: string | null,
+): string | undefined {
+  const path = marksPath(serial, env);
+  const value = readJson(path);
+  if (value !== undefined && !isMarksFile(value))
+    throw new Error(`State file ${path} is not a marks file`);
+  if (bootId === null) {
+    return value !== undefined && Object.keys(value.marks).length > 0
+      ? "Log marks could not be verified for this boot; stored marks were not used"
+      : undefined;
+  }
+  if (value?.boot_id === bootId) return undefined;
+  const dropped = value !== undefined && Object.keys(value.marks).length > 0;
+  writeJsonAtomic(path, { boot_id: bootId, marks: {} } satisfies MarksFile);
+  return dropped ? "Log marks from a previous device or boot were dropped" : undefined;
+}
+
+/** A named window or a new mark requires proof of the device's current boot. */
+export function assertMarkVerified(serial: string, name: string, verified: boolean): void {
+  if (verified) return;
+  throw new AdbAxiError(
+    "MARK_UNVERIFIED",
+    `log mark ${name} could not be verified for this boot on ${serial}`,
+    {
+      help: [
+        runHint(["logs", "mark", name], "to re-mark once the device's boot ID can be read"),
+        "Or use a duration such as `--since 5m` instead of a stored mark",
+      ],
+    },
+  );
+}
+
 /** Every mark of a device by name; none when the device has never been marked. */
 export function readMarks(serial: string, env: NodeJS.ProcessEnv): Map<string, Mark> {
   const path = marksPath(serial, env);
@@ -80,7 +138,12 @@ export function readMarks(serial: string, env: NodeJS.ProcessEnv): Map<string, M
 export function writeMark(serial: string, env: NodeJS.ProcessEnv, name: string, mark: Mark): void {
   const marks = readMarks(serial, env);
   marks.set(name, mark);
-  const file: MarksFile = { marks: Object.create(null) as Record<string, StoredMark> };
+  const stored = readJson(marksPath(serial, env));
+  const bootId = isMarksFile(stored) ? stored.boot_id : undefined;
+  const file: MarksFile = {
+    ...(bootId === undefined ? {} : { boot_id: bootId }),
+    marks: Object.create(null) as Record<string, StoredMark>,
+  };
   for (const [markName, value] of marks) {
     file.marks[markName] = {
       epoch_ms: value.epochMs,
