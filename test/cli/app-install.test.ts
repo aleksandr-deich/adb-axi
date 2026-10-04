@@ -415,7 +415,7 @@ describe("app install", () => {
     }
 
     it("is the already-installed no-op when versionCode and signature match", async () => {
-      const { toon, data, fake } = await both(withRecord(sameInstall()), [
+      const { toon, json, data, fake } = await both(withRecord(sameInstall()), [
         "app",
         "install",
         APK,
@@ -423,11 +423,12 @@ describe("app install", () => {
       ]);
       expect(toon.exitCode).toBe(0);
       expect(toonLines(toon)).toEqual([
-        "ok: install com.example.notes -> already installed (same versionCode and signature)",
+        "ok: install com.example.notes -> already installed (same versionCode and signature) (no-op)",
       ]);
       expect(data).toEqual({
-        ok: "install com.example.notes -> already installed (same versionCode and signature)",
+        ok: "install com.example.notes -> already installed (same versionCode and signature) (no-op)",
       });
+      expect(JSON.parse(json.stdout)).toEqual({ ...data, noop: true });
       expect(calls(fake)).toEqual([
         `shell ${SDK}`,
         `shell ${DUMPSYS}`,

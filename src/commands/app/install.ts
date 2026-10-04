@@ -9,7 +9,7 @@ import { invalidOutput, readShell, type ReadOptions } from "../../android/read.j
 import { formatDuration } from "../../core/args.js";
 import { Deadline } from "../../core/deadline.js";
 import { AdbAxiError } from "../../core/errors.js";
-import { okLine, runHint, shellWords, type Output } from "../../core/output.js";
+import { noop, okLine, runHint, shellWords, type Output } from "../../core/output.js";
 import { MAX_INTERVAL_MS, poll } from "../../core/poll.js";
 import { isErrno } from "../../core/state.js";
 import { defineCommand } from "../define.js";
@@ -95,7 +95,7 @@ async function runInstall(context: CommandContext): Promise<Output> {
         ok: okLine(
           "install",
           read.info.package,
-          "already installed (same versionCode and signature)",
+          noop("already installed (same versionCode and signature)"),
         ),
       };
     }
