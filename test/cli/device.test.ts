@@ -123,6 +123,45 @@ describe("an offline emulator's last-known AVD name", () => {
     });
   });
 
+  it("does not label an online emulator with a previous occupant's name when its console fails", async () => {
+    fake = createFakeAdb({
+      synthetic: true,
+      rules: [
+        {
+          match: ["devices", "-l"],
+          respond: { stdout: "List of devices attached\nemulator-5556          device transport_id:2\n\n" },
+        },
+        {
+          match: ["-s", "emulator-5556", "shell", { re: "echo @sdk; .*" }],
+          respond: {
+            stdout: "@sdk\n37\n@boot_completed\n1\n@boot_id\n3f1c8a52-0d7e-4c1b-9b1e-5a3f2d6c7e81\n@size\nPhysical size: 1344x2992\n@density\nPhysical density: 480\n",
+          },
+        },
+        {
+          match: ["-s", "emulator-5556", "emu", "avd", "name"],
+          respond: { stderr: "console unavailable", exit: 1 },
+        },
+      ],
+    });
+    const f = fake;
+    writeJsonAtomic(join(deviceStateDir("emulator-5556", f.env), "avd.json"), {
+      boot_id: "9b0e7d44-51a2-4c3e-8f6d-2c1b0a9e8d77",
+      avd: "medium_tablet",
+    });
+    const listed = await runCli(["devices", "--json"], f.env);
+    expect(listed.exitCode).toBe(0);
+    expect(JSON.parse(listed.stdout)).toMatchObject({
+      devices: [{ serial: "emulator-5556", avd: "-", state: "device" }],
+    });
+    const missing = await runCli(["logs", "--device", "not_here", "--json"], f.env);
+    expect(missing.exitCode).toBe(1);
+    expect(JSON.parse(missing.stdout)).toMatchObject({
+      code: "DEVICE_NOT_FOUND",
+      devices: [{ serial: "emulator-5556", avd: "-", state: "device" }],
+    });
+    expect(f.unmatched()).toEqual([]);
+  });
+
   it("never claims the old name for a serial whose console now names another AVD", async () => {
     const f = tabletGoingDown({ stdout: "Pixel_Fold\r\nOK\r\n" });
     const run = await runCli(["logs", "--device", "medium_tablet"], f.env);

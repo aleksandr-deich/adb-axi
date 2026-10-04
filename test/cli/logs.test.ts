@@ -446,14 +446,15 @@ describe("logs", () => {
       tag: "ziparchive",
       message: expect.stringContaining("Unable to open") as string,
     });
-    // Repeats were folded but nothing was cut: every row is shown and there is no `--full` help.
+    // Repeats were folded: every row is shown, but the distinct timestamps need `--full`.
     const shownRows = rowsOf(data).length;
     expect(data.shown).toEqual({
       rows: `${shownRows} of ${shownRows}`,
       lines: `${warnings.length} matched, ${warnings.length - shownRows} folded into repeated rows`,
     });
-    expect(data).not.toHaveProperty("help");
-    expect(toon.stdout).not.toContain("--full");
+    expect(data.help).toEqual([
+      `Run the same command with \`--full\` to write all ${warnings.length} matched lines to a file`,
+    ]);
     expect(logcatCommands(f)).toEqual([
       logcatFor("1790834222.000", 10213),
       logcatFor("1790834222.000", 10213),
@@ -615,7 +616,9 @@ describe("logs", () => {
     // Counts are lines, not rows, and `shown` says the difference is folded repeats.
     expect(data.counts).toEqual({ W: 3, I: 1 });
     expect(data.shown).toEqual({ rows: "3 of 3", lines: "4 matched, 1 folded into repeated rows" });
-    expect(data).not.toHaveProperty("help");
+    expect(data.help).toEqual([
+      "Run the same command with `--full` to write all 4 matched lines to a file",
+    ]);
   });
 
   describe("truncation", () => {
@@ -732,6 +735,34 @@ describe("logs", () => {
         expect(existsSync(join(f.home, "out"))).toBe(false);
         f.cleanup();
       }
+    });
+
+    it("writes the uncollapsed timestamps when folded repeats are the only loss", async () => {
+      const f = devices({
+        serial: A,
+        api: 35,
+        clocks: ["1790835000.000000000 +0000\n"],
+        shell: {
+          [logcatFor("1790834100.000")]: {
+            stdout: [
+              logLine(1790834890000, 1, "W", "Tag", "repeat"),
+              logLine(1790834890500, 1, "W", "Tag", "repeat"),
+            ].join("\n"),
+          },
+        },
+      });
+      const run = await runCli(["logs", "--full"], f.env);
+      expect(run.exitCode).toBe(0);
+      const data = decode(run.stdout.trimEnd()) as Record<string, unknown>;
+      expect(data.shown).toEqual({
+        rows: "1 of 1",
+        lines: "2 matched, 1 folded into repeated rows",
+      });
+      expect(data).not.toHaveProperty("help");
+      expect(readFileSync(data.full as string, "utf8")).toBe(
+        "06:08:10.000 W Tag: repeat\n06:08:10.500 W Tag: repeat\n",
+      );
+      expectClean(f);
     });
 
     it("keeps distinct timestamps for identical messages in the --full file", async () => {

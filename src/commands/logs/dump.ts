@@ -129,7 +129,7 @@ export const logsDump = defineCommand({
             },
           };
     const accounting = account(lines.length, rows, visible, printed);
-    const cut = accounting.cut !== undefined || accounting.omitted > 0;
+    const cut = accounting.lossy;
     const crashed = parseCrashes(lines).length > 0;
     return {
       window: `${window.label} -> now (${seconds} s), ${scanned.length} lines scanned`,
@@ -146,7 +146,6 @@ export const logsDump = defineCommand({
       ...(accounting.shown === undefined ? {} : { shown: accounting.shown }),
       ...(full
         ? {
-            // Every matched line is on screen already when nothing was cut.
             full: cut
               ? writeFullOutput(
                   `logs-${window.label}-${clockTime(now.epochMs, now.utcOffsetMinutes).slice(0, 8).replaceAll(":", "")}`,
@@ -188,10 +187,7 @@ export const logsDump = defineCommand({
 /** What `shown` says: how the rows on screen relate to the lines that matched. */
 interface Accounting {
   shown: { rows: string; lines: string; cut?: string } | undefined;
-  /** Rows left out to fit the output caps, oldest first. */
-  omitted: number;
-  /** Rows on screen whose content was cut. */
-  cut: string | undefined;
+  lossy: boolean;
 }
 
 /**
@@ -224,7 +220,7 @@ function account(
   ];
   const cut = parts.length === 0 ? undefined : parts.join(", ");
   if (omitted === 0 && folded === 0 && cut === undefined) {
-    return { shown: undefined, omitted, cut };
+    return { shown: undefined, lossy: false };
   }
   return {
     shown: {
@@ -232,8 +228,7 @@ function account(
       lines: `${matched} matched${folded > 0 ? `, ${folded} folded into repeated rows` : ""}`,
       ...(cut === undefined ? {} : { cut }),
     },
-    omitted,
-    cut,
+    lossy: true,
   };
 }
 

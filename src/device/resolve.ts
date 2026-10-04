@@ -119,7 +119,7 @@ async function byName(
   // seen on its serial before is then the best evidence, and it is labelled as such.
   const lastKnown = new Map(
     names
-      .filter((entry) => entry.avd === null)
+      .filter((entry) => entry.device.state !== ONLINE && entry.avd === null)
       .flatMap((entry) => {
         const avd = lastKnownAvd(entry.device.serial, options.env);
         return avd === null ? [] : [[entry.device.serial, avd] as const];

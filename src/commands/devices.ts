@@ -112,9 +112,8 @@ export async function readRow(
     settle(() => avdName(adb, device.serial, facts.bootId, options)),
     settle(() => readExtraFields(adb, device, facts, fields, options)),
   ]);
-  // An emulator whose console does not answer, as when it is going down, keeps the name
-  // last seen on its serial, labelled as such.
-  const last = (avd ?? null) === null ? lastKnownAvd(device.serial, options.env) : null;
+  const last =
+    device.state !== ONLINE && avd == null ? lastKnownAvd(device.serial, options.env) : null;
   return {
     device,
     facts: { ...facts, avd: avd ?? (last === null ? null : lastKnownLabel(last)) },
