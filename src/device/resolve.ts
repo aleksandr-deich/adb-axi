@@ -115,6 +115,16 @@ async function byName(
     );
   }
 
+  // The device list may still have said online just before the console disappeared.
+  // Refresh that snapshot before deciding whether its cached name is safe to use.
+  if (names.some((entry) => entry.avd === null && entry.device.state === ONLINE)) {
+    const current = await listDevices(options.adb, options.deadline);
+    for (const entry of names) {
+      const device = current.find((device) => device.serial === entry.device.serial);
+      if (entry.avd === null && device !== undefined) entry.device = device;
+    }
+  }
+
   // An emulator that is going down or coming up may not answer on its console. The name
   // seen on its serial before is then the best evidence, and it is labelled as such.
   const lastKnown = new Map(

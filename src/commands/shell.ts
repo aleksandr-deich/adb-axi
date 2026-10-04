@@ -48,7 +48,7 @@ async function runShellCommand(context: CommandContext): Promise<Output> {
   try {
     result = await runShell(context.adb(), target.serial, command, {
       deadline: context.deadline,
-      step: `running the command on ${target.serial}`,
+      step: "running the command",
     });
   } catch (error) {
     if (error instanceof AdbAxiError && error.code === "TIMEOUT") {

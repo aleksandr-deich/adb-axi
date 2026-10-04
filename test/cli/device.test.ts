@@ -42,11 +42,22 @@ function deviceCalls(f: FakeAdb): string[][] {
 }
 
 /** A phone online, and a tablet going down: offline, with a console that no longer answers. */
-function tabletGoingDown(tabletConsole: Rule["respond"]): FakeAdb {
+function tabletGoingDown(tabletConsole: Rule["respond"], onlineFirst = false): FakeAdb {
   fake = createFakeAdb({
     description: "An online phone and an offline emulator whose console is gone",
     synthetic: true,
     rules: [
+      ...(onlineFirst
+        ? [
+            {
+              match: ["devices", "-l"],
+              times: 1,
+              respond: {
+                stdout: "List of devices attached\nemulator-5554 device\nemulator-5556 device\n",
+              },
+            },
+          ]
+        : []),
       {
         match: ["devices", "-l"],
         respond: {
@@ -97,6 +108,30 @@ describe("an offline emulator's last-known AVD name", () => {
     });
     expect(f.unmatched()).toEqual([]);
   });
+
+  it.each([{ command: [] }, { command: ["logs"] }, { command: ["shell"] }])(
+    "rechecks a device that went offline during name resolution: $command",
+    async ({ command }) => {
+      const f = tabletGoingDown(GONE, true);
+      const result = await runCli(
+        [
+          ...command,
+          "--device",
+          "medium_tablet",
+          "--json",
+          ...(command[0] === "shell" ? ["--", "echo hi"] : []),
+        ],
+        f.env,
+      );
+      const data = JSON.parse(result.stdout) as Record<string, unknown>;
+      if (command.length === 0) {
+        expect(data.target_note).toBe("emulator-5556 (last known as medium_tablet) is offline");
+      } else {
+        expect(data.code).toBe("DEVICE_OFFLINE");
+        expect(result.exitCode).toBe(1);
+      }
+    },
+  );
 
   it("labels it in the device list and in a DEVICE_NOT_FOUND table", async () => {
     const f = tabletGoingDown(GONE);

@@ -21,6 +21,8 @@ export interface CommandContext {
   /** The resolved device for commands with `device: "target"`, checked online. */
   target: Target | undefined;
   env: NodeJS.ProcessEnv;
+  /** A one-time notice if this invocation dropped marks from another device boot. */
+  marksNote?: string;
   /** The host's process list, for commands that check which host tools are running. */
   hostProcesses: HostProcessList;
   /** Whether `adb-axi <path>` ships in this build, so help lines never name one that does not. */

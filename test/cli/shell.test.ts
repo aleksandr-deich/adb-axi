@@ -280,9 +280,9 @@ describe("shell", () => {
     const { toon, data } = await both(f, ["--timeout", "1s", "--", "sleep 30"]);
     expect(toon.exitCode).toBe(1);
     expect(data).toEqual({
-      error: "running the command on emulator-5554 did not finish before the 1 s deadline",
+      error: "running the command did not finish before the 1 s deadline",
       code: "TIMEOUT",
-      step: "running the command on emulator-5554",
+      step: "running the command",
       stdout: "starting",
       stderr: "still waiting",
       help: [
@@ -380,6 +380,35 @@ describe("shell", () => {
     });
     const help = await runCli(["shell", "--help"], f.env);
     expect(help.stdout).toContain("Flags such as --device go before `--`");
+  });
+
+  it("names the serial only once when a command loses its device", async () => {
+    fake = createFakeAdb({
+      synthetic: true,
+      state: { state: "online" },
+      rules: [
+        {
+          match: ["devices", "-l"],
+          when: { state: "online" },
+          respond: { stdout: "List of devices attached\nemulator-5554 device\n" },
+        },
+        {
+          match: ["devices", "-l"],
+          when: { state: "offline" },
+          respond: { stdout: "List of devices attached\nemulator-5554 offline\n" },
+        },
+        {
+          match: ["-s", "emulator-5554", "shell", "sleep 30"],
+          set: { state: "offline" },
+          respond: { stderr: "error: closed\n", exit: 1 },
+        },
+      ],
+    });
+    const result = await runCli(["shell", "--json", "--", "sleep 30"], fake.env);
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      code: "DEVICE_OFFLINE",
+      error: "emulator-5554 went offline while running the command",
+    });
   });
 
   it("fails an offline device at once without sending the command", async () => {

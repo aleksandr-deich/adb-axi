@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { decode } from "@toon-format/toon";
 import { afterEach, describe, expect, it } from "vitest";
+import { main } from "../../src/cli.js";
 import { isShippedPath, REGISTRY } from "../../src/commands/registry.js";
 import { createFakeAdb, type FakeAdb } from "../fake-adb/harness.js";
 import type { Response, Rule } from "../fake-adb/scenario.js";
@@ -735,6 +736,29 @@ describe("doctor", () => {
         `Run \`adb-axi doctor ui --device ${SERIAL}\` to see what holds UiAutomation`,
       ]);
       expectAddressed(f);
+    });
+
+    it("names the live host client instead of calling its holder harmless", async () => {
+      const f = scenario({
+        probes: { processes: { stdout: instrumentation(ANDROID_CLI) } },
+        rules: [{ match: ["-s", SERIAL, "shell", WEDGE_SEARCH], respond: { stdout: "" } }],
+      });
+      let output = "";
+      await main({
+        argv: ["doctor", "--device", SERIAL, "--json"],
+        env: f.env,
+        stdout: {
+          write: (chunk) => {
+            output += chunk;
+          },
+        },
+        hostProcesses: () =>
+          Promise.resolve([{ pid: 12345, args: `android layout --device ${SERIAL}` }]),
+      });
+      const data = JSON.parse(output) as { checks: { check: string; detail: string }[] };
+      expect(data.checks.find((row) => row.check === "instrumentation")?.detail).toBe(
+        "the Android CLI's UI server holds UiAutomation; in use by android pid 12345 on the host",
+      );
     });
 
     it("still fails for a wedged Android CLI server", async () => {

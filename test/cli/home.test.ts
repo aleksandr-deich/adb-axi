@@ -1,6 +1,6 @@
 import { decode } from "@toon-format/toon";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { writeMark } from "../../src/commands/logs/marks.js";
+import { bindMarks, writeMark } from "../../src/commands/logs/marks.js";
 import { isProcessAlive } from "../../src/core/exec.js";
 import { createFakeAdb, type FakeAdb } from "../fake-adb/harness.js";
 import type { Response, Rule } from "../fake-adb/scenario.js";
@@ -77,6 +77,7 @@ function body(run: CliRun): string {
 describe("adb-axi (home view)", () => {
   it("shows the devices, the target, its foreground app and the crashes since the latest mark", async () => {
     const f = device({ foreground: PROBE_FRONT, clock: { stdout: NOW }, logcat: JAVA_CRASH });
+    bindMarks(SERIAL, f.env, "3f1c8a52-0d7e-4c1b-9b1e-5a3f2d6c7e81");
     writeMark(SERIAL, f.env, "before-save", {
       epochMs: 1790834300_000,
       utcOffsetMinutes: 120,
@@ -110,6 +111,7 @@ describe("adb-axi (home view)", () => {
 
   it("says how long ago, by the host's clock, the latest mark was set", async () => {
     const f = device({ foreground: PROBE_FRONT, clock: { stdout: NOW }, logcat: JAVA_CRASH });
+    bindMarks(SERIAL, f.env, "3f1c8a52-0d7e-4c1b-9b1e-5a3f2d6c7e81");
     writeMark(SERIAL, f.env, "t1", {
       epochMs: 1790834300_000,
       utcOffsetMinutes: 120,

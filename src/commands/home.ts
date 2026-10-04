@@ -11,7 +11,7 @@ import { UNKNOWN } from "./app/shared.js";
 import { defineCommand } from "./define.js";
 import { deviceRow, readRow, type Row } from "./devices.js";
 import { DEFAULT_SINCE } from "./logs/dump.js";
-import { readMarks } from "./logs/marks.js";
+import { bindMarks, readMarks } from "./logs/marks.js";
 import { clockTime, readWindowLines, resolveWindow } from "./logs/window.js";
 import type { CommandContext } from "./types.js";
 
@@ -44,7 +44,10 @@ async function runHome(context: CommandContext): Promise<Output> {
   const adb = context.adb();
   const attached = await listDevices(adb, context.deadline);
   const options = { deadline: context.deadline, env: context.env };
-  const rowsPromise = Promise.all(attached.map((device) => readRow(adb, device, [], options)));
+  const rowPromises = new Map(
+    attached.map((device) => [device.serial, readRow(adb, device, [], options)]),
+  );
+  const rowsPromise = Promise.all(rowPromises.values());
   const selection = resolveTarget({
     adb,
     deadline: context.deadline,
@@ -54,7 +57,12 @@ async function runHome(context: CommandContext): Promise<Output> {
     commandArgs: ["<command>"],
     isShipped: context.isShipped,
   }).then(
-    async (target) => ({ target, state: await readTargetState(adb, target.serial, context) }),
+    async (target) => {
+      const row = await rowPromises.get(target.serial);
+      const bootId = row?.facts.bootId ?? null;
+      const marksNote = bindMarks(target.serial, context.env, bootId);
+      return { target, state: await readTargetState(adb, target.serial, context), marksNote };
+    },
     (error: unknown) => {
       if (!(error instanceof AdbAxiError) || !SELECTION_CODES.has(error.code)) throw error;
       return { error };
@@ -109,6 +117,7 @@ async function runHome(context: CommandContext): Promise<Output> {
     target: target.serial,
     foreground: state.foreground,
     crashes: state.crashes,
+    ...(selected.marksNote === undefined ? {} : { marks_note: selected.marksNote }),
     ...withHelp(help),
   };
 }

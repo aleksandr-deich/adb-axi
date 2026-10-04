@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { decode } from "@toon-format/toon";
 import { afterEach, describe, expect, it } from "vitest";
@@ -145,6 +145,40 @@ const rowsOf = (data: Record<string, unknown>): Record<string, string>[] =>
   data.lines as Record<string, string>[];
 
 describe("logs mark", () => {
+  it("drops marks from an earlier boot of the same serial and explains the reset once", async () => {
+    const f = devices({
+      serial: A,
+      api: 35,
+      clocks: [MARK_CLOCK],
+      shell: {
+        "logcat -d -v epoch -T 1790833210.420": { stdout: "" },
+      },
+    });
+    await runCli(["logs", "mark", "old"], f.env);
+    const path = join(f.home, A, "marks.json");
+    const saved = JSON.parse(readFileSync(path, "utf8")) as Record<string, unknown>;
+    writeFileSync(path, JSON.stringify({ ...saved, boot_id: "previous-boot" }));
+    const first = await runCli(["logs", "--since", "old", "--json"], f.env);
+    expect(JSON.parse(first.stdout)).toMatchObject({
+      code: "MARK_NOT_FOUND",
+      marks: [],
+      marks_note: "Log marks from a previous device or boot were dropped",
+    });
+    const second = await runCli(["logs", "--since", "old", "--json"], f.env);
+    expect(JSON.parse(second.stdout)).not.toHaveProperty("marks_note");
+  });
+
+  it("prints an explicit zero when no log lines match", async () => {
+    const f = devices({
+      serial: A,
+      api: 35,
+      shell: {
+        "logcat -d -v epoch -T 1790833240.000": { stdout: "" },
+      },
+    });
+    const { data } = await both(["logs", "--since", "15m", "--grep", "NEVERMATCH"], f);
+    expect(data.counts).toEqual({ matched: 0 });
+  });
   it("stores the device clock, not the host clock, and prints it in device local time", async () => {
     const f = devices({ serial: A, api: 35, clocks: [MARK_CLOCK] });
     const before = Date.now();
@@ -548,7 +582,11 @@ describe("logs", () => {
     expect(data).not.toHaveProperty("scope");
     expect(rowsOf(data)).toHaveLength(2);
     // No package means no package lookup and no process list.
-    expect(shellCommands(f).filter((c) => !c.startsWith("logcat") && c !== CLOCK)).toHaveLength(0);
+    expect(
+      shellCommands(f).filter(
+        (c) => !c.startsWith("logcat") && c !== CLOCK && !c.startsWith("echo @sdk;"),
+      ),
+    ).toHaveLength(0);
     expectClean(f);
   });
 
@@ -562,7 +600,7 @@ describe("logs", () => {
     const { data } = await both(["logs", "--since", "30s"], f);
     expect(data.window).toBe("30s ago -> now (30 s), 0 lines scanned");
     expect(rowsOf(data)).toEqual([]);
-    expect(data.counts).toEqual({});
+    expect(data.counts).toEqual({ matched: 0 });
     expectClean(f);
   });
 
