@@ -19,6 +19,7 @@ import { createFakeAdb, FIXTURES_DIR, type FakeAdb } from "../fake-adb/harness.j
 import type { Response, Rule } from "../fake-adb/scenario.js";
 import { buildApk, digestOf, withZip64End } from "../helpers/apk-builder.js";
 import { runCli, type CliRun } from "../helpers/run.js";
+import { sharedWithToon } from "../helpers/json.js";
 
 const SERIAL = "emulator-5554";
 const PKG = "com.example.notes";
@@ -188,7 +189,7 @@ async function both(make: () => FakeAdb, args: string[]): Promise<Both> {
     runCli([...args, "--json"], jsonWorld.env),
   ]);
   expect(toon.exitCode).toBe(json.exitCode);
-  const data = JSON.parse(json.stdout) as Record<string, unknown>;
+  const data = sharedWithToon(JSON.parse(json.stdout) as Record<string, unknown>);
   const decoded = decode(toon.stdout.trimEnd()) as Record<string, unknown>;
   expect(withoutTime(decoded)).toEqual(withoutTime(data));
   return { toon, json, data, fake: toonWorld };
@@ -260,11 +261,12 @@ describe("app install", () => {
       "ok: install com.example.notes -> 1.4.0 (57) with data kept",
       "install:",
       "  previous: 1.4.0 (56)",
+      "  debuggable: false",
       "  took_ms: <n>",
     ]);
     expect(data).toMatchObject({
       ok: "install com.example.notes -> 1.4.0 (57) with data kept",
-      install: { previous: "1.4.0 (56)" },
+      install: { previous: "1.4.0 (56)", debuggable: false },
     });
     // `-r` keeps the data; the device is read before the install and after it.
     expect(calls(fake)).toEqual([
@@ -275,6 +277,39 @@ describe("app install", () => {
     ]);
     expectClean(fake);
     expect(toon.stderr).toBe("");
+  });
+
+  it("says when a build of the same version flips debuggable or its signer", async () => {
+    const debuggable: Response = {
+      stdout: V57.stdout?.replace("flags=[ HAS_CODE ]", "flags=[ DEBUGGABLE HAS_CODE ]") ?? "",
+    };
+    const { toon, data } = await both(() => {
+      const fake = world({
+        start: "debug",
+        dumps: { debug: debuggable, new: V57 },
+        rules: [installs(APK)],
+      });
+      seedRecord(fake, {
+        packages: {
+          [PKG]: {
+            versionCode: 57,
+            versionName: "1.4.0",
+            signers: [digestOf(CERT_B)],
+            installedAt: "2026-10-01T08:00:00.000Z",
+          },
+        },
+      });
+      return fake;
+    }, ["app", "install", APK]);
+    expect(toon.exitCode).toBe(0);
+    expect(data).toMatchObject({
+      ok: "install com.example.notes -> 1.4.0 (57) with data kept",
+      install: {
+        previous: "1.4.0 (57)",
+        debuggable: false,
+        changed: ["debuggable: true -> false", "signed differently from the last adb-axi install"],
+      },
+    });
   });
 
   it("installs a package the device does not have, with no previous version", async () => {
@@ -613,6 +648,7 @@ describe("app install", () => {
         "ok: install com.example.notes -> 1.4.0 (57) with data kept",
         "install:",
         "  previous: 1.4.0 (56)",
+        "  debuggable: false",
         "  took_ms: <n>",
       ]);
       expect(calls(fake)).toContain(`install -r ${APK}`);

@@ -215,6 +215,13 @@ if (chosen === undefined) {
       process.stdout.write(readFileSync(resolve(baseDir, response.stdoutFile)));
     }
     if (response.stdout !== undefined) process.stdout.write(response.stdout);
+    if (response.clockOffsetMs !== undefined) {
+      const ms = Date.now() + response.clockOffsetMs;
+      const seconds = Math.floor(ms / 1000);
+      process.stdout.write(
+        `${seconds}.${String(ms - seconds * 1000).padStart(3, "0")}000000 +0000\n`,
+      );
+    }
     if (response.stderr !== undefined) process.stderr.write(response.stderr);
     const exit = response.exit ?? 0;
     log({ event: "end", pid: process.pid, at: Date.now(), rule: index, exit });

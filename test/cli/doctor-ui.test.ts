@@ -5,6 +5,7 @@ import type { HostProcess, HostProcessList } from "../../src/host/processes.js";
 import { createFakeAdb, type FakeAdb } from "../fake-adb/harness.js";
 import type { Response, Rule } from "../fake-adb/scenario.js";
 import { runCli } from "../helpers/run.js";
+import { sharedWithToon } from "../helpers/json.js";
 
 const SERIAL = "emulator-5554";
 const DEVICES = `List of devices attached\n${SERIAL}          device product:sdk_gphone64_arm64 model:sdk_gphone64_arm64 device:emu64a transport_id:1\n\n`;
@@ -182,7 +183,7 @@ async function cli(
   f.resetVars();
   const json = await once(["--json"]);
   expect(toon.exit).toBe(json.exit);
-  const data = JSON.parse(json.out) as Record<string, unknown>;
+  const data = sharedWithToon(JSON.parse(json.out) as Record<string, unknown>);
   expect(decode(toon.out.trimEnd())).toEqual(data);
   return { exitCode: toon.exit, data, toon: toon.out };
 }
@@ -260,6 +261,27 @@ describe("doctor ui", () => {
       expectAddressed(f);
     });
 
+    it("reports the Android CLI's idle server as resident, says what it blocks, and exits 0", async () => {
+      const f = scenario({ dumpsys: dumpsys({ component: ANDROID_CLI, pid: 3773 }) });
+      const { exitCode, data } = await cli(f, ["doctor", "ui"]);
+      expect(exitCode).toBe(0);
+      expect(data).toEqual({
+        uiautomation: "in use",
+        holders: [
+          {
+            pid: 3773,
+            holder: "com.android.cli.interact.instrumentation (Android CLI)",
+            state: "resident",
+            why: "no host client",
+          },
+        ],
+        help: [
+          `The Android CLI keeps its UI server between \`android\` commands; that is harmless, but it blocks instrumentation tests (Gradle connected* tasks, \`am instrument\`), so run \`adb-axi doctor ui --fix --device ${SERIAL}\` before starting them`,
+        ],
+      });
+      expectAddressed(f);
+    });
+
     it("reports a leaked mobilecli server and a wedged Android CLI server, and exits 1", async () => {
       const f = scenario({
         dumpsys: dumpsys({ component: ANDROID_CLI, pid: 5673 }),
@@ -302,7 +324,7 @@ describe("doctor ui", () => {
 
     it("counts only the holder's own pid as wedged", async () => {
       const f = scenario({
-        dumpsys: dumpsys({ component: ANDROID_CLI, pid: 5673 }),
+        dumpsys: dumpsys({ component: AGENT_DEVICE, pid: 5673 }),
         // An earlier holder, long gone, logged the signature under another pid.
         logcat: wedgeLog(4100),
       });
@@ -311,7 +333,7 @@ describe("doctor ui", () => {
       expect(data.holders).toEqual([
         {
           pid: 5673,
-          holder: "com.android.cli.interact.instrumentation (Android CLI)",
+          holder: "com.callstack.agentdevice.test (agent-device)",
           state: "leaked",
           why: "no host client",
         },
@@ -823,6 +845,7 @@ describe("doctor ui", () => {
       expect(fix.exitCode).toBe(0);
       expect(JSON.parse(fix.stdout)).toEqual({
         ok: `doctor ui ${SERIAL} -> uiautomation free (no-op)`,
+        noop: true,
       });
       expectAddressed(f);
     });

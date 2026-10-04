@@ -20,6 +20,7 @@ import { isProcessAlive } from "../../src/core/exec.js";
 import { createFakeAdb, FIXTURES_DIR, type FakeAdb } from "../fake-adb/harness.js";
 import type { Response, Rule } from "../fake-adb/scenario.js";
 import { runCli, type CliRun } from "../helpers/run.js";
+import { sharedWithToon } from "../helpers/json.js";
 
 vi.setConfig({ testTimeout: 40_000 });
 
@@ -153,7 +154,7 @@ async function both(
   const toon = await runCli(["data", "db", ...args], f.env);
   const json = await runCli(["data", "db", ...args, "--json"], f.env);
   expect(json.exitCode).toBe(toon.exitCode);
-  const data = JSON.parse(json.stdout) as Record<string, unknown>;
+  const data = sharedWithToon(JSON.parse(json.stdout) as Record<string, unknown>);
   expect(normalize(data)).toEqual(
     normalize(decode(toon.stdout.trimEnd()) as Record<string, unknown>),
   );

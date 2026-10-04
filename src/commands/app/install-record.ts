@@ -35,6 +35,16 @@ function readRecords(serial: string, env: NodeJS.ProcessEnv): Record<string, Ins
   return valid;
 }
 
+/** What adb-axi last installed for a package on a device, if it has a record. */
+export function readInstallRecord(
+  serial: string,
+  pkg: string,
+  env: NodeJS.ProcessEnv,
+): InstallRecord | undefined {
+  const records = readRecords(serial, env);
+  return Object.hasOwn(records, pkg) ? records[pkg] : undefined;
+}
+
 export function writeInstallRecord(
   serial: string,
   pkg: string,

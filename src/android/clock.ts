@@ -56,3 +56,12 @@ export async function readDeviceClock(
   if (time === null) throw invalidOutput(step, result.stdout);
   return time;
 }
+
+/** A length of time in its largest whole unit: `45 s`, `12 min`, `5 h`, `3 d`. */
+export function formatSpan(ms: number): string {
+  const seconds = Math.round(Math.abs(ms) / 1000);
+  if (seconds < 60) return `${seconds} s`;
+  if (seconds < 3600) return `${Math.floor(seconds / 60)} min`;
+  if (seconds < 48 * 3600) return `${Math.floor(seconds / 3600)} h`;
+  return `${Math.floor(seconds / 86400)} d`;
+}

@@ -7,6 +7,9 @@ import { runCli, type CliRun } from "../helpers/run.js";
 
 const MARGIN_MS = 750;
 
+const DOCTOR_HINT =
+  "Run `adb-axi doctor --device emulator-5554` to check the device; it may be hung, which a longer deadline does not fix (`adb -s emulator-5554 reconnect`, or restart the emulator)";
+
 let fake: FakeAdb | undefined;
 afterEach(() => {
   fake?.cleanup();
@@ -30,8 +33,18 @@ async function both(
   );
   expect(json.exitCode).toBe(toon.exitCode);
   const data = JSON.parse(json.stdout) as Record<string, unknown>;
-  expect(data).toEqual(decode(toon.stdout.trimEnd()));
+  expect(data).toEqual(joinedStreams(decode(toon.stdout.trimEnd())));
   return { toon, data };
+}
+
+/** TOON lists a stream of several lines one per row; JSON keeps it as one string. */
+function joinedStreams(decoded: unknown): unknown {
+  const data = { ...(decoded as Record<string, unknown>) };
+  for (const key of ["stdout", "stderr"]) {
+    const value = data[key];
+    if (Array.isArray(value)) data[key] = value.join("\n");
+  }
+  return data;
 }
 
 describe("shell", () => {
@@ -173,6 +186,21 @@ describe("shell", () => {
     });
   });
 
+  it("prints several lines as a TOON list with one line per row, and as one JSON string", async () => {
+    const f = withFake();
+    const { toon, data } = await both(f, ["--", "cat /data/local/tmp/noisy; exit 2"]);
+    expect(toon.stdout.split("\n").slice(0, 6)).toEqual([
+      "error: remote command exited 2",
+      "code: REMOTE_EXIT",
+      "exit: 2",
+      "stdout[50]:",
+      "  - line 1",
+      "  - line 2",
+    ]);
+    expect(toon.stdout).toContain("stderr[50]:\n  - warn 1\n  - warn 2\n");
+    expect(data.stdout).toBe(Array.from({ length: 50 }, (_, i) => `line ${i + 1}`).join("\n"));
+  });
+
   it("stops at 50 lines, says how many there were, and points at --full", async () => {
     const f = withFake();
     const { toon, data } = await both(f, ["--", "seq 1 120"]);
@@ -257,7 +285,10 @@ describe("shell", () => {
       step: "running the command on emulator-5554",
       stdout: "starting",
       stderr: "still waiting",
-      help: ["Run the same command with a longer `--timeout`, for example `--timeout 60s`"],
+      help: [
+        DOCTOR_HINT,
+        "Run the same command with a longer `--timeout`, for example `--timeout 60s`",
+      ],
     });
     expect(toon.durationMs).toBeLessThan(1000 + MARGIN_MS + 500);
     for (const call of f.calls()) {
@@ -272,6 +303,7 @@ describe("shell", () => {
     expect((data.stdout as string).split("\n")).toHaveLength(50);
     expect(data.shown).toBe("50 of 80 lines");
     expect(data.help).toEqual([
+      DOCTOR_HINT,
       "Run the same command with a longer `--timeout`, for example `--timeout 60s`",
       "Run `adb-axi shell --device emulator-5554 --timeout 1s --full -- 'sleep 30; seq 1 80'` to write the complete output to a file",
     ]);
@@ -288,6 +320,7 @@ describe("shell", () => {
     expect(data.shown).toBe("50 of 80 lines");
     expect(existsSync(data.full as string)).toBe(true);
     expect(data.help).toEqual([
+      DOCTOR_HINT,
       "Run the same command with a longer `--timeout`, for example `--timeout 60s`",
     ]);
   });
@@ -327,11 +360,26 @@ describe("shell", () => {
     expect(decode(ambiguous.stdout.trimEnd())).toMatchObject({
       code: "DEVICE_AMBIGUOUS",
       help: [
-        "Run `adb-axi shell --device <serial or avd> -- id`",
+        "Run `adb-axi shell --device <serial or avd> -- '<command>'`",
         "Or export ANDROID_SERIAL=<serial> in this shell",
       ],
     });
     expect(f.calls().some((call) => call.argv.includes("id"))).toBe(false);
+  });
+
+  it("never echoes text after -- in a help line, even a misplaced device flag", async () => {
+    const f = withFake("multi-device.json");
+    const run = await runCli(["shell", "--", "cmd uimode night", "-s", "emulator-5554"], f.env);
+    expect(run.exitCode).toBe(1);
+    expect(decode(run.stdout.trimEnd())).toMatchObject({
+      code: "DEVICE_AMBIGUOUS",
+      help: [
+        "Run `adb-axi shell --device <serial or avd> -- '<command>'`",
+        "Or export ANDROID_SERIAL=<serial> in this shell",
+      ],
+    });
+    const help = await runCli(["shell", "--help"], f.env);
+    expect(help.stdout).toContain("Flags such as --device go before `--`");
   });
 
   it("fails an offline device at once without sending the command", async () => {
@@ -352,7 +400,9 @@ describe("shell", () => {
     expect(exitCode).toBe(1);
     expect(decode(stdout.trimEnd())).toMatchObject({
       code: "DEVICE_NOT_FOUND",
-      help: ["Run `adb-axi shell --device <serial or avd> -- id` with one of the devices above"],
+      help: [
+        "Run `adb-axi shell --device <serial or avd> -- '<command>'` with one of the devices above",
+      ],
     });
   });
 

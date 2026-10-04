@@ -186,6 +186,24 @@ export async function avdName(
   return name;
 }
 
+/**
+ * The AVD name adb-axi last saw on this serial, whatever emulator boot it was read in, or
+ * `null`. Only for an emulator that is not online and whose console does not answer, so it
+ * is never mistaken for the live name: callers print it with `lastKnownLabel`.
+ */
+export function lastKnownAvd(serial: string, env?: NodeJS.ProcessEnv): string | null {
+  if (!serial.startsWith("emulator-")) return null;
+  const cached = readCache(join(deviceStateDir(serial, env), "avd.json"));
+  return typeof cached?.avd === "string" && parseAvdName(cached.avd) === cached.avd
+    ? cached.avd
+    : null;
+}
+
+/** How a last-known AVD name prints, so it never reads as the emulator's current name. */
+export function lastKnownLabel(avd: string): string {
+  return `${avd} (last known)`;
+}
+
 /** A cache that cannot be read is a miss, never a failure. */
 function readCache(path: string): Partial<AvdCache> | undefined {
   try {

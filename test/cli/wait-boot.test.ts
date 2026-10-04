@@ -8,6 +8,7 @@ import { isProcessAlive } from "../../src/core/exec.js";
 import { createFakeAdb, type FakeAdb } from "../fake-adb/harness.js";
 import type { Response, Rule } from "../fake-adb/scenario.js";
 import { runCli, type CliRun } from "../helpers/run.js";
+import { sharedWithToon } from "../helpers/json.js";
 
 const SERIAL = "emulator-5554";
 const TABLET = "emulator-5556";
@@ -65,7 +66,7 @@ async function both(args: string[], f: FakeAdb): Promise<Both> {
   const toon = await runCli(args, f.env);
   const json = await runCli([...args, "--json"], f.env);
   expect(toon.exitCode).toBe(json.exitCode);
-  const data = JSON.parse(json.stdout) as Record<string, unknown>;
+  const data = sharedWithToon(JSON.parse(json.stdout) as Record<string, unknown>);
   const decoded = decode(toon.stdout.trimEnd()) as Record<string, unknown>;
   // Two runs wait for different times; every other field must match exactly.
   expect(withoutWaitTime(decoded)).toEqual(withoutWaitTime(data));
@@ -302,7 +303,12 @@ describe("wait boot", () => {
       const run = await runCli(["wait", "boot", "--timeout", "1s"], f.env);
       expect(run.exitCode).toBe(1);
       expect(run.durationMs).toBeLessThan(1000 + 1500);
-      expect(decode(run.stdout.trimEnd())).toMatchObject({ code: "ADB_SERVER_UNREACHABLE" });
+      // Each look has its own short deadline, so a server that never answers leaves the
+      // device state unknown until the wait runs out.
+      expect(decode(run.stdout.trimEnd())).toMatchObject({
+        code: "WAIT_TIMEOUT",
+        last: { state: "unknown" },
+      });
     }, 20_000);
 
     it("uses the 120 s default deadline", async () => {

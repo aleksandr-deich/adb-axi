@@ -4,6 +4,7 @@ import { allCommands, REGISTRY } from "../../src/commands/registry.js";
 import { createFakeAdb, type FakeAdb } from "../fake-adb/harness.js";
 import type { Response, Rule } from "../fake-adb/scenario.js";
 import { runCli, type CliRun } from "../helpers/run.js";
+import { sharedWithToon } from "../helpers/json.js";
 
 // Parity cases run two CLI deadlines sequentially, plus process startup and cleanup.
 vi.setConfig({ testTimeout: 40_000 });
@@ -159,7 +160,7 @@ async function both(args: string[], f: FakeAdb): Promise<Both> {
   // A mismatch reports both runs whole, so each format's typed error survives a rare failure.
   const runs = `TOON run: ${describeRun(toon)}\n--json run: ${describeRun(json)}`;
   expect(toon.exitCode, runs).toBe(json.exitCode);
-  const data = JSON.parse(json.stdout) as Record<string, unknown>;
+  const data = sharedWithToon(JSON.parse(json.stdout) as Record<string, unknown>);
   const decoded = decode(toon.stdout.trimEnd()) as Record<string, unknown>;
   // The two runs take different times; every other field must match exactly.
   expect(withoutTime(decoded), runs).toEqual(withoutTime(data));
@@ -581,7 +582,7 @@ describe("app stop", () => {
     const json = await runCli(["app", "stop", "dev.probe", "--json"], jsonDevice.env);
     expect(json.exitCode).toBe(toon.exitCode);
     const decoded = decode(toon.stdout.trimEnd()) as Record<string, unknown>;
-    const data = JSON.parse(json.stdout) as Record<string, unknown>;
+    const data = sharedWithToon(JSON.parse(json.stdout) as Record<string, unknown>);
     expect(Object.keys(data)).toEqual(["ok"]);
     expect(withoutTime(decoded)).toEqual(withoutTime(data));
   });
@@ -1213,10 +1214,9 @@ describe("lifecycle review regressions", () => {
           fake.env,
         );
         expect(result.exitCode).toBe(0);
-        const data = (json ? JSON.parse(result.stdout) : decode(result.stdout.trimEnd())) as Record<
-          string,
-          unknown
-        >;
+        const data = (
+          json ? sharedWithToon(JSON.parse(result.stdout)) : decode(result.stdout.trimEnd())
+        ) as Record<string, unknown>;
         if (previous !== undefined) expect(withoutTime(data)).toEqual(withoutTime(previous));
         previous = data;
         expect(fake.vars()).toMatchObject({

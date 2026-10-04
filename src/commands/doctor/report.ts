@@ -4,6 +4,7 @@ import type { CommandContext } from "../types.js";
 import {
   checkAnimations,
   checkBoot,
+  checkClock,
   checkConsoleToken,
   checkDataFree,
   checkIme,
@@ -51,6 +52,7 @@ async function checkTarget(context: CommandContext, serial: string): Promise<Che
   const checks = { context, adb: context.adb(), serial };
   return Promise.all([
     checkBoot(checks),
+    checkClock(checks),
     checkDataFree(checks),
     checkAnimations(checks),
     checkIme(checks),

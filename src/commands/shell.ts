@@ -1,6 +1,6 @@
 import { formatDuration } from "../core/args.js";
 import { AdbAxiError } from "../core/errors.js";
-import { runHint, type Output } from "../core/output.js";
+import { runHint, TextBlock, type Output } from "../core/output.js";
 import { capLines, shownLine, writeFullOutput } from "../core/truncate.js";
 import { runShell } from "../adb/shell.js";
 import { defineCommand } from "./define.js";
@@ -14,7 +14,7 @@ export const shell = defineCommand({
     {
       name: "cmd",
       description:
-        "The command string, passed after `--` to the device's sh; quoting is up to the caller",
+        "The command string, passed after `--` to the device's sh; quoting is up to the caller. Flags such as --device go before `--`: everything after it runs on the device",
       required: true,
       rest: true,
     },
@@ -83,7 +83,8 @@ async function runShellCommand(context: CommandContext): Promise<Output> {
 }
 
 interface StreamFields {
-  fields: Record<string, string>;
+  /** `stdout` and `stderr` are text blocks, so TOON prints their lines one per row. */
+  fields: Record<string, string | TextBlock>;
   /** Some stream was cut at the caps. */
   truncated: boolean;
 }
@@ -98,14 +99,14 @@ function streamFields(
   streams: Record<Stream, string>,
   options: { serial: string; full: boolean; alwaysStdout?: boolean; alwaysStderr?: boolean },
 ): StreamFields {
-  const fields: Record<string, string> = {};
+  const fields: Record<string, string | TextBlock> = {};
   let truncated = false;
   for (const name of ["stdout", "stderr"] as const) {
     const complete = streams[name];
     const window = capLines(complete);
     const always = name === "stdout" ? options.alwaysStdout : options.alwaysStderr;
     if (complete !== "" || always === true) {
-      fields[name] = window.lines.join("\n");
+      fields[name] = new TextBlock(window.lines.join("\n"));
     }
     if (window.truncated) {
       truncated = true;

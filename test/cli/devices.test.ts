@@ -347,11 +347,11 @@ describe("devices", () => {
     expect(json.exitCode).toBe(1);
   });
 
-  it("fails with ADB_SERVER_UNREACHABLE when devices -l hangs past the deadline", async () => {
+  it("fails with TIMEOUT naming the step when devices -l hangs past the deadline", async () => {
     const f = withFake({ rules: [{ match: ["devices", "-l"], respond: { hang: true } }] });
     const { stdout, exitCode, durationMs } = await runCli(["devices", "--timeout", "1s"], f.env);
     expect(exitCode).toBe(1);
-    expect(decode(stdout.trimEnd())).toMatchObject({ code: "ADB_SERVER_UNREACHABLE" });
+    expect(decode(stdout.trimEnd())).toMatchObject({ code: "TIMEOUT", step: "listing devices" });
     expect(durationMs).toBeLessThan(1000 + 750 + 500);
     for (const call of f.calls()) expect(isProcessAlive(call.pid)).toBe(false);
   });

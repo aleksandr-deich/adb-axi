@@ -2,7 +2,14 @@ import { AdbAxiError } from "../core/errors.js";
 import { runHint, type Output } from "../core/output.js";
 import { EXTRA_FIELDS, extraValues, readExtraFields, type ExtraField } from "../device/columns.js";
 import type { AdbClient } from "../adb/run.js";
-import { avdName, readShellFacts, type DeviceFacts, type FactsOptions } from "../device/facts.js";
+import {
+  avdName,
+  lastKnownAvd,
+  lastKnownLabel,
+  readShellFacts,
+  type DeviceFacts,
+  type FactsOptions,
+} from "../device/facts.js";
 import { listDevices, ONLINE, type AttachedDevice } from "../device/list.js";
 import { defineCommand } from "./define.js";
 import type { CommandContext } from "./types.js";
@@ -105,9 +112,12 @@ export async function readRow(
     settle(() => avdName(adb, device.serial, facts.bootId, options)),
     settle(() => readExtraFields(adb, device, facts, fields, options)),
   ]);
+  // An emulator whose console does not answer, as when it is going down, keeps the name
+  // last seen on its serial, labelled as such.
+  const last = (avd ?? null) === null ? lastKnownAvd(device.serial, options.env) : null;
   return {
     device,
-    facts: { ...facts, avd: avd ?? null },
+    facts: { ...facts, avd: avd ?? (last === null ? null : lastKnownLabel(last)) },
     extra: extra ?? extraValues(device, facts, fields),
     degraded,
   };

@@ -2,8 +2,9 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { runShell } from "../../adb/shell.js";
 import type { AdbClient } from "../../adb/run.js";
-import { probeHolders } from "../../android/holders.js";
+import { ANDROID_CLI_PACKAGE, probeHolders, readWedgedPids } from "../../android/holders.js";
 import { readBoot } from "../../android/boot.js";
+import { formatSpan, readDeviceClock } from "../../android/clock.js";
 import { readShell } from "../../android/read.js";
 import { runHint } from "../../core/output.js";
 import { formatUptime, formatSize } from "../../device/columns.js";
@@ -55,6 +56,23 @@ export async function checkBoot(checks: DeviceChecks): Promise<CheckResult> {
     return packages.exitCode === 0 && packages.stdout.startsWith("package:")
       ? ok("boot", "boot finished")
       : warn("boot", "boot finished, but the package manager does not answer yet");
+  });
+}
+
+/** How far the device clock may be from the host's before log times read wrong against it. */
+export const CLOCK_SKEW_WARN_MS = 60_000;
+
+export async function checkClock(checks: DeviceChecks): Promise<CheckResult> {
+  return settle("clock", async () => {
+    const before = Date.now();
+    const device = await readDeviceClock(checks.adb, checks.serial, reads(checks));
+    // The device answered somewhere between the two host readings.
+    const skew = device.epochMs - (before + Date.now()) / 2;
+    if (Math.abs(skew) <= CLOCK_SKEW_WARN_MS) return ok("clock", "within a minute of the host");
+    return warn(
+      "clock",
+      `${formatSpan(skew)} ${skew < 0 ? "behind" : "ahead of"} the host; log times and log marks use the device clock`,
+    );
   });
 }
 
@@ -209,6 +227,19 @@ export async function checkInstrumentation(checks: DeviceChecks): Promise<CheckR
     const next = checks.context.isShipped(["doctor", "ui"])
       ? hint(checks, ["doctor", "ui"], [], "to see what holds UiAutomation")
       : hint(checks, ["app", "stop"], [first], "to end its instrumentation");
+    // The Android CLI keeps its UI server between commands. Unless it is wedged, it only
+    // stands in the way of instrumentation tests.
+    if (holding.every((holder) => holder.package === ANDROID_CLI_PACKAGE)) {
+      const wedged = await readWedgedPids(checks.adb, checks.serial, reads(checks));
+      const pids = holding.flatMap((holder) => holder.processes.map((process) => process.pid));
+      if (!pids.some((pid) => wedged.has(pid))) {
+        return warn(
+          "instrumentation",
+          "the Android CLI's UI server holds UiAutomation; harmless, but instrumentation tests cannot start while it runs",
+          next,
+        );
+      }
+    }
     return failed("instrumentation", `UiAutomation is held by ${packages.join(", ")}`, next);
   });
 }

@@ -50,6 +50,7 @@ export const logsMark = defineCommand({
       epochMs: now.epochMs,
       utcOffsetMinutes: now.utcOffsetMinutes,
       processes,
+      hostEpochMs: Date.now(),
     });
     return { ok: okLine("mark", name, `${shown} on ${serial}`) };
   },

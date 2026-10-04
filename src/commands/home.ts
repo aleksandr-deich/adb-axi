@@ -1,5 +1,5 @@
 import type { AdbClient } from "../adb/run.js";
-import { readDeviceClock } from "../android/clock.js";
+import { formatSpan, readDeviceClock } from "../android/clock.js";
 import { parseCrashes } from "../android/crash.js";
 import { readForeground } from "../android/foreground.js";
 import type { ReadOptions } from "../android/read.js";
@@ -34,7 +34,7 @@ const SELECTION_CODES = new Set([
 export const home = defineCommand({
   path: [],
   summary: "Devices, the resolved target, its foreground app and recent crashes",
-  examples: ["adb-axi", "adb-axi --json"],
+  examples: ["adb-axi", "adb-axi --device emulator-5556", "adb-axi --json"],
   device: "none",
   shipped: true,
   run: runHome,
@@ -50,7 +50,7 @@ async function runHome(context: CommandContext): Promise<Output> {
     deadline: context.deadline,
     env: context.env,
     devices: attached,
-    requested: undefined,
+    requested: typeof context.flags.device === "string" ? context.flags.device : undefined,
     commandArgs: ["<command>"],
     isShipped: context.isShipped,
   }).then(
@@ -85,18 +85,24 @@ async function runHome(context: CommandContext): Promise<Output> {
   }
 
   const { target, state } = selected;
+  // A read that shows `-` is the first thing to look at; the device may not be answering.
+  const degraded = state.degraded || rows.some((row) => row.degraded);
   const help = [
+    ...(degraded
+      ? [runHint(["doctor", "--device", target.serial], "to see why a read shows `-`")]
+      : []),
     ...stuckHints(rows, target.serial, context),
     ...(state.crashCount > 0
       ? [runHint(["logs", "crash", "--since", state.since], "to see what crashed")]
       : []),
-    runHint(
-      ["logs", "--pkg", state.foregroundPackage ?? "<package>", "--since", "1m"],
-      "for recent app logs",
-    ),
-    ...(state.degraded || rows.some((row) => row.degraded)
-      ? [runHint(["doctor"], "to see why a read shows `-`")]
-      : []),
+    ...(state.foregroundPackage === undefined && state.degraded
+      ? []
+      : [
+          runHint(
+            ["logs", "--pkg", state.foregroundPackage ?? "<package>", "--since", "1m"],
+            "for recent app logs",
+          ),
+        ]),
   ];
   return {
     ...base,
@@ -150,10 +156,14 @@ async function readTargetState(
       const window = resolveWindow(serial, context.env, mark ?? DEFAULT_SINCE, now);
       const lines = await readWindowLines(adb, serial, window, options, undefined, true);
       const count = parseCrashes(lines).filter((crash) => crash.epochMs >= window.startMs).length;
+      // The age is by the host's clock, so a stale mark shows even when the device clock is off.
+      const hostEpochMs = window.mark?.hostEpochMs;
+      const age =
+        hostEpochMs === undefined ? "" : `, set ${formatSpan(Date.now() - hostEpochMs)} ago`;
       const label =
         mark === undefined
           ? `in the last ${DEFAULT_SINCE} (no log mark yet)`
-          : `since ${clockTime(window.startMs, now.utcOffsetMinutes).slice(0, 8)} (latest mark ${mark})`;
+          : `since ${clockTime(window.startMs, now.utcOffsetMinutes).slice(0, 8)} (latest mark ${mark}${age})`;
       return { count, text: `${count} ${label}`, since: mark ?? DEFAULT_SINCE };
     }),
   ]);

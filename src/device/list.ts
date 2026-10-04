@@ -19,20 +19,30 @@ export const ONLINE = "device";
 export const LIST_CAP_MS = 15_000;
 
 /**
- * Read attached devices with `adb devices -l` under a deadline. No answer in time, or a
- * server that cannot be reached, is `ADB_SERVER_UNREACHABLE`.
+ * Read attached devices with `adb devices -l` under a deadline. A server that cannot be
+ * reached, or that does not answer within `LIST_CAP_MS`, is `ADB_SERVER_UNREACHABLE`. The
+ * command's own deadline running out first is `TIMEOUT` naming this step: a short
+ * `--timeout` says nothing about the server.
  */
-export async function listDevices(adb: AdbClient, deadline: Deadline): Promise<AttachedDevice[]> {
+export async function listDevices(
+  adb: AdbClient,
+  deadline: Deadline,
+  capMs: number = LIST_CAP_MS,
+): Promise<AttachedDevice[]> {
   let result;
   try {
-    result = await adb.host(["devices", "-l"], {
-      deadline,
-      step: "listing devices",
-      capMs: LIST_CAP_MS,
-    });
+    result = await adb.host(["devices", "-l"], { deadline, step: "listing devices", capMs });
   } catch (error) {
-    if (error instanceof AdbAxiError && error.code === "TIMEOUT") throw serverUnreachable();
-    throw error;
+    if (!(error instanceof AdbAxiError) || error.code !== "TIMEOUT") throw error;
+    if (deadline.remainingMs() > 0) throw serverUnreachable();
+    throw new AdbAxiError("TIMEOUT", error.message, {
+      fields: error.fields,
+      help: [
+        ...error.help,
+        "If a longer deadline times out too, the adb server is not answering: check that nothing else holds tcp:5037",
+      ],
+      cause: error,
+    });
   }
   const stdout = result.stdout.toString("utf8");
   if (result.exitCode !== 0 || !/^List of devices attached/m.test(stdout)) {

@@ -12,7 +12,12 @@ export const appInfo = defineCommand({
   path: ["app", "info"],
   summary: "One package's facts: installed, version, debuggable, pid, foreground, data size",
   positionals: [
-    { name: "pkg", description: "Package name, for example com.example.notes", required: true },
+    {
+      name: "pkg",
+      description:
+        "Package name, for example com.example.notes. One that is not installed answers `installed: false` with exit 0, not an error",
+      required: true,
+    },
   ],
   examples: [
     "adb-axi app info com.example.notes",

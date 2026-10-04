@@ -108,6 +108,20 @@ describe("adb-axi (home view)", () => {
     }
   });
 
+  it("says how long ago, by the host's clock, the latest mark was set", async () => {
+    const f = device({ foreground: PROBE_FRONT, clock: { stdout: NOW }, logcat: JAVA_CRASH });
+    writeMark(SERIAL, f.env, "t1", {
+      epochMs: 1790834300_000,
+      utcOffsetMinutes: 120,
+      processes: [],
+      hostEpochMs: Date.now() - 3 * 86_400_000,
+    });
+    const run = await both(f);
+    expect(decode(run.stdout.trimEnd())).toMatchObject({
+      crashes: "1 since 07:58:20 (latest mark t1, set 3 d ago)",
+    });
+  });
+
   it("counts crashes in the last 15 minutes when the target has no mark, and prints that window", async () => {
     const f = device({ foreground: PROBE_FRONT, clock: { stdout: NOW }, logcat: { stdout: "" } });
     const run = await both(f);
@@ -235,7 +249,10 @@ describe("adb-axi (home view)", () => {
     expect(run.exitCode).toBe(0);
     const data = decode(run.stdout.trimEnd()) as Record<string, unknown>;
     expect(data).toMatchObject({ target: SERIAL, foreground: "-", crashes: "-" });
-    expect(data.help).toContain("Run `adb-axi doctor` to see why a read shows `-`");
+    // The reason comes first, and no placeholder package stands in for the unknown one.
+    expect(data.help).toEqual([
+      `Run \`adb-axi doctor --device ${SERIAL}\` to see why a read shows \`-\``,
+    ]);
     expect(f.unmatched()).toEqual([]);
   });
 
@@ -264,11 +281,52 @@ describe("adb-axi (home view)", () => {
     expect(JSON.parse(json.stdout)).toEqual(error);
   });
 
-  it("still rejects a device flag before the command, even with --json", async () => {
+  it("targets the device named by --device or -s, and its help lines keep it", async () => {
+    const f = device(
+      { foreground: PROBE_FRONT, clock: { stdout: NOW }, logcat: { stdout: "" } },
+      {
+        lines: "emulator-5556 device transport_id:2\n",
+        rules: [
+          {
+            match: ["-s", "emulator-5556", "shell", { re: "echo @sdk; .*" }],
+            respond: { stdout: FACTS },
+          },
+          {
+            match: ["-s", "emulator-5556", "emu", "avd", "name"],
+            respond: { stdout: "Pixel_Tablet\r\nOK\r\n" },
+          },
+        ],
+      },
+    );
+    for (const flag of ["--device", "-s"]) {
+      const toon = await runCli([flag, SERIAL], f.env);
+      const json = await runCli(["--json", flag, SERIAL], f.env);
+      expect(toon.exitCode).toBe(0);
+      expect(JSON.parse(json.stdout)).toEqual(decode(toon.stdout.trimEnd()));
+      expect(decode(toon.stdout.trimEnd())).toMatchObject({
+        count: "2 attached, 2 online",
+        target: SERIAL,
+        foreground: "dev.probe/.MainActivity",
+        help: [
+          `Run \`adb-axi logs --pkg dev.probe --since 1m --device ${SERIAL}\` for recent app logs`,
+        ],
+      });
+    }
+    expect(f.unmatched()).toEqual([]);
+  });
+
+  it("rejects a command's flag with no command, without saying it goes after one", async () => {
     fake = createFakeAdb("multi-device.json");
-    const run = await runCli(["--json", "--device", "emulator-5554"], fake.env);
+    const run = await runCli(["--json", "--pkg", "dev.probe"], fake.env);
     expect(run.exitCode).toBe(2);
-    expect(JSON.parse(run.stdout)).toMatchObject({ code: "VALIDATION_ERROR" });
+    expect(JSON.parse(run.stdout)).toEqual({
+      error: "`--pkg dev.probe` needs a command to go with",
+      code: "VALIDATION_ERROR",
+      help: [
+        "Run `adb-axi <command> --pkg dev.probe`",
+        "Run `adb-axi --help` for every command and its summary",
+      ],
+    });
     expect(fake.calls()).toEqual([]);
   });
 });

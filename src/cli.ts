@@ -10,6 +10,7 @@ import {
   render,
   renderError,
   runHint,
+  withDeviceSelection,
   type Output,
   type OutputMode,
 } from "./core/output.js";
@@ -63,24 +64,30 @@ export async function main(options: MainOptions = {}): Promise<void> {
     env: options.env ?? process.env,
     hostProcesses: options.hostProcesses ?? readHostProcesses,
   };
+  // Every suggested next step carries the device the user picked (7.2).
+  const device = selectedDevice(argv);
+  const selected = (output: Output): Output =>
+    device === undefined ? output : withDeviceSelection(output, device);
+
+  // The home view takes the global flags alone (`adb-axi --device emulator-5556`), and the
+  // SDK always renders TOON, so JSON home and JSON top-level help render here too.
+  if (argv.length === 0 ? mode === "json" : isHomeFlags(argv)) {
+    await runDirect(stdout, mode, device, async () => {
+      const invocation = await resolveInvocation(run, undefined, argv);
+      const output = selected(await produce(invocation));
+      return invocation.kind === "run" ? { ...homeHeader(DESCRIPTION), ...output } : output;
+    });
+    return;
+  }
 
   // G1: a flag before the command is rejected with the corrected command line, before
   // anything touches adb. Bare --help and version flags stay with the SDK.
   const first = argv[0];
   if (first?.startsWith("-") === true && !(argv.length === 1 && isSdkBareFlag(first))) {
-    writeError(stdout, leadingFlagError(argv, registry), mode);
+    writeError(stdout, leadingFlagError(argv, registry), mode, device);
     return;
   }
 
-  // G2: the SDK always renders TOON, so JSON home and JSON top-level help render here.
-  if (mode === "json" && argv.length === 0) {
-    await runDirect(stdout, mode, async () => {
-      const invocation = await resolveInvocation(run, undefined, []);
-      const output = await produce(invocation);
-      return { ...homeHeader(DESCRIPTION), ...output };
-    });
-    return;
-  }
   if (mode === "json" && argv.length === 1 && argv[0] === "--help") {
     stdout.write(`${render(topLevelHelp(registry), mode)}\n`);
     return;
@@ -88,7 +95,7 @@ export async function main(options: MainOptions = {}): Promise<void> {
 
   const commands: Record<string, AxiCliCommand<Invocation>> = {};
   for (const name of Object.keys(registry.entries)) {
-    commands[name] = async (_args, invocation) => render(await produce(invocation), mode);
+    commands[name] = async (_args, invocation) => render(selected(await produce(invocation)), mode);
   }
 
   await runAxiCli<Invocation>({
@@ -99,13 +106,14 @@ export async function main(options: MainOptions = {}): Promise<void> {
     topLevelHelp: `${render(topLevelHelp(registry), mode)}\n`,
     commands,
     // The SDK merges `bin` and `description` into the home object itself.
-    home: async (_args, invocation) => produce(invocation),
+    home: async (_args, invocation) => selected(await produce(invocation)),
     // G4: help is resolved per subcommand inside `resolveContext`, never by the SDK.
     getCommandHelp: () => null,
     resolveContext: ({ command, args }) => resolveInvocation(run, command, args),
-    renderUnknownCommand: (command) => render(unknownCommandError(command, registry), mode) + "\n",
+    renderUnknownCommand: (command) =>
+      render(selected(unknownCommandError(command, argv, registry)), mode) + "\n",
     // G3: structured fields, the `error, code, <fields>, help` order, and exit codes.
-    formatError: (error) => renderError(error, mode),
+    formatError: (error) => renderError(error, mode, device),
   });
 }
 
@@ -120,12 +128,13 @@ async function produce(invocation: Invocation | undefined): Promise<Output> {
 async function runDirect(
   stdout: { write: (chunk: string) => unknown },
   mode: OutputMode,
+  device: string | undefined,
   produceOutput: () => Promise<Output>,
 ): Promise<void> {
   try {
     stdout.write(`${render(await produceOutput(), mode)}\n`);
   } catch (error) {
-    writeError(stdout, error, mode);
+    writeError(stdout, error, mode, device);
   }
 }
 
@@ -133,8 +142,9 @@ function writeError(
   stdout: { write: (chunk: string) => unknown },
   error: unknown,
   mode: OutputMode,
+  device: string | undefined,
 ): void {
-  const formatted = renderError(error, mode);
+  const formatted = renderError(error, mode, device);
   stdout.write(formatted.output);
   process.exitCode = formatted.exitCode;
 }
@@ -151,6 +161,39 @@ export function extractJsonFlag(argv: readonly string[]): { mode: OutputMode; ar
   return { mode: kept.length === head.length ? "toon" : "json", argv: [...kept, ...tail] };
 }
 
+/** The `--device` / `-s` value given before any `--`, which the command's help lines repeat. */
+export function selectedDevice(argv: readonly string[]): string | undefined {
+  for (let i = 0; i < argv.length; i++) {
+    const token = argv[i] ?? "";
+    if (token === "--") return undefined;
+    if (token === "--device" || token === "-s") {
+      const value = argv[i + 1];
+      return value === undefined || value === "" || value.startsWith("-") ? undefined : value;
+    }
+    if (token.startsWith("--device=")) {
+      const value = token.slice("--device=".length);
+      return value === "" ? undefined : value;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Whether the arguments are only global flags, which the home view takes as any command
+ * does: `adb-axi --device emulator-5556`. Their values are checked when they are parsed.
+ */
+function isHomeFlags(argv: readonly string[]): boolean {
+  for (let i = 0; i < argv.length; i++) {
+    const token = argv[i] ?? "";
+    if (VALUE_FLAGS.has(token)) {
+      i++;
+    } else if (token !== "--debug" && !/^--(?:device|timeout)=/.test(token)) {
+      return false;
+    }
+  }
+  return argv.length > 0;
+}
+
 function isSdkBareFlag(flag: string): boolean {
   return flag === "--help" || flag === "-v" || flag === "-V" || flag === "--version";
 }
@@ -161,6 +204,8 @@ function isSdkBareFlag(flag: string): boolean {
  */
 export function leadingFlagError(argv: readonly string[], registry: Registry): AdbAxiError {
   const leading: string[] = [];
+  // Whether the last flag is one adb-axi does not know, so the word after it may be its value.
+  let unknownLast = false;
   let i = 0;
   while (i < argv.length) {
     const token = argv[i] ?? "";
@@ -169,19 +214,25 @@ export function leadingFlagError(argv: readonly string[], registry: Registry): A
     if (VALUE_FLAGS.has(token) && value !== undefined) {
       leading.push(token === "-s" ? "--device" : token, value);
       i += 2;
+      unknownLast = false;
     } else {
       leading.push(token);
       i += 1;
+      unknownLast = token !== "--debug" && !/^--(?:device|timeout)=/.test(token);
     }
   }
-  const shown = argv.slice(0, i).join(" ");
   const rest = argv.slice(i);
-  const message = `\`${shown}\` must come after the command`;
-  if (rest.length === 0) {
-    return new AdbAxiError("VALIDATION_ERROR", message, {
-      help: [runHint(["<command>", ...leading])],
+  if (rest.length === 0 || (unknownLast && registry.entries[rest[0] ?? ""] === undefined)) {
+    // No command follows: only the global flags work alone (they go to the home view).
+    return new AdbAxiError("VALIDATION_ERROR", `\`${argv.join(" ")}\` needs a command to go with`, {
+      help: [
+        runHint(["<command>", ...argv.map((token) => (token === "-s" ? "--device" : token))]),
+        runHint(["--help"], "for every command and its summary"),
+      ],
     });
   }
+  const shown = argv.slice(0, i).join(" ");
+  const message = `\`${shown}\` must come after the command`;
 
   const words = commandWords(rest, registry);
   const after = rest.slice(words);
@@ -207,11 +258,14 @@ function commandWords(tokens: readonly string[], registry: Registry): number {
   return 1;
 }
 
-function unknownCommandError(command: string, registry: Registry): Output {
+function unknownCommandError(command: string, argv: readonly string[], registry: Registry): Output {
   const shipped = shippedEntryNames(registry);
   const guess = closest(command, shipped);
+  const rest = argv.slice(argv.indexOf(command) + 1);
   const help = [
-    ...(guess === undefined ? [] : [runHint([guess], `if you meant \`${guess}\``)]),
+    ...(guess === undefined
+      ? []
+      : [runHint([guess, ...rest], `if \`${command}\` was meant to be \`${guess}\``)]),
     runHint(["--help"], "for every command and its summary"),
   ];
   return {
@@ -243,7 +297,7 @@ async function resolveInvocation(
   args: readonly string[],
 ): Promise<Invocation> {
   if (command === undefined) {
-    return leafInvocation(run, run.registry.home, []);
+    return leafInvocation(run, run.registry.home, args);
   }
   const entry = run.registry.entries[command];
   if (entry === undefined) {
@@ -279,7 +333,7 @@ async function groupInvocation(
     return { kind: "output", output: helpForGroup() };
   }
   if (!isVisible(group)) throw notAvailable([group.name]);
-  if (!first.startsWith("-")) throw unknownSubcommand(group, first);
+  if (!first.startsWith("-")) throw unknownSubcommand(group, first, args.slice(1));
 
   // Flags before the subcommand: say where the subcommand goes.
   const word = args.find((token) => group.subcommands.some((s) => s.path[1] === token));
@@ -351,13 +405,17 @@ async function leafInvocation(
   };
 }
 
-/** The typed arguments minus any device selection, for help lines that add their own. */
+/**
+ * The typed arguments minus any device selection, for help lines that add their own.
+ * What follows `--` is the remote command, shown as a placeholder: anything typed after
+ * it, flags included, goes to the device, so echoing it would repeat a misplaced flag.
+ */
 function withoutDeviceFlag(args: readonly string[]): string[] {
   const out: string[] = [];
   for (let i = 0; i < args.length; i++) {
     const token = args[i] ?? "";
     if (token === "--") {
-      out.push(...args.slice(i));
+      out.push("--", "'<command>'");
       break;
     }
     if (token === "-s" || token === "--device") {
@@ -374,7 +432,7 @@ function subcommandNames(group: GroupSpec): string[] {
   return visibleSubcommands(group).map((command) => command.path[1] ?? "");
 }
 
-function unknownSubcommand(group: GroupSpec, word: string): AdbAxiError {
+function unknownSubcommand(group: GroupSpec, word: string, rest: readonly string[]): AdbAxiError {
   const names = subcommandNames(group);
   const guess = closest(word, names);
   return new AdbAxiError(
@@ -383,7 +441,9 @@ function unknownSubcommand(group: GroupSpec, word: string): AdbAxiError {
     {
       fields: { subcommands: names },
       help: [
-        ...(guess === undefined ? [] : [runHint([group.name, guess], `if you meant \`${guess}\``)]),
+        ...(guess === undefined
+          ? []
+          : [runHint([group.name, guess, ...rest], `if \`${word}\` was meant to be \`${guess}\``)]),
         runHint([group.name, "--help"], "for its subcommands"),
       ],
     },
