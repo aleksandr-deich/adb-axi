@@ -65,7 +65,8 @@ if (tool === "adb") {
 if (
   config.task === "4" &&
   ["adb", "android"].includes(tool) &&
-  args.some((a) => ["install", "uninstall"].includes(a))
+  (args.some((a) => ["install", "uninstall"].includes(a)) ||
+    (tool === "adb" && forwarded[2] === "shell" && /^\s*pm\s+uninstall(?:\s|$)/.test(forwarded.slice(3).join(" "))))
 ) {
   const serial = config.devices[0].serial;
   const dir = fs.mkdtempSync(path.join(process.env.TMPDIR, "db-oracle-"));

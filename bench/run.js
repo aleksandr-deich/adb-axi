@@ -234,6 +234,7 @@ async function main() {
             );
             if (record.agentError) record.success = false;
           } catch (e) {
+            if (e.metrics) Object.assign(record, e.metrics);
             record.error = String(e);
           } finally {
             fs.mkdirSync(results, { recursive: true });

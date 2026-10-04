@@ -82,8 +82,21 @@ export class Devices {
     }
     throw new Error(`Boot deadline: ${d.name}`);
   }
+  current(d) {
+    if (!this.owned.includes(d)) throw new Error("Unowned emulator");
+    const matches = this.list().filter(
+      (x) =>
+        x.state === "device" &&
+        /^emulator-\d+$/.test(x.serial) &&
+        this.name(x.serial) === d.name,
+    );
+    if (matches.length > 1) throw new Error(`Ambiguous owned AVD: ${d.name}`);
+    if (!matches.length) return false;
+    d.serial = matches[0].serial;
+    return true;
+  }
   recover(d) {
-    if (!this.list().some((x) => x.serial === d.serial && x.state === "device")) {
+    if (!this.current(d)) {
       const before = new Set(this.list().map((x) => x.serial));
       command(this.bins.android, ["emulator", "start", "--headless", "--cold", d.name], {
         timeout: 240000,
@@ -123,7 +136,7 @@ export class Devices {
   }
   shutdown() {
     for (const d of this.owned) {
-      if (!this.list().some((x) => x.serial === d.serial && x.state === "device")) continue;
+      if (!this.current(d)) continue;
       this.assert(d);
       command(this.bins.android, ["emulator", "stop", d.name], { timeout: 90000 });
       if (this.list().some((x) => x.serial === d.serial))

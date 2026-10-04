@@ -106,8 +106,11 @@ export function command(bin, args, options = {}) {
     maxBuffer: 64 * 1024 * 1024,
     ...options,
   });
-  if (r.error || r.status !== 0)
-    throw new Error(`${bin} ${args.join(" ")}: ${r.error?.message ?? r.stderr ?? r.stdout}`);
+  if (r.error || r.status !== 0) {
+    const error = new Error(`${bin} ${args.join(" ")}: ${r.error?.message ?? r.stderr ?? r.stdout}`);
+    error.stdout = r.stdout;
+    throw error;
+  }
   return r.stdout;
 }
 export function verifyPath(env, condition) {

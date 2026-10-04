@@ -66,7 +66,18 @@ export function runPi({ binary, env, cwd, skills, prompt, output }) {
     path.join(cwd, "pi-invocation.json"),
     JSON.stringify({ args, configDir: env.PI_CODING_AGENT_DIR }, null, 2),
   );
-  const text = command(binary, args, { env, cwd, timeout: 900000 });
+  let text;
+  try {
+    text = command(binary, args, { env, cwd, timeout: 900000 });
+  } catch (error) {
+    if (error.stdout) {
+      fs.writeFileSync(output, error.stdout);
+      try {
+        error.metrics = parsePi(error.stdout);
+      } catch {}
+    }
+    throw error;
+  }
   fs.writeFileSync(output, text);
   return parsePi(text);
 }

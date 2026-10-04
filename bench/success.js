@@ -24,6 +24,8 @@ export function setupTask(task, devices) {
 }
 export function checkTask(id, { devices, finalAnswer, audit }) {
   const phone = devices.owned[0];
+  const stoppedSerial = id === "8" ? phone.serial : null;
+  const recoveredOnline = id === "8" ? devices.current(phone) : false;
   const calls = fs.existsSync(audit)
     ? fs
         .readFileSync(audit, "utf8")
@@ -194,12 +196,11 @@ export function checkTask(id, { devices, finalAnswer, audit }) {
           (!restart || c.time < restart.time) &&
           ((c.args[0] === "devices" &&
             c.status === 0 &&
-            !(c.stdout ?? "").includes(phone.serial)) ||
+            !(c.stdout ?? "").includes(stoppedSerial)) ||
             /offline|not found|missing|unavailable/i.test(`${c.stdout ?? ""}\n${c.stderr ?? ""}`)),
       );
     checks.online =
-      devices.list().some((d) => d.serial === phone.serial && d.state === "device") &&
-      devices.shell(phone, "getprop sys.boot_completed").trim() === "1";
+      recoveredOnline && devices.shell(phone, "getprop sys.boot_completed").trim() === "1";
     checks.report =
       ["offline", "missing", "unavailable"].includes(answer.unavailableState) &&
       answer.recovered === true;
