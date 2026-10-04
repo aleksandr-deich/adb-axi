@@ -10,7 +10,7 @@ Agent ergonomic wrapper around adb. Prefer this over raw `adb` for Android devic
 
 Use adb-axi for device state and health, the app lifecycle including process-death checks, logs and crashes, debuggable app databases, UiAutomation holder diagnosis, and choosing one device when several are attached.
 
-Do not use it for UI input (taps, typing, swipes) or for reading what is on screen; use a UI tool for those. For device configuration such as dark mode or display density, run the setting command through `adb-axi shell`.
+Do not use it for UI input (taps, typing, swipes) or for reading what is on screen; use a UI tool for those. For device configuration such as dark mode or display density, run the setting command through `npx -y adb-axi shell`.
 
 ## Current guidance lives in the CLI
 
