@@ -1,10 +1,10 @@
 # Real-device tools
 
-Nothing here runs in `npm test` or `npm run check`. The device checks run in CI on an emulator (`.github/workflows/emulator.yml`). Everything here changes the devices it touches, so run it only on emulators reserved for the job, and always name each one by serial.
+Nothing here runs in `npm test` or `npm run check`. The device checks run on every pull request and on pushes to `main`, against API 30 and 35 emulators (`.github/workflows/emulator.yml`). Everything here changes the devices it touches, so run it only on emulators reserved for the job, and always name each one by serial.
 
 ## Device checks (`*.test.ts`)
 
-Each check drives adb-axi installed from a packed tarball against one emulator, through the probe app only, and waits with adb-axi's own `wait` commands instead of sleeping. The numbers follow the v0.1 real-emulator checks; check 6 needs two devices and is a local step (see below):
+The checks drive adb-axi installed from a packed tarball against one emulator, use the probe app for app and log scenarios, and wait for app and log events with adb-axi's own `wait` commands instead of sleeping. The numbers follow the v0.1 real-emulator checks; check 6 needs two devices and is a local step (see below):
 
 | File              | What it checks                                                                                                                        |
 | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------- |

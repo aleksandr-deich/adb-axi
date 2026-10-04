@@ -204,7 +204,7 @@ npm ci
 npm run check   # build, typecheck, lint, format check, tests
 ```
 
-Tests run the built CLI against a scripted fake adb in `test/fake-adb`, so no device or emulator is needed; `test/fixtures/EVIDENCE.md` maps the recorded evidence cases to their scenarios and tests. `npm run test:device` runs the device suite against a real emulator.
+`npm run check` runs the built CLI against a scripted fake adb in `test/fake-adb`, so no device or emulator is needed; `test/fixtures/EVIDENCE.md` maps the recorded evidence cases to their scenarios and tests. The separate real-emulator suite runs in CI; see [real-device checks](test/device/README.md) for local usage and coverage.
 
 ## License
 
