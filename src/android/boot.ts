@@ -38,7 +38,7 @@ export const BOOT_COMMAND = [
   "cmd activity get-current-user >/dev/null 2>&1",
   "echo $?",
   "echo @system_server_after",
-  "pidof system_server",
+  "pidof system_server || true",
 ].join("; ");
 
 /**

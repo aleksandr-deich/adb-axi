@@ -13,7 +13,7 @@ import { sharedWithToon } from "../helpers/json.js";
 const SERIAL = "emulator-5554";
 const TABLET = "emulator-5556";
 const BOOT =
-  "echo @boot_completed; getprop sys.boot_completed; echo @uptime; cat /proc/uptime; echo @system_server; pidof system_server; echo @package; cmd package path android >/dev/null 2>&1; echo $?; echo @activity; cmd activity get-current-user >/dev/null 2>&1; echo $?; echo @system_server_after; pidof system_server";
+  "echo @boot_completed; getprop sys.boot_completed; echo @uptime; cat /proc/uptime; echo @system_server; pidof system_server; echo @package; cmd package path android >/dev/null 2>&1; echo $?; echo @activity; cmd activity get-current-user >/dev/null 2>&1; echo $?; echo @system_server_after; pidof system_server || true";
 
 const line = (serial: string, state: string): string =>
   `${serial}          ${state} product:sdk_gphone64_arm64 model:sdk_gphone64_arm64 device:emu64a transport_id:1\n`;
@@ -178,6 +178,19 @@ describe("wait boot", () => {
     const f = scenario([
       listing(devices(line(SERIAL, "device"))),
       shell(boot(1, "1141.19 3978.79", { pidAfter: "912" }), { times: 1 }),
+      shell(BOOTED),
+    ]);
+    const { toon, data } = await once(["wait", "boot"], f);
+    expect(toon.exitCode).toBe(0);
+    expect(data.ok).toMatch(/^wait boot emulator-5554 -> booted after \d+ ms$/);
+    expect(f.calls().filter((call) => call.argv[2] === "shell")).toHaveLength(2);
+    expectClean(f);
+  });
+
+  it("keeps polling when system_server disappears at the trailing pid read", async () => {
+    const f = scenario([
+      listing(devices(line(SERIAL, "device"))),
+      shell(boot(1, "1141.19 3978.79", { pidAfter: "" }), { times: 1 }),
       shell(BOOTED),
     ]);
     const { toon, data } = await once(["wait", "boot"], f);

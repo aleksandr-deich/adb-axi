@@ -18,7 +18,7 @@ const list = (...lines: string[]): string => `List of devices attached\n${lines.
 
 /** The shell commands doctor sends to the target, one per check. */
 const SHELL = {
-  boot: "echo @boot_completed; getprop sys.boot_completed; echo @uptime; cat /proc/uptime; echo @system_server; pidof system_server; echo @package; cmd package path android >/dev/null 2>&1; echo $?; echo @activity; cmd activity get-current-user >/dev/null 2>&1; echo $?; echo @system_server_after; pidof system_server",
+  boot: "echo @boot_completed; getprop sys.boot_completed; echo @uptime; cat /proc/uptime; echo @system_server; pidof system_server; echo @package; cmd package path android >/dev/null 2>&1; echo $?; echo @activity; cmd activity get-current-user >/dev/null 2>&1; echo $?; echo @system_server_after; pidof system_server || true",
   packages: "pm path android",
   clock: "date '+%s.%N %z'",
   data: "df -k /data",
