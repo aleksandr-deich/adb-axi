@@ -67,7 +67,11 @@ describe("parseBoot", () => {
 
   it("accepts a pid only when it is still running after both service calls", () => {
     for (const after of ["912", "", "invalid"]) {
-      expect(parseBoot(`@boot_completed\n1\n@system_server\n585\n@package\n0\n@activity\n0\n@system_server_after\n${after}\n`)?.systemServerPid).toBeNull();
+      expect(
+        parseBoot(
+          `@boot_completed\n1\n@system_server\n585\n@package\n0\n@activity\n0\n@system_server_after\n${after}\n`,
+        )?.systemServerPid,
+      ).toBeNull();
     }
   });
 
