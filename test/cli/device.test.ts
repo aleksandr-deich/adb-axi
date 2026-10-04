@@ -123,6 +123,48 @@ describe("an offline emulator's last-known AVD name", () => {
     });
   });
 
+  it("reports multiple offline last-known matches as ambiguous with serial guidance", async () => {
+    fake = createFakeAdb({
+      synthetic: true,
+      rules: [
+        {
+          match: ["devices", "-l"],
+          respond: {
+            stdout:
+              "List of devices attached\nemulator-5554          offline transport_id:1\nemulator-5556          offline transport_id:2\n\n",
+          },
+        },
+        ...["emulator-5554", "emulator-5556"].map((serial) => ({
+          match: ["-s", serial, "emu", "avd", "name"],
+          respond: GONE,
+        })),
+      ],
+    });
+    const f = fake;
+    for (const serial of ["emulator-5554", "emulator-5556"]) {
+      writeJsonAtomic(join(deviceStateDir(serial, f.env), "avd.json"), {
+        boot_id: "9b0e7d44-51a2-4c3e-8f6d-2c1b0a9e8d77",
+        avd: "medium_tablet",
+      });
+    }
+    const toon = await runCli(["logs", "--device", "medium_tablet"], f.env);
+    const json = await runCli(["logs", "--device", "medium_tablet", "--json"], f.env);
+    expect(toon.exitCode).toBe(1);
+    expect(json.exitCode).toBe(1);
+    expect(JSON.parse(json.stdout)).toEqual(decode(toon.stdout.trimEnd()));
+    expect(JSON.parse(json.stdout)).toEqual({
+      error: "2 unavailable emulators were last known as medium_tablet",
+      code: "DEVICE_AMBIGUOUS",
+      devices: [
+        { serial: "emulator-5554", avd: "medium_tablet (last known)", form: "-" },
+        { serial: "emulator-5556", avd: "medium_tablet (last known)", form: "-" },
+      ],
+      help: ["Run `adb-axi logs --device <serial>` to pick one by serial"],
+    });
+    expect(f.unmatched()).toEqual([]);
+    expect(deviceCalls(f).every((argv) => argv[2] === "emu")).toBe(true);
+  });
+
   it("does not label an online emulator with a previous occupant's name when its console fails", async () => {
     fake = createFakeAdb({
       synthetic: true,

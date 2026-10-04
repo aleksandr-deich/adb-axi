@@ -133,6 +133,22 @@ async function byName(
   if (stale.length === 1 && only !== undefined) {
     checkState(only.device, options, wanted);
   }
+  if (stale.length > 1) {
+    throw new AdbAxiError(
+      "DEVICE_AMBIGUOUS",
+      `${stale.length} unavailable emulators were last known as ${wanted}`,
+      {
+        fields: {
+          devices: stale.map(({ device }) => ({
+            serial: device.serial,
+            avd: lastKnownLabel(wanted),
+            form: "-",
+          })),
+        },
+        help: [runHint(withDevice(options.commandArgs, "<serial>"), "to pick one by serial")],
+      },
+    );
+  }
 
   const known = new Map(
     names.map((entry) => {
