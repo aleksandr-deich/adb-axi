@@ -738,7 +738,10 @@ describe("doctor", () => {
       expectAddressed(f);
     });
 
-    it("names the live host client instead of calling its holder harmless", async () => {
+    it.each([
+      `android layout --device ${SERIAL}`,
+      `/isolated/home/.android/bin/android-cli layout --device ${SERIAL} --flat`,
+    ])("names the live host client instead of calling its holder harmless: %s", async (args) => {
       const f = scenario({
         probes: { processes: { stdout: instrumentation(ANDROID_CLI) } },
         rules: [{ match: ["-s", SERIAL, "shell", WEDGE_SEARCH], respond: { stdout: "" } }],
@@ -753,7 +756,7 @@ describe("doctor", () => {
           },
         },
         hostProcesses: () =>
-          Promise.resolve([{ pid: 12345, args: `android layout --device ${SERIAL}` }]),
+          Promise.resolve([{ pid: 12345, args }]),
       });
       const data = JSON.parse(output) as { checks: { check: string; detail: string }[] };
       expect(data.checks.find((row) => row.check === "instrumentation")?.detail).toBe(
