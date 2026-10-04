@@ -1,0 +1,8 @@
+{
+  "id": "2",
+  "prompt": "Start the probe, use the inc UI action exactly three times, background it, kill its process without force-stopping it, and bring its existing task back. Report the saved and unsaved counter values before and after, and whether they survived or reset. Return your final answer as JSON only with these fields (the quoted type labels describe the values to report): {\"before\": {\"saved\": \"number\", \"unsaved\": \"number\"}, \"after\": {\"saved\": \"number\", \"unsaved\": \"number\"}, \"savedSurvived\": \"boolean\", \"unsavedReset\": \"boolean\"}.",
+  "setup": "debug",
+  "reset": "clean-both",
+  "success": "bench/tasks/2.js",
+  "reference": "bench/reference/2.js"
+}

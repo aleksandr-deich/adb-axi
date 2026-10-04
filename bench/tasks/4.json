@@ -1,0 +1,8 @@
+{
+  "id": "4",
+  "prompt": "Start the debug probe and use the write UI action once. Read the inserted database row and report its text. Then replace it with the release APK, use write once, attempt the same database read and report the result and reason. Leave the release app running for verification. Return your final answer as JSON only with these fields (the quoted type labels describe the values to report): {\"rowText\": \"string\", \"releaseError\": \"string\"}.",
+  "setup": "debug",
+  "reset": "clean-both",
+  "success": "bench/tasks/4.js",
+  "reference": "bench/reference/4.js"
+}

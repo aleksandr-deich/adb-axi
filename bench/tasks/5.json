@@ -1,0 +1,8 @@
+{
+  "id": "5",
+  "prompt": "Read the current dark-mode configuration, change it to the opposite of its current yes/no state (use yes if currently auto), verify the change for a test, and restore the original configuration. Report the original, changed and restored values. Return your final answer as JSON only with these fields (the quoted type labels describe the values to report): {\"original\": \"string\", \"changed\": \"string\", \"restored\": \"string\"}.",
+  "setup": "clean",
+  "reset": "clean-both",
+  "success": "bench/tasks/5.js",
+  "reference": "bench/reference/5.js"
+}

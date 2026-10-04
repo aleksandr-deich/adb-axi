@@ -1,0 +1,8 @@
+{
+  "id": "7",
+  "prompt": "Install and cold-start the debug probe on the phone, confirm it is foreground, then do the same on the tablet in this same session. Report the two serials and foreground packages. Return your final answer as JSON only with these fields (the quoted type labels describe the values to report): {\"phone\": {\"serial\": \"string\", \"foreground\": \"string\"}, \"tablet\": {\"serial\": \"string\", \"foreground\": \"string\"}}.",
+  "setup": "clean",
+  "reset": "clean-both",
+  "success": "bench/tasks/7.js",
+  "reference": "bench/reference/7.js"
+}
