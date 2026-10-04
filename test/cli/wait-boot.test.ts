@@ -12,7 +12,8 @@ import { sharedWithToon } from "../helpers/json.js";
 
 const SERIAL = "emulator-5554";
 const TABLET = "emulator-5556";
-const BOOT = "echo @boot_completed; getprop sys.boot_completed; echo @uptime; cat /proc/uptime";
+const BOOT =
+  "echo @boot_completed; getprop sys.boot_completed; echo @uptime; cat /proc/uptime; echo @system_server; pidof system_server; echo @package; cmd package path android >/dev/null 2>&1; echo $?; echo @activity; cmd activity get-current-user >/dev/null 2>&1; echo $?";
 
 const line = (serial: string, state: string): string =>
   `${serial}          ${state} product:sdk_gphone64_arm64 model:sdk_gphone64_arm64 device:emu64a transport_id:1\n`;
@@ -20,13 +21,39 @@ const devices = (...lines: string[]): Response => ({
   stdout: `List of devices attached\n${lines.join("")}\n`,
 });
 
-/** What the boot read prints: the property (empty while unset) and `/proc/uptime`. */
-const boot = (completed: 0 | 1, uptime = "1141.19 3978.79"): Response => ({
-  stdout: `@boot_completed\n${completed === 1 ? "1" : ""}\n@uptime\n${uptime}\n`,
+interface Services {
+  /** `pidof system_server`; empty while it is not running. */
+  pid?: string;
+  /** The exit codes of the package and activity calls: 0 answered, 20 is "Can't find service". */
+  pkg?: number;
+  activity?: number;
+}
+
+/**
+ * What the boot read prints: the property (empty while unset), `/proc/uptime`, the
+ * system_server pid, and the exit codes of the package and activity service calls.
+ */
+const boot = (
+  completed: 0 | 1,
+  uptime = "1141.19 3978.79",
+  { pid = "585", pkg = 0, activity = 0 }: Services = {},
+): Response => ({
+  stdout: `@boot_completed\n${completed === 1 ? "1" : ""}\n@uptime\n${uptime}\n@system_server\n${pid}\n@package\n${String(pkg)}\n@activity\n${String(activity)}\n`,
 });
 
+const UNREAD = {
+  boot_completed: "-",
+  uptime_s: "-",
+  package_service: "-",
+  activity_service: "-",
+} as const;
+
 const BOOTED = boot(1);
-const BOOTING = boot(0, "131.54 400.00");
+const BOOTING = boot(0, "131.54 400.00", { pid: "", pkg: 20, activity: 20 });
+/** Booted, but system_server has not brought up the services yet. */
+const NO_SERVICES = boot(1, "1141.19 3978.79", { pkg: 20, activity: 20 });
+/** A device up for under five minutes, with its services answering. */
+const fresh = (pid: string): Response => boot(1, "31.20 60.00", { pid });
 
 let fake: FakeAdb | undefined;
 afterEach(() => {
@@ -132,6 +159,54 @@ describe("wait boot", () => {
     expectClean(f);
   });
 
+  it("keeps waiting after the boot flag until the package and activity services answer", async () => {
+    const f = scenario([
+      listing(devices(line(SERIAL, "device"))),
+      shell(NO_SERVICES, { times: 1 }),
+      shell(boot(1, "1141.19 3978.79", { activity: 20 }), { times: 1 }),
+      shell(BOOTED),
+    ]);
+    const { toon, data } = await once(["wait", "boot"], f);
+    expect(toon.exitCode).toBe(0);
+    expect(data.ok).toMatch(/^wait boot emulator-5554 -> booted after \d+ ms$/);
+    expect(f.calls().filter((call) => call.argv[2] === "shell")).toHaveLength(3);
+    expectClean(f);
+  });
+
+  it("on a fresh device, waits for the services to keep answering from one system_server", async () => {
+    // system_server 585 answers, then restarts: its services go away and 912 brings them back.
+    const f = scenario([
+      listing(devices(line(SERIAL, "device"))),
+      shell(fresh("585"), { times: 3 }),
+      shell(boot(1, "33.00 64.00", { pid: "", pkg: 20, activity: 20 }), { times: 1 }),
+      shell(boot(1, "33.40 65.00", { pid: "912", pkg: 0, activity: 20 }), { times: 1 }),
+      shell(fresh("912")),
+    ]);
+    const { toon, data } = await once(["wait", "boot", "--timeout", "30s"], f);
+    expect(toon.exitCode).toBe(0);
+    const waited = data.waited_ms as number;
+    // Five looks at least 400 ms apart before 912 answers in full, then ten seconds of it answering.
+    expect(waited).toBeGreaterThanOrEqual(5 * 400 + 10_000);
+    expect(data.ok).toBe(`wait boot ${SERIAL} -> booted after ${String(waited)} ms`);
+    const looks = f.calls().filter((call) => call.argv[2] === "shell");
+    expect(looks.length).toBeGreaterThan(5 + 1);
+    expectClean(f);
+  }, 40_000);
+
+  it("on a fresh device, starts the settle again when system_server changes between looks", async () => {
+    // The restart falls between two looks, so no look sees the services missing.
+    const f = scenario([
+      listing(devices(line(SERIAL, "device"))),
+      shell(fresh("585"), { times: 3 }),
+      shell(fresh("912")),
+    ]);
+    const { toon, data } = await once(["wait", "boot", "--timeout", "30s"], f);
+    expect(toon.exitCode).toBe(0);
+    // Looks start at least 400 ms apart, so 912's ten seconds start 1.2 s in.
+    expect(data.waited_ms as number).toBeGreaterThanOrEqual(3 * 400 + 10_000);
+    expectClean(f);
+  }, 40_000);
+
   it("waits through a device that is not attached yet and one that is still offline", async () => {
     const f = scenario([
       // One look finds nothing attached, one finds the device offline, then it is up and booted.
@@ -163,7 +238,7 @@ describe("wait boot", () => {
     expect(data).toMatchObject({
       code: "WAIT_TIMEOUT",
       error: `${SERIAL} had not finished booting after 1 s`,
-      last: { state: "not attached", boot_completed: "-", uptime_s: "-" },
+      last: { state: "not attached", ...UNREAD },
     });
     expect(f.calls().filter((call) => call.argv[2] === "shell" && call.argv[1] === TABLET)).toEqual(
       [],
@@ -204,6 +279,8 @@ describe("wait boot", () => {
           "  state: device",
           "  boot_completed: 0",
           "  uptime_s: 131",
+          "  package_service: 0",
+          "  activity_service: 0",
           "help[1]: Run `adb-axi doctor --device emulator-5556` to see why",
           "",
         ].join("\n"),
@@ -211,10 +288,56 @@ describe("wait boot", () => {
       expect(data).toEqual({
         error: "emulator-5556 had not finished booting after 3 s",
         code: "WAIT_TIMEOUT",
-        last: { state: "device", boot_completed: 0, uptime_s: 131 },
+        last: {
+          state: "device",
+          boot_completed: 0,
+          uptime_s: 131,
+          package_service: 0,
+          activity_service: 0,
+        },
         help: ["Run `adb-axi doctor --device emulator-5556` to see why"],
       });
       expectClean(f, TABLET);
+    }, 20_000);
+
+    it("carries which service still did not answer after the boot flag", async () => {
+      const f = scenario([
+        listing(devices(line(SERIAL, "device"))),
+        shell(boot(1, "1141.19 3978.79", { pkg: 20 })),
+      ]);
+      const { toon, data } = await both(["wait", "boot", "--timeout", "1s"], f);
+      expect(toon.exitCode).toBe(1);
+      expect(data).toMatchObject({
+        error: `${SERIAL} had not finished booting after 1 s`,
+        code: "WAIT_TIMEOUT",
+        last: {
+          state: "device",
+          boot_completed: 1,
+          uptime_s: 1141,
+          package_service: 0,
+          activity_service: 1,
+        },
+      });
+      expectClean(f);
+    }, 20_000);
+
+    it("says so when a fresh device was ready but had not answered for the settle yet", async () => {
+      const f = scenario([listing(devices(line(SERIAL, "device"))), shell(fresh("585"))]);
+      const { toon, data } = await both(["wait", "boot", "--timeout", "2s"], f);
+      expect(toon.exitCode).toBe(1);
+      expect(data).toEqual({
+        error: `${SERIAL} had booted, but its services had not answered for 10 s in a row after 2 s`,
+        code: "WAIT_TIMEOUT",
+        last: {
+          state: "device",
+          boot_completed: 1,
+          uptime_s: 31,
+          package_service: 1,
+          activity_service: 1,
+        },
+        help: [`Run \`adb-axi doctor --device ${SERIAL}\` to see why`],
+      });
+      expectClean(f);
     }, 20_000);
 
     it("reports an offline device as the last state, with the boot unknown", async () => {
@@ -224,7 +347,7 @@ describe("wait boot", () => {
       expect(data).toMatchObject({
         error: "the device had not finished booting after 2 s",
         code: "WAIT_TIMEOUT",
-        last: { state: "offline", boot_completed: "-", uptime_s: "-" },
+        last: { state: "offline", ...UNREAD },
       });
       // The boot is never read from a device that is not online.
       expect(f.calls().filter((call) => call.argv[0] === "-s")).toEqual([]);
@@ -241,7 +364,7 @@ describe("wait boot", () => {
         expect(toon.exitCode).toBe(1);
         expect(data).toMatchObject({
           code: "WAIT_TIMEOUT",
-          last: { state, boot_completed: "-", uptime_s: "-" },
+          last: { state, ...UNREAD },
         });
         expect(f.unmatched()).toEqual([]);
       },
@@ -258,7 +381,7 @@ describe("wait boot", () => {
       expect(decode(run.stdout.trimEnd())).toEqual({
         error: `${TABLET} had not finished booting after 1 s`,
         code: "WAIT_TIMEOUT",
-        last: { state: "not attached", boot_completed: "-", uptime_s: "-" },
+        last: { state: "not attached", ...UNREAD },
         help: [`Run \`adb-axi doctor --device ${TABLET}\` to see why`],
       });
       expect(f.unmatched()).toEqual([]);
@@ -271,7 +394,7 @@ describe("wait boot", () => {
       expect(data).toEqual({
         error: "emulator-5556 had not finished booting after 2 s",
         code: "WAIT_TIMEOUT",
-        last: { state: "not attached", boot_completed: "-", uptime_s: "-" },
+        last: { state: "not attached", ...UNREAD },
         help: ["Run `adb-axi doctor --device emulator-5556` to see why"],
       });
       expect(f.unmatched()).toEqual([]);
@@ -293,7 +416,7 @@ describe("wait boot", () => {
       expect(run.durationMs).toBeLessThan(2000 + 1500);
       expect(decode(run.stdout.trimEnd())).toMatchObject({
         code: "WAIT_TIMEOUT",
-        last: { state: "device", boot_completed: "-", uptime_s: "-" },
+        last: { state: "device", ...UNREAD },
       });
       for (const call of f.calls()) expect(isProcessAlive(call.pid)).toBe(false);
     }, 20_000);

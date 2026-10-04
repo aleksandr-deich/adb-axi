@@ -25,16 +25,21 @@ describe("splitSections", () => {
 });
 
 describe("parseBoot", () => {
+  const SERVICES = "@system_server\n585\n@package\n0\n@activity\n0\n";
+
   it("reads a finished boot and the uptime in whole seconds (a real /proc/uptime)", () => {
     const uptime = captured("35/proc-uptime.txt");
-    expect(parseBoot(`@boot_completed\n1\n@uptime\n${uptime}`)).toEqual({
+    expect(parseBoot(`@boot_completed\n1\n@uptime\n${uptime}${SERVICES}`)).toEqual({
       bootCompleted: true,
       uptimeS: 1141,
+      systemServerPid: 585,
+      packageService: true,
+      activityService: true,
     });
   });
 
   it("reads an unset property as a boot that is not finished", () => {
-    expect(parseBoot("@boot_completed\n\n@uptime\n131.54 400.00\n")).toEqual({
+    expect(parseBoot(`@boot_completed\n\n@uptime\n131.54 400.00\n${SERVICES}`)).toMatchObject({
       bootCompleted: false,
       uptimeS: 131,
     });
@@ -44,6 +49,31 @@ describe("parseBoot", () => {
   it("leaves the uptime unknown when /proc/uptime printed nothing usable", () => {
     expect(parseBoot("@boot_completed\n1\n@uptime\n")?.uptimeS).toBeNull();
     expect(parseBoot("@boot_completed\n1\n@uptime\nnot a number\n")?.uptimeS).toBeNull();
+  });
+
+  it("reads a service that does not answer, and a system_server that is not running", () => {
+    // `cmd` exits 20 for "Can't find service" and non-zero for a call that breaks off.
+    const reading = parseBoot(
+      "@boot_completed\n1\n@uptime\n31.20 60.00\n@system_server\n@package\n20\n@activity\n255\n",
+    );
+    expect(reading).toEqual({
+      bootCompleted: true,
+      uptimeS: 31,
+      systemServerPid: null,
+      packageService: false,
+      activityService: false,
+    });
+  });
+
+  it("leaves the services and the pid unknown when their parts are missing or unreadable", () => {
+    expect(parseBoot("@boot_completed\n1\n@uptime\n5.00 5.00\n")).toMatchObject({
+      systemServerPid: null,
+      packageService: null,
+      activityService: null,
+    });
+    expect(
+      parseBoot("@boot_completed\n1\n@system_server\nx\n@package\nok\n@activity\n\n"),
+    ).toMatchObject({ systemServerPid: null, packageService: null, activityService: null });
   });
 
   it("refuses output it cannot read instead of guessing", () => {
