@@ -19,10 +19,11 @@ function ownedSerials() {
     });
     let name = named.status === 0 ? named.stdout.split("\n")[0].trim() : "";
     if (!name) {
-      const property = spawnSync(config.bins.adb, ["-s", serial, "shell", "getprop ro.boot.qemu.avd_name"], {
-        encoding: "utf8",
-        timeout: 10000,
-      });
+      const property = spawnSync(
+        config.bins.adb,
+        ["-s", serial, "shell", "getprop ro.boot.qemu.avd_name"],
+        { encoding: "utf8", timeout: 10000 },
+      );
       if (property.status === 0) name = property.stdout.trim();
     }
     if (names.includes(name)) serials.push(serial);
@@ -90,7 +91,9 @@ if (
   config.task === "4" &&
   ["adb", "android"].includes(tool) &&
   (args.some((a) => ["install", "uninstall"].includes(a)) ||
-    (tool === "adb" && forwarded[2] === "shell" && /^\s*pm\s+uninstall(?:\s|$)/.test(forwarded.slice(3).join(" "))))
+    (tool === "adb" &&
+      forwarded[2] === "shell" &&
+      /^\s*pm\s+uninstall(?:\s|$)/.test(forwarded.slice(3).join(" "))))
 ) {
   const serial = config.devices[0].serial;
   const dir = fs.mkdtempSync(path.join(process.env.TMPDIR, "db-oracle-"));

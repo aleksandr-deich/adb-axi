@@ -10,9 +10,9 @@ export default function reference({ android, adb, phone, wait }, skipRecover = f
       const current = serials.find((serial) => {
         const device = { serial };
         return (
-          adb(device, ["emu", "avd", "name"]).split("\n")[0].trim() ||
-          adb(device, ["shell", "getprop ro.boot.qemu.avd_name"]).trim()
-        ) === phone.name;
+          (adb(device, ["emu", "avd", "name"]).split("\n")[0].trim() ||
+            adb(device, ["shell", "getprop ro.boot.qemu.avd_name"]).trim()) === phone.name
+        );
       });
       if (!current) return false;
       return adb({ serial: current }, ["shell", "getprop sys.boot_completed"]).trim() === "1";

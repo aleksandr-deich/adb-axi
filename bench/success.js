@@ -211,7 +211,9 @@ export function checkTask(id, { devices, finalAnswer, audit }) {
               /offline|not found|missing|unavailable/i.test(`${c.stdout ?? ""}\n${c.stderr ?? ""}`))),
       );
     checks.online =
-      !!restart && recoveredOnline && devices.shell(phone, "getprop sys.boot_completed").trim() === "1";
+      !!restart &&
+      recoveredOnline &&
+      devices.shell(phone, "getprop sys.boot_completed").trim() === "1";
     checks.report =
       ["offline", "missing", "unavailable"].includes(answer.unavailableState) &&
       answer.recovered === true;

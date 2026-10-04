@@ -142,11 +142,23 @@ test("nonzero Pi exit retains completed metrics and output while remaining a fai
     fs.writeFileSync(fake, `#!/bin/sh\nprintf '%s\\n' '${event}'\nexit 7\n`, { mode: 0o755 });
     const output = path.join(dir, "agent.jsonl");
     assert.throws(
-      () => runPi({ binary: fake, env: { PATH: "/usr/bin:/bin" }, cwd: dir, skills: [], prompt: "task", output }),
+      () =>
+        runPi({
+          binary: fake,
+          env: { PATH: "/usr/bin:/bin" },
+          cwd: dir,
+          skills: [],
+          prompt: "task",
+          output,
+        }),
       (error) => {
         assert.match(error.message, /pi .*:/);
         assert.deepEqual(
-          { inputTokens: error.metrics.inputTokens, cost: error.metrics.cost, turns: error.metrics.turns },
+          {
+            inputTokens: error.metrics.inputTokens,
+            cost: error.metrics.cost,
+            turns: error.metrics.turns,
+          },
           { inputTokens: 13, cost: 0.03, turns: 1 },
         );
         return true;
@@ -198,16 +210,27 @@ test("bridge discovers and accepts only verified owned serials after restart", (
     const android = path.join(dir, "android");
     const active = path.join(dir, "active");
     fs.writeFileSync(active, "emulator-5554");
-    fs.writeFileSync(fake, `#!/bin/sh\ncase "$*" in\n  devices) printf 'List of devices attached\\n%s\\tdevice\\nemulator-9998\\tdevice\\n' "$(/bin/cat '${active}')";;\n  *"emulator-9998 emu avd name") echo foreign;;\n  *"emu avd name") echo phone;;\n  *) echo ready;;\nesac\n`, { mode: 0o755 });
+    fs.writeFileSync(
+      fake,
+      `#!/bin/sh\ncase "$*" in\n  devices) printf 'List of devices attached\\n%s\\tdevice\\nemulator-9998\\tdevice\\n' "$(/bin/cat '${active}')";;\n  *"emulator-9998 emu avd name") echo foreign;;\n  *"emu avd name") echo phone;;\n  *) echo ready;;\nesac\n`,
+      { mode: 0o755 },
+    );
     fs.writeFileSync(android, "#!/bin/sh\necho layout-ready\n", { mode: 0o755 });
     const config = path.join(dir, "tools.json");
-    fs.writeFileSync(config, JSON.stringify({
-      bins: { adb: fake, android }, devices: [{ name: "phone", serial: "emulator-5554" }],
-      audit: path.join(dir, "audit"), condition: "baseline",
-    }));
-    const invoke = (...args) => spawnSync(process.execPath, [path.join(root, "bench/tool-bridge.js"), ...args], {
-      env: { BENCH_TOOLS: config }, encoding: "utf8",
-    });
+    fs.writeFileSync(
+      config,
+      JSON.stringify({
+        bins: { adb: fake, android },
+        devices: [{ name: "phone", serial: "emulator-5554" }],
+        audit: path.join(dir, "audit"),
+        condition: "baseline",
+      }),
+    );
+    const invoke = (...args) =>
+      spawnSync(process.execPath, [path.join(root, "bench/tool-bridge.js"), ...args], {
+        env: { BENCH_TOOLS: config },
+        encoding: "utf8",
+      });
     assert.match(invoke("adb", "devices").stdout, /emulator-5554/);
     fs.writeFileSync(active, "emulator-5580");
     const listing = invoke("adb", "devices");
@@ -288,21 +311,50 @@ test("success scripts reject incorrect reports even when device evidence succeed
 test("treatment's adb transport snapshots the debug database before shell uninstall", () =>
   temporary((dir) => {
     const database = path.join(dir, "probe.db");
-    assert.equal(spawnSync("/usr/bin/sqlite3", [database, "CREATE TABLE notes(id INTEGER, text TEXT); INSERT INTO notes VALUES(1, 'probe-1');"]).status, 0);
+    assert.equal(
+      spawnSync("/usr/bin/sqlite3", [
+        database,
+        "CREATE TABLE notes(id INTEGER, text TEXT); INSERT INTO notes VALUES(1, 'probe-1');",
+      ]).status,
+      0,
+    );
     const fake = path.join(dir, "adb");
-    fs.writeFileSync(fake, `#!/bin/sh\ncase "$*" in\n  devices) printf 'List of devices attached\\nemulator-5554\\tdevice\\n';;\n  *"emu avd name") echo owned;;\n  *"run-as dev.probe cat databases/probe.db") exec /bin/cat '${database}';;\n  *"run-as dev.probe cat databases/probe.db-wal") exit 1;;\n  *"shell pm uninstall dev.probe") /bin/rm '${database}'; echo Success;;\nesac\n`, { mode: 0o755 });
+    fs.writeFileSync(
+      fake,
+      `#!/bin/sh\ncase "$*" in\n  devices) printf 'List of devices attached\\nemulator-5554\\tdevice\\n';;\n  *"emu avd name") echo owned;;\n  *"run-as dev.probe cat databases/probe.db") exec /bin/cat '${database}';;\n  *"run-as dev.probe cat databases/probe.db-wal") exit 1;;\n  *"shell pm uninstall dev.probe") /bin/rm '${database}'; echo Success;;\nesac\n`,
+      { mode: 0o755 },
+    );
     const audit = path.join(dir, "audit.jsonl");
     const config = path.join(dir, "tools.json");
-    fs.writeFileSync(config, JSON.stringify({
-      bins: { adb: fake }, devices: [{ serial: "emulator-5554", name: "owned" }],
-      condition: "adb-axi", task: "4", audit,
-    }));
-    const result = spawnSync(process.execPath, [path.join(root, "bench/tool-bridge.js"), "adb", "-s", "emulator-5554", "shell", "pm uninstall dev.probe"], {
-      env: { BENCH_TOOLS: config, TMPDIR: dir }, encoding: "utf8",
-    });
+    fs.writeFileSync(
+      config,
+      JSON.stringify({
+        bins: { adb: fake },
+        devices: [{ serial: "emulator-5554", name: "owned" }],
+        condition: "adb-axi",
+        task: "4",
+        audit,
+      }),
+    );
+    const result = spawnSync(
+      process.execPath,
+      [
+        path.join(root, "bench/tool-bridge.js"),
+        "adb",
+        "-s",
+        "emulator-5554",
+        "shell",
+        "pm uninstall dev.probe",
+      ],
+      { env: { BENCH_TOOLS: config, TMPDIR: dir }, encoding: "utf8" },
+    );
     assert.equal(result.status, 0);
     assert.equal(fs.existsSync(database), false);
-    const calls = fs.readFileSync(audit, "utf8").trim().split("\n").map((x) => JSON.parse(x));
+    const calls = fs
+      .readFileSync(audit, "utf8")
+      .trim()
+      .split("\n")
+      .map((x) => JSON.parse(x));
     assert.equal(calls[0].tool, "database-oracle");
     assert.match(calls[0].stdout, /1\\|probe-1/);
   }));
@@ -445,21 +497,37 @@ test("UI clear oracle requires observed old-PID disappearance, not command spell
 test("recovery and scoring follow the verified AVD onto its new serial", () =>
   temporary((dir) => {
     const fake = path.join(dir, "adb");
-    fs.writeFileSync(fake, '#!/bin/sh\ncase "$*" in\n  devices) printf "List of devices attached\\nemulator-5580\\tdevice\\n";;\n  *"emu avd name"*) echo owned;;\n  *"getprop sys.boot_completed"*) echo 1;;\n  *"pm path android"*) echo package:android;;\n  *) echo "";;\nesac\n', { mode: 0o755 });
+    fs.writeFileSync(
+      fake,
+      '#!/bin/sh\ncase "$*" in\n  devices) printf "List of devices attached\\nemulator-5580\\tdevice\\n";;\n  *"emu avd name"*) echo owned;;\n  *"getprop sys.boot_completed"*) echo 1;;\n  *"pm path android"*) echo package:android;;\n  *) echo "";;\nesac\n',
+      { mode: 0o755 },
+    );
     const d = new Devices({ adb: fake, android: "/nonexistent-android" }, ["owned"]);
     const phone = { name: "owned", serial: "emulator-5554" };
     d.owned.push(phone);
     d.recover(phone);
     assert.equal(phone.serial, "emulator-5580");
     const audit = path.join(dir, "audit");
-    fs.writeFileSync(audit, [
-      { time: 1, tool: "android", args: ["emulator", "stop", "owned"], status: 0 },
-      { time: 2, tool: "adb", args: ["devices"], status: 0, stdout: "List of devices attached\n" },
-      { time: 3, tool: "android", args: ["emulator", "start", "owned"], status: 0 },
-    ].map((c) => JSON.stringify(c)).join("\n"));
+    fs.writeFileSync(
+      audit,
+      [
+        { time: 1, tool: "android", args: ["emulator", "stop", "owned"], status: 0 },
+        {
+          time: 2,
+          tool: "adb",
+          args: ["devices"],
+          status: 0,
+          stdout: "List of devices attached\n",
+        },
+        { time: 3, tool: "android", args: ["emulator", "start", "owned"], status: 0 },
+      ]
+        .map((c) => JSON.stringify(c))
+        .join("\n"),
+    );
     phone.serial = "emulator-5554";
     const result = checkTask("8", {
-      devices: d, audit,
+      devices: d,
+      audit,
       finalAnswer: JSON.stringify({ unavailableState: "missing", recovered: true }),
     });
     assert.equal(result.success, true);
@@ -467,22 +535,38 @@ test("recovery and scoring follow the verified AVD onto its new serial", () =>
     const auditCases = [
       [
         { time: 1, tool: "android", args: ["emulator", "stop", "tablet"], status: 0 },
-        { time: 2, tool: "adb", args: ["devices"], status: 0, stdout: "List of devices attached\\nemulator-5554 device\\n" },
+        {
+          time: 2,
+          tool: "adb",
+          args: ["devices"],
+          status: 0,
+          stdout: "List of devices attached\\nemulator-5554 device\\n",
+        },
         { time: 3, tool: "android", args: ["emulator", "start", "tablet"], status: 0 },
       ],
       [
         { time: 1, tool: "android", args: ["emulator", "stop", "owned"], status: 0 },
-        { time: 2, tool: "adb", args: ["devices"], status: 0, stdout: "List of devices attached\\n" },
+        {
+          time: 2,
+          tool: "adb",
+          args: ["devices"],
+          status: 0,
+          stdout: "List of devices attached\\n",
+        },
         { time: 3, tool: "android", args: ["emulator", "start", "tablet"], status: 0 },
       ],
     ];
     for (const entries of auditCases) {
       fs.writeFileSync(audit, entries.map((c) => JSON.stringify(c)).join("\n"));
       phone.serial = "emulator-5554";
-      assert.equal(checkTask("8", {
-        devices: d, audit,
-        finalAnswer: JSON.stringify({ unavailableState: "missing", recovered: true }),
-      }).success, false);
+      assert.equal(
+        checkTask("8", {
+          devices: d,
+          audit,
+          finalAnswer: JSON.stringify({ unavailableState: "missing", recovered: true }),
+        }).success,
+        false,
+      );
     }
   }));
 
@@ -492,10 +576,15 @@ test("task 8 reference confirms boot on the restarted AVD's new serial", () => {
   const seen = [];
   const answer = task8Reference({
     phone,
-    android: (args) => { phase = args[1] === "stop" ? "stopped" : "restarted"; },
+    android: (args) => {
+      phase = args[1] === "stop" ? "stopped" : "restarted";
+    },
     adb: (device, args) => {
       seen.push([device?.serial, ...args]);
-      if (args[0] === "devices") return phase === "stopped" ? "List of devices attached\n" : "List of devices attached\nemulator-5580 device\n";
+      if (args[0] === "devices")
+        return phase === "stopped"
+          ? "List of devices attached\n"
+          : "List of devices attached\nemulator-5580 device\n";
       if (args[0] === "emu") return "phone\nOK\n";
       return "1\n";
     },
