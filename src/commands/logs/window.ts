@@ -71,6 +71,29 @@ export async function readWindowLines(
     : parsed.lines.filter((line) => line.epochMs >= window.startMs);
 }
 
+/**
+ * The first line of the window across every app, read alone (`-m 1`). A uid-filtered
+ * read cannot tell a quiet app from a log buffer that starts after the window; this can.
+ */
+export async function readFirstWindowLine(
+  adb: AdbClient,
+  serial: string,
+  window: LogWindow,
+  options: ReadOptions,
+): Promise<LogLine | undefined> {
+  const step = "reading the start of the log buffer";
+  const result = await readShell(
+    adb,
+    serial,
+    `${logcatCommand(window.startMs)} -m 1`,
+    step,
+    options,
+  );
+  const parsed = parseLogcat(result.stdout);
+  if (parsed.lines.length === 0 && parsed.unparsed > 0) throw invalidOutput(step, result.stdout);
+  return parsed.lines.find((line) => line.epochMs >= window.startMs);
+}
+
 /** A regex from the command line; one that does not compile is a usage error. */
 export function compileRegex(flag: string, source: string): RegExp {
   try {

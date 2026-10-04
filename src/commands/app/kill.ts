@@ -233,14 +233,20 @@ async function packagePids(context: CommandContext, pkg: string, uid: number): P
   }
   const names = new Map<string, Set<number>>();
   for (const line of lines) {
-    const row = /^\s*(\d+)\s+(\d+)\s+(\S+)\s*$/.exec(line);
-    if (!row || !Number.isSafeInteger(Number(row[1])) || !Number.isSafeInteger(Number(row[2]))) {
-      throw invalidOutput("reading package process names", result.stdout);
-    }
-    const [pid, rowUid, name] = [Number(row[1]), Number(row[2]), row[3] as string];
-    if (pid <= 0 || rowUid !== uid) continue;
-    if (!/^[A-Za-z_][A-Za-z0-9_.:-]*$/.test(name)) {
-      throw invalidOutput("reading package process names", result.stdout);
+    // Foreign rows, including those with an unreadable UID, cannot name this app.
+    // NAME is the rest of the row: kernel threads can carry spaces.
+    const row = /^\s*(\S+)\s+(\S+)(?:\s+(.+?))?\s*$/.exec(line);
+    const rowUid = row?.[2];
+    if (rowUid === undefined || !/^\d+$/.test(rowUid) || Number(rowUid) !== uid) continue;
+    const pid = Number(row?.[1]);
+    const name = row?.[3];
+    if (
+      !Number.isSafeInteger(pid) ||
+      pid <= 0 ||
+      !name ||
+      !/^[A-Za-z_][A-Za-z0-9_.:-]*$/.test(name)
+    ) {
+      throw invalidOutput("reading package process names", line);
     }
     const known = names.get(name) ?? new Set<number>();
     known.add(pid);

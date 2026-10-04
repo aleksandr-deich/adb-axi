@@ -425,28 +425,43 @@ describe("logs", () => {
     },
   );
 
-  it("omits the note when API 31+ logcat has already filtered by uid", async () => {
-    const f = devices({
-      serial: A,
-      api: 35,
-      clocks: ["1790835000.000000000 +0000\n"],
-      shell: {
-        [PACKAGE_DUMP]: PROBE_DUMP_35,
-        [logcatFor("1790834700.000", 10213)]: {
-          stdout: logLine(1790834950000, 2, "W", "Probe", "wanted"),
+  it.each([true, false])(
+    "notes a late buffer start for an API 31+ uid scope from every app's first line (early other line: %s)",
+    async (earlyOtherLine) => {
+      const first = earlyOtherLine
+        ? logLine(1790834701000, 1, "I", "System", "earlier")
+        : logLine(1790834930000, 1, "I", "System", "first kept");
+      const f = devices({
+        serial: A,
+        api: 35,
+        clocks: ["1790835000.000000000 +0000\n"],
+        shell: {
+          [PACKAGE_DUMP]: PROBE_DUMP_35,
+          [logcatFor("1790834700.000", 10213)]: {
+            stdout: logLine(1790834950000, 2, "W", "Probe", "wanted"),
+          },
+          [`${logcatFor("1790834700.000")} -m 1`]: { stdout: first },
         },
-      },
-    });
-    const { toon, data } = await both(["logs", "--since", "5m", "--pkg", "dev.probe"], f);
-    expect(toon.exitCode).toBe(0);
-    expect(rowsOf(data)).toHaveLength(1);
-    expect(data).not.toHaveProperty("note");
-    expect(logcatCommands(f)).toEqual([
-      logcatFor("1790834700.000", 10213),
-      logcatFor("1790834700.000", 10213),
-    ]);
-    expectClean(f);
-  });
+      });
+      const { toon, data } = await both(["logs", "--since", "5m", "--pkg", "dev.probe"], f);
+      expect(toon.exitCode).toBe(0);
+      expect(rowsOf(data)).toHaveLength(1);
+      if (earlyOtherLine) expect(data).not.toHaveProperty("note");
+      else
+        expect(data.note).toBe(
+          "first log line in this window is at 06:08:50.000, after the window start; the device log buffer may have dropped earlier lines",
+        );
+      // Only the app's own lines are scanned; the other app's line only dates the buffer.
+      expect(data.window).toBe("5m ago -> now (300 s), 1 lines scanned");
+      expect(logcatCommands(f)).toEqual([
+        logcatFor("1790834700.000", 10213),
+        `${logcatFor("1790834700.000")} -m 1`,
+        logcatFor("1790834700.000", 10213),
+        `${logcatFor("1790834700.000")} -m 1`,
+      ]);
+      expectClean(f);
+    },
+  );
 
   it("does not note an empty scanned window", async () => {
     const f = devices({
@@ -496,6 +511,9 @@ describe("logs", () => {
       shell: {
         [PACKAGE_DUMP]: PROBE_DUMP_35,
         [logcatFor("1790834222.000", 10213)]: fixture("captured/35/logcat-epoch-uid.txt"),
+        [`${logcatFor("1790834222.000")} -m 1`]: {
+          stdout: logLine(1790834222500, 1, "I", "System", "first"),
+        },
       },
     });
     await runCli(["logs", "mark", "before-run"], f.env);
@@ -529,7 +547,9 @@ describe("logs", () => {
     ]);
     expect(logcatCommands(f)).toEqual([
       logcatFor("1790834222.000", 10213),
+      `${logcatFor("1790834222.000")} -m 1`,
       logcatFor("1790834222.000", 10213),
+      `${logcatFor("1790834222.000")} -m 1`,
     ]);
     expectBounded(f);
     expectClean(f);

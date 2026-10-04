@@ -92,10 +92,12 @@ const AM_TIMEOUT: Response = { stdoutFile: "synthetic/29/am-start-timeout.txt" }
 
 const PIDOF_OF = (pid: number): Response => ({ stdout: `${pid}\n` });
 const PIDOF_GONE: Response = { exit: 1 };
+/** Synthetic: a phone also lists kernel threads whose names have spaces, as a vendor irq thread does. */
+const KERNEL_THREAD = "  526     0 [irq/511-vendor gpio wakeup]\n";
 const UIDS_OF = (pid: number): Response => ({
-  stdout: `  PID   UID NAME\n ${pid} 10213 dev.probe\n`,
+  stdout: `  PID   UID NAME\n${KERNEL_THREAD} ${pid} 10213 dev.probe\n`,
 });
-const UIDS_NONE: Response = { stdout: "  PID   UID NAME\n" };
+const UIDS_NONE: Response = { stdout: `  PID   UID NAME\n${KERNEL_THREAD}` };
 
 /** Where the probe is: in front, just sent home, the previous app, dead, or restored. */
 type Phase = "front" | "leaving" | "previous" | "dead" | "restored";
@@ -272,6 +274,65 @@ const killedFront = {
 };
 
 describe("app kill", () => {
+  it("ignores a malformed PID for a known foreign UID", async () => {
+    const { toon, data, fake } = await both(["app", "kill", "dev.probe"], () =>
+      probeDevice({
+        phase: "previous",
+        rules: [
+          {
+            match: shell(KERNEL_UIDS),
+            when: { app: "previous" },
+            respond: {
+              stdout: `PID UID NAME\nnot-a-pid 0 [irq/511-vendor gpio wakeup]\n8235 10213 dev.probe\n`,
+            },
+          },
+        ],
+      }),
+    );
+    expect(toon.exitCode, JSON.stringify(data)).toBe(0);
+    expect(data).toMatchObject({ kill: { pid_before: OLD_PID, pid_after: null } });
+    expectClean(fake);
+  });
+
+  it("ignores a process row without a numeric UID", async () => {
+    const { toon, data, fake } = await both(["app", "death", "dev.probe"], () =>
+      probeDevice({
+        phase: "previous",
+        rules: [
+          {
+            match: shell(KERNEL_UIDS),
+            respond: {
+              stdout:
+                "PID UID NAME\n526 unknown [irq/511-vendor gpio wakeup]\n8235 10213 dev.probe\n",
+            },
+          },
+        ],
+      }),
+    );
+    expect(toon.exitCode, JSON.stringify(data)).toBe(0);
+    expect(data).toMatchObject({ death: { pid_before: OLD_PID, pid_restored: NEW_PID } });
+    expectClean(fake);
+  });
+
+  it("rejects a malformed target-UID PID without attempting a kill", async () => {
+    const { toon, data, fake } = await both(["app", "kill", "dev.probe"], () =>
+      probeDevice({
+        phase: "previous",
+        rules: [
+          {
+            match: shell(KERNEL_UIDS),
+            when: { app: "previous" },
+            respond: { stdout: "PID UID NAME\nnot-a-pid 10213 dev.probe\n" },
+          },
+        ],
+      }),
+    );
+    expect(toon.exitCode).toBe(1);
+    expect(data).toMatchObject({ code: "INVALID_OUTPUT" });
+    expect(shellCommands(fake)).not.toContain(AM_KILL);
+    expectClean(fake);
+  });
+
   it("sends the app home, polls until it can be killed, then kills it (S5, L5)", async () => {
     const { toon, data, fake } = await both(["app", "kill", "dev.probe"], () =>
       probeDevice({ phase: "front" }),

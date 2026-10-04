@@ -353,7 +353,10 @@ function startTimeout(
     {
       fields: { last },
       help: [
-        runHint(lifecycleCommand(context, ["app", "current"]), "to see what is in front"),
+        runHint(
+          lifecycleCommand(context, ["app", "current"]),
+          "to see what is in front (on a physical phone a system dialog such as Play Protect or a permission request can block the launch)",
+        ),
         runHint([...command, "--timeout", "30s"], "to give it longer"),
       ],
     },

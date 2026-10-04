@@ -593,7 +593,7 @@ describe("doctor", () => {
       expect(rows.animations).toEqual({ check: "animations", status: "ok", detail: "scales 0" });
     });
 
-    it("warns with the scale and how to turn animations off", async () => {
+    it("warns with the scale and how to turn animations off, saying it changes settings", async () => {
       const f = scenario({ probes: { animations: { stdout: "1.0\n1.0\n1.0\n" } } });
       const { toon, rows, data } = await doctor(f);
       expect(toon.exitCode).toBe(0);
@@ -603,7 +603,7 @@ describe("doctor", () => {
         detail: "scales 1.0, animations can make UI steps flaky",
       });
       expect(data.help).toEqual([
-        `Run \`adb-axi shell --device ${SERIAL} -- 'settings put global window_animation_scale 0; settings put global transition_animation_scale 0; settings put global animator_duration_scale 0'\` to turn animations off`,
+        `Run \`adb-axi shell --device ${SERIAL} -- 'settings put global window_animation_scale 0; settings put global transition_animation_scale 0; settings put global animator_duration_scale 0'\` to turn animations off (this changes the device's settings)`,
       ]);
       expectHelpShipped(data.help);
     });
