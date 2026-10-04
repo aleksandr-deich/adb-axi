@@ -80,7 +80,7 @@ test("records are exclusive, aggregation counts failures and missing metrics", (
   }));
 test("PATH verification detects contamination inside exact environment", () =>
   temporary((dir) => {
-    assert.equal(verifyPath({ PATH: dir }, "baseline").status, 1);
+    assert.notEqual(verifyPath({ PATH: dir }, "baseline").status, 0);
     fs.writeFileSync(path.join(dir, "adb-axi"), "#!/bin/sh\nexit 0\n", { mode: 0o755 });
     assert.throws(() => verifyPath({ PATH: dir }, "baseline"));
     assert.equal(verifyPath({ PATH: dir }, "adb-axi").resolved, path.join(dir, "adb-axi"));

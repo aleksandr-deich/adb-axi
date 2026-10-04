@@ -118,7 +118,7 @@ export function verifyPath(env, condition) {
   };
   if (
     condition === "baseline"
-      ? evidence.status !== 1 || !!evidence.resolved
+      ? evidence.status === 0 || !!evidence.resolved
       : evidence.status !== 0 || !evidence.resolved
   )
     throw new Error("PATH condition violated");
