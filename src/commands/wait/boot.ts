@@ -58,7 +58,7 @@ export const waitBoot = defineCommand({
     let serial: string | undefined;
     let latest: BootObservation | undefined;
     // The system_server pid that has answered since `since` (ms on the host clock).
-    let settling: { pid: number | null; since: number } | undefined;
+    let settling: { pid: number; since: number } | undefined;
     const result = await poll({
       timeoutMs: context.deadline.remainingMs(),
       check: async (remainingMs) => {
@@ -87,7 +87,8 @@ export const waitBoot = defineCommand({
           if (
             !boot.bootCompleted ||
             boot.packageService !== true ||
-            boot.activityService !== true
+            boot.activityService !== true ||
+            boot.systemServerPid === null
           ) {
             settling = undefined;
             return { done: false, last: latest };

@@ -13,7 +13,7 @@ import { sharedWithToon } from "../helpers/json.js";
 const SERIAL = "emulator-5554";
 const TABLET = "emulator-5556";
 const BOOT =
-  "echo @boot_completed; getprop sys.boot_completed; echo @uptime; cat /proc/uptime; echo @system_server; pidof system_server; echo @package; cmd package path android >/dev/null 2>&1; echo $?; echo @activity; cmd activity get-current-user >/dev/null 2>&1; echo $?";
+  "echo @boot_completed; getprop sys.boot_completed; echo @uptime; cat /proc/uptime; echo @system_server; pidof system_server; echo @package; cmd package path android >/dev/null 2>&1; echo $?; echo @activity; cmd activity get-current-user >/dev/null 2>&1; echo $?; echo @system_server_after; pidof system_server";
 
 const line = (serial: string, state: string): string =>
   `${serial}          ${state} product:sdk_gphone64_arm64 model:sdk_gphone64_arm64 device:emu64a transport_id:1\n`;
@@ -24,6 +24,7 @@ const devices = (...lines: string[]): Response => ({
 interface Services {
   /** `pidof system_server`; empty while it is not running. */
   pid?: string;
+  pidAfter?: string;
   /** The exit codes of the package and activity calls: 0 answered, 20 is "Can't find service". */
   pkg?: number;
   activity?: number;
@@ -36,9 +37,9 @@ interface Services {
 const boot = (
   completed: 0 | 1,
   uptime = "1141.19 3978.79",
-  { pid = "585", pkg = 0, activity = 0 }: Services = {},
+  { pid = "585", pidAfter = pid, pkg = 0, activity = 0 }: Services = {},
 ): Response => ({
-  stdout: `@boot_completed\n${completed === 1 ? "1" : ""}\n@uptime\n${uptime}\n@system_server\n${pid}\n@package\n${String(pkg)}\n@activity\n${String(activity)}\n`,
+  stdout: `@boot_completed\n${completed === 1 ? "1" : ""}\n@uptime\n${uptime}\n@system_server\n${pid}\n@package\n${String(pkg)}\n@activity\n${String(activity)}\n@system_server_after\n${pidAfter}\n`,
 });
 
 const UNREAD = {
@@ -173,6 +174,19 @@ describe("wait boot", () => {
     expectClean(f);
   });
 
+  it("rejects a service probe spanning a restart even on an older device", async () => {
+    const f = scenario([
+      listing(devices(line(SERIAL, "device"))),
+      shell(boot(1, "1141.19 3978.79", { pidAfter: "912" }), { times: 1 }),
+      shell(BOOTED),
+    ]);
+    const { toon, data } = await once(["wait", "boot"], f);
+    expect(toon.exitCode).toBe(0);
+    expect(data.ok).toMatch(/^wait boot emulator-5554 -> booted after \d+ ms$/);
+    expect(f.calls().filter((call) => call.argv[2] === "shell")).toHaveLength(2);
+    expectClean(f);
+  });
+
   it("on a fresh device, waits for the services to keep answering from one system_server", async () => {
     // system_server 585 answers, then restarts: its services go away and 912 brings them back.
     const f = scenario([
@@ -192,6 +206,20 @@ describe("wait boot", () => {
     expect(looks.length).toBeGreaterThan(5 + 1);
     expectClean(f);
   }, 40_000);
+
+  it("on a fresh device, does not count a probe spanning a restart toward settle", async () => {
+    const f = scenario([
+      listing(devices(line(SERIAL, "device"))),
+      shell(boot(1, "31.20 60.00", { pid: "585", pidAfter: "912" })),
+    ]);
+    const { toon, data } = await once(["wait", "boot", "--timeout", "2s"], f);
+    expect(toon.exitCode).toBe(1);
+    expect(data).toMatchObject({
+      code: "WAIT_TIMEOUT",
+      error: `${SERIAL} had not finished booting after 2 s`,
+    });
+    expectClean(f);
+  }, 20_000);
 
   it("on a fresh device, starts the settle again when system_server changes between looks", async () => {
     // The restart falls between two looks, so no look sees the services missing.

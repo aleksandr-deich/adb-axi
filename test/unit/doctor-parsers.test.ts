@@ -25,7 +25,7 @@ describe("splitSections", () => {
 });
 
 describe("parseBoot", () => {
-  const SERVICES = "@system_server\n585\n@package\n0\n@activity\n0\n";
+  const SERVICES = "@system_server\n585\n@package\n0\n@activity\n0\n@system_server_after\n585\n";
 
   it("reads a finished boot and the uptime in whole seconds (a real /proc/uptime)", () => {
     const uptime = captured("35/proc-uptime.txt");
@@ -54,7 +54,7 @@ describe("parseBoot", () => {
   it("reads a service that does not answer, and a system_server that is not running", () => {
     // `cmd` exits 20 for "Can't find service" and non-zero for a call that breaks off.
     const reading = parseBoot(
-      "@boot_completed\n1\n@uptime\n31.20 60.00\n@system_server\n@package\n20\n@activity\n255\n",
+      "@boot_completed\n1\n@uptime\n31.20 60.00\n@system_server\n@package\n20\n@activity\n255\n@system_server_after\n\n",
     );
     expect(reading).toEqual({
       bootCompleted: true,
@@ -63,6 +63,12 @@ describe("parseBoot", () => {
       packageService: false,
       activityService: false,
     });
+  });
+
+  it("accepts a pid only when it is still running after both service calls", () => {
+    for (const after of ["912", "", "invalid"]) {
+      expect(parseBoot(`@boot_completed\n1\n@system_server\n585\n@package\n0\n@activity\n0\n@system_server_after\n${after}\n`)?.systemServerPid).toBeNull();
+    }
   });
 
   it("leaves the services and the pid unknown when their parts are missing or unreadable", () => {

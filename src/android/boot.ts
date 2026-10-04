@@ -37,6 +37,8 @@ export const BOOT_COMMAND = [
   "echo @activity",
   "cmd activity get-current-user >/dev/null 2>&1",
   "echo $?",
+  "echo @system_server_after",
+  "pidof system_server",
 ].join("; ");
 
 /**
@@ -54,10 +56,11 @@ export function parseBoot(stdout: string): BootReading | null {
   const seconds = Math.floor(Number(sections.get("uptime")?.[0]?.split(/\s+/)[0]));
   // `pidof` prints nothing while the process is not running.
   const pid = Number(sections.get("system_server")?.[0]);
+  const pidAfter = Number(sections.get("system_server_after")?.[0]);
   return {
     bootCompleted: value === "1",
     uptimeS: Number.isFinite(seconds) && seconds >= 0 ? seconds : null,
-    systemServerPid: Number.isInteger(pid) && pid > 0 ? pid : null,
+    systemServerPid: Number.isInteger(pid) && pid > 0 && pid === pidAfter ? pid : null,
     packageService: answered(sections.get("package")),
     activityService: answered(sections.get("activity")),
   };
