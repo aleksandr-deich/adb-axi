@@ -755,8 +755,7 @@ describe("doctor", () => {
             output += chunk;
           },
         },
-        hostProcesses: () =>
-          Promise.resolve([{ pid: 12345, args }]),
+        hostProcesses: () => Promise.resolve([{ pid: 12345, args }]),
       });
       const data = JSON.parse(output) as { checks: { check: string; detail: string }[] };
       expect(data.checks.find((row) => row.check === "instrumentation")?.detail).toBe(
