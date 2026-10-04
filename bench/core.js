@@ -7,13 +7,14 @@ export const root = path.dirname(import.meta.dirname);
 export const model = "openai-codex/gpt-6.1-sol";
 export function parseTask(text, file = "task") {
   const t = JSON.parse(text);
-  for (const k of ["id", "prompt", "setup", "reset", "success"])
+  for (const k of ["id", "prompt", "setup", "reset", "success", "reference"])
     if (typeof t[k] !== "string" || !t[k]) throw new Error(`Missing task ${k}: ${file}`);
   if (
     !/^[1-8]$/.test(t.id) ||
     !["clean", "debug", "ui-holder"].includes(t.setup) ||
     t.reset !== "clean-both" ||
-    t.success !== `bench/tasks/${t.id}.js`
+    t.success !== `bench/tasks/${t.id}.js` ||
+    t.reference !== `bench/reference/${t.id}.js`
   )
     throw new Error(`Invalid task definition: ${file}`);
   if (/adb-axi|raw adb/i.test(t.prompt)) throw new Error(`Non-neutral prompt: ${file}`);
@@ -41,7 +42,9 @@ export function plan(argv) {
   };
   const seen = new Set();
   for (let i = 0; i < argv.length; i++) {
-    const key = argv[i].replace(/^--/, "");
+    if (!argv[i].startsWith("--"))
+      throw new Error(`Options must use explicit -- flags: ${argv[i]}`);
+    const key = argv[i].slice(2);
     if (key === "run") {
       opts.run = true;
       continue;
@@ -86,7 +89,9 @@ export function plan(argv) {
   if (
     opts.phone === opts.tablet ||
     [opts.phone, opts.tablet].some(
-      (x) => !/^[\w.-]+$/.test(x) || ["Pixel_10_Pro_XL_Sasha", "small_phone"].includes(x),
+      (x) =>
+        !/^\w[\w.-]*$/.test(x) ||
+        ["pixel_10_pro_xl_sasha", "small_phone"].includes(x.toLowerCase()),
     )
   )
     throw new Error("Unsafe AVD selection");

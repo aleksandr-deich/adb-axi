@@ -3,5 +3,6 @@
   "prompt": "Stop the phone emulator, observe and report how its unavailable device is reported, then restart that same AVD and confirm it is online and booted. Do not restart the shared device server. Return your final answer as JSON only with these fields (the quoted type labels describe the values to report): {\"unavailableState\": \"offline | missing | unavailable\", \"recovered\": \"boolean\"}.",
   "setup": "clean",
   "reset": "clean-both",
-  "success": "bench/tasks/8.js"
+  "success": "bench/tasks/8.js",
+  "reference": "bench/reference/8.js"
 }

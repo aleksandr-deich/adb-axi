@@ -105,6 +105,17 @@ export function environment(directory, condition, version, bins, devices, task =
 }
 async function main() {
   const argv = process.argv.slice(2);
+  if (argv[0] === "self-check") {
+    if (argv.includes("--help")) {
+      console.log(
+        "node bench/run.js self-check [--tasks 1,2,3,4,5,6,7,8] [--phone <avd>] [--tablet <avd>]\nBoot owned AVDs and test reference solutions and negative outcomes. No agents or CI.",
+      );
+      return;
+    }
+    const { selfCheck } = await import("./self-check.js");
+    await selfCheck(plan(argv.slice(1)));
+    return;
+  }
   if (argv[0] === "summary") {
     const records = fs.existsSync(results)
       ? fs

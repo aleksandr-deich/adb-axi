@@ -57,7 +57,7 @@ Success is computed by scripts, not an agent's assertion:
 3. Real `IllegalStateException: probe crash requested` in logcat and both exception and message in final answer.
 4. Actual debug database row captured before package replacement (read-only host SQLite query including WAL), row in agent read output and final report, release installed non-debuggable, an attempted read refusing access and matching final explanation. Database snapshot errors fail this criterion rather than accepting a claim.
 5. Opposite night-mode value observed in command output, original state restored on the device, final restoration report.
-6. Holder identity in diagnostics and final answer, successful clear operation, then a successful JSON Android layout response.
+6. Holder identity in diagnostics and final answer, independent observation that the original holder PID disappeared, then a valid nonempty Android layout response. The verifier does not require a particular clearing command.
 7. Task 1's device-state checks on both owned devices, both serials/packages in final answer.
 8. Successful owned emulator stop, real unavailable/offline diagnostic output, phone online and booted again, matching final report. A stopped emulator can appear missing rather than literally `offline`; either counts as unavailable.
 
@@ -68,6 +68,19 @@ Tasks 2-8 require JSON-only final reports with named fields, so incorrect values
 `bench/results/` is gitignored. Each run writes a unique record JSON, agent JSONL, invocation JSON (no credentials) and command-audit JSONL. Records include success/check details, condition/task/repeat, exact package version, Pi version/model/medium effort, owned devices, actual skills, PATH evidence, reset result, and errors. A failure to collect metrics is recorded as null, never zero. Config directories are removed after shutdown; recorded paths describe the ephemeral config at launch, while hashes and invocation arguments retain the evidence.
 
 Input tokens sum Pi's authoritative completed assistant-message usage: input + cacheRead + cacheWrite. Compaction usage, when emitted by Pi, is included in token and cost totals. Cost is Pi's reported USD `usage.cost.total` (a pricing estimate, not an invoice). Turns count completed assistant messages, including tool-calling turns. Wall time measures agent subprocess launch through exit, including tool execution and package acquisition, excluding setup/check/reset. Retries remain in the transcript; errored/aborted assistant responses fail the run. Authentication or infrastructure failures are not silently retried. The agent has a 15-minute timeout; device commands have finite timeouts.
+
+## No-agent device self-check
+
+```sh
+node bench/run.js self-check --tasks 1,2,3,4,5,6,7,8
+node bench/run.js self-check --tasks 6 --phone Pixel_10_Pro_XL --tablet medium_tablet
+```
+
+This explicit command boots only the harness-owned AVDs and never invokes Pi or any other agent. It is not part of CI. Every task definition points to `reference/<id>.js`, a readable scripted solution using the same controlled device tools, `setupTask`, success script, and reset as an agent run. Each case must (1) reject untouched setup with an empty answer, (2) accept the reference solution, (3) reject untouched setup even with the reference's correct-looking answer, and (4) reject a natural wrong answer or incomplete device outcome. Wrong cases include claiming the unsaved counter survived, reporting the wrong crash cause, claiming release database access succeeded, skipping configuration restoration, leaving the UI holder uncleared, skipping the tablet, and skipping emulator recovery. Task 1's wrong case leaves the app in the background.
+
+Results and external command evidence go under ignored `results/self-check/`, separate from agent records and summary aggregation. A failed case makes the command exit nonzero; reset failure aborts the remaining cases. The command requires Node, the SDK, and Android CLI, but not Pi or model credentials. Every reset is verified, and owned AVDs are shut down after the command.
+
+For UI-holder verification, the setup captures the initial PID. The bridge privately samples holder PID state after outer tool calls; nested transport calls are not sampled again. These observations never enter agent stdout. Their shared instrumentation overhead is included in measured agent wall time, so disclose it when interpreting timing. Binary output is forwarded byte-for-byte, and large piped output is allowed to drain before exit. A silently empty emulator-console identity is checked against the independent `ro.boot.qemu.avd_name` property; no serial mapping is guessed.
 
 ## Checks
 

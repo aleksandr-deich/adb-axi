@@ -3,5 +3,6 @@
   "prompt": "On the phone emulator, install the debug probe APK, cold-start dev.probe, and confirm it is the foreground app.",
   "setup": "clean",
   "reset": "clean-both",
-  "success": "bench/tasks/1.js"
+  "success": "bench/tasks/1.js",
+  "reference": "bench/reference/1.js"
 }

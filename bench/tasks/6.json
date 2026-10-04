@@ -3,5 +3,6 @@
   "prompt": "A UI inspection server has been left resident on the phone. Diagnose its identity, clear it, then confirm android layout works again. Report the holder and recovery result. Return your final answer as JSON only with these fields (the quoted type labels describe the values to report): {\"holder\": \"string\", \"layoutWorks\": \"boolean\"}.",
   "setup": "ui-holder",
   "reset": "clean-both",
-  "success": "bench/tasks/6.js"
+  "success": "bench/tasks/6.js",
+  "reference": "bench/reference/6.js"
 }

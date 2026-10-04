@@ -10,7 +10,15 @@ export function setupTask(task, devices) {
   }
   if (task.setup === "ui-holder") {
     devices.androidLayout(phone);
-    if (!devices.shell(phone, "ps -A").includes("com.android.cli.interact"))
+    phone.uiHolderPid = devices
+      .shell(phone, "pidof com.android.cli.interact.instrumentation || true")
+      .trim();
+    if (
+      !/^\d+$/.test(phone.uiHolderPid) ||
+      !devices
+        .shell(phone, "dumpsys activity processes")
+        .includes("com.android.cli.interact.instrumentation")
+    )
       throw new Error("Resident UI holder not established");
   }
 }
@@ -25,7 +33,7 @@ export function checkTask(id, { devices, finalAnswer, audit }) {
         .map((x) => JSON.parse(x))
     : [];
   const output = calls.map((c) => `${c.stdout ?? ""}\n${c.stderr ?? ""}`).join("\n");
-  const logs = devices.adb(phone, ["logcat", "-d", "-v", "brief"]);
+  const logs = devices.adb(phone, ["logcat", "-d", "-v", "epoch"]);
   const foreground = (d) =>
     /(?:mResumedActivity|topResumedActivity).*dev\.probe/.test(
       devices.shell(d, "dumpsys activity activities"),
@@ -38,6 +46,7 @@ export function checkTask(id, { devices, finalAnswer, audit }) {
   }
   if (!answer || typeof answer !== "object") answer = {};
   const checks = {};
+  const evidence = {};
   if (id === "1" || id === "7") {
     for (const d of id === "7" ? devices.owned : [phone]) {
       checks[`${d.name}:installed`] =
@@ -57,6 +66,14 @@ export function checkTask(id, { devices, finalAnswer, audit }) {
     const after = logs.match(/event=start saved=3 volatile=0 .*restored=true pid=(\d+)/);
     checks.processDeath = !!before && !!after && before[1] !== after[1];
     checks.foreground = foreground(phone);
+    const currentPid = devices.shell(phone, "pidof dev.probe || true").trim();
+    const states = [
+      ...logs.matchAll(
+        /^\s*\d+\.\d+\s+(\d+)\s+\d+\s+I\s+ProbeState:\s+event=\w+ saved=(\d+) volatile=(\d+) .*pid=(\d+)\s*$/gm,
+      ),
+    ].filter((m) => m[1] === m[4] && m[4] === currentPid);
+    const current = states.at(-1);
+    checks.currentCounters = !!current && current[2] === "3" && current[3] === "0";
     checks.report =
       answer.before?.saved === 3 &&
       answer.before?.unsaved === 3 &&
@@ -65,7 +82,16 @@ export function checkTask(id, { devices, finalAnswer, audit }) {
       answer.savedSurvived === true &&
       answer.unsavedReset === true;
   } else if (id === "3") {
-    checks.crash = /java.lang.IllegalStateException: probe crash requested/.test(logs);
+    const runtime = logs.match(
+      /^\s*\d+\.\d+\s+(\d+)\s+\d+\s+E\s+AndroidRuntime:\s+Process: dev\.probe, PID: (\d+)\s*$/m,
+    );
+    checks.crash =
+      !!runtime &&
+      runtime[1] === runtime[2] &&
+      new RegExp(
+        `^\\s*\\d+\\.\\d+\\s+${runtime[1]}\\s+\\d+\\s+E\\s+AndroidRuntime:\\s+java\\.lang\\.IllegalStateException: probe crash requested\\s*$`,
+        "m",
+      ).test(logs);
     checks.report =
       ["IllegalStateException", "java.lang.IllegalStateException"].includes(answer.exception) &&
       answer.message === "probe crash requested";
@@ -86,7 +112,7 @@ export function checkTask(id, { devices, finalAnswer, audit }) {
     const releasePid = devices.shell(phone, "pidof dev.probe || true").trim();
     checks.releaseWrite =
       /^\d+$/.test(releasePid) &&
-      new RegExp(`event=write .*rows=1 .*pid=${releasePid}(?:\\s|$)`).test(logs);
+      new RegExp(`event=write .*rows=[1-9]\\d* .*pid=${releasePid}(?:\\s|$)`).test(logs);
     checks.refusedRead =
       /not debuggable|APP_NOT_DEBUGGABLE/i.test(output) &&
       /not debuggable/i.test(devices.shell(phone, "run-as dev.probe ls databases 2>&1 || true"));
@@ -113,23 +139,35 @@ export function checkTask(id, { devices, finalAnswer, audit }) {
     checks.diagnosed = /com.android.cli.interact/.test(output);
     const clear = calls.find(
       (c) =>
-        c.tool === "adb" &&
-        /am force-stop com\.android\.cli\.interact\.instrumentation(?:\s|$)/.test(
-          c.args.join(" "),
-        ) &&
-        c.status === 0,
+        c.tool === "ui-holder-oracle" &&
+        c.status === 0 &&
+        /^(?:\d+(?:\s+\d+)*)?\s*$/.test(c.stdout) &&
+        /^\d+$/.test(phone.uiHolderPid ?? "") &&
+        !c.stdout.trim().split(/\s+/).includes(phone.uiHolderPid),
     );
+    evidence.initialHolderPid = phone.uiHolderPid;
+    evidence.clearedAt = clear?.time ?? null;
+    checks.cleared = !!clear;
     checks.layout =
       !!clear &&
-      calls.some(
-        (c) =>
-          c.time >= clear.time &&
-          c.tool === "android" &&
-          c.args[0] === "layout" &&
-          c.status === 0 &&
-          /\{|\[/.test(c.stdout),
-      );
-    checks.cleared = !!clear;
+      calls.some((c) => {
+        if (c.time < clear.time || c.tool !== "android" || c.args[0] !== "layout" || c.status !== 0)
+          return false;
+        try {
+          const layout = JSON.parse(c.stdout);
+          return (
+            Array.isArray(layout) &&
+            layout.some(
+              (window) =>
+                typeof window?.["window-title"] === "string" &&
+                Array.isArray(window.content) &&
+                window.content.length > 0,
+            )
+          );
+        } catch {
+          return false;
+        }
+      });
   } else if (id === "8") {
     const stop = calls.find(
       (c) =>
@@ -166,5 +204,9 @@ export function checkTask(id, { devices, finalAnswer, audit }) {
       ["offline", "missing", "unavailable"].includes(answer.unavailableState) &&
       answer.recovered === true;
   } else throw new Error("No success oracle");
-  return { success: Object.values(checks).every(Boolean), checks };
+  return {
+    success: Object.values(checks).every(Boolean),
+    checks,
+    ...(Object.keys(evidence).length ? { evidence } : {}),
+  };
 }

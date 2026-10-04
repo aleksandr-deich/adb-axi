@@ -101,21 +101,49 @@ if (
   }
 }
 const r = spawnSync(binary, forwarded, {
-  encoding: "utf8",
+  encoding: null,
   timeout: 180000,
   maxBuffer: 16 * 1024 * 1024,
+  env: { ...process.env, BENCH_OBSERVER_DEPTH: "1" },
 });
+const completedAt = Date.now();
 fs.appendFileSync(
   config.audit,
   JSON.stringify({
-    time: Date.now(),
+    time: completedAt,
     tool,
     args,
     status: r.status,
-    stdout: r.stdout,
-    stderr: r.stderr,
+    stdout: r.stdout?.toString("utf8"),
+    stderr: r.stderr?.toString("utf8"),
   }) + "\n",
 );
+// A neutral device-state oracle observes clearing without requiring a particular
+// tool or command. Observe only outer calls so nested CLI transport adds no samples.
+if (config.task === "6" && process.env.BENCH_OBSERVER_DEPTH !== "1") {
+  const holder = spawnSync(
+    config.bins.adb,
+    [
+      "-s",
+      config.devices[0].serial,
+      "shell",
+      "pidof com.android.cli.interact.instrumentation || true",
+    ],
+    { encoding: "utf8", timeout: 10000 },
+  );
+  fs.appendFileSync(
+    config.audit,
+    JSON.stringify({
+      time: completedAt,
+      tool: "ui-holder-oracle",
+      args: [],
+      status: holder.status,
+      stdout: holder.stdout ?? "",
+      stderr: holder.stderr ?? "",
+    }) + "\n",
+  );
+}
 process.stdout.write(r.stdout ?? "");
 process.stderr.write(r.stderr ?? "");
-process.exit(r.status ?? 1);
+// Do not terminate before large piped output drains, and keep exec-out bytes intact.
+process.exitCode = r.status ?? 1;

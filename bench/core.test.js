@@ -16,6 +16,8 @@ import {
   writeRecord,
 } from "./core.js";
 import { parsePi } from "./pi.js";
+import { checkTask } from "./success.js";
+import { Devices } from "./devices.js";
 import { environment } from "./run.js";
 
 function temporary(fn) {
@@ -28,7 +30,10 @@ function temporary(fn) {
 }
 test("eight neutral task definitions point to executable success checks", () => {
   assert.equal(tasks().length, 8);
-  for (const t of tasks()) assert.ok(fs.existsSync(t.success));
+  for (const t of tasks()) {
+    assert.ok(fs.existsSync(t.success));
+    assert.ok(fs.existsSync(t.reference));
+  }
   assert.throws(() => parseTask("{}"));
   assert.throws(() => parseTask(JSON.stringify({ ...tasks()[0], setup: "unknown" })));
   assert.throws(() => parseTask(JSON.stringify({ ...tasks()[0], prompt: "Use adb-axi" })));
@@ -37,11 +42,15 @@ test("dry-run guard, explicit spend authorization and hard cap", () => {
   assert.equal(plan([]).run, false);
   assert.equal(plan([]).runs, 16);
   assert.throws(() => plan(["--run"]));
+  assert.throws(() => plan(["run", "--tasks", "1", "--repeats", "1", "--version", "0.1.2"]));
+  assert.throws(() => plan(["--run", "tasks", "1", "repeats", "1", "version", "0.1.2"]));
   assert.throws(() => plan(["--run", "--tasks", "1", "--version", "0.1.2"]));
   assert.throws(() => plan(["--tasks", "9"]));
   assert.throws(() => plan(["--repeats", "0"]));
   assert.throws(() => plan(["--repeats", "5", "--max-runs", "79"]));
   assert.throws(() => plan(["--phone", "small_phone"]));
+  assert.throws(() => plan(["--phone", "SMALL_PHONE"]));
+  assert.throws(() => plan(["--tablet", "pixel_10_pro_xl_sasha"]));
   assert.throws(() => plan(["--tablet", "Pixel_10_Pro_XL_Sasha"]));
   assert.equal(plan(["--run", "--tasks", "1", "--repeats", "1", "--version", "0.1.2"]).runs, 2);
 });
@@ -169,8 +178,9 @@ test("success scripts reject incorrect reports even when device evidence succeed
     const devices = {
       owned: [phone],
       adb: () =>
-        "event=inc saved=3 volatile=3 rows=0 restored=false pid=100\nevent=start saved=3 volatile=0 rows=0 restored=true pid=200\njava.lang.IllegalStateException: probe crash requested",
-      shell: () => "mResumedActivity dev.probe/.MainActivity",
+        "123.450 100 100 I ProbeState: event=inc saved=3 volatile=3 rows=0 restored=false pid=100\n123.451 200 200 I ProbeState: event=start saved=3 volatile=0 rows=0 restored=true pid=200\n123.456 100 100 E AndroidRuntime: Process: dev.probe, PID: 100\n123.457 100 100 E AndroidRuntime: java.lang.IllegalStateException: probe crash requested",
+      shell: (d, text) =>
+        text.startsWith("pidof") ? "200" : "mResumedActivity dev.probe/.MainActivity",
     };
     const audit = path.join(dir, "absent");
     return import("./success.js").then(({ checkTask }) => {
@@ -213,3 +223,200 @@ test("success scripts reject incorrect reports even when device evidence succeed
       );
     });
   }));
+
+test("bridge preserves binary exec-out bytes and drains large piped stdout", () =>
+  temporary((dir) => {
+    const fake = path.join(dir, "fake.mjs");
+    fs.writeFileSync(
+      fake,
+      `#!${process.execPath}\nimport process from 'node:process';\nimport { Buffer } from 'node:buffer';\nconst b = Buffer.alloc(262144); for(let i=0;i<b.length;i++) b[i]=i%256; process.stdout.write(b);\n`,
+      { mode: 0o755 },
+    );
+    const config = path.join(dir, "tools.json");
+    fs.writeFileSync(
+      config,
+      JSON.stringify({
+        bins: { adb: fake },
+        devices: [{ serial: "emulator-5554", name: "owned" }],
+        condition: "baseline",
+        audit: path.join(dir, "audit.jsonl"),
+      }),
+    );
+    const r = spawnSync(
+      process.execPath,
+      [
+        path.join(root, "bench/tool-bridge.js"),
+        "adb",
+        "-s",
+        "emulator-5554",
+        "exec-out",
+        "payload",
+      ],
+      { env: { BENCH_TOOLS: config }, maxBuffer: 4194304 },
+    );
+    assert.equal(r.status, 0);
+    assert.equal(r.stdout.length, 262144);
+    for (let i = 0; i < r.stdout.length; i++) assert.equal(r.stdout[i], i % 256);
+  }));
+test("self-check help and spend rejection require neither devices nor Pi", () => {
+  const invoke = (args) =>
+    spawnSync(process.execPath, [path.join(root, "bench/run.js"), "self-check", ...args], {
+      env: { PATH: "" },
+      encoding: "utf8",
+    });
+  assert.equal(invoke(["--help"]).status, 0);
+  const rejected = invoke(["--run", "--tasks", "1", "--repeats", "1", "--version", "0.1.2"]);
+  assert.equal(rejected.status, 1);
+  assert.match(rejected.stderr, /never runs an agent/);
+});
+
+test("emulator identity uses the boot property when the console silently returns no bytes", () =>
+  temporary((dir) => {
+    const fake = path.join(dir, "adb");
+    fs.writeFileSync(fake, '#!/bin/sh\nif [ "$3" = "shell" ]; then echo owned; fi\n', {
+      mode: 0o755,
+    });
+    const d = new Devices({ adb: fake }, ["owned"]);
+    const owned = { serial: "emulator-5554", name: "owned" };
+    d.owned.push(owned);
+    assert.equal(d.name(owned.serial), "owned");
+    d.assert(owned);
+    owned.name = "foreign";
+    assert.throws(() => d.assert(owned));
+  }));
+test("release write oracle accepts retained debug data rather than requiring a destructive reinstall", () =>
+  temporary((dir) => {
+    const audit = path.join(dir, "audit");
+    fs.writeFileSync(
+      audit,
+      [
+        { tool: "database-oracle", args: [], status: 0, stdout: "1|probe-1\n" },
+        { tool: "adb", args: [], status: 0, stdout: "probe-1\n" },
+        { tool: "adb", args: [], status: 0, stdout: "run-as: package not debuggable" },
+      ]
+        .map((x) => JSON.stringify(x))
+        .join("\n"),
+    );
+    const devices = {
+      owned: [{}],
+      adb: () =>
+        "event=write saved=0 volatile=0 rows=1 restored=false pid=10\nevent=write saved=0 volatile=0 rows=2 restored=false pid=20",
+      shell: (d, text) =>
+        text.startsWith("pm path")
+          ? "package:/base.apk"
+          : text.startsWith("pidof")
+            ? "20"
+            : text.startsWith("run-as")
+              ? "not debuggable"
+              : "flags=[]",
+    };
+    assert.equal(
+      checkTask("4", {
+        devices,
+        audit,
+        finalAnswer: JSON.stringify({ rowText: "probe-1", releaseError: "not debuggable" }),
+      }).success,
+      true,
+    );
+  }));
+test("UI clear oracle requires observed old-PID disappearance, not command spelling", () =>
+  temporary((dir) => {
+    const audit = path.join(dir, "audit");
+    const devices = { owned: [{ uiHolderPid: "100" }], adb: () => "" };
+    const report = JSON.stringify({
+      holder: "com.android.cli.interact.instrumentation",
+      layoutWorks: true,
+    });
+    const base = [
+      {
+        time: 1,
+        tool: "adb",
+        args: ["shell", "ps -A"],
+        status: 0,
+        stdout: "com.android.cli.interact.instrumentation",
+      },
+      {
+        time: 20,
+        tool: "android",
+        args: ["layout"],
+        status: 0,
+        stdout: JSON.stringify([{ "window-title": "Probe", content: [{ text: "dev.probe" }] }]),
+      },
+    ];
+    for (const [stdout, success] of [
+      ["100", false],
+      ["", true],
+      ["200", true],
+      ["error: transport failed", false],
+    ]) {
+      fs.writeFileSync(
+        audit,
+        [...base, { time: 10, tool: "ui-holder-oracle", args: [], status: 0, stdout }]
+          .map((x) => JSON.stringify(x))
+          .join("\n"),
+      );
+      assert.equal(checkTask("6", { devices, audit, finalAnswer: report }).success, success);
+    }
+  }));
+
+test("bare run cannot authorize spending or reach dependency lookup", () => {
+  const r = spawnSync(
+    process.execPath,
+    [
+      path.join(root, "bench/run.js"),
+      "run",
+      "--tasks",
+      "1",
+      "--repeats",
+      "1",
+      "--version",
+      "0.1.2",
+    ],
+    { env: { PATH: "" }, encoding: "utf8" },
+  );
+  assert.equal(r.status, 1);
+  assert.doesNotMatch(r.stdout, /"run": true/);
+  assert.match(r.stderr, /explicit -- flags/);
+  assert.doesNotMatch(r.stderr, /command -v adb/);
+});
+test("a crash query mentioning the expected cause is not itself a real app crash", () => {
+  const answer = JSON.stringify({
+    exception: "IllegalStateException",
+    message: "probe crash requested",
+  });
+  const devices = {
+    owned: [{}],
+    adb: () =>
+      "123.456 10 10 I adbd: shell requested logcat | grep 'java.lang.IllegalStateException: probe crash requested'",
+  };
+  assert.equal(
+    checkTask("3", { devices, finalAnswer: answer, audit: "/nonexistent-benchmark-audit" }).success,
+    false,
+  );
+  devices.adb = () =>
+    "123.456 100 100 E AndroidRuntime: Process: dev.probe, PID: 100\n123.457 200 200 E AndroidRuntime: java.lang.IllegalStateException: probe crash requested";
+  assert.equal(
+    checkTask("3", { devices, finalAnswer: answer, audit: "/nonexistent-benchmark-audit" }).success,
+    false,
+  );
+});
+
+test("process-death oracle rejects stale correct values after an extra increment", () => {
+  const finalAnswer = JSON.stringify({
+    before: { saved: 3, unsaved: 3 },
+    after: { saved: 3, unsaved: 0 },
+    savedSurvived: true,
+    unsavedReset: true,
+  });
+  const devices = {
+    owned: [{}],
+    shell: (d, text) =>
+      text.startsWith("pidof") ? "200" : "mResumedActivity dev.probe/.MainActivity",
+    adb: () =>
+      "123.450 100 100 I ProbeState: event=inc saved=3 volatile=3 rows=0 restored=false pid=100\n123.451 200 200 I ProbeState: event=start saved=3 volatile=0 rows=0 restored=true pid=200\n123.452 200 200 I ProbeState: event=inc saved=4 volatile=1 rows=0 restored=true pid=200",
+  };
+  const result = checkTask("2", { devices, finalAnswer, audit: "/nonexistent-benchmark-audit" });
+  assert.equal(result.checks.processDeath, true);
+  assert.equal(result.checks.currentCounters, false);
+  assert.equal(result.success, false);
+});

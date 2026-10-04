@@ -15,7 +15,15 @@ export class Devices {
       .map((x) => ({ serial: x.split(/\s/)[0], state: x.split(/\s+/)[1] }));
   }
   name(serial) {
-    return command(this.bins.adb, ["-s", serial, "emu", "avd", "name"]).split("\n")[0].trim();
+    const consoleName = command(this.bins.adb, ["-s", serial, "emu", "avd", "name"])
+      .split("\n")[0]
+      .trim();
+    // Some emulator consoles silently return no bytes after a restart. The boot
+    // property is an independent identity check, not an assumed serial mapping.
+    return (
+      consoleName ||
+      command(this.bins.adb, ["-s", serial, "shell", "getprop ro.boot.qemu.avd_name"]).trim()
+    );
   }
   boot() {
     // Refuse an AVD already running, even if it has not registered with the server yet.
@@ -114,8 +122,12 @@ export class Devices {
     }
   }
   shutdown() {
-    for (const d of this.owned)
-      if (this.list().some((x) => x.serial === d.serial && x.state === "device"))
-        this.adb(d, ["emu", "kill"]);
+    for (const d of this.owned) {
+      if (!this.list().some((x) => x.serial === d.serial && x.state === "device")) continue;
+      this.assert(d);
+      command(this.bins.android, ["emulator", "stop", d.name], { timeout: 90000 });
+      if (this.list().some((x) => x.serial === d.serial))
+        throw new Error(`Owned emulator did not shut down: ${d.name}`);
+    }
   }
 }
