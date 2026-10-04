@@ -1,6 +1,6 @@
 {
   "name": "adb-axi",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Truthful, token-efficient adb for agents: devices, app lifecycle, logs and app data",
   "keywords": [
     "adb",
