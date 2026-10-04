@@ -283,8 +283,7 @@ describe("app kill", () => {
             match: shell(KERNEL_UIDS),
             when: { app: "previous" },
             respond: {
-              stdout:
-                `PID UID NAME\nnot-a-pid 0 [irq/511-vendor gpio wakeup]\n8235 10213 dev.probe\n`,
+              stdout: `PID UID NAME\nnot-a-pid 0 [irq/511-vendor gpio wakeup]\n8235 10213 dev.probe\n`,
             },
           },
         ],
