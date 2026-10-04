@@ -21,7 +21,7 @@ Run them against an emulator nobody else is using. The last check shuts it down:
 ANDROID_SERIAL=emulator-5554 npm run test:device
 ```
 
-The setup packs and installs adb-axi into a temporary prefix (set `ADB_AXI_BIN` to use an installed one instead) and uses a fresh `ADB_AXI_HOME`. Every adb-axi call and its output is written to `test-results/device/<check>.txt`; CI uploads that folder as the `device-transcripts-api-<level>` artifact.
+The setup packs and installs adb-axi into a temporary prefix (set `ADB_AXI_BIN` to use an installed one instead) and uses a fresh `ADB_AXI_HOME`. Before any check runs it waits until the emulator's package and activity services answer steadily, since `sys.boot_completed` alone can come seconds before they do. Every adb-axi call and its output is written to `test-results/device/<check>.txt`; CI uploads that folder as the `device-transcripts-api-<level>` artifact.
 
 ## Local-only checks
 
