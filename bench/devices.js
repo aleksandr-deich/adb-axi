@@ -86,9 +86,7 @@ export class Devices {
     if (!this.owned.includes(d)) throw new Error("Unowned emulator");
     const matches = this.list().filter(
       (x) =>
-        x.state === "device" &&
-        /^emulator-\d+$/.test(x.serial) &&
-        this.name(x.serial) === d.name,
+        x.state === "device" && /^emulator-\d+$/.test(x.serial) && this.name(x.serial) === d.name,
     );
     if (matches.length > 1) throw new Error(`Ambiguous owned AVD: ${d.name}`);
     if (!matches.length) return false;

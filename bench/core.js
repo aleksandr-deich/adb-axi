@@ -100,7 +100,9 @@ export function command(bin, args, options = {}) {
     ...options,
   });
   if (r.error || r.status !== 0) {
-    const error = new Error(`${bin} ${args.join(" ")}: ${r.error?.message ?? r.stderr ?? r.stdout}`);
+    const error = new Error(
+      `${bin} ${args.join(" ")}: ${r.error?.message ?? r.stderr ?? r.stdout}`,
+    );
     error.stdout = r.stdout;
     throw error;
   }

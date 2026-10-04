@@ -208,7 +208,9 @@ export function checkTask(id, { devices, finalAnswer, audit }) {
             !(c.stdout ?? "").includes(stoppedSerial)) ||
             (c.args[0] === "-s" &&
               c.args[1] === stoppedSerial &&
-              /offline|not found|missing|unavailable/i.test(`${c.stdout ?? ""}\n${c.stderr ?? ""}`))),
+              /offline|not found|missing|unavailable/i.test(
+                `${c.stdout ?? ""}\n${c.stderr ?? ""}`,
+              ))),
       );
     checks.online =
       !!restart &&
