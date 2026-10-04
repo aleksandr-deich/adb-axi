@@ -26,6 +26,16 @@ adb-axi --version
 
 adb is found on `PATH`, then in `$ANDROID_HOME/platform-tools`, `$ANDROID_SDK_ROOT/platform-tools` and `~/Library/Android/sdk/platform-tools`. When none has it, every command fails with `ADB_NOT_FOUND` and lists the places it searched. `data db` also needs a host `sqlite3`, found the same way.
 
+## Agent skill
+
+The repository ships an agent skill at [`skills/adb-axi/SKILL.md`](skills/adb-axi/SKILL.md). Install it with [`npx skills`](https://github.com/vercel-labs/skills):
+
+```sh
+npx skills add aleksandr-deich/adb-axi --skill adb-axi -g
+```
+
+`-g` installs the skill for all projects; drop it to install for the current project only. With the skill, adb-axi needs no global install: the skill tells the agent when to use adb-axi and runs it with `npx -y adb-axi`. The skill does not copy command details. It sends the agent to `npx -y adb-axi --help` and `npx -y adb-axi <command> --help` for current usage. The requirements above still apply.
+
 ## Start here
 
 Run `adb-axi` with no command for the live state, not a manual: the attached devices, the device a command would target, what is in its foreground, and its recent crashes.
