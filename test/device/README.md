@@ -33,7 +33,7 @@ A resident holder needs the Android CLI. With one emulator (here `emulator-5554`
 
 ```
 android layout --device=emulator-5554 > /dev/null    # leaves com.android.cli.interact.instrumentation resident
-adb-axi doctor ui --device emulator-5554             # in use, names it as resident, says it blocks instrumentation tests, exit 0
+adb-axi doctor ui --device emulator-5554             # resident after android exits, blocks instrumentation tests, exit 0
 adb-axi doctor --device emulator-5554                # instrumentation: warn, exit 0
 adb-axi doctor ui --fix --device emulator-5554       # clears it, exit 0
 adb-axi doctor ui --device emulator-5554             # uiautomation: free
