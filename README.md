@@ -36,7 +36,7 @@ The repository ships an agent skill at [`skills/adb-axi/SKILL.md`](skills/adb-ax
 npx skills add aleksandr-deich/adb-axi --skill adb-axi -g
 ```
 
-`-g` installs the skill for all projects; drop it to install for the current project only. With the skill, adb-axi needs no global install: the agent uses the executable supplied by its environment, or `npx -y adb-axi` otherwise, without a preliminary availability probe. Command and flag details stay in live help: agents ask a known command or family directly, consult the root index only to choose a command, and batch independent help requests. The skill adds short examples for using verified lifecycle evidence, querying a schema directly, and chaining operations with exit checks and guaranteed settings cleanup. The requirements above still apply.
+`-g` installs the skill for all projects; drop it to install for the current project only. With the skill, adb-axi needs no global install: use the executable supplied by the environment, or `npx -y adb-axi` otherwise. The skill explains how agents can avoid unnecessary help and verification calls; command and flag details stay in live CLI help. The requirements above still apply.
 
 ## Start here
 
@@ -176,16 +176,13 @@ The lifecycle commands require the package to be installed for the current Andro
 
 `shell -- '<cmd>'` runs one command string in the device shell through `shell_v2`, so the remote exit code is real. adb-axi's own flags, such as `--device`, go before `--`: everything after it runs on the device. A non-zero exit is exit 1 with `code: REMOTE_EXIT`, the remote `exit` and its `stderr`.
 
-Device settings such as dark mode and display density have no command of their own; `shell` changes them. Read the value first, so you can put it back:
+Device settings such as dark mode and display density have no command of their own; `shell` changes them. Read the original values first:
 
 ```sh
-adb-axi shell --device emulator-5554 -- 'cmd uimode night; wm density'   # current values
-adb-axi shell --device emulator-5554 -- 'cmd uimode night yes; wm density 560'
-adb-axi shell --device emulator-5554 -- 'cmd uimode night; wm density'   # check the change
-adb-axi shell --device emulator-5554 -- 'cmd uimode night no; wm density reset'
+adb-axi shell --device emulator-5554 -- 'cmd uimode night && wm density'
 ```
 
-`cmd uimode night` prints `Night mode: yes` or `no`, and `wm density` prints the physical density and any override. Restore the values you read, rather than assuming the defaults (`night no` and `density reset` are the defaults).
+`cmd uimode night` prints `Night mode: yes` or `no`, and `wm density` prints the physical density and any override. When testing a change, install an EXIT trap in a subshell before mutating settings, verify the result, and restore the values you read even if the check fails. Do not assume the defaults (`night no` and `density reset`) were the original values; propagate both verification and cleanup failures.
 
 ## Walkthrough: does an app survive process death?
 
