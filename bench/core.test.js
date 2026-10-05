@@ -17,9 +17,10 @@ import {
 } from "./core.js";
 import { parsePi, runPi } from "./pi.js";
 import { checkTask } from "./success.js";
-import { Devices } from "./devices.js";
+import { Devices, emulatorPid } from "./devices.js";
 import { environment } from "./run.js";
 import task8Reference from "./reference/8.js";
+import "./success.test.js";
 
 function temporary(fn) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "benchmark-test-"));
@@ -499,11 +500,17 @@ test("recovery and scoring follow the verified AVD onto its new serial", () =>
     const fake = path.join(dir, "adb");
     fs.writeFileSync(
       fake,
-      '#!/bin/sh\ncase "$*" in\n  devices) printf "List of devices attached\\nemulator-5580\\tdevice\\n";;\n  *"emu avd name"*) echo owned;;\n  *"getprop sys.boot_completed"*) echo 1;;\n  *"pm path android"*) echo package:android;;\n  *) echo "";;\nesac\n',
+      '#!/bin/sh\ncase "$*" in\n  devices) printf "List of devices attached\\nemulator-5580\\tdevice\\n";;\n  *"emu avd name"*) echo owned;;\n  *"getprop sys.boot_completed"*) echo 1;;\n  *"cat /proc/sys/kernel/random/boot_id"*) echo abcdef01-1234-1234-1234-123456789abc;;\n  *"pm path android"*) echo package:android;;\n  *) echo "";;\nesac\n',
       { mode: 0o755 },
     );
     const d = new Devices({ adb: fake, android: "/nonexistent-android" }, ["owned"]);
-    const phone = { name: "owned", serial: "emulator-5554" };
+    const phone = {
+      name: "owned",
+      serial: "emulator-5554",
+      task8BootId: "12345678-1234-1234-1234-123456789abc",
+      task8EmulatorPid: "101",
+    };
+    d.emulatorPid = () => "202";
     d.owned.push(phone);
     d.recover(phone);
     assert.equal(phone.serial, "emulator-5580");
@@ -570,6 +577,45 @@ test("recovery and scoring follow the verified AVD onto its new serial", () =>
     }
   }));
 
+test("host emulator PID lookup requires one real executable for the exact AVD", () => {
+  const processes = [
+    "101 /sdk/emulator/emulator -avd phone_backup -no-window",
+    "202 /sdk/qemu-system-aarch64 -avd phone -no-window",
+    "303 /bin/sh -c /sdk/emulator/emulator -avd phone",
+    "404 /sdk/emulator/emulator -avd tablet",
+  ].join("\n");
+  assert.equal(emulatorPid(processes, "phone"), "202");
+  assert.throws(() => emulatorPid(processes, "other"), /Cannot identify/);
+  assert.equal(emulatorPid(processes + "\n505 /sdk/emulator/emulator -avd phone", "phone"), "202");
+  assert.throws(
+    () => emulatorPid(processes + "\n606 /sdk/qemu-system-aarch64 -avd phone", "phone"),
+    /candidates:.*202.*606/,
+  );
+  // Actual Android CLI process shape from the owned phone on macOS.
+  assert.equal(
+    emulatorPid(
+      "74733 /Users/alexanderdeych/Library/Android/sdk/emulator/qemu/darwin-aarch64/qemu-system-aarch64-headless @Pixel_10_Pro_XL -no-snapshot-load -no-window",
+      "Pixel_10_Pro_XL",
+    ),
+    "74733",
+  );
+  assert.throws(
+    () =>
+      emulatorPid(
+        "74733 /sdk/qemu-system-aarch64-headless @Pixel_10_Pro_XL_Sasha",
+        "Pixel_10_Pro_XL",
+      ),
+    /candidates: none/,
+  );
+  assert.throws(
+    () =>
+      emulatorPid(
+        "74733 /sdk/qemu-system-aarch64-headless @Pixel_10_Pro_XL_backup",
+        "Pixel_10_Pro_XL",
+      ),
+    /candidates: none/,
+  );
+});
 test("task 8 reference confirms boot on the restarted AVD's new serial", () => {
   const phone = { name: "phone", serial: "emulator-5554" };
   let phase = "before";

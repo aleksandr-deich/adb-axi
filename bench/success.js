@@ -1,9 +1,123 @@
 import fs from "node:fs";
 import path from "node:path";
 import { root } from "./core.js";
+// Recognize device-state output, not the executable that produced it. Unknown
+// formats are not evidence; in particular, an AVD inventory is not an attached list.
+export function deviceState(call, serial, name) {
+  if ((call.args ?? []).some((arg) => ["--help", "-h"].includes(arg))) return null;
+  const stdout = call.stdout ?? "";
+  const text = `${stdout}\n${call.stderr ?? ""}`;
+  if (call.status === 0) {
+    try {
+      const value = JSON.parse(stdout);
+      if (Array.isArray(value.devices)) {
+        const device = value.devices.find((d) => d.serial === serial || d.avd === name);
+        if (!device) return "missing";
+        if (device.state === "device") return "online";
+        if (device.state === "offline") return "offline";
+      }
+    } catch {
+      // Text listings and targeted errors below are also valid evidence.
+    }
+    const table = stdout.match(/^devices\[(\d+)\]\{([^}]+)\}:\s*\n?/m);
+    if (table) {
+      const fields = table[2].split(",");
+      const rows = stdout
+        .slice(table.index + table[0].length)
+        .split("\n")
+        .slice(0, Number(table[1]));
+      const serialColumn = fields.indexOf("serial");
+      const stateColumn = fields.indexOf("state");
+      if (
+        serialColumn >= 0 &&
+        stateColumn >= 0 &&
+        rows.length === Number(table[1]) &&
+        rows.every((line) => line.trim().split(",").length === fields.length)
+      ) {
+        const row = rows
+          .map((line) => line.trim().split(","))
+          .find((values) => values[serialColumn] === serial);
+        if (!row) return "missing";
+        if (row[stateColumn] === "device") return "online";
+        if (row[stateColumn] === "offline") return "offline";
+      }
+    }
+    if (/^List of devices attached\s*$/m.test(stdout)) {
+      const rows = stdout.split("\n").map((line) => line.trim().split(/\s+/));
+      const row = rows.find((fields) => fields[0] === serial);
+      if (!row) return "missing";
+      if (row[1] === "device") return "online";
+      if (row[1] === "offline") return "offline";
+    }
+  }
+  const args = call.args ?? [];
+  const waitIndex = args.findIndex((arg, index) => arg === "wait" && args[index + 1] === "boot");
+  const target = args.flatMap((arg, index) =>
+    ["--device", "-s"].includes(arg)
+      ? [args[index + 1]]
+      : arg.startsWith("--device=")
+        ? [arg.slice(9)]
+        : [],
+  );
+  if (
+    call.status !== 0 &&
+    waitIndex >= 0 &&
+    target.length === 1 &&
+    (target[0] === serial || target[0] === name)
+  ) {
+    for (const result of [stdout, call.stderr ?? ""]) {
+      let error;
+      let code;
+      let state;
+      try {
+        const value = JSON.parse(result);
+        error = typeof value.error === "string" ? value.error : value.error?.message;
+        code = value.code;
+        state = value.last?.state;
+      } catch {
+        error = result.match(/^error:\s*"?([^\n"]+)/m)?.[1];
+        code = result.match(/^code:\s*"?([^\n"]+)/m)?.[1];
+        state =
+          result.match(/^last\.state:\s*"?(not attached|offline)\b/m)?.[1] ??
+          result.match(/^last:\s*\n\s+state:\s*"?(not attached|offline)\b/m)?.[1];
+      }
+      if (
+        typeof error === "string" &&
+        (code === "WAIT_TIMEOUT" || /timed out|timeout|deadline/i.test(error)) &&
+        (error.includes(serial) || error.includes(name)) &&
+        ["not attached", "offline"].includes(state)
+      )
+        return state === "offline" ? "offline" : "missing";
+    }
+  }
+  if (
+    waitIndex >= 0 &&
+    (target.length !== 1 ||
+      (target[0] !== serial && target[0] !== name) ||
+      /"last"\s*:|^last(?:\.state)?:/m.test(text))
+  )
+    return null;
+  // Require identity and state in the same output line. A generic timeout or
+  // a command's usage examples cannot establish the target's unavailable state.
+  for (const line of text.split("\n")) {
+    if (!line.includes(serial) && !line.includes(name)) continue;
+    if (/\boffline\b/i.test(line)) return "offline";
+    if (/not found|\bmissing\b|no attached device has/i.test(line)) return "missing";
+    if (/\bunavailable\b/i.test(line)) return "unavailable";
+  }
+  return null;
+}
+const validBootId = (value) =>
+  /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(value) &&
+  !/^0{8}(?:-0{4}){3}-0{12}$/.test(value);
 export function setupTask(task, devices) {
   devices.reset();
   const phone = devices.owned[0];
+  if (task.id === "8") {
+    phone.task8BootId = devices.shell(phone, "cat /proc/sys/kernel/random/boot_id").trim();
+    if (!validBootId(phone.task8BootId)) throw new Error("Invalid initial phone boot ID");
+    phone.task8EmulatorPid = devices.emulatorPid(phone);
+  }
   if (["debug", "ui-holder"].includes(task.setup)) {
     devices.adb(phone, ["install", path.join(root, "test/fixtures/apk/probe-debug.apk")]);
     devices.shell(phone, "am start -W -n dev.probe/.MainActivity");
@@ -136,8 +250,17 @@ export function checkTask(id, { devices, finalAnswer, audit }) {
     checks.report =
       answer.original === original && answer.changed === opposite && answer.restored === original;
   } else if (id === "6") {
+    const holders =
+      typeof answer.holder === "string"
+        ? (answer.holder.match(/\b(?:[a-z][\w]*\.)+[a-z][\w]*(?:\/[\w.$]+)?/g) ?? [])
+        : [];
     checks.holderReport =
-      answer.holder === "com.android.cli.interact.instrumentation" && answer.layoutWorks === true;
+      holders.length > 0 &&
+      holders.every((holder) =>
+        /^com\.android\.cli\.interact\.instrumentation(?:[./][\w.$]+)?$/.test(holder),
+      ) &&
+      !/\bnot\s+com\.android\.cli\.interact\.instrumentation\b/i.test(answer.holder) &&
+      answer.layoutWorks === true;
     checks.diagnosed = /com.android.cli.interact/.test(output);
     const clear = calls.find(
       (c) =>
@@ -171,7 +294,11 @@ export function checkTask(id, { devices, finalAnswer, audit }) {
         }
       });
   } else if (id === "8") {
-    const stop = calls.find(
+    const lifecycle = (c) =>
+      c.status === 0 &&
+      !c.args.some((arg) => ["--help", "-h"].includes(arg)) &&
+      !/^(?:KO:|error:)/im.test(`${c.stdout ?? ""}\n${c.stderr ?? ""}`);
+    const stops = calls.filter(
       (c) =>
         ((c.tool === "android" &&
           c.args[0] === "emulator" &&
@@ -182,42 +309,47 @@ export function checkTask(id, { devices, finalAnswer, audit }) {
             c.args[1] === stoppedSerial &&
             c.args[2] === "emu" &&
             c.args[3] === "kill")) &&
-        c.status === 0,
+        lifecycle(c),
     );
-    const restart = calls.find(
+    const restarts = calls.filter(
       (c) =>
-        stop &&
-        c.time > stop.time &&
         c.tool === "android" &&
         c.args[0] === "emulator" &&
         c.args[1] === "start" &&
         c.args.at(-1) === phone.name &&
-        c.status === 0,
+        lifecycle(c),
     );
-    checks.stopped = !!stop;
-    checks.observed =
-      !!stop &&
-      !!restart &&
-      calls.some(
-        (c) =>
-          c.tool === "adb" &&
-          c.time >= stop.time &&
-          c.time < restart.time &&
-          ((c.args[0] === "devices" &&
-            c.status === 0 &&
-            !(c.stdout ?? "").includes(stoppedSerial)) ||
-            (c.args[0] === "-s" &&
-              c.args[1] === stoppedSerial &&
-              /offline|not found|missing|unavailable/i.test(
-                `${c.stdout ?? ""}\n${c.stderr ?? ""}`,
-              ))),
-      );
+    const states = calls
+      .map((call) => ({ call, state: deviceState(call, stoppedSerial, phone.name) }))
+      .filter(({ state }) => state !== null);
+    const observations = states.filter(
+      ({ call, state }) =>
+        state !== "online" &&
+        (stops.some(
+          (s) => s.time < call.time && restarts.some((r) => r.time > call.time && r.time > s.time),
+        ) ||
+          (states.some((s) => s.state === "online" && s.call.time < call.time) &&
+            states.some((s) => s.state === "online" && s.call.time > call.time))),
+    );
+    checks.stopped = observations.length > 0;
+    checks.observed = observations.length > 0;
+    evidence.unavailableStates = [...new Set(observations.map((s) => s.state))];
+    const finalBootId = recoveredOnline
+      ? devices.shell(phone, "cat /proc/sys/kernel/random/boot_id").trim()
+      : "";
     checks.online =
-      !!restart &&
+      observations.length > 0 &&
       recoveredOnline &&
-      devices.shell(phone, "getprop sys.boot_completed").trim() === "1";
+      devices.shell(phone, "getprop sys.boot_completed").trim() === "1" &&
+      validBootId(phone.task8BootId) &&
+      validBootId(finalBootId) &&
+      phone.task8BootId.toLowerCase() !== finalBootId.toLowerCase() &&
+      /^[1-9]\d*$/.test(phone.task8EmulatorPid ?? "") &&
+      devices.emulatorPid(phone) !== phone.task8EmulatorPid;
     checks.report =
-      ["offline", "missing", "unavailable"].includes(answer.unavailableState) &&
+      (answer.unavailableState === "unavailable"
+        ? observations.length > 0
+        : evidence.unavailableStates.includes(answer.unavailableState)) &&
       answer.recovered === true;
   } else throw new Error("No success oracle");
   return {

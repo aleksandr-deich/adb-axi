@@ -1,0 +1,84 @@
+{
+  "id": "1791157061077-8-baseline-1-ebbb0b00-ce37-4ac2-87fd-90f16eefb554",
+  "task": "8",
+  "condition": "baseline",
+  "devices": [
+    {
+      "name": "Pixel_10_Pro_XL",
+      "serial": "emulator-5554"
+    },
+    {
+      "name": "medium_tablet",
+      "serial": "emulator-5556"
+    }
+  ],
+  "finalAnswer": "{\"unavailableState\":\"unavailable\",\"recovered\":true}",
+  "initialHolderPid": null,
+  "calls": [
+    {
+      "time": 1791157073970,
+      "tool": "adb",
+      "args": ["-s", "emulator-5554", "emu", "avd", "name"],
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "time": 1791157074120,
+      "tool": "adb",
+      "args": ["-s", "emulator-5554", "get-state"],
+      "status": 0,
+      "stdout": "device\n",
+      "stderr": ""
+    },
+    {
+      "time": 1791157074259,
+      "tool": "adb",
+      "args": ["-s", "emulator-5554", "emu", "kill"],
+      "status": 0,
+      "stdout": "KO: unknown command, try 'help'\r\n",
+      "stderr": ""
+    },
+    {
+      "time": 1791157102610,
+      "tool": "android",
+      "args": ["emulator", "stop", "Pixel_10_Pro_XL"],
+      "status": 0,
+      "stdout": "\rWaiting for virtual device 'emulator-5554' to fully terminate (59 seconds left)\rWaiting for virtual device 'emulator-5554' to fully terminate (59 seconds left)\rWaiting for virtual device 'emulator-5554' to fully terminate (58 seconds left)\rWaiting for virtual device 'emulator-5554' to fully terminate (57 seconds left)\rWaiting for virtual device 'emulator-5554' to fully terminate (56 seconds left)\rWaiting for virtual device 'emulator-5554' to fully terminate (55 seconds left)\rWaiting for virtual device 'emulator-5554' to fully terminate (54 seconds left)\rWaiting for virtual device 'emulator-5554' to fully terminate (53 seconds left)\rWaiting for virtual device 'emulator-5554' to fully terminate (52 seconds left)\rWaiting for virtual device 'emulator-5554' to fully terminate (51 seconds left)\rWaiting for virtual device 'emulator-5554' to fully terminate (50 seconds left)\rWaiting for virtual device 'emulator-5554' to fully terminate (50 seconds left)\n",
+      "stderr": "Downloading Android CLI...\nUnpacking embedded installation...\n\nTerms of Service and License Agreement for the Android Software Development Kit\n\nhttps://developer.android.com/studio/terms\n\nGoogle collects usage data for the Android CLI, such as commands, sub-commands, and flags used. This data does not include custom parameters or identifiable information. This information helps improve the tool and is collected in accordance with Google's Privacy Policy.\n\nhttps://policies.google.com/privacy\n\nDisable Android CLI metrics collection by using the --no-metrics flag.\n\nTip: For the best experience using Android CLI with agents, we strongly recommend running android init to install the necessary skills and resources.\n"
+    },
+    {
+      "time": 1791157117741,
+      "tool": "android",
+      "args": ["emulator", "start", "Pixel_10_Pro_XL"],
+      "status": 0,
+      "stdout": "Emulator process 73516 started, log file location: '/Users/alexanderdeych/.android/Pixel_10_Pro_XL/emulator.log'\n\rWaiting for virtual device 'Pixel_10_Pro_XL' to fully start (299 seconds left)\rWaiting for virtual device 'Pixel_10_Pro_XL' to fully start (299 seconds left)\rWaiting for virtual device 'Pixel_10_Pro_XL' to fully start (298 seconds left)\rWaiting for virtual device 'Pixel_10_Pro_XL' to fully start (297 seconds left)\rWaiting for virtual device 'Pixel_10_Pro_XL' to fully start (296 seconds left)\rWaiting for virtual device 'Pixel_10_Pro_XL' to fully start (295 seconds left)\rWaiting for virtual device 'Pixel_10_Pro_XL' to fully start (294 seconds left)\rWaiting for virtual device 'Pixel_10_Pro_XL' to fully start (293 seconds left)\rWaiting for virtual device 'Pixel_10_Pro_XL' to fully start (292 seconds left)\rWaiting for virtual device 'Pixel_10_Pro_XL' to fully start (291 seconds left)\rWaiting for virtual device 'Pixel_10_Pro_XL' to fully start (290 seconds left)\nVirtual device successfully started as 'emulator-5554'\n",
+      "stderr": ""
+    },
+    {
+      "time": 1791157118114,
+      "tool": "adb",
+      "args": ["-s", "emulator-5554", "get-state"],
+      "status": 0,
+      "stdout": "device\n",
+      "stderr": ""
+    },
+    {
+      "time": 1791157118242,
+      "tool": "adb",
+      "args": ["-s", "emulator-5554", "shell", "getprop", "sys.boot_completed"],
+      "status": 0,
+      "stdout": "1\n",
+      "stderr": ""
+    },
+    {
+      "time": 1791157118361,
+      "tool": "adb",
+      "args": ["-s", "emulator-5554", "shell", "getprop", "ro.boot.qemu.avd_name"],
+      "status": 0,
+      "stdout": "Pixel_10_Pro_XL\n",
+      "stderr": ""
+    }
+  ],
+  "fixtureNote": "Real pilot record fields and unmodified audit calls; large unrelated dumpsys outputs omitted."
+}
