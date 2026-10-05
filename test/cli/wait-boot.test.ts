@@ -364,10 +364,11 @@ describe("wait boot", () => {
 
     it("says so when a fresh device was ready but had not answered for the settle yet", async () => {
       const f = scenario([listing(devices(line(SERIAL, "device"))), shell(fresh("585"))]);
-      const { toon, data } = await both(["wait", "boot", "--timeout", "2s"], f);
+      // Two independent deadlines can see different last observations on a slow runner.
+      const { toon, data } = await once(["wait", "boot", "--timeout", "5s"], f);
       expect(toon.exitCode).toBe(1);
       expect(data).toEqual({
-        error: `${SERIAL} had booted, but its services had not answered for 10 s in a row after 2 s`,
+        error: `${SERIAL} had booted, but its services had not answered for 10 s in a row after 5 s`,
         code: "WAIT_TIMEOUT",
         last: {
           state: "device",

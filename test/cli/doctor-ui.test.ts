@@ -810,8 +810,11 @@ describe("doctor ui", () => {
       });
     });
 
-    it("fails with REMOTE_EXIT when ps fails", async () => {
-      const f = scenario({ ps: { exit: 1, stderr: "ps: bad -o ARGS\n" } });
+    it("waits for the sibling read to finish when ps fails", async () => {
+      const f = scenario({
+        ps: { exit: 1, stderr: "ps: bad -o ARGS\n" },
+        dumpsys: { ...dumpsys(), delayMs: 500 },
+      });
       const { exitCode, data } = await cli(f, ["doctor", "ui"]);
       expect(exitCode).toBe(1);
       expect(data).toMatchObject({
@@ -820,6 +823,8 @@ describe("doctor ui", () => {
         exit: 1,
         stderr: "ps: bad -o ARGS",
       });
+      expect(f.calls().filter((call) => call.argv[2] === "shell")).toHaveLength(4);
+      expect(f.calls().every((call) => call.end !== null)).toBe(true);
     });
 
     it("fails with TIMEOUT at --timeout when the device stops answering, through the bin", async () => {
