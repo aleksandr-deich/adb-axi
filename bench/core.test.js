@@ -418,6 +418,27 @@ test("both default conditions have exactly their declared isolated skills", () =
       assert.ok(!e.env.PATH.includes(".local/bin"));
     }
   }));
+test("isolated environments use the host adb key only when it exists", (t) =>
+  temporary((dir) => {
+    const home = path.join(dir, "host-home");
+    const adbKey = path.join(home, ".android", "adbkey");
+    fs.mkdirSync(path.dirname(adbKey), { recursive: true });
+    t.mock.method(os, "homedir", () => home);
+    for (const exists of [false, true]) {
+      if (exists) fs.writeFileSync(adbKey, "test-key");
+      for (const condition of ["baseline", "adb-axi"]) {
+        const directory = path.join(dir, `${condition}-${exists}`);
+        const { env } = environment(directory, condition, "0.1.2", { node: process.execPath }, [
+          { name: "owned", serial: "emulator-5554" },
+        ]);
+        assert.equal(env.HOME, directory);
+        assert.notEqual(env.HOME, home);
+        if (exists) assert.equal(env.ADB_VENDOR_KEYS, adbKey);
+        else assert.ok(!Object.hasOwn(env, "ADB_VENDOR_KEYS"));
+        assert.ok(!fs.existsSync(path.join(directory, ".android", "adbkey")));
+      }
+    }
+  }));
 test("Pi event parser captures all assistant turns, cached input, cost and final answer", () => {
   const message = {
     role: "assistant",

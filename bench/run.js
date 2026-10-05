@@ -80,6 +80,7 @@ export function environment(directory, condition, version, bins, devices, task =
     );
   }
   fs.symlinkSync(bins.node, path.join(binDir, "node"));
+  const adbKey = path.join(os.homedir(), ".android", "adbkey");
   const env = {
     PATH: `${binDir}:/usr/bin:/bin:/usr/sbin:/sbin`,
     HOME: directory,
@@ -100,6 +101,7 @@ export function environment(directory, condition, version, bins, devices, task =
     ENV: "/dev/null",
     ZDOTDIR: directory,
   };
+  if (fs.existsSync(adbKey)) env.ADB_VENDOR_KEYS = adbKey;
   if (process.env.JAVA_HOME) env.JAVA_HOME = process.env.JAVA_HOME;
   for (const key of ["OPENAI_API_KEY", "OPENAI_BASE_URL"])
     if (process.env[key]) env[key] = process.env[key];
