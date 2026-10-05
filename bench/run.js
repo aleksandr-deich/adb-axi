@@ -174,22 +174,24 @@ async function main() {
   };
   assertConsistency(records, identity);
   fs.mkdirSync(results, { recursive: true });
-  if (!progress.toRun.length) return;
+  const lock = path.join(os.tmpdir(), "android-repeatable-benchmark.lock");
+  if (!progress.toRun.length && !fs.existsSync(lock)) return;
   // A single host-wide lock prevents concurrent benchmark processes sharing AVDs.
   const bins = Object.fromEntries(["adb", "android", "pi", "node", "npx"].map((t) => [t, find(t)]));
-  const lock = path.join(os.tmpdir(), "android-repeatable-benchmark.lock");
   const ownership = acquireLock(lock, [options.phone, options.tablet]);
   const devices = new Devices(bins, [options.phone, options.tablet]);
   devices.androidLayout = (d) => command(bins.android, ["layout", `--device=${d.serial}`]);
-  const work = fs.mkdtempSync(path.join(os.tmpdir(), "android-benchmark-"));
+  const work = progress.toRun.length
+    ? fs.mkdtempSync(path.join(os.tmpdir(), "android-benchmark-"))
+    : null;
   try {
+    devices.boot(ownership.previous, !!progress.toRun.length, ownership.save);
+    if (!progress.toRun.length) return;
     const benchmarkDirty = !!command("git", ["status", "--porcelain"], { cwd: root }).trim();
     const toolVersions = {
       android: command(bins.android, ["-V"]).trim(),
       adb: command(bins.adb, ["version"]).trim(),
     };
-    devices.boot(ownership.previous);
-    ownership.save(devices.owned);
     for (const run of progress.toRun) {
       const task = tasks().find((t) => t.id === run.task);
       const { repeat, condition } = run;
@@ -301,7 +303,7 @@ async function main() {
       devices.shutdown();
       fs.rmSync(lock, { recursive: true });
     } finally {
-      fs.rmSync(work, { recursive: true, force: true });
+      if (work) fs.rmSync(work, { recursive: true, force: true });
     }
   }
 }

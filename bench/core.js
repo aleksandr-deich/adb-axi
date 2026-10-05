@@ -219,11 +219,7 @@ export function readRecords(dir) {
     .map((f) => JSON.parse(fs.readFileSync(path.join(dir, f), "utf8")));
 }
 export function complete(record) {
-  return (
-    typeof record.success === "boolean" &&
-    (record.verdictProduced === true ||
-      (record.verdictProduced === undefined && record.checks != null))
-  );
+  return typeof record.success === "boolean" && record.verdictProduced === true;
 }
 export function resumePlan(options, records, enforceCap = true) {
   const skipped = [],
@@ -311,6 +307,7 @@ export function aggregate(records) {
       task: r.task,
       condition: r.condition,
       runs: 0,
+      failedAttempts: 0,
       successes: 0,
       inputTokens: 0,
       cost: 0,
@@ -318,6 +315,11 @@ export function aggregate(records) {
       wallTimeMs: 0,
       missingMetrics: 0,
     };
+    if (!complete(r)) {
+      g.failedAttempts++;
+      groups.set(key, g);
+      continue;
+    }
     g.runs++;
     g.successes += Number(r.success === true);
     for (const k of ["inputTokens", "cost", "turns", "wallTimeMs"])
@@ -325,5 +327,8 @@ export function aggregate(records) {
       else g.missingMetrics++;
     groups.set(key, g);
   }
-  return [...groups.values()].map((g) => ({ ...g, successRate: g.successes / g.runs }));
+  return [...groups.values()].map((g) => ({
+    ...g,
+    successRate: g.runs ? g.successes / g.runs : null,
+  }));
 }

@@ -190,7 +190,10 @@ test("status and summary read external results without side effects or tools", (
     });
     const summary = invoke(["summary"]);
     assert.equal(summary.status, 0, summary.stderr);
-    assert.equal(JSON.parse(summary.stdout).length, 2);
+    assert.deepEqual(JSON.parse(summary.stdout).map((g) => [g.runs, g.failedAttempts]), [
+      [1, 0],
+      [0, 1],
+    ]);
     const dry = invoke(["--tasks", "1", "--repeats", "1", "--max-runs", "1"]);
     assert.equal(dry.status, 0, dry.stderr);
     assert.equal(JSON.parse(dry.stdout).toRunCount, 1);
@@ -251,25 +254,20 @@ test("active lock refuses overlap and stale ownership authorizes targeted recove
       process.kill = kill;
     }
   }));
-test("interrupted owned emulators are reset and stopped before normal boot", () => {
+test("interrupted recovery requires the saved process identity", () => {
   const d = new Devices({}, ["phone"]);
   const events = [];
   d.list = () => [{ serial: "emulator-5554", state: "device" }];
   d.name = () => "phone";
-  d.recover = () => events.push("recover");
-  d.reset = () => events.push("reset");
-  d.shutdown = () => {
-    events.push("shutdown");
-    throw new Error("stop before actual boot");
-  };
-  assert.throws(
-    () =>
-      d.boot({
-        owned: [{ name: "phone", night: "Night mode: no", density: "Physical density: 420" }],
-      }),
-    /stop before actual boot/,
-  );
-  assert.deepEqual(events, ["recover", "reset", "shutdown"]);
+  d.processIdentity = () => "202:Mon Jun  2 10:00:00 2025";
+  d.resetDevice = () => events.push("reset");
+  d.shutdownDevice = () => events.push("shutdown");
+  for (const owned of [[], [{ name: "phone" }], [{ name: "phone", processIdentity: "101:old" }]])
+    d.boot({ owned }, false);
+  assert.deepEqual(events, []);
+  d.boot({ owned: [{ name: "phone", processIdentity: d.processIdentity() }] }, false);
+  assert.deepEqual(events, ["reset", "shutdown"]);
+  assert.deepEqual(d.owned, []);
 });
 test("reset-before-run restores interrupted app, UI holder and settings without device commands", () => {
   const d = new Devices({}, ["phone"]);
@@ -314,13 +312,23 @@ test("reset-before-run restores interrupted app, UI holder and settings without 
   assert.equal(holder, "");
   assert.equal(logs, "");
 });
-test("records are exclusive, aggregation counts failures and missing metrics", () =>
+test("explicit verdict alone completes a slot and failed attempts do not dilute its rate", () => {
+  const slot = { task: "1", condition: "baseline", repeat: 1 };
+  const failed = { ...slot, success: false, checks: { test: false } };
+  assert.equal(resumePlan(plan(["--tasks", "1", "--repeats", "1"]), [failed]).groups[0].done, 0);
+  const g = aggregate([failed, { ...slot, success: true, verdictProduced: true }])[0];
+  assert.equal(g.runs, 1);
+  assert.equal(g.failedAttempts, 1);
+  assert.equal(g.successRate, 1);
+});
+test("records are exclusive, aggregation counts verdicts and missing metrics", () =>
   temporary((dir) => {
     const r = {
       id: "one",
       task: "1",
       condition: "baseline",
       success: true,
+      verdictProduced: true,
       inputTokens: 50,
       cost: 0.1,
       turns: 3,
@@ -333,7 +341,7 @@ test("records are exclusive, aggregation counts failures and missing metrics", (
     assert.equal(g.successRate, 0.5);
     assert.equal(g.turns, 6);
     assert.equal(g.cost, 0.2);
-    assert.equal(aggregate([{ task: "1", condition: "baseline" }])[0].missingMetrics, 4);
+    assert.equal(aggregate([{ task: "1", condition: "baseline" }])[0].missingMetrics, 0);
   }));
 test("PATH verification detects contamination inside exact environment", () =>
   temporary((dir) => {

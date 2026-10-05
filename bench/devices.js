@@ -46,33 +46,39 @@ export class Devices {
       command(this.bins.adb, ["-s", serial, "shell", "getprop ro.boot.qemu.avd_name"]).trim()
     );
   }
-  boot(interrupted = null) {
+  processIdentity(name) {
+    const processes = command("/bin/ps", ["-axo", "pid=,lstart=,command="]);
+    const lines = processes.split("\n").flatMap((line) => {
+      const match = line.match(/^\s*([1-9]\d*)\s+(.{24})\s+(.*)$/);
+      return match ? [{ pid: match[1], started: match[2], command: match[3] }] : [];
+    });
+    const pid = emulatorPid(lines.map((p) => `${p.pid} ${p.command}`).join("\n"), name);
+    const process = lines.find((p) => p.pid === pid);
+    return `${pid}:${process.started}`;
+  }
+  boot(interrupted = null, coldBoot = true, save = () => {}) {
     if (interrupted) {
       for (const name of this.names) {
-        const saved = interrupted.owned.find((d) => d.name === name);
+        const saved = interrupted.owned?.find((d) => d.name === name);
+        if (!saved?.processIdentity || saved.processIdentity !== this.processIdentityOrNull(name))
+          continue;
         const matches = this.list().filter(
           (d) =>
             d.state === "device" && /^emulator-\d+$/.test(d.serial) && this.name(d.serial) === name,
         );
         if (matches.length > 1) throw new Error(`Ambiguous owned AVD: ${name}`);
-        if (matches.length || saved) {
-          const d = { ...saved, ...matches[0], name };
-          this.owned.push(d);
-          this.recover(d);
-          d.night ??= this.shell(d, "cmd uimode night").trim();
-          d.density ??= this.shell(d, "wm density").trim();
-        }
+        if (!matches.length) continue;
+        const d = { ...saved, ...matches[0], recoveryProof: saved.processIdentity };
+        this.owned.push(d);
+        this.resetDevice(d);
+        this.shutdownDevice(d);
+        this.owned = this.owned.filter((owned) => owned !== d);
       }
-      // Stop only recovered, identity-verified AVDs before the normal cold boot.
-      this.reset();
-      this.shutdown();
-      this.owned = [];
     }
+    if (!coldBoot) return;
     // Refuse an AVD already running, even if it has not registered with the server yet.
-    const processes = command("/bin/ps", ["-axo", "command"]);
     for (const name of this.names)
-      if (new RegExp(`-avd ${name.replaceAll(".", "\\.")}(?:\\s|$)`).test(processes))
-        throw new Error(`AVD already in use: ${name}`);
+      if (this.processIdentityOrNull(name)) throw new Error(`AVD already in use: ${name}`);
     for (const name of this.names) {
       const before = new Set(this.list().map((d) => d.serial));
       command(this.bins.android, ["emulator", "start", "--headless", "--cold", name], {
@@ -91,6 +97,16 @@ export class Devices {
       this.ready(d);
       d.night = this.shell(d, "cmd uimode night").trim();
       d.density = this.shell(d, "wm density").trim();
+      d.processIdentity = this.processIdentity(name);
+      save(this.owned);
+    }
+  }
+  processIdentityOrNull(name) {
+    try {
+      return this.processIdentity(name);
+    } catch (error) {
+      if (/Cannot identify one emulator process/.test(error.message)) return null;
+      throw error;
     }
   }
   emulatorPid(d) {
@@ -158,7 +174,11 @@ export class Devices {
     this.ready(d);
   }
   reset() {
-    for (const d of this.owned) {
+    for (const d of this.owned) this.resetDevice(d);
+  }
+  resetDevice(d) {
+      if (d.recoveryProof && this.processIdentityOrNull(d.name) !== d.recoveryProof)
+        throw new Error(`Interrupted ownership changed: ${d.name}`);
       this.recover(d);
       const night = d.night.match(/(?:Night mode: )?(yes|no|auto|custom)/i)?.[1];
       if (!night) throw new Error(`Unknown night setting: ${d.night}`);
@@ -176,15 +196,17 @@ export class Devices {
         this.shell(d, "wm density").trim() !== d.density
       )
         throw new Error("Reset verification failed");
-    }
   }
   shutdown() {
-    for (const d of this.owned) {
-      if (!this.current(d)) continue;
+    for (const d of this.owned) this.shutdownDevice(d);
+  }
+  shutdownDevice(d) {
+      if (d.recoveryProof && this.processIdentityOrNull(d.name) !== d.recoveryProof)
+        throw new Error(`Interrupted ownership changed: ${d.name}`);
+      if (!this.current(d)) return;
       this.assert(d);
       command(this.bins.android, ["emulator", "stop", d.name], { timeout: 90000 });
       if (this.list().some((x) => x.serial === d.serial))
         throw new Error(`Owned emulator did not shut down: ${d.name}`);
-    }
   }
 }
