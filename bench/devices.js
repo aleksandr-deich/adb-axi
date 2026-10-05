@@ -63,8 +63,7 @@ export class Devices {
     }
   }
   emulatorPid(d) {
-    if (!this.owned.includes(d) || !this.current(d))
-      throw new Error("Unowned or offline emulator");
+    if (!this.owned.includes(d) || !this.current(d)) throw new Error("Unowned or offline emulator");
     return emulatorPid(command("/bin/ps", ["-axo", "pid=,command="]), d.name);
   }
   assert(d) {

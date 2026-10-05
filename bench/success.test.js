@@ -187,8 +187,14 @@ test("unavailable observation is tool-neutral and report must match evidence", (
 });
 test("targeted wait boot timeouts count as unavailable observations in JSON and TOON", () => {
   for (const target of ["phone", "emulator-5554"]) {
-    for (const [state, report] of [["not attached", "missing"], ["offline", "offline"]]) {
-      for (const [flag, suffix] of [["--device", "--json"], ["-s", ""]]) {
+    for (const [state, report] of [
+      ["not attached", "missing"],
+      ["offline", "offline"],
+    ]) {
+      for (const [flag, suffix] of [
+        ["--device", "--json"],
+        ["-s", ""],
+      ]) {
         const result = suffix
           ? JSON.stringify({ error: `wait boot ${target} timed out`, last: { state } })
           : `error: "wait boot ${target} timed out"\nlast:\n  state: "${state}"\n`;

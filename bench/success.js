@@ -249,7 +249,7 @@ export function checkTask(id, { devices, finalAnswer, audit }) {
   } else if (id === "6") {
     const holders =
       typeof answer.holder === "string"
-        ? answer.holder.match(/\b(?:[a-z][\w]*\.)+[a-z][\w]*(?:\/[\w.$]+)?/g) ?? []
+        ? (answer.holder.match(/\b(?:[a-z][\w]*\.)+[a-z][\w]*(?:\/[\w.$]+)?/g) ?? [])
         : [];
     checks.holderReport =
       holders.length > 0 &&
@@ -319,13 +319,14 @@ export function checkTask(id, { devices, finalAnswer, audit }) {
     const states = calls
       .map((call) => ({ call, state: deviceState(call, stoppedSerial, phone.name) }))
       .filter(({ state }) => state !== null);
-    const observations = states.filter(({ call, state }) =>
-      state !== "online" &&
-      (stops.some((s) =>
-        s.time < call.time && restarts.some((r) => r.time > call.time && r.time > s.time),
-      ) ||
-        (states.some((s) => s.state === "online" && s.call.time < call.time) &&
-          states.some((s) => s.state === "online" && s.call.time > call.time))),
+    const observations = states.filter(
+      ({ call, state }) =>
+        state !== "online" &&
+        (stops.some(
+          (s) => s.time < call.time && restarts.some((r) => r.time > call.time && r.time > s.time),
+        ) ||
+          (states.some((s) => s.state === "online" && s.call.time < call.time) &&
+            states.some((s) => s.state === "online" && s.call.time > call.time))),
     );
     checks.stopped = observations.length > 0;
     checks.observed = observations.length > 0;
