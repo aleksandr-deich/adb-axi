@@ -46,7 +46,28 @@ export class Devices {
       command(this.bins.adb, ["-s", serial, "shell", "getprop ro.boot.qemu.avd_name"]).trim()
     );
   }
-  boot() {
+  boot(interrupted = null) {
+    if (interrupted) {
+      for (const name of this.names) {
+        const saved = interrupted.owned.find((d) => d.name === name);
+        const matches = this.list().filter(
+          (d) =>
+            d.state === "device" && /^emulator-\d+$/.test(d.serial) && this.name(d.serial) === name,
+        );
+        if (matches.length > 1) throw new Error(`Ambiguous owned AVD: ${name}`);
+        if (matches.length || saved) {
+          const d = { ...saved, ...matches[0], name };
+          this.owned.push(d);
+          this.recover(d);
+          d.night ??= this.shell(d, "cmd uimode night").trim();
+          d.density ??= this.shell(d, "wm density").trim();
+        }
+      }
+      // Stop only recovered, identity-verified AVDs before the normal cold boot.
+      this.reset();
+      this.shutdown();
+      this.owned = [];
+    }
     // Refuse an AVD already running, even if it has not registered with the server yet.
     const processes = command("/bin/ps", ["-axo", "command"]);
     for (const name of this.names)

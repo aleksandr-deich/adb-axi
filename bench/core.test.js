@@ -7,6 +7,11 @@ import os from "node:os";
 import path from "node:path";
 import {
   aggregate,
+  acquireLock,
+  assertConsistency,
+  manifestHashes,
+  readRecords,
+  resumePlan,
   parseTask,
   plan,
   root,
@@ -16,7 +21,7 @@ import {
   writeRecord,
 } from "./core.js";
 import { parsePi, runPi } from "./pi.js";
-import { checkTask } from "./success.js";
+import { checkTask, setupTask } from "./success.js";
 import { Devices, emulatorPid } from "./devices.js";
 import { environment } from "./run.js";
 import task8Reference from "./reference/8.js";
@@ -51,12 +56,263 @@ test("dry-run guard, explicit spend authorization and hard cap", () => {
   assert.throws(() => plan(["--run", "--tasks", "1", "--version", "0.1.2"]));
   assert.throws(() => plan(["--tasks", "9"]));
   assert.throws(() => plan(["--repeats", "0"]));
-  assert.throws(() => plan(["--repeats", "5", "--max-runs", "79"]));
+  assert.throws(() => resumePlan(plan(["--repeats", "5", "--max-runs", "79"]), []));
   assert.throws(() => plan(["--phone", "small_phone"]));
   assert.throws(() => plan(["--phone", "SMALL_PHONE"]));
   assert.throws(() => plan(["--tablet", "pixel_10_pro_xl_sasha"]));
   assert.throws(() => plan(["--tablet", "Pixel_10_Pro_XL_Sasha"]));
   assert.equal(plan(["--run", "--tasks", "1", "--repeats", "1", "--version", "0.1.2"]).runs, 2);
+});
+test("resume skips both verdicts, reruns harness failures, preserves order and repeat numbers", () => {
+  const options = plan(["--tasks", "1", "--repeats", "3", "--max-runs", "4"]);
+  const records = [
+    { task: "1", condition: "baseline", repeat: 1, success: true, verdictProduced: true },
+    { task: "1", condition: "adb-axi", repeat: 2, success: false, verdictProduced: true },
+    { task: "1", condition: "baseline", repeat: 3, success: false, error: "setup failed" },
+  ];
+  const p = resumePlan(options, records);
+  assert.equal(p.skippedCount, 2);
+  assert.deepEqual(
+    p.toRun.map((r) => [r.condition, r.repeat]),
+    [
+      ["adb-axi", 1],
+      ["baseline", 2],
+      ["baseline", 3],
+      ["adb-axi", 3],
+    ],
+  );
+  assert.throws(() => resumePlan({ ...options, maxRuns: 3 }, records), /4 exceeds/);
+  assert.equal(p.groups[0].failedWithoutVerdict, 1);
+  assert.equal(p.groups[0].remaining, 2);
+  assert.equal(p.totalRemaining, 4);
+});
+test("consistency rejects every mismatching or absent experiment field", () => {
+  const current = {
+    model: "model",
+    effort: "medium",
+    agentVersion: "1",
+    adbAxiVersion: "0.1.2",
+    benchmarkRevision: "revision",
+    skillManifestHashes: manifestHashes(),
+  };
+  assertConsistency([{ ...current, id: "one" }], current);
+  for (const field of Object.keys(current)) {
+    assert.throws(
+      () => assertConsistency([{ ...current, [field]: "changed", id: "one" }], current),
+      new RegExp(field),
+    );
+    assert.throws(
+      () => assertConsistency([{ ...current, [field]: undefined, id: "one" }], current),
+      new RegExp(field),
+    );
+  }
+});
+test("spending refuses mixed experiments before any device dependency lookup", () =>
+  temporary((dir) => {
+    const bins = path.join(dir, "bin");
+    fs.mkdirSync(bins);
+    fs.writeFileSync(path.join(bins, "pi"), "#!/bin/sh\necho fake-version\n", { mode: 0o755 });
+    const git = spawnSync("/bin/sh", ["-c", "command -v git"], { encoding: "utf8" }).stdout.trim();
+    fs.symlinkSync(git, path.join(bins, "git"));
+    const revision = spawnSync(git, ["rev-parse", "HEAD"], {
+      cwd: root,
+      encoding: "utf8",
+    }).stdout.trim();
+    const current = {
+      model: "openai-codex/gpt-6.1-sol",
+      effort: "medium",
+      agentVersion: "fake-version",
+      adbAxiVersion: "0.1.2",
+      benchmarkRevision: revision,
+      skillManifestHashes: manifestHashes(),
+    };
+    for (const field of Object.keys(current)) {
+      const results = path.join(dir, field);
+      writeRecord(results, {
+        ...current,
+        [field]: "different",
+        id: "one",
+        task: "1",
+        condition: "baseline",
+        repeat: 1,
+        success: true,
+        verdictProduced: true,
+      });
+      const r = spawnSync(
+        process.execPath,
+        [
+          path.join(root, "bench/run.js"),
+          "--run",
+          "--tasks",
+          "1",
+          "--repeats",
+          "1",
+          "--version",
+          "0.1.2",
+          "--results-dir",
+          results,
+        ],
+        { env: { PATH: bins }, encoding: "utf8" },
+      );
+      assert.equal(r.status, 1);
+      assert.match(r.stderr, new RegExp(`Inconsistent experiment:[\\s\\S]*${field}`));
+      assert.doesNotMatch(r.stderr, /command -v adb/);
+    }
+  }));
+test("status and summary read external results without side effects or tools", () =>
+  temporary((dir) => {
+    writeRecord(dir, {
+      id: "done",
+      task: "1",
+      condition: "baseline",
+      repeat: 1,
+      success: false,
+      verdictProduced: true,
+    });
+    writeRecord(dir, { id: "retry", task: "1", condition: "adb-axi", repeat: 1, success: null });
+    fs.writeFileSync(path.join(dir, "ignored.invocation.json"), "{}");
+    fs.writeFileSync(path.join(dir, "unfinished.json.tmp"), "{");
+    const invoke = (args) =>
+      spawnSync(
+        process.execPath,
+        [path.join(root, "bench/run.js"), ...args, "--results-dir", dir],
+        { env: { PATH: "" }, encoding: "utf8" },
+      );
+    const before = fs.readdirSync(dir);
+    const status = invoke(["status", "--tasks", "1", "--repeats", "2"]);
+    assert.equal(status.status, 0, status.stderr);
+    assert.deepEqual(JSON.parse(status.stdout), {
+      groups: [
+        { task: "1", condition: "baseline", done: 1, failedWithoutVerdict: 0, remaining: 1 },
+        { task: "1", condition: "adb-axi", done: 0, failedWithoutVerdict: 1, remaining: 2 },
+      ],
+      totalRemaining: 3,
+    });
+    const summary = invoke(["summary"]);
+    assert.equal(summary.status, 0, summary.stderr);
+    assert.equal(JSON.parse(summary.stdout).length, 2);
+    const dry = invoke(["--tasks", "1", "--repeats", "1", "--max-runs", "1"]);
+    assert.equal(dry.status, 0, dry.stderr);
+    assert.equal(JSON.parse(dry.stdout).toRunCount, 1);
+    assert.deepEqual(fs.readdirSync(dir), before);
+    const absent = path.join(dir, "absent");
+    assert.equal(
+      spawnSync(
+        process.execPath,
+        [
+          path.join(root, "bench/run.js"),
+          "status",
+          "--tasks",
+          "1",
+          "--repeats",
+          "1",
+          "--results-dir",
+          absent,
+        ],
+        { encoding: "utf8" },
+      ).status,
+      0,
+    );
+    assert.equal(fs.existsSync(absent), false);
+    assert.throws(() => plan(["--results-dir", path.join(dir, "done.json")]), /not a directory/);
+  }));
+test("atomic records publish only on rename and clean failed temporary writes", () =>
+  temporary((dir) => {
+    const rename = fs.renameSync;
+    fs.renameSync = (source, destination) => {
+      assert.equal(readRecords(dir).length, 0);
+      assert.deepEqual(JSON.parse(fs.readFileSync(source)), { id: "one" });
+      assert.equal(fs.existsSync(destination), false);
+      throw new Error("interrupted rename");
+    };
+    try {
+      assert.throws(() => writeRecord(dir, { id: "one" }), /interrupted rename/);
+    } finally {
+      fs.renameSync = rename;
+    }
+    assert.deepEqual(fs.readdirSync(dir), []);
+  }));
+test("active lock refuses overlap and stale ownership authorizes targeted recovery", () =>
+  temporary((dir) => {
+    const lock = path.join(dir, "lock");
+    const acquired = acquireLock(lock, ["phone"]);
+    acquired.save([{ name: "phone", serial: "emulator-5554" }]);
+    assert.throws(() => acquireLock(lock, ["phone"]), /still active/);
+    const kill = process.kill;
+    process.kill = () => {
+      const error = new Error("dead");
+      error.code = "ESRCH";
+      throw error;
+    };
+    try {
+      assert.throws(() => acquireLock(lock, ["tablet"]), /different AVDs/);
+      assert.equal(acquireLock(lock, ["phone"]).previous.owned[0].name, "phone");
+    } finally {
+      process.kill = kill;
+    }
+  }));
+test("interrupted owned emulators are reset and stopped before normal boot", () => {
+  const d = new Devices({}, ["phone"]);
+  const events = [];
+  d.list = () => [{ serial: "emulator-5554", state: "device" }];
+  d.name = () => "phone";
+  d.recover = () => events.push("recover");
+  d.reset = () => events.push("reset");
+  d.shutdown = () => {
+    events.push("shutdown");
+    throw new Error("stop before actual boot");
+  };
+  assert.throws(
+    () =>
+      d.boot({
+        owned: [{ name: "phone", night: "Night mode: no", density: "Physical density: 420" }],
+      }),
+    /stop before actual boot/,
+  );
+  assert.deepEqual(events, ["recover", "reset", "shutdown"]);
+});
+test("reset-before-run restores interrupted app, UI holder and settings without device commands", () => {
+  const d = new Devices({}, ["phone"]);
+  const phone = {
+    name: "phone",
+    serial: "emulator-5554",
+    night: "Night mode: no",
+    density: "Physical density: 420\nOverride density: 440",
+  };
+  d.owned.push(phone);
+  let night = "Night mode: yes",
+    density = "Physical density: 420\nOverride density: 600",
+    installed = true,
+    holder = "123",
+    logs = "dirty",
+    recoveries = 0;
+  d.recover = () => {
+    recoveries++;
+  };
+  d.shell = (device, text) => {
+    assert.equal(device, phone);
+    if (text === "cmd uimode night no") night = phone.night;
+    if (text === "wm density 440") density = phone.density;
+    if (text === "am force-stop com.android.cli.interact.instrumentation") holder = "";
+    if (text === "cmd uimode night") return night;
+    if (text === "wm density") return density;
+    if (text.startsWith("pm path")) return installed ? "package:/probe.apk" : "";
+    if (text.startsWith("pidof")) return holder;
+    return "";
+  };
+  d.adb = (device, args) => {
+    assert.equal(device, phone);
+    if (args[0] === "uninstall") installed = false;
+    if (args[0] === "logcat") logs = "";
+    return "";
+  };
+  setupTask(tasks()[0], d);
+  assert.equal(recoveries, 1);
+  assert.equal(night, phone.night);
+  assert.equal(density, phone.density);
+  assert.equal(installed, false);
+  assert.equal(holder, "");
+  assert.equal(logs, "");
 });
 test("records are exclusive, aggregation counts failures and missing metrics", () =>
   temporary((dir) => {
