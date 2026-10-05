@@ -586,9 +586,34 @@ test("host emulator PID lookup requires one real executable for the exact AVD", 
   ].join("\n");
   assert.equal(emulatorPid(processes, "phone"), "202");
   assert.throws(() => emulatorPid(processes, "other"), /Cannot identify/);
+  assert.equal(emulatorPid(processes + "\n505 /sdk/emulator/emulator -avd phone", "phone"), "202");
   assert.throws(
-    () => emulatorPid(processes + "\n505 /sdk/emulator/emulator -avd phone", "phone"),
-    /Cannot identify/,
+    () => emulatorPid(processes + "\n606 /sdk/qemu-system-aarch64 -avd phone", "phone"),
+    /candidates:.*202.*606/,
+  );
+  // Actual Android CLI process shape from the owned phone on macOS.
+  assert.equal(
+    emulatorPid(
+      "74733 /Users/alexanderdeych/Library/Android/sdk/emulator/qemu/darwin-aarch64/qemu-system-aarch64-headless @Pixel_10_Pro_XL -no-snapshot-load -no-window",
+      "Pixel_10_Pro_XL",
+    ),
+    "74733",
+  );
+  assert.throws(
+    () =>
+      emulatorPid(
+        "74733 /sdk/qemu-system-aarch64-headless @Pixel_10_Pro_XL_Sasha",
+        "Pixel_10_Pro_XL",
+      ),
+    /candidates: none/,
+  );
+  assert.throws(
+    () =>
+      emulatorPid(
+        "74733 /sdk/qemu-system-aarch64-headless @Pixel_10_Pro_XL_backup",
+        "Pixel_10_Pro_XL",
+      ),
+    /candidates: none/,
   );
 });
 test("task 8 reference confirms boot on the restarted AVD's new serial", () => {

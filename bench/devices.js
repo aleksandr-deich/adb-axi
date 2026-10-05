@@ -3,14 +3,24 @@ import { command } from "./core.js";
 
 export function emulatorPid(processes, name) {
   const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const avd = new RegExp(`(?:^|\\s)-avd\\s+${escaped}(?=\\s|$)`);
-  const matches = processes.split("\n").flatMap((line) => {
+  const avd = new RegExp(`(?:^|\\s)(?:-avd\\s+|@)${escaped}(?=\\s|$)`);
+  const candidates = processes.split("\n").flatMap((line) => {
     const match = line.match(/^\s*([1-9]\d*)\s+(\S+)\s*(.*)$/);
-    if (!match || !/^(?:emulator|qemu-system-[\w.-]+)$/.test(match[2].split("/").at(-1))) return [];
-    return avd.test(`${match[2]} ${match[3]}`) ? [match[1]] : [];
+    if (!match) return [];
+    const executable = match[2].split("/").at(-1);
+    if (!/^(?:emulator|qemu-system-[\w.-]+)$/.test(executable)) return [];
+    if (!avd.test(match[3])) return [];
+    return [{ pid: match[1], qemu: executable.startsWith("qemu-system-"), command: line.trim() }];
   });
-  if (matches.length !== 1) throw new Error(`Cannot identify one emulator process for ${name}`);
-  return matches[0];
+  // The launcher may remain beside its VM child. The VM process, not the
+  // launcher, is the identity that survives an Android reboot.
+  const qemu = candidates.filter((candidate) => candidate.qemu);
+  const matches = qemu.length ? qemu : candidates;
+  if (matches.length !== 1)
+    throw new Error(
+      `Cannot identify one emulator process for ${name}; candidates: ${candidates.map((c) => c.command).join("; ") || "none"}`,
+    );
+  return matches[0].pid;
 }
 export class Devices {
   constructor(bins, names) {
