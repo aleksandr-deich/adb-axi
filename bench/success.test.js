@@ -158,6 +158,37 @@ test("unavailable observation is tool-neutral and report must match evidence", (
     }
   }
 });
+test("targeted wait boot timeouts count as unavailable observations in JSON and TOON", () => {
+  for (const target of ["phone", "emulator-5554"]) {
+    for (const [state, report] of [["not attached", "missing"], ["offline", "offline"]]) {
+      for (const [flag, suffix] of [["--device", "--json"], ["-s", ""]]) {
+        const result = suffix
+          ? JSON.stringify({ error: `wait boot ${target} timed out`, last: { state } })
+          : `error: "wait boot ${target} timed out"\nlast:\n  state: "${state}"\n`;
+        const call = {
+          time: 2,
+          tool: "adb-axi",
+          args: ["wait", "boot", flag, target, "--timeout", "500ms", ...(suffix ? [suffix] : [])],
+          status: 1,
+          stdout: result,
+        };
+        const answer = JSON.stringify({ unavailableState: report, recovered: true });
+        assert.equal(score(base, [stop, call, restart], answer).success, true);
+        assert.equal(score(base, [stop, call, restart], JSON.stringify({ unavailableState: report === "missing" ? "offline" : "missing", recovered: true })).success, false);
+        for (const invalid of [
+          { ...call, args: ["wait", "boot", flag, "tablet", "--timeout", "500ms"] },
+          { ...call, stdout: result.replace(target, "tablet") },
+          { ...call, stdout: result.replace(/timed out/, "waiting") },
+          { ...call, args: ["wait", "boot", "--timeout", "500ms"] },
+        ])
+          assert.equal(score(base, [stop, invalid, restart], answer).success, false);
+      }
+    }
+  }
+  const toon = { time: 2, tool: "adb-axi", args: ["wait", "boot", "--device=phone"], status: 1,
+    stderr: 'error: "wait boot phone timed out"\nlast.state: "not attached"\n' };
+  assert.equal(score(base, [stop, toon, restart]).success, true);
+});
 test("visible missing listing and raw offline output demand their respective reports", () => {
   const listing = { time: 2, tool: "adb", args: ["devices", "-l"], status: 0, stdout: "List of devices attached\n" };
   const offline = { ...listing, stdout: "List of devices attached\nemulator-5554 offline\n" };

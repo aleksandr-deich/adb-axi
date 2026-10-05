@@ -50,6 +50,49 @@ export function deviceState(call, serial, name) {
       if (row[1] === "offline") return "offline";
     }
   }
+  const args = call.args ?? [];
+  const waitIndex = args.findIndex((arg, index) => arg === "wait" && args[index + 1] === "boot");
+  const target = args.flatMap((arg, index) =>
+    ["--device", "-s"].includes(arg)
+      ? [args[index + 1]]
+      : arg.startsWith("--device=")
+        ? [arg.slice(9)]
+        : [],
+  );
+  if (
+    call.status !== 0 &&
+    waitIndex >= 0 &&
+    target.length === 1 &&
+    (target[0] === serial || target[0] === name)
+  ) {
+    for (const result of [stdout, call.stderr ?? ""]) {
+      let error;
+      let state;
+      try {
+        const value = JSON.parse(result);
+        error = typeof value.error === "string" ? value.error : value.error?.message;
+        state = value.last?.state;
+      } catch {
+        error = result.match(/^error:\s*"?([^\n"]+)/m)?.[1];
+        state = result.match(/^last\.state:\s*"?(not attached|offline)\b/m)?.[1] ??
+          result.match(/^last:\s*\n\s+state:\s*"?(not attached|offline)\b/m)?.[1];
+      }
+      if (
+        typeof error === "string" &&
+        /timed out|timeout|deadline/i.test(error) &&
+        (error.includes(serial) || error.includes(name)) &&
+        ["not attached", "offline"].includes(state)
+      )
+        return state === "offline" ? "offline" : "missing";
+    }
+  }
+  if (
+    waitIndex >= 0 &&
+    (target.length !== 1 ||
+      (target[0] !== serial && target[0] !== name) ||
+      /"last"\s*:|^last(?:\.state)?:/m.test(text))
+  )
+    return null;
   // Require identity and state in the same output line. A generic timeout or
   // a command's usage examples cannot establish the target's unavailable state.
   for (const line of text.split("\n")) {
