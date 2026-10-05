@@ -39,6 +39,7 @@ export function plan(argv) {
     phone: "Pixel_10_Pro_XL",
     tablet: "medium_tablet",
     conditions: ["baseline", "adb-axi"],
+    resultsDir: path.join(root, "bench/results"),
   };
   const seen = new Set();
   for (let i = 0; i < argv.length; i++) {
@@ -56,6 +57,7 @@ export function plan(argv) {
       version: "version",
       phone: "phone",
       tablet: "tablet",
+      "results-dir": "resultsDir",
     };
     if (!keys[key] || !argv[i + 1]) throw new Error(`Unknown or incomplete option: ${argv[i]}`);
     const value = argv[++i];
@@ -89,7 +91,9 @@ export function plan(argv) {
   )
     throw new Error("Unsafe AVD selection");
   opts.runs = opts.tasks.length * opts.conditions.length * opts.repeats;
-  if (opts.runs > opts.maxRuns) throw new Error(`${opts.runs} exceeds --max-runs ${opts.maxRuns}`);
+  opts.resultsDir = path.resolve(opts.resultsDir);
+  if (fs.existsSync(opts.resultsDir) && !fs.statSync(opts.resultsDir).isDirectory())
+    throw new Error(`Results path is not a directory: ${opts.resultsDir}`);
   return opts;
 }
 export function command(bin, args, options = {}) {
@@ -154,17 +158,138 @@ export function skillEvidence(directory, condition) {
 export function writeRecord(dir, record) {
   fs.mkdirSync(dir, { recursive: true });
   const file = path.join(dir, `${record.id}.json`);
-  fs.writeFileSync(file, JSON.stringify(record, null, 2) + "\n", { flag: "wx" });
+  if (fs.existsSync(file)) throw new Error(`Record already exists: ${file}`);
+  const temporary = `${file}.${crypto.randomUUID()}.tmp`;
+  try {
+    const fd = fs.openSync(temporary, "wx");
+    try {
+      fs.writeFileSync(fd, JSON.stringify(record, null, 2) + "\n");
+      fs.fsyncSync(fd);
+    } finally {
+      fs.closeSync(fd);
+    }
+    fs.renameSync(temporary, file);
+    const directory = fs.openSync(dir, "r");
+    try {
+      fs.fsyncSync(directory);
+    } finally {
+      fs.closeSync(directory);
+    }
+  } finally {
+    fs.rmSync(temporary, { force: true });
+  }
   return file;
+}
+export function acquireLock(lock) {
+  try {
+    fs.mkdirSync(lock);
+  } catch (error) {
+    if (error.code !== "EEXIST") throw error;
+    throw new Error(
+      `Benchmark lock exists: ${lock}. Confirm no benchmark is running before removing it manually.`,
+      { cause: error },
+    );
+  }
+}
+export function readRecords(dir) {
+  if (!fs.existsSync(dir)) return [];
+  if (!fs.statSync(dir).isDirectory()) throw new Error(`Results path is not a directory: ${dir}`);
+  return fs
+    .readdirSync(dir)
+    .filter((f) => f.endsWith(".json") && !f.endsWith(".invocation.json"))
+    .map((f) => JSON.parse(fs.readFileSync(path.join(dir, f), "utf8")));
+}
+export function complete(record) {
+  return typeof record.success === "boolean" && record.verdictProduced === true;
+}
+export function resumePlan(options, records, enforceCap = true) {
+  const skipped = [],
+    toRun = [],
+    groups = [];
+  for (const task of tasks().filter((t) => options.tasks.includes(t.id))) {
+    for (const condition of options.conditions) {
+      const group = { task: task.id, condition, done: 0, failedWithoutVerdict: 0, remaining: 0 };
+      for (let repeat = 1; repeat <= options.repeats; repeat++) {
+        const matching = records.filter(
+          (r) => r.task === task.id && r.condition === condition && r.repeat === repeat,
+        );
+        if (matching.some(complete)) group.done++;
+        else {
+          group.remaining++;
+          if (matching.length) group.failedWithoutVerdict++;
+        }
+      }
+      groups.push(group);
+    }
+    for (let repeat = 1; repeat <= options.repeats; repeat++)
+      for (const condition of options.conditions) {
+        const run = { task: task.id, condition, repeat };
+        (records.some(
+          (r) =>
+            r.task === run.task && r.condition === condition && r.repeat === repeat && complete(r),
+        )
+          ? skipped
+          : toRun
+        ).push(run);
+      }
+  }
+  if (enforceCap && toRun.length > options.maxRuns)
+    throw new Error(`${toRun.length} exceeds --max-runs ${options.maxRuns}`);
+  return {
+    skipped,
+    toRun,
+    skippedCount: skipped.length,
+    toRunCount: toRun.length,
+    groups,
+    totalRemaining: toRun.length,
+  };
+}
+export function manifestHashes() {
+  const hashes = {};
+  for (const condition of ["baseline", "adb-axi"]) {
+    const manifest = fs.readFileSync(path.join(root, `bench/conditions/${condition}.json`));
+    const hash = crypto.createHash("sha256").update(manifest);
+    const visit = (dir, prefix) => {
+      for (const entry of fs
+        .readdirSync(dir, { withFileTypes: true })
+        .sort((a, b) => a.name.localeCompare(b.name))) {
+        const relative = `${prefix}/${entry.name}`;
+        if (entry.isDirectory()) visit(path.join(dir, entry.name), relative);
+        else hash.update(relative).update(fs.readFileSync(path.join(dir, entry.name)));
+      }
+    };
+    for (const source of JSON.parse(manifest).skills) visit(path.join(root, source), source);
+    hashes[condition] = hash.digest("hex");
+  }
+  return hashes;
+}
+export function assertConsistency(records, current) {
+  const mismatches = [];
+  for (const record of records)
+    for (const field of [
+      "model",
+      "effort",
+      "agentVersion",
+      "adbAxiVersion",
+      "benchmarkRevision",
+      "skillManifestHashes",
+    ])
+      if (JSON.stringify(record[field]) !== JSON.stringify(current[field]))
+        mismatches.push(
+          `${record.id}: ${field}: recorded ${JSON.stringify(record[field])}, current ${JSON.stringify(current[field])}`,
+        );
+  if (mismatches.length) throw new Error(`Inconsistent experiment:\n${mismatches.join("\n")}`);
 }
 export function aggregate(records) {
   const groups = new Map();
+  const completed = new Set();
   for (const r of records) {
     const key = `${r.task}/${r.condition}`;
     const g = groups.get(key) ?? {
       task: r.task,
       condition: r.condition,
       runs: 0,
+      failedAttempts: 0,
       successes: 0,
       inputTokens: 0,
       cost: 0,
@@ -172,6 +297,14 @@ export function aggregate(records) {
       wallTimeMs: 0,
       missingMetrics: 0,
     };
+    if (!complete(r)) {
+      g.failedAttempts++;
+      groups.set(key, g);
+      continue;
+    }
+    const slot = `${key}/${r.repeat}`;
+    if (completed.has(slot)) continue;
+    completed.add(slot);
     g.runs++;
     g.successes += Number(r.success === true);
     for (const k of ["inputTokens", "cost", "turns", "wallTimeMs"])
@@ -179,5 +312,8 @@ export function aggregate(records) {
       else g.missingMetrics++;
     groups.set(key, g);
   }
-  return [...groups.values()].map((g) => ({ ...g, successRate: g.successes / g.runs }));
+  return [...groups.values()].map((g) => ({
+    ...g,
+    successRate: g.runs ? g.successes / g.runs : null,
+  }));
 }

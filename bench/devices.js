@@ -48,10 +48,18 @@ export class Devices {
   }
   boot() {
     // Refuse an AVD already running, even if it has not registered with the server yet.
-    const processes = command("/bin/ps", ["-axo", "command"]);
-    for (const name of this.names)
-      if (new RegExp(`-avd ${name.replaceAll(".", "\\.")}(?:\\s|$)`).test(processes))
-        throw new Error(`AVD already in use: ${name}`);
+    const processes = command("/bin/ps", ["-axo", "pid=,command="]);
+    for (const name of this.names) {
+      try {
+        emulatorPid(processes, name);
+      } catch (error) {
+        if (/candidates: none/.test(error.message)) continue;
+        throw error;
+      }
+      throw new Error(
+        `AVD already in use: ${name}; inspect and stop it before restarting the benchmark`,
+      );
+    }
     for (const name of this.names) {
       const before = new Set(this.list().map((d) => d.serial));
       command(this.bins.android, ["emulator", "start", "--headless", "--cold", name], {
@@ -137,33 +145,35 @@ export class Devices {
     this.ready(d);
   }
   reset() {
-    for (const d of this.owned) {
-      this.recover(d);
-      const night = d.night.match(/(?:Night mode: )?(yes|no|auto|custom)/i)?.[1];
-      if (!night) throw new Error(`Unknown night setting: ${d.night}`);
-      this.shell(d, `cmd uimode night ${night.toLowerCase()}`);
-      const density = d.density.match(/Override density: (\d+)/)?.[1] ?? "reset";
-      this.shell(d, `wm density ${density}`);
-      this.shell(d, "am force-stop com.android.cli.interact.instrumentation");
-      if (this.shell(d, "pm path dev.probe || true").includes("package:"))
-        this.adb(d, ["uninstall", "dev.probe"]);
-      this.adb(d, ["logcat", "-c"]);
-      if (
-        this.shell(d, "pm path dev.probe || true").includes("package:") ||
-        this.shell(d, "pidof com.android.cli.interact.instrumentation || true").trim() ||
-        this.shell(d, "cmd uimode night").trim() !== d.night ||
-        this.shell(d, "wm density").trim() !== d.density
-      )
-        throw new Error("Reset verification failed");
-    }
+    for (const d of this.owned) this.resetDevice(d);
+  }
+  resetDevice(d) {
+    this.recover(d);
+    const night = d.night.match(/(?:Night mode: )?(yes|no|auto|custom)/i)?.[1];
+    if (!night) throw new Error(`Unknown night setting: ${d.night}`);
+    this.shell(d, `cmd uimode night ${night.toLowerCase()}`);
+    const density = d.density.match(/Override density: (\d+)/)?.[1] ?? "reset";
+    this.shell(d, `wm density ${density}`);
+    this.shell(d, "am force-stop com.android.cli.interact.instrumentation");
+    if (this.shell(d, "pm path dev.probe || true").includes("package:"))
+      this.adb(d, ["uninstall", "dev.probe"]);
+    this.adb(d, ["logcat", "-c"]);
+    if (
+      this.shell(d, "pm path dev.probe || true").includes("package:") ||
+      this.shell(d, "pidof com.android.cli.interact.instrumentation || true").trim() ||
+      this.shell(d, "cmd uimode night").trim() !== d.night ||
+      this.shell(d, "wm density").trim() !== d.density
+    )
+      throw new Error("Reset verification failed");
   }
   shutdown() {
-    for (const d of this.owned) {
-      if (!this.current(d)) continue;
-      this.assert(d);
-      command(this.bins.android, ["emulator", "stop", d.name], { timeout: 90000 });
-      if (this.list().some((x) => x.serial === d.serial))
-        throw new Error(`Owned emulator did not shut down: ${d.name}`);
-    }
+    for (const d of this.owned) this.shutdownDevice(d);
+  }
+  shutdownDevice(d) {
+    if (!this.current(d)) return;
+    this.assert(d);
+    command(this.bins.android, ["emulator", "stop", d.name], { timeout: 90000 });
+    if (this.list().some((x) => x.serial === d.serial))
+      throw new Error(`Owned emulator did not shut down: ${d.name}`);
   }
 }

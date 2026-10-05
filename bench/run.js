@@ -7,6 +7,11 @@ import crypto from "node:crypto";
 import { pathToFileURL } from "node:url";
 import {
   aggregate,
+  acquireLock,
+  assertConsistency,
+  manifestHashes,
+  readRecords,
+  resumePlan,
   command,
   model,
   plan,
@@ -19,7 +24,6 @@ import {
 import { Devices } from "./devices.js";
 import { runPi } from "./pi.js";
 import { setupTask } from "./success.js";
-const results = path.join(root, "bench/results");
 const quote = (x) => `'${x.replaceAll("'", "'\\''")}'`;
 function find(tool) {
   return command("/bin/sh", ["-c", `command -v ${tool}`]).trim();
@@ -116,21 +120,37 @@ async function main() {
     await selfCheck(plan(argv.slice(1)));
     return;
   }
-  if (argv[0] === "summary") {
-    const records = fs.existsSync(results)
-      ? fs
-          .readdirSync(results)
-          .filter((f) => f.endsWith(".json") && !f.endsWith(".invocation.json"))
-          .map((f) => JSON.parse(fs.readFileSync(path.join(results, f), "utf8")))
-      : [];
-    console.log(JSON.stringify(aggregate(records), null, 2));
+  if (argv[0] === "summary" || argv[0] === "status") {
+    const allowed =
+      argv[0] === "summary" ? ["--results-dir"] : ["--tasks", "--repeats", "--results-dir"];
+    for (let i = 1; i < argv.length; i += 2)
+      if (!allowed.includes(argv[i]) || !argv[i + 1])
+        throw new Error(`Invalid ${argv[0]} option: ${argv[i]}`);
+    if (argv[0] === "status" && (!argv.includes("--tasks") || !argv.includes("--repeats")))
+      throw new Error("status requires --tasks and --repeats");
+    const options = plan(argv.slice(1));
+    const records = readRecords(options.resultsDir);
+    const progress = resumePlan(options, records, false);
+    console.log(
+      JSON.stringify(
+        argv[0] === "summary"
+          ? aggregate(records)
+          : { groups: progress.groups, totalRemaining: progress.totalRemaining },
+        null,
+        2,
+      ),
+    );
     return;
   }
   const options = plan(argv);
+  const results = options.resultsDir;
+  const records = readRecords(results);
+  const progress = resumePlan(options, records);
   console.log(
     JSON.stringify(
       {
         ...options,
+        ...progress,
         model,
         effort: "medium",
         setup:
@@ -142,131 +162,154 @@ async function main() {
     ),
   );
   if (!options.run) return;
-  // A single host-wide lock prevents concurrent benchmark processes sharing AVDs.
-  const bins = Object.fromEntries(["adb", "android", "pi", "node", "npx"].map((t) => [t, find(t)]));
+  const agentVersion = command(find("pi"), ["--version"]).trim();
+  const benchmarkRevision = command("git", ["rev-parse", "HEAD"], { cwd: root }).trim();
+  const identity = {
+    model,
+    effort: "medium",
+    agentVersion,
+    benchmarkRevision,
+    adbAxiVersion: options.version,
+    skillManifestHashes: manifestHashes(),
+  };
+  assertConsistency(records, identity);
+  fs.mkdirSync(results, { recursive: true });
   const lock = path.join(os.tmpdir(), "android-repeatable-benchmark.lock");
-  fs.mkdirSync(lock);
-  const devices = new Devices(bins, [options.phone, options.tablet]);
-  devices.androidLayout = (d) => command(bins.android, ["layout", `--device=${d.serial}`]);
-  const work = fs.mkdtempSync(path.join(os.tmpdir(), "android-benchmark-"));
+  acquireLock(lock);
+  let devices;
+  let work;
+  let bootIncomplete = false;
   try {
-    const agentVersion = command(bins.pi, ["--version"]).trim();
-    const benchmarkRevision = command("git", ["rev-parse", "HEAD"], { cwd: root }).trim();
+    const currentRecords = readRecords(results);
+    assertConsistency(currentRecords, identity);
+    const spending = resumePlan(options, currentRecords);
+    if (!spending.toRun.length) return;
+    const bins = Object.fromEntries(
+      ["adb", "android", "pi", "node", "npx"].map((t) => [t, find(t)]),
+    );
+    devices = new Devices(bins, [options.phone, options.tablet]);
+    devices.androidLayout = (d) => command(bins.android, ["layout", `--device=${d.serial}`]);
+    work = fs.mkdtempSync(path.join(os.tmpdir(), "android-benchmark-"));
+    bootIncomplete = true;
+    devices.boot();
+    bootIncomplete = false;
     const benchmarkDirty = !!command("git", ["status", "--porcelain"], { cwd: root }).trim();
     const toolVersions = {
       android: command(bins.android, ["-V"]).trim(),
       adb: command(bins.adb, ["version"]).trim(),
     };
-    devices.boot();
-    for (const task of tasks().filter((t) => options.tasks.includes(t.id)))
-      for (let repeat = 1; repeat <= options.repeats; repeat++)
-        for (const condition of options.conditions) {
-          const id = `${Date.now()}-${task.id}-${condition}-${repeat}-${crypto.randomUUID()}`;
-          const directory = path.join(work, id);
-          const record = {
-            id,
-            task: task.id,
-            condition,
-            repeat,
-            adbAxiVersion: options.version,
-            agent: "pi",
-            agentVersion,
-            benchmarkRevision,
-            benchmarkDirty,
-            taskDefinitionSha256: crypto
-              .createHash("sha256")
-              .update(JSON.stringify(task))
-              .digest("hex"),
-            toolVersions,
-            model,
-            effort: "medium",
-            success: false,
-            inputTokens: null,
-            cost: null,
-            turns: null,
-            wallTimeMs: null,
-            devices: devices.owned.map((d) => ({ name: d.name, serial: d.serial })),
-            startedAt: new Date().toISOString(),
-          };
-          try {
-            setupTask(task, devices);
-            const controlled = environment(
-              directory,
-              condition,
-              options.version,
-              bins,
-              record.devices,
-              task.id,
-            );
-            record.skills = controlled.skills;
-            record.pathEvidence = controlled.pathEvidence;
-            record.isolation = {
-              configDir: controlled.configDir,
-              noDiscovery: ["extensions", "skills", "context-files", "prompt-templates", "themes"],
-              skillSource: "isolated config plus explicit --skill paths",
-            };
-            for (const variant of ["debug", "release"])
-              fs.copyFileSync(
-                path.join(root, `test/fixtures/apk/probe-${variant}.apk`),
-                path.join(directory, `probe-${variant}.apk`),
-              );
-            const prompt = `Work only on the following benchmark-owned emulators: phone ${devices.owned[0].serial} (AVD ${options.phone}), tablet ${devices.owned[1].serial} (AVD ${options.tablet}). Never touch other emulators or physical devices, or restart the shared device server. The debug and release APKs are ./probe-debug.apk and ./probe-release.apk; package dev.probe. The UI action is the device shell activity launch: am start -n dev.probe/.MainActivity --es probe <inc|write|crash|anr>. Do not install additional tools or skills or change PATH. Always use an explicit serial for device operations.\n\n${task.prompt}`;
-            const started = Date.now();
-            try {
-              Object.assign(
-                record,
-                runPi({
-                  binary: bins.pi,
-                  env: controlled.env,
-                  cwd: directory,
-                  skills: controlled.skills,
-                  prompt,
-                  output: path.join(directory, "agent.jsonl"),
-                }),
-              );
-            } finally {
-              record.wallTimeMs = Date.now() - started;
-            }
-            const check = (await import(pathToFileURL(path.join(root, task.success)).href)).default;
-            Object.assign(
-              record,
-              check({ devices, finalAnswer: record.finalAnswer, audit: controlled.audit }),
-            );
-            if (record.agentError) record.success = false;
-          } catch (e) {
-            if (e.metrics) Object.assign(record, e.metrics);
-            record.error = String(e);
-          } finally {
-            fs.mkdirSync(results, { recursive: true });
-            for (const [source, field, suffix] of [
-              ["agent.jsonl", "agentOutput", "agent.jsonl"],
-              ["tool-audit.jsonl", "audit", "audit.jsonl"],
-              ["pi-invocation.json", "invocation", "invocation.json"],
-            ]) {
-              if (fs.existsSync(path.join(directory, source))) {
-                record[field] = path.join(results, `${id}.${suffix}`);
-                fs.copyFileSync(path.join(directory, source), record[field]);
-              }
-            }
-            try {
-              devices.reset();
-              record.reset = "verified";
-            } catch (e) {
-              record.reset = String(e);
-              record.success = false;
-            }
-            writeRecord(results, record);
-          }
-          console.log(JSON.stringify(record));
-          if (record.reset !== "verified" || !record.pathEvidence)
-            throw new Error("Safety/reset failure; remaining runs cancelled");
+    for (const run of spending.toRun) {
+      const task = tasks().find((t) => t.id === run.task);
+      const { repeat, condition } = run;
+      const id = `${Date.now()}-${task.id}-${condition}-${repeat}-${crypto.randomUUID()}`;
+      const directory = path.join(work, id);
+      const record = {
+        id,
+        task: task.id,
+        condition,
+        repeat,
+        adbAxiVersion: options.version,
+        agent: "pi",
+        agentVersion,
+        benchmarkRevision,
+        benchmarkDirty,
+        taskDefinitionSha256: crypto
+          .createHash("sha256")
+          .update(JSON.stringify(task))
+          .digest("hex"),
+        toolVersions,
+        model,
+        effort: "medium",
+        skillManifestHashes: identity.skillManifestHashes,
+        success: null,
+        verdictProduced: false,
+        inputTokens: null,
+        cost: null,
+        turns: null,
+        wallTimeMs: null,
+        devices: devices.owned.map((d) => ({ name: d.name, serial: d.serial })),
+        startedAt: new Date().toISOString(),
+      };
+      try {
+        setupTask(task, devices);
+        const controlled = environment(
+          directory,
+          condition,
+          options.version,
+          bins,
+          record.devices,
+          task.id,
+        );
+        record.skills = controlled.skills;
+        record.pathEvidence = controlled.pathEvidence;
+        record.isolation = {
+          configDir: controlled.configDir,
+          noDiscovery: ["extensions", "skills", "context-files", "prompt-templates", "themes"],
+          skillSource: "isolated config plus explicit --skill paths",
+        };
+        for (const variant of ["debug", "release"])
+          fs.copyFileSync(
+            path.join(root, `test/fixtures/apk/probe-${variant}.apk`),
+            path.join(directory, `probe-${variant}.apk`),
+          );
+        const prompt = `Work only on the following benchmark-owned emulators: phone ${devices.owned[0].serial} (AVD ${options.phone}), tablet ${devices.owned[1].serial} (AVD ${options.tablet}). Never touch other emulators or physical devices, or restart the shared device server. The debug and release APKs are ./probe-debug.apk and ./probe-release.apk; package dev.probe. The UI action is the device shell activity launch: am start -n dev.probe/.MainActivity --es probe <inc|write|crash|anr>. Do not install additional tools or skills or change PATH. Always use an explicit serial for device operations.\n\n${task.prompt}`;
+        const started = Date.now();
+        try {
+          Object.assign(
+            record,
+            runPi({
+              binary: bins.pi,
+              env: controlled.env,
+              cwd: directory,
+              skills: controlled.skills,
+              prompt,
+              output: path.join(directory, "agent.jsonl"),
+            }),
+          );
+        } finally {
+          record.wallTimeMs = Date.now() - started;
         }
+        const check = (await import(pathToFileURL(path.join(root, task.success)).href)).default;
+        Object.assign(
+          record,
+          check({ devices, finalAnswer: record.finalAnswer, audit: controlled.audit }),
+        );
+        record.verdictProduced = typeof record.success === "boolean";
+        if (record.agentError) record.success = false;
+      } catch (e) {
+        if (e.metrics) Object.assign(record, e.metrics);
+        record.error = String(e);
+      } finally {
+        fs.mkdirSync(results, { recursive: true });
+        for (const [source, field, suffix] of [
+          ["agent.jsonl", "agentOutput", "agent.jsonl"],
+          ["tool-audit.jsonl", "audit", "audit.jsonl"],
+          ["pi-invocation.json", "invocation", "invocation.json"],
+        ]) {
+          if (fs.existsSync(path.join(directory, source))) {
+            record[field] = path.join(results, `${id}.${suffix}`);
+            fs.copyFileSync(path.join(directory, source), record[field]);
+          }
+        }
+        try {
+          devices.reset();
+          record.reset = "verified";
+        } catch (e) {
+          record.reset = String(e);
+          record.success = false;
+        }
+        writeRecord(results, record);
+      }
+      console.log(JSON.stringify(record));
+      if (record.reset !== "verified" || !record.pathEvidence)
+        throw new Error("Safety/reset failure; remaining runs cancelled");
+    }
   } finally {
     try {
-      devices.shutdown();
+      devices?.shutdown();
+      if (!bootIncomplete) fs.rmdirSync(lock);
     } finally {
-      fs.rmSync(work, { recursive: true, force: true });
-      fs.rmdirSync(lock);
+      if (work) fs.rmSync(work, { recursive: true, force: true });
     }
   }
 }
