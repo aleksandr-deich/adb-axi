@@ -159,6 +159,59 @@ test("spending refuses mixed experiments before any device dependency lookup", (
       assert.doesNotMatch(r.stderr, /command -v adb/);
     }
   }));
+test("spending rechecks slots after locking before looking up device tools", () =>
+  temporary((dir) => {
+    const bins = path.join(dir, "bin");
+    const results = path.join(dir, "results");
+    const staged = path.join(dir, "staged");
+    fs.mkdirSync(bins);
+    fs.mkdirSync(results);
+    const git = spawnSync("/bin/sh", ["-c", "command -v git"], { encoding: "utf8" }).stdout.trim();
+    fs.symlinkSync(git, path.join(bins, "git"));
+    const revision = spawnSync(git, ["rev-parse", "HEAD"], {
+      cwd: root,
+      encoding: "utf8",
+    }).stdout.trim();
+    for (const condition of ["baseline", "adb-axi"])
+      writeRecord(staged, {
+        id: condition,
+        task: "1",
+        condition,
+        repeat: 1,
+        success: true,
+        verdictProduced: true,
+        model: "openai-codex/gpt-6.1-sol",
+        effort: "medium",
+        agentVersion: "fake-version",
+        adbAxiVersion: "0.1.2",
+        benchmarkRevision: revision,
+        skillManifestHashes: manifestHashes(),
+      });
+    fs.writeFileSync(
+      path.join(bins, "pi"),
+      `#!/bin/sh\n/bin/cp '${staged}'/*.json '${results}'/\necho fake-version\n`,
+      { mode: 0o755 },
+    );
+    const r = spawnSync(
+      process.execPath,
+      [
+        path.join(root, "bench/run.js"),
+        "--run",
+        "--tasks",
+        "1",
+        "--repeats",
+        "1",
+        "--version",
+        "0.1.2",
+        "--results-dir",
+        results,
+      ],
+      { env: { PATH: bins, TMPDIR: dir }, encoding: "utf8" },
+    );
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(readRecords(results).length, 2);
+    assert.equal(fs.existsSync(path.join(dir, "android-repeatable-benchmark.lock")), false);
+  }));
 test("status and summary read external results without side effects or tools", () =>
   temporary((dir) => {
     writeRecord(dir, {
@@ -238,64 +291,20 @@ test("atomic records publish only on rename and clean failed temporary writes", 
     }
     assert.deepEqual(fs.readdirSync(dir), []);
   }));
-test("active lock refuses overlap and stale ownership authorizes targeted recovery", () =>
+test("run lock refuses overlap and requires manual inspection after interruption", () =>
   temporary((dir) => {
     const lock = path.join(dir, "lock");
-    const acquired = acquireLock(lock, ["phone"]);
-    acquired.save([{ name: "phone", serial: "emulator-5554" }]);
-    assert.throws(() => acquireLock(lock, ["phone"]), /still active/);
-    const kill = process.kill;
-    process.kill = () => {
-      const error = new Error("dead");
-      error.code = "ESRCH";
-      throw error;
-    };
-    try {
-      assert.throws(() => acquireLock(lock, ["tablet"]), /different AVDs/);
-      const rename = fs.renameSync;
-      fs.renameSync = (source, destination) => {
-        if (destination === path.join(lock, "owner.json")) {
-          assert.throws(() => acquireLock(lock, ["phone"]), /EEXIST/);
-          assert.equal(fs.existsSync(destination), true);
-        }
-        return rename(source, destination);
-      };
-      try {
-        assert.equal(acquireLock(lock, ["phone"]).previous.owned[0].name, "phone");
-      } finally {
-        fs.renameSync = rename;
-      }
-    } finally {
-      process.kill = kill;
-    }
+    acquireLock(lock);
+    for (const attempt of [1, 2])
+      assert.throws(
+        () => acquireLock(lock),
+        (error) =>
+          error.message.includes(lock) && /Confirm no benchmark is running/.test(error.message),
+      );
+    fs.rmdirSync(lock);
+    acquireLock(lock);
+    assert.equal(fs.existsSync(lock), true);
   }));
-test("interrupted recovery requires the saved process identity", () => {
-  const d = new Devices({}, ["phone"]);
-  const events = [];
-  d.list = () => [{ serial: "emulator-5554", state: "device" }];
-  d.name = () => "phone";
-  d.processIdentity = () => "202:Mon Jun  2 10:00:00 2025";
-  d.resetDevice = () => events.push("reset");
-  d.shutdownDevice = () => events.push("shutdown");
-  for (const owned of [[], [{ name: "phone" }], [{ name: "phone", processIdentity: "101:old" }]])
-    assert.throws(() => d.boot({ owned }, false), /Unresolved interrupted ownership/);
-  assert.deepEqual(events, []);
-  const phone = { name: "phone", serial: "emulator-5554", processIdentity: "101:old" };
-  d.owned.push(phone);
-  d.current = () => true;
-  let saved;
-  d.saveOwnership = (owned) => {
-    saved = structuredClone(owned);
-  };
-  d.refreshOwnership(phone);
-  assert.equal(saved[0].processIdentity, d.processIdentity());
-  d.owned = [];
-  d.boot({ owned: saved }, false);
-  assert.deepEqual(events, ["reset", "shutdown"]);
-  assert.deepEqual(d.owned, []);
-  d.list = () => [];
-  assert.throws(() => d.boot({ owned: saved }, false), /Owned emulator offline/);
-});
 test("reset-before-run restores interrupted app, UI holder and settings without device commands", () => {
   const d = new Devices({}, ["phone"]);
   const phone = {

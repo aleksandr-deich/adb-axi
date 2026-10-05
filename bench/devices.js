@@ -46,41 +46,20 @@ export class Devices {
       command(this.bins.adb, ["-s", serial, "shell", "getprop ro.boot.qemu.avd_name"]).trim()
     );
   }
-  processIdentity(name) {
-    const processes = command("/bin/ps", ["-axo", "pid=,lstart=,command="]);
-    const lines = processes.split("\n").flatMap((line) => {
-      const match = line.match(/^\s*([1-9]\d*)\s+(.{24})\s+(.*)$/);
-      return match ? [{ pid: match[1], started: match[2], command: match[3] }] : [];
-    });
-    const pid = emulatorPid(lines.map((p) => `${p.pid} ${p.command}`).join("\n"), name);
-    const process = lines.find((p) => p.pid === pid);
-    return `${pid}:${process.started}`;
-  }
-  boot(interrupted = null, coldBoot = true, save = () => {}) {
-    if (interrupted) {
-      for (const name of this.names) {
-        const saved = interrupted.owned?.find((d) => d.name === name);
-        const identity = this.processIdentityOrNull(name);
-        if (identity && identity !== saved?.processIdentity)
-          throw new Error(`Unresolved interrupted ownership: ${name}`);
-        if (!identity) continue;
-        const matches = this.list().filter(
-          (d) =>
-            d.state === "device" && /^emulator-\d+$/.test(d.serial) && this.name(d.serial) === name,
-        );
-        if (matches.length > 1) throw new Error(`Ambiguous owned AVD: ${name}`);
-        if (!matches.length) throw new Error(`Owned emulator offline: ${name}`);
-        const d = { ...saved, ...matches[0] };
-        this.owned.push(d);
-        this.resetDevice(d);
-        this.shutdownDevice(d);
-        this.owned = this.owned.filter((owned) => owned !== d);
-      }
-    }
-    if (!coldBoot) return;
+  boot() {
     // Refuse an AVD already running, even if it has not registered with the server yet.
-    for (const name of this.names)
-      if (this.processIdentityOrNull(name)) throw new Error(`AVD already in use: ${name}`);
+    const processes = command("/bin/ps", ["-axo", "pid=,command="]);
+    for (const name of this.names) {
+      try {
+        emulatorPid(processes, name);
+      } catch (error) {
+        if (/candidates: none/.test(error.message)) continue;
+        throw error;
+      }
+      throw new Error(
+        `AVD already in use: ${name}; inspect and stop it before restarting the benchmark`,
+      );
+    }
     for (const name of this.names) {
       const before = new Set(this.list().map((d) => d.serial));
       command(this.bins.android, ["emulator", "start", "--headless", "--cold", name], {
@@ -99,22 +78,7 @@ export class Devices {
       this.ready(d);
       d.night = this.shell(d, "cmd uimode night").trim();
       d.density = this.shell(d, "wm density").trim();
-      d.processIdentity = this.processIdentity(name);
-      save(this.owned);
     }
-  }
-  processIdentityOrNull(name) {
-    try {
-      return this.processIdentity(name);
-    } catch (error) {
-      if (/Cannot identify one emulator process/.test(error.message)) return null;
-      throw error;
-    }
-  }
-  refreshOwnership(d) {
-    if (!this.owned.includes(d) || !this.current(d)) throw new Error("Unowned or offline emulator");
-    d.processIdentity = this.processIdentity(d.name);
-    this.saveOwnership(this.owned);
   }
   emulatorPid(d) {
     if (!this.owned.includes(d) || !this.current(d)) throw new Error("Unowned or offline emulator");
@@ -163,11 +127,7 @@ export class Devices {
     return true;
   }
   recover(d) {
-    const identity = this.processIdentityOrNull(d.name);
-    if (identity && identity !== d.processIdentity)
-      throw new Error(`Owned process changed: ${d.name}`);
     if (!this.current(d)) {
-      if (identity) throw new Error(`Owned emulator offline: ${d.name}`);
       const before = new Set(this.list().map((x) => x.serial));
       command(this.bins.android, ["emulator", "start", "--headless", "--cold", d.name], {
         timeout: 240000,
@@ -181,8 +141,6 @@ export class Devices {
       );
       if (added.length !== 1) throw new Error("Cannot prove recovered ownership");
       d.serial = added[0].serial;
-      d.processIdentity = this.processIdentity(d.name);
-      this.saveOwnership?.(this.owned);
     }
     this.ready(d);
   }
@@ -212,14 +170,7 @@ export class Devices {
     for (const d of this.owned) this.shutdownDevice(d);
   }
   shutdownDevice(d) {
-    const identity = this.processIdentityOrNull(d.name);
-    if (identity && identity !== d.processIdentity)
-      throw new Error(`Owned process changed: ${d.name}`);
-    if (!this.current(d)) {
-      if (identity) throw new Error(`Owned emulator offline: ${d.name}`);
-      return;
-    }
-    if (!identity) throw new Error(`Cannot prove owned process: ${d.name}`);
+    if (!this.current(d)) return;
     this.assert(d);
     command(this.bins.android, ["emulator", "stop", d.name], { timeout: 90000 });
     if (this.list().some((x) => x.serial === d.serial))

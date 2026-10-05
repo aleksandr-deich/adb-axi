@@ -1,7 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
-import process from "node:process";
 import { spawnSync } from "node:child_process";
 
 export const root = path.dirname(import.meta.dirname);
@@ -181,38 +180,14 @@ export function writeRecord(dir, record) {
   }
   return file;
 }
-export function acquireLock(lock, names) {
-  const claim = `${lock}.reclaim`;
-  fs.mkdirSync(claim);
+export function acquireLock(lock) {
   try {
-    let previous = null;
-    if (fs.existsSync(lock)) {
-      previous = JSON.parse(fs.readFileSync(path.join(lock, "owner.json"), "utf8"));
-      try {
-        process.kill(previous.pid, 0);
-        throw new Error("Benchmark runner is still active");
-      } catch (error) {
-        if (error.code !== "ESRCH") throw error;
-      }
-      if (JSON.stringify(previous.names) !== JSON.stringify(names))
-        throw new Error(
-          "Interrupted benchmark owns different AVDs; resume with its original AVD names",
-        );
-    } else fs.mkdirSync(lock);
-    const owner = { pid: process.pid, names, owned: previous?.owned ?? [] };
-    const file = path.join(lock, "owner.json");
-    const temp = `${file}.tmp`;
-    fs.writeFileSync(temp, JSON.stringify({ ...owner, id: "owner" }));
-    fs.renameSync(temp, file);
-    return {
-      previous,
-      save(owned) {
-        fs.writeFileSync(temp, JSON.stringify({ ...owner, owned }));
-        fs.renameSync(temp, file);
-      },
-    };
-  } finally {
-    fs.rmdirSync(claim);
+    fs.mkdirSync(lock);
+  } catch (error) {
+    if (error.code !== "EEXIST") throw error;
+    throw new Error(
+      `Benchmark lock exists: ${lock}. Confirm no benchmark is running before removing it manually.`,
+    );
   }
 }
 export function readRecords(dir) {

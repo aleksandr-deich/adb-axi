@@ -175,27 +175,30 @@ async function main() {
   assertConsistency(records, identity);
   fs.mkdirSync(results, { recursive: true });
   const lock = path.join(os.tmpdir(), "android-repeatable-benchmark.lock");
-  if (!progress.toRun.length && !fs.existsSync(lock)) return;
-  // A single host-wide lock prevents concurrent benchmark processes sharing AVDs.
-  const bins = Object.fromEntries(["adb", "android", "pi", "node", "npx"].map((t) => [t, find(t)]));
-  const ownership = acquireLock(lock, [options.phone, options.tablet]);
-  const devices = new Devices(bins, [options.phone, options.tablet]);
-  devices.saveOwnership = ownership.save;
-  devices.androidLayout = (d) => command(bins.android, ["layout", `--device=${d.serial}`]);
-  const work = progress.toRun.length
-    ? fs.mkdtempSync(path.join(os.tmpdir(), "android-benchmark-"))
-    : null;
-  let recovered = false;
+  acquireLock(lock);
+  let devices;
+  let work;
+  let bootIncomplete = false;
   try {
-    devices.boot(ownership.previous, !!progress.toRun.length, ownership.save);
-    recovered = true;
-    if (!progress.toRun.length) return;
+    const currentRecords = readRecords(results);
+    assertConsistency(currentRecords, identity);
+    const spending = resumePlan(options, currentRecords);
+    if (!spending.toRun.length) return;
+    const bins = Object.fromEntries(
+      ["adb", "android", "pi", "node", "npx"].map((t) => [t, find(t)]),
+    );
+    devices = new Devices(bins, [options.phone, options.tablet]);
+    devices.androidLayout = (d) => command(bins.android, ["layout", `--device=${d.serial}`]);
+    work = fs.mkdtempSync(path.join(os.tmpdir(), "android-benchmark-"));
+    bootIncomplete = true;
+    devices.boot();
+    bootIncomplete = false;
     const benchmarkDirty = !!command("git", ["status", "--porcelain"], { cwd: root }).trim();
     const toolVersions = {
       android: command(bins.android, ["-V"]).trim(),
       adb: command(bins.adb, ["version"]).trim(),
     };
-    for (const run of progress.toRun) {
+    for (const run of spending.toRun) {
       const task = tasks().find((t) => t.id === run.task);
       const { repeat, condition } = run;
       const id = `${Date.now()}-${task.id}-${condition}-${repeat}-${crypto.randomUUID()}`;
@@ -272,9 +275,6 @@ async function main() {
           check({ devices, finalAnswer: record.finalAnswer, audit: controlled.audit }),
         );
         record.verdictProduced = typeof record.success === "boolean";
-        if (task.id === "8" && record.checks?.stopped && record.checks?.online) {
-          devices.refreshOwnership(devices.owned[0]);
-        }
         if (record.agentError) record.success = false;
       } catch (e) {
         if (e.metrics) Object.assign(record, e.metrics);
@@ -306,8 +306,8 @@ async function main() {
     }
   } finally {
     try {
-      devices.shutdown();
-      if (recovered) fs.rmSync(lock, { recursive: true });
+      devices?.shutdown();
+      if (!bootIncomplete) fs.rmdirSync(lock);
     } finally {
       if (work) fs.rmSync(work, { recursive: true, force: true });
     }
