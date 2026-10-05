@@ -4,7 +4,7 @@ This is a sequential, local benchmark, not CI and not part of the npm package (`
 
 ## Commands and spend guard
 
-No arguments means **dry run**: print all task definitions, setup, model, conditions and run count without booting devices, installing packages or calling the agent.
+No arguments means **dry run**: print all task definitions, setup, model, conditions and remaining-run plan without booting devices, installing packages or calling the agent.
 
 ```sh
 node bench/run.js
@@ -24,7 +24,7 @@ node bench/run.js --run --tasks 1,2,3,4,5,6,7,8 --repeats 5 --version 0.1.2 --ma
 node bench/run.js summary
 ```
 
-For a later release, use the **same repository commit, model, skill manifests, AVD images and repeat count**, changing only `--version` to the exact published version. Pin the benchmark revision in your report. A new skill revision is a separate experiment: explicitly record the new benchmark commit. `--phone` and `--tablet` override AVD names. Every repeat runs both conditions (2 agent runs per task); repeats are positive integers, with 3-5 recommended for a full run. Every spending command requires explicit `--run`, `--tasks`, `--repeats`, and `--version`; `--max-runs` is a hard cap (default 80).
+For a later release, use the **same repository commit, model, skill manifests, AVD images and repeat count**, changing only `--version` to the exact published version. Pin the benchmark revision in your report. A new skill revision is a separate experiment: explicitly record the new benchmark commit. `--phone` and `--tablet` override AVD names. A full plan includes both conditions per repeat (2 agent runs per task); resumed plans skip completed slots. Repeats are positive integers, with 3-5 recommended for a full run. Every spending command requires explicit `--run`, `--tasks`, `--repeats`, and `--version`; `--max-runs` is a hard cap (default 80).
 
 Use `--results-dir <path>` to keep records, transcripts and audits outside the clone (default: `bench/results/`). Spending commands create it if needed; a file path is refused. Use a separate directory for each experiment:
 
@@ -34,7 +34,7 @@ node bench/run.js status --tasks 1,2,3,4,5,6,7,8 --repeats 5 --results-dir /abso
 node bench/run.js summary --results-dir /absolute/path/to/experiment
 ```
 
-Restart the same spending command after interruption, once any leftover run lock has been inspected and removed manually. A task/condition/repeat is done only when its record explicitly marks a boolean verdict, including `false`. Completed runs are skipped, while missing records and harness failures without a verdict run again. Repeat numbers stay 1..N and remaining runs retain the original task/repeat/condition order. The plan prints `skipped`, `toRun`, and their counts before any devices start; a spending command rechecks records and remaining slots after taking the run lock. `--max-runs` caps only `toRun`, not skipped runs. Omit `--run` to inspect that plan without devices or agent calls. `status` reports done, failed-without-verdict and remaining counts per task/condition plus total remaining, without creating directories or needing tools on PATH. Failed-without-verdict counts are a subset of remaining, not an additional category.
+Restart the same spending command after interruption, once any leftover run lock has been inspected and removed manually. A task/condition/repeat is done only when a record has `verdictProduced: true` and a boolean `success`, including `false`. Completed runs are skipped, while missing records and harness failures without a verdict run again. Repeat numbers stay 1..N and remaining runs retain the original task/repeat/condition order. The plan prints `skipped`, `toRun`, and their counts before any devices start; a spending command rechecks records and remaining slots after taking the run lock. `--max-runs` caps only `toRun`, not skipped runs. Omit `--run` to inspect that plan without devices or agent calls. `status` reports done, failed-without-verdict and remaining counts per task/condition plus total remaining, without creating directories or needing tools on PATH. Failed-without-verdict counts are a subset of remaining, not an additional category.
 
 Resume refuses any existing record whose model, effort, agent version, exact adb-axi version, benchmark revision or skill-manifest hashes differ from the invocation, listing every mismatch. There is no override. Skill-manifest hashes cover the manifest and every file in its declared skill directories, including references. Version consistency is checked before device access on a spending invocation. Legacy records without these hashes cannot be resumed; preserve them in a separate experiment directory.
 
