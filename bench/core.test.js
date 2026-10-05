@@ -295,11 +295,13 @@ test("run lock refuses overlap and requires manual inspection after interruption
   temporary((dir) => {
     const lock = path.join(dir, "lock");
     acquireLock(lock);
-    for (const attempt of [1, 2])
+    for (let remaining = 2; remaining > 0; remaining--)
       assert.throws(
         () => acquireLock(lock),
         (error) =>
-          error.message.includes(lock) && /Confirm no benchmark is running/.test(error.message),
+          error.message.includes(lock) &&
+          /Confirm no benchmark is running/.test(error.message) &&
+          error.cause?.code === "EEXIST",
       );
     fs.rmdirSync(lock);
     acquireLock(lock);

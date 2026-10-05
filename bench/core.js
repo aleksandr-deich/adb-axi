@@ -187,6 +187,7 @@ export function acquireLock(lock) {
     if (error.code !== "EEXIST") throw error;
     throw new Error(
       `Benchmark lock exists: ${lock}. Confirm no benchmark is running before removing it manually.`,
+      { cause: error },
     );
   }
 }
