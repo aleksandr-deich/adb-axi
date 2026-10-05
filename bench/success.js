@@ -60,9 +60,16 @@ export function deviceState(call, serial, name) {
   }
   return null;
 }
+const validBootId = (value) =>
+  /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(value) &&
+  !/^0{8}(?:-0{4}){3}-0{12}$/.test(value);
 export function setupTask(task, devices) {
   devices.reset();
   const phone = devices.owned[0];
+  if (task.id === "8") {
+    phone.task8BootId = devices.shell(phone, "cat /proc/sys/kernel/random/boot_id").trim();
+    if (!validBootId(phone.task8BootId)) throw new Error("Invalid initial phone boot ID");
+  }
   if (["debug", "ui-holder"].includes(task.setup)) {
     devices.adb(phone, ["install", path.join(root, "test/fixtures/apk/probe-debug.apk")]);
     devices.shell(phone, "am start -W -n dev.probe/.MainActivity");
@@ -236,7 +243,7 @@ export function checkTask(id, { devices, finalAnswer, audit }) {
       c.status === 0 &&
       !c.args.some((arg) => ["--help", "-h"].includes(arg)) &&
       !/^(?:KO:|error:)/im.test(`${c.stdout ?? ""}\n${c.stderr ?? ""}`);
-    const stop = calls.find(
+    const stops = calls.filter(
       (c) =>
         ((c.tool === "android" &&
           c.args[0] === "emulator" &&
@@ -249,10 +256,8 @@ export function checkTask(id, { devices, finalAnswer, audit }) {
             c.args[3] === "kill")) &&
         lifecycle(c),
     );
-    const restart = calls.find(
+    const restarts = calls.filter(
       (c) =>
-        stop &&
-        c.time > stop.time &&
         c.tool === "android" &&
         c.args[0] === "emulator" &&
         c.args[1] === "start" &&
@@ -262,26 +267,27 @@ export function checkTask(id, { devices, finalAnswer, audit }) {
     const states = calls
       .map((call) => ({ call, state: deviceState(call, stoppedSerial, phone.name) }))
       .filter(({ state }) => state !== null);
-    const observations = states.filter(({ call, state }) => {
-      if (state === "online") return false;
-      const before = stop
-        ? call.time > stop.time
-        : states.some((s) => s.state === "online" && s.call.time < call.time);
-      const after = restart
-        ? call.time < restart.time
-        : states.some((s) => s.state === "online" && s.call.time > call.time);
-      return before && after;
-    });
-    // Some lifecycle calls bypass the bridge. An audited online -> unavailable
-    // -> online sequence plus the independent boot check can establish recovery.
-    checks.stopped = !!stop || observations.length > 0;
+    const observations = states.filter(({ call, state }) =>
+      state !== "online" &&
+      (stops.some((s) =>
+        s.time < call.time && restarts.some((r) => r.time > call.time && r.time > s.time),
+      ) ||
+        (states.some((s) => s.state === "online" && s.call.time < call.time) &&
+          states.some((s) => s.state === "online" && s.call.time > call.time))),
+    );
+    checks.stopped = observations.length > 0;
     checks.observed = observations.length > 0;
-    const restarted = !!restart || observations.length > 0;
     evidence.unavailableStates = [...new Set(observations.map((s) => s.state))];
+    const finalBootId = recoveredOnline
+      ? devices.shell(phone, "cat /proc/sys/kernel/random/boot_id").trim()
+      : "";
     checks.online =
-      restarted &&
+      observations.length > 0 &&
       recoveredOnline &&
-      devices.shell(phone, "getprop sys.boot_completed").trim() === "1";
+      devices.shell(phone, "getprop sys.boot_completed").trim() === "1" &&
+      validBootId(phone.task8BootId) &&
+      validBootId(finalBootId) &&
+      phone.task8BootId.toLowerCase() !== finalBootId.toLowerCase();
     checks.report =
       (answer.unavailableState === "unavailable"
         ? observations.length > 0

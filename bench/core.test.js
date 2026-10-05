@@ -500,11 +500,11 @@ test("recovery and scoring follow the verified AVD onto its new serial", () =>
     const fake = path.join(dir, "adb");
     fs.writeFileSync(
       fake,
-      '#!/bin/sh\ncase "$*" in\n  devices) printf "List of devices attached\\nemulator-5580\\tdevice\\n";;\n  *"emu avd name"*) echo owned;;\n  *"getprop sys.boot_completed"*) echo 1;;\n  *"pm path android"*) echo package:android;;\n  *) echo "";;\nesac\n',
+      '#!/bin/sh\ncase "$*" in\n  devices) printf "List of devices attached\\nemulator-5580\\tdevice\\n";;\n  *"emu avd name"*) echo owned;;\n  *"getprop sys.boot_completed"*) echo 1;;\n  *"cat /proc/sys/kernel/random/boot_id"*) echo abcdef01-1234-1234-1234-123456789abc;;\n  *"pm path android"*) echo package:android;;\n  *) echo "";;\nesac\n',
       { mode: 0o755 },
     );
     const d = new Devices({ adb: fake, android: "/nonexistent-android" }, ["owned"]);
-    const phone = { name: "owned", serial: "emulator-5554" };
+    const phone = { name: "owned", serial: "emulator-5554", task8BootId: "12345678-1234-1234-1234-123456789abc" };
     d.owned.push(phone);
     d.recover(phone);
     assert.equal(phone.serial, "emulator-5580");

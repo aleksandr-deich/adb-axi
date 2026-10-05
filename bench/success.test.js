@@ -4,18 +4,24 @@ import os from "node:os";
 import path from "node:path";
 import { URL } from "node:url";
 import { test } from "node:test";
-import { checkTask, deviceState } from "./success.js";
+import { checkTask, deviceState, setupTask } from "./success.js";
 
-function score(fixture, calls = fixture.calls, answer = fixture.finalAnswer) {
+const beforeBoot = "12345678-1234-1234-1234-123456789abc";
+const afterBoot = "abcdef01-1234-1234-1234-123456789abc";
+function score(fixture, calls = fixture.calls, answer = fixture.finalAnswer, finalBoot = afterBoot) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "oracle-test-"));
   try {
     const audit = path.join(dir, "audit.jsonl");
     fs.writeFileSync(audit, calls.map((c) => JSON.stringify(c)).join("\n"));
     const devices = {
-      owned: fixture.devices.map((d) => ({ ...d, uiHolderPid: fixture.initialHolderPid })),
+      owned: fixture.devices.map((d) => ({
+        ...d,
+        uiHolderPid: fixture.initialHolderPid,
+        task8BootId: fixture.task8BootId,
+      })),
       current: () => true,
       adb: () => "",
-      shell: () => "1",
+      shell: (_d, text) => text.includes("boot_id") ? finalBoot : "1",
     };
     return checkTask(fixture.task, { devices, audit, finalAnswer: answer });
   } finally {
@@ -28,7 +34,7 @@ for (const task of ["6", "8"]) {
       fs.readFileSync(new URL(`./fixtures/pilot/${task}-${condition}.json`, import.meta.url)),
     );
     test(`pilot task ${task} ${condition}: evidence-backed historical score`, () => {
-      assert.equal(score(fixture).success, task !== "8" || condition !== "baseline");
+      assert.equal(score(fixture).success, task !== "8");
     });
     test(`pilot task ${task} ${condition}: fabricated or incomplete outcome fails`, () => {
       if (task === "6") {
@@ -76,7 +82,22 @@ for (const task of ["6", "8"]) {
     });
   }
 }
+test("historical treatment observation needs an independently captured setup boot ID", () => {
+  const fixture = JSON.parse(fs.readFileSync(new URL("./fixtures/pilot/8-adb-axi.json", import.meta.url)));
+  assert.equal(score(fixture).success, false);
+  assert.equal(score({ ...fixture, task8BootId: beforeBoot }).success, true);
+  assert.equal(score({ ...fixture, task8BootId: beforeBoot }, fixture.calls, fixture.finalAnswer, beforeBoot).success, false);
+});
+test("task 8 setup captures and validates the owned phone boot identity", () => {
+  const phone = { name: "phone", serial: "emulator-5554" };
+  const devices = { owned: [phone], reset: () => {}, shell: () => beforeBoot };
+  setupTask({ id: "8", setup: "clean" }, devices);
+  assert.equal(phone.task8BootId, beforeBoot);
+  devices.shell = () => "not-a-boot-id";
+  assert.throws(() => setupTask({ id: "8", setup: "clean" }, devices), /Invalid initial phone boot ID/);
+});
 const base = {
+  task8BootId: beforeBoot,
   task: "8",
   devices: [{ name: "phone", serial: "emulator-5554" }],
   finalAnswer: JSON.stringify({ unavailableState: "missing", recovered: true }),
@@ -116,7 +137,7 @@ test("unavailable observation is tool-neutral and report must match evidence", (
     }
   }
 });
-test("inferred lifecycle requires an online/unavailable/online sequence", () => {
+test("boot identity rejects transient disconnect and accepts a reboot with observation", () => {
   const online = {
     time: 1,
     tool: "other",
@@ -126,10 +147,17 @@ test("inferred lifecycle requires an online/unavailable/online sequence", () => 
   };
   const missing = { ...online, time: 2, stdout: '{"devices":[]}' };
   const recovered = { ...online, time: 3 };
+  assert.equal(score(base, [online, missing, recovered], base.finalAnswer, beforeBoot).success, false);
   assert.equal(score(base, [online, missing, recovered]).success, true);
+  assert.equal(score(base, [online, missing, recovered], base.finalAnswer, "invalid").success, false);
   assert.equal(score(base, [missing, recovered]).success, false);
   assert.equal(score(base, [online, missing]).success, false);
   assert.equal(score(base, [recovered, { ...missing, time: 4 }]).success, false);
+});
+test("later valid stop/observation/restart cycle counts", () => {
+  const missing = { time: 5, tool: "adb", args: ["devices"], status: 0, stdout: "List of devices attached\n" };
+  assert.equal(score(base, [stop, restart, { ...stop, time: 4 }, missing, { ...restart, time: 6 }]).success, true);
+  assert.equal(score(base, [stop, restart, missing]).success, false);
 });
 test("stop/start without observation, help, wrong target, and out-of-window output fail", () => {
   const missing = { time: 2, tool: "adb-axi", args: [], status: 0, stdout: '{"devices":[]}' };
