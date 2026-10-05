@@ -67,20 +67,23 @@ export function deviceState(call, serial, name) {
   ) {
     for (const result of [stdout, call.stderr ?? ""]) {
       let error;
+      let code;
       let state;
       try {
         const value = JSON.parse(result);
         error = typeof value.error === "string" ? value.error : value.error?.message;
+        code = value.code;
         state = value.last?.state;
       } catch {
         error = result.match(/^error:\s*"?([^\n"]+)/m)?.[1];
+        code = result.match(/^code:\s*"?([^\n"]+)/m)?.[1];
         state =
           result.match(/^last\.state:\s*"?(not attached|offline)\b/m)?.[1] ??
           result.match(/^last:\s*\n\s+state:\s*"?(not attached|offline)\b/m)?.[1];
       }
       if (
         typeof error === "string" &&
-        /timed out|timeout|deadline/i.test(error) &&
+        (code === "WAIT_TIMEOUT" || /timed out|timeout|deadline/i.test(error)) &&
         (error.includes(serial) || error.includes(name)) &&
         ["not attached", "offline"].includes(state)
       )

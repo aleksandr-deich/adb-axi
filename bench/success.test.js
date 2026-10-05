@@ -237,6 +237,41 @@ test("targeted wait boot timeouts count as unavailable observations in JSON and 
   };
   assert.equal(score(base, [stop, toon, restart]).success, true);
 });
+test("actual targeted WAIT_TIMEOUT output scores JSON and TOON unavailable states", () => {
+  for (const target of ["phone", "emulator-5554"]) {
+    for (const [state, report] of [
+      ["not attached", "missing"],
+      ["offline", "offline"],
+    ]) {
+      for (const format of ["json", "toon"]) {
+        const result =
+          format === "json"
+            ? JSON.stringify({
+                error: `${target} had not finished booting after 500 ms`,
+                code: "WAIT_TIMEOUT",
+                last: { state, boot_completed: "unknown" },
+              })
+            : `error: ${target} had not finished booting after 500 ms\ncode: WAIT_TIMEOUT\nlast:\n  state: ${state}\n  boot_completed: unknown\n`;
+        const call = {
+          time: 2,
+          tool: "adb-axi",
+          args: ["wait", "boot", "-s", target, "--timeout", "500ms", ...(format === "json" ? ["--json"] : [])],
+          status: 1,
+          [format === "json" ? "stdout" : "stderr"]: result,
+        };
+        const answer = JSON.stringify({ unavailableState: report, recovered: true });
+        assert.equal(score(base, [stop, call, restart], answer).success, true);
+        for (const invalid of [
+          { ...call, args: ["wait", "boot", "-s", "tablet", "--timeout", "500ms"] },
+          { ...call, [format === "json" ? "stdout" : "stderr"]: result.replace(target, "tablet") },
+          { ...call, [format === "json" ? "stdout" : "stderr"]: result.replace("WAIT_TIMEOUT", "OTHER_ERROR") },
+          { ...call, args: ["wait", "boot", "--timeout", "500ms"] },
+        ])
+          assert.equal(score(base, [stop, invalid, restart], answer).success, false);
+      }
+    }
+  }
+});
 test("visible missing listing and raw offline output demand their respective reports", () => {
   const listing = {
     time: 2,
