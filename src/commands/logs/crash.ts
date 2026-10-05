@@ -67,7 +67,8 @@ export const logsCrash = defineCommand({
     const seconds = Math.max(0, Math.round((now.epochMs - window.startMs) / 1000));
     const full = context.flags.full === true;
     const shown = crashes.slice(0, MAX_CRASHES);
-    const rows = shown.map((crash) => describe(crash, now.utcOffsetMinutes));
+    const includeCause = shown.some((crash) => crash.rootCause !== undefined);
+    const rows = shown.map((crash) => describe(crash, now.utcOffsetMinutes, includeCause));
     return {
       crashes: `${crashes.length} since ${window.label} (${seconds} s, ${scanned.length} lines scanned)`,
       // One crash prints as a block, several as a table.
@@ -95,13 +96,23 @@ export const logsCrash = defineCommand({
 });
 
 /** One crash as the output states it. */
-function describe(crash: Crash, utcOffsetMinutes: number | null): Record<string, unknown> {
+function describe(
+  crash: Crash,
+  utcOffsetMinutes: number | null,
+  includeCause: boolean,
+): Record<string, unknown> {
   return {
     kind: crash.kind,
     at: formatDeviceTime(crash.epochMs, utcOffsetMinutes),
     process: crash.process,
     exception: crash.exception,
     message: truncateField(crash.message),
+    ...(includeCause
+      ? {
+          cause: truncateField(crash.rootCause?.exception ?? UNKNOWN),
+          cause_message: truncateField(crash.rootCause?.message ?? UNKNOWN),
+        }
+      : {}),
     app_frame: crash.appFrame ?? UNKNOWN,
     frames: crash.frames,
   };

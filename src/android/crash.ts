@@ -14,6 +14,8 @@ export interface Crash {
   /** The exception class, `ANR`, or the signal name of a native crash. */
   exception: string;
   message: string;
+  /** The deepest direct Java cause, excluding suppressed exceptions and their causes. */
+  rootCause?: { exception: string; message: string };
   /** The first stack frame inside the app, or `null` when the trace has none. */
   appFrame: string | null;
   /** How many stack frames the log carries for it. */
@@ -164,7 +166,7 @@ interface Block {
 
 const FATAL = /^FATAL EXCEPTION(?: IN SYSTEM PROCESS)?:/;
 const FRAME = /^\s*at\s+(\S.*?)\s*$/;
-const END_OF_MESSAGE = /^(?:Caused by: |Suppressed: |\s*\.\.\. \d+ more)/;
+const END_OF_MESSAGE = /^\s*(?:Caused by: |Suppressed: |\.\.\. \d+ more)/;
 
 /** Class prefixes of the platform and its libraries, never the app's own code. */
 const PLATFORM_FRAME =
@@ -193,6 +195,7 @@ function buildJava(block: Block): Crash {
     next++;
   }
   const frames = body.flatMap((message) => FRAME.exec(message)?.[1] ?? []);
+  const cause = rootCause(body);
   return {
     kind: "java",
     epochMs: block.start.epochMs,
@@ -200,10 +203,26 @@ function buildJava(block: Block): Crash {
     pid,
     exception: header?.[1] ?? "-",
     message: messageLines.join(" ").trim(),
+    ...(cause === undefined ? {} : { rootCause: cause }),
     appFrame: firstAppFrame(frames, process),
     frames: frames.length,
     trace: [block.start.message, ...block.rest],
   };
+}
+
+/** Java prints direct causes without indentation; suppressed branches are indented. */
+function rootCause(body: readonly string[]): Crash["rootCause"] {
+  const index = body.findLastIndex((message) => /^Caused by: /.test(message));
+  if (index < 0) return undefined;
+  const header = /^Caused by: ([A-Za-z_$][\w$.]*)(?::\s?(.*))?$/.exec(body[index] ?? "");
+  if (header?.[1] === undefined) return undefined;
+  const messages = [header[2] ?? ""];
+  for (let next = index + 1; next < body.length; next++) {
+    const message = body[next] ?? "";
+    if (FRAME.test(message) || END_OF_MESSAGE.test(message)) break;
+    messages.push(message.trim());
+  }
+  return { exception: header[1], message: messages.join(" ").trim() };
 }
 
 /** The first frame in the app's package, else the first one outside the platform. */

@@ -42,14 +42,14 @@ async function inspect(context: CommandContext): Promise<ClassifiedHolder[]> {
   const serial = targetSerial(context);
   const adb = context.adb();
   const reads = readOptions(context);
-  const [instrumentations, servers] = await Promise.all([
+  const [instrumentations, servers] = await allFinished([
     probeHolders(adb, serial, reads),
     probeAppProcessServers(adb, serial, reads),
   ]);
   const found = findHolders(instrumentations, servers);
   if (found.length === 0) return [];
 
-  const [wedgedPids, host, forwards, devices, avd] = await Promise.all([
+  const [wedgedPids, host, forwards, devices, avd] = await allFinished([
     readWedgedPids(adb, serial, reads),
     context.hostProcesses(Math.min(context.deadline.remainingMs(), CHECK_CAP_MS)),
     found.some((holder) => holder.kind === "server") ? readForwards(context) : [],
@@ -67,6 +67,17 @@ async function inspect(context: CommandContext): Promise<ClassifiedHolder[]> {
     avd,
     selfPid: process.pid,
   });
+}
+
+/** Let every concurrent read finish before propagating a failed sibling's error. */
+async function allFinished<T extends readonly unknown[]>(
+  reads: T,
+): Promise<{ -readonly [K in keyof T]: Awaited<T[K]> }> {
+  const outcomes = await Promise.allSettled(reads);
+  for (const outcome of outcomes) {
+    if (outcome.status === "rejected") throw outcome.reason;
+  }
+  return Promise.all(reads);
 }
 
 /** `adb forward --list`, or `null` when they cannot be listed: liveness is then unknown. */

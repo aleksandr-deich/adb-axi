@@ -19,7 +19,10 @@ export function topLevelHelp(registry: Registry): Output {
     global_flags: [...GLOBAL_FLAGS, HELP_FLAG].map((flag) =>
       flagRow(flag.name === "--timeout" ? { ...flag, default: "per command" } : flag),
     ),
-    help: [runHint(["<command>", "--help"], "for its arguments, flags and examples")],
+    help: [
+      "Flags go after the command, for example `adb-axi app start <pkg> --device <serial|avd>`",
+      runHint(["<command>", "--help"], "for its arguments, flags and examples"),
+    ],
   };
 }
 
@@ -51,19 +54,45 @@ export function commandHelp(spec: CommandSpec): Output {
 
 /** `adb-axi <group> --help`, or a bare group without a default command. */
 export function groupHelp(group: GroupSpec): Output {
-  const base = group.defaultCommand?.shipped ? commandHelp(group.defaultCommand) : {};
+  const defaultCommand = group.defaultCommand?.shipped ? group.defaultCommand : undefined;
+  const base = defaultCommand === undefined ? {} : commandHelp(defaultCommand);
+  const commands = visibleSubcommands(group);
+  const example = defaultCommand ?? commands[0];
   return {
     ...base,
     command: commandLine([group.name]),
     summary: group.summary,
-    subcommands: visibleSubcommands(group).map((command) => ({
+    ...(defaultCommand === undefined
+      ? {}
+      : {
+          usage: familyUsage(defaultCommand),
+          flags: defaultCommand.flags.map(flagRow),
+        }),
+    subcommands: commands.map((command) => ({
       command: commandLine(command.path),
+      usage: familyUsage(command),
       summary: command.summary,
     })),
+    global_flags: [...GLOBAL_FLAGS, HELP_FLAG].map((flag) =>
+      flagRow(flag.name === "--timeout" ? { ...flag, default: "per command" } : flag),
+    ),
     help: [
-      runHint([group.name, "<subcommand>", "--help"], "for its arguments, flags and examples"),
+      ...(example === undefined
+        ? []
+        : [
+            `Flags go after the command, for example \`${usageLine(example).replace("[flags]", "--device <serial|avd>")}\``,
+          ]),
+      runHint([group.name, "<subcommand>", "--help"], "for flag details, defaults and examples"),
     ],
   };
+}
+
+/** Compact family usages share globals once, but expose each command's own flags. */
+function familyUsage(spec: CommandSpec): string {
+  const flags = spec.flags.map((flag) =>
+    flag.required === true ? flagUsage(flag) : `[${flagUsage(flag)}]`,
+  );
+  return usageLine(spec).replace("[flags]", [...flags, "[global flags]"].join(" "));
 }
 
 const HELP_FLAG: FlagSpec = { name: "--help", type: "boolean", description: "Show this help" };

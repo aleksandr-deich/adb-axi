@@ -217,6 +217,20 @@ describe("dispatch", () => {
       expect(exit).toBe(0);
       const group = decode(out.trimEnd()) as { subcommands: { command: string }[] };
       expect(group.subcommands.map((s) => s.command)).toEqual(["adb-axi app start"]);
+      expect(out).toMatchInlineSnapshot(`
+        "command: adb-axi app
+        summary: App lifecycle
+        subcommands[1]{command,usage,summary}:
+          adb-axi app start,"adb-axi app start <pkg> [--fresh] [global flags]",Start an app in the test registry
+        global_flags[5]{flag,default,description}:
+          "--device <serial|avd>, -s","$ANDROID_SERIAL, else the only online device",Target device by serial or AVD name
+          "--timeout <dur>",per command,"Deadline for the whole command, for example 500ms, 30s or 5m"
+          "--json","-",Print the same data as JSON
+          "--debug","-",Print the underlying adb calls on stderr
+          "--help","-",Show this help
+        help[2]: "Flags go after the command, for example \`adb-axi app start <pkg> --device <serial|avd>\`","Run \`adb-axi app <subcommand> --help\` for flag details, defaults and examples"
+        "
+      `);
     }
   });
 
