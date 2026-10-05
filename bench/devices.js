@@ -6,8 +6,7 @@ export function emulatorPid(processes, name) {
   const avd = new RegExp(`(?:^|\\s)-avd\\s+${escaped}(?=\\s|$)`);
   const matches = processes.split("\n").flatMap((line) => {
     const match = line.match(/^\s*([1-9]\d*)\s+(\S+)\s*(.*)$/);
-    if (!match || !/^(?:emulator|qemu-system-[\w.-]+)$/.test(match[2].split("/").at(-1)))
-      return [];
+    if (!match || !/^(?:emulator|qemu-system-[\w.-]+)$/.test(match[2].split("/").at(-1))) return [];
     return avd.test(`${match[2]} ${match[3]}`) ? [match[1]] : [];
   });
   if (matches.length !== 1) throw new Error(`Cannot identify one emulator process for ${name}`);

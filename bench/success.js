@@ -74,7 +74,8 @@ export function deviceState(call, serial, name) {
         state = value.last?.state;
       } catch {
         error = result.match(/^error:\s*"?([^\n"]+)/m)?.[1];
-        state = result.match(/^last\.state:\s*"?(not attached|offline)\b/m)?.[1] ??
+        state =
+          result.match(/^last\.state:\s*"?(not attached|offline)\b/m)?.[1] ??
           result.match(/^last:\s*\n\s+state:\s*"?(not attached|offline)\b/m)?.[1];
       }
       if (

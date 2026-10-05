@@ -504,7 +504,12 @@ test("recovery and scoring follow the verified AVD onto its new serial", () =>
       { mode: 0o755 },
     );
     const d = new Devices({ adb: fake, android: "/nonexistent-android" }, ["owned"]);
-    const phone = { name: "owned", serial: "emulator-5554", task8BootId: "12345678-1234-1234-1234-123456789abc", task8EmulatorPid: "101" };
+    const phone = {
+      name: "owned",
+      serial: "emulator-5554",
+      task8BootId: "12345678-1234-1234-1234-123456789abc",
+      task8EmulatorPid: "101",
+    };
     d.emulatorPid = () => "202";
     d.owned.push(phone);
     d.recover(phone);
@@ -581,7 +586,10 @@ test("host emulator PID lookup requires one real executable for the exact AVD", 
   ].join("\n");
   assert.equal(emulatorPid(processes, "phone"), "202");
   assert.throws(() => emulatorPid(processes, "other"), /Cannot identify/);
-  assert.throws(() => emulatorPid(processes + "\n505 /sdk/emulator/emulator -avd phone", "phone"), /Cannot identify/);
+  assert.throws(
+    () => emulatorPid(processes + "\n505 /sdk/emulator/emulator -avd phone", "phone"),
+    /Cannot identify/,
+  );
 });
 test("task 8 reference confirms boot on the restarted AVD's new serial", () => {
   const phone = { name: "phone", serial: "emulator-5554" };
