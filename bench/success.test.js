@@ -255,7 +255,15 @@ test("actual targeted WAIT_TIMEOUT output scores JSON and TOON unavailable state
         const call = {
           time: 2,
           tool: "adb-axi",
-          args: ["wait", "boot", "-s", target, "--timeout", "500ms", ...(format === "json" ? ["--json"] : [])],
+          args: [
+            "wait",
+            "boot",
+            "-s",
+            target,
+            "--timeout",
+            "500ms",
+            ...(format === "json" ? ["--json"] : []),
+          ],
           status: 1,
           [format === "json" ? "stdout" : "stderr"]: result,
         };
@@ -264,7 +272,13 @@ test("actual targeted WAIT_TIMEOUT output scores JSON and TOON unavailable state
         for (const invalid of [
           { ...call, args: ["wait", "boot", "-s", "tablet", "--timeout", "500ms"] },
           { ...call, [format === "json" ? "stdout" : "stderr"]: result.replace(target, "tablet") },
-          { ...call, [format === "json" ? "stdout" : "stderr"]: result.replace("WAIT_TIMEOUT", "OTHER_ERROR") },
+          {
+            ...call,
+            [format === "json" ? "stdout" : "stderr"]: result.replace(
+              "WAIT_TIMEOUT",
+              "OTHER_ERROR",
+            ),
+          },
           { ...call, args: ["wait", "boot", "--timeout", "500ms"] },
         ])
           assert.equal(score(base, [stop, invalid, restart], answer).success, false);
