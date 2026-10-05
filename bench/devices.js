@@ -60,15 +60,17 @@ export class Devices {
     if (interrupted) {
       for (const name of this.names) {
         const saved = interrupted.owned?.find((d) => d.name === name);
-        if (!saved?.processIdentity || saved.processIdentity !== this.processIdentityOrNull(name))
-          continue;
+        const identity = this.processIdentityOrNull(name);
+        if (identity && identity !== saved?.processIdentity)
+          throw new Error(`Unresolved interrupted ownership: ${name}`);
+        if (!identity) continue;
         const matches = this.list().filter(
           (d) =>
             d.state === "device" && /^emulator-\d+$/.test(d.serial) && this.name(d.serial) === name,
         );
         if (matches.length > 1) throw new Error(`Ambiguous owned AVD: ${name}`);
-        if (!matches.length) continue;
-        const d = { ...saved, ...matches[0], recoveryProof: saved.processIdentity };
+        if (!matches.length) throw new Error(`Owned emulator offline: ${name}`);
+        const d = { ...saved, ...matches[0] };
         this.owned.push(d);
         this.resetDevice(d);
         this.shutdownDevice(d);
@@ -108,6 +110,11 @@ export class Devices {
       if (/Cannot identify one emulator process/.test(error.message)) return null;
       throw error;
     }
+  }
+  refreshOwnership(d) {
+    if (!this.owned.includes(d) || !this.current(d)) throw new Error("Unowned or offline emulator");
+    d.processIdentity = this.processIdentity(d.name);
+    this.saveOwnership(this.owned);
   }
   emulatorPid(d) {
     if (!this.owned.includes(d) || !this.current(d)) throw new Error("Unowned or offline emulator");
@@ -156,7 +163,11 @@ export class Devices {
     return true;
   }
   recover(d) {
+    const identity = this.processIdentityOrNull(d.name);
+    if (identity && identity !== d.processIdentity)
+      throw new Error(`Owned process changed: ${d.name}`);
     if (!this.current(d)) {
+      if (identity) throw new Error(`Owned emulator offline: ${d.name}`);
       const before = new Set(this.list().map((x) => x.serial));
       command(this.bins.android, ["emulator", "start", "--headless", "--cold", d.name], {
         timeout: 240000,
@@ -170,6 +181,8 @@ export class Devices {
       );
       if (added.length !== 1) throw new Error("Cannot prove recovered ownership");
       d.serial = added[0].serial;
+      d.processIdentity = this.processIdentity(d.name);
+      this.saveOwnership?.(this.owned);
     }
     this.ready(d);
   }
@@ -177,36 +190,39 @@ export class Devices {
     for (const d of this.owned) this.resetDevice(d);
   }
   resetDevice(d) {
-      if (d.recoveryProof && this.processIdentityOrNull(d.name) !== d.recoveryProof)
-        throw new Error(`Interrupted ownership changed: ${d.name}`);
-      this.recover(d);
-      const night = d.night.match(/(?:Night mode: )?(yes|no|auto|custom)/i)?.[1];
-      if (!night) throw new Error(`Unknown night setting: ${d.night}`);
-      this.shell(d, `cmd uimode night ${night.toLowerCase()}`);
-      const density = d.density.match(/Override density: (\d+)/)?.[1] ?? "reset";
-      this.shell(d, `wm density ${density}`);
-      this.shell(d, "am force-stop com.android.cli.interact.instrumentation");
-      if (this.shell(d, "pm path dev.probe || true").includes("package:"))
-        this.adb(d, ["uninstall", "dev.probe"]);
-      this.adb(d, ["logcat", "-c"]);
-      if (
-        this.shell(d, "pm path dev.probe || true").includes("package:") ||
-        this.shell(d, "pidof com.android.cli.interact.instrumentation || true").trim() ||
-        this.shell(d, "cmd uimode night").trim() !== d.night ||
-        this.shell(d, "wm density").trim() !== d.density
-      )
-        throw new Error("Reset verification failed");
+    this.recover(d);
+    const night = d.night.match(/(?:Night mode: )?(yes|no|auto|custom)/i)?.[1];
+    if (!night) throw new Error(`Unknown night setting: ${d.night}`);
+    this.shell(d, `cmd uimode night ${night.toLowerCase()}`);
+    const density = d.density.match(/Override density: (\d+)/)?.[1] ?? "reset";
+    this.shell(d, `wm density ${density}`);
+    this.shell(d, "am force-stop com.android.cli.interact.instrumentation");
+    if (this.shell(d, "pm path dev.probe || true").includes("package:"))
+      this.adb(d, ["uninstall", "dev.probe"]);
+    this.adb(d, ["logcat", "-c"]);
+    if (
+      this.shell(d, "pm path dev.probe || true").includes("package:") ||
+      this.shell(d, "pidof com.android.cli.interact.instrumentation || true").trim() ||
+      this.shell(d, "cmd uimode night").trim() !== d.night ||
+      this.shell(d, "wm density").trim() !== d.density
+    )
+      throw new Error("Reset verification failed");
   }
   shutdown() {
     for (const d of this.owned) this.shutdownDevice(d);
   }
   shutdownDevice(d) {
-      if (d.recoveryProof && this.processIdentityOrNull(d.name) !== d.recoveryProof)
-        throw new Error(`Interrupted ownership changed: ${d.name}`);
-      if (!this.current(d)) return;
-      this.assert(d);
-      command(this.bins.android, ["emulator", "stop", d.name], { timeout: 90000 });
-      if (this.list().some((x) => x.serial === d.serial))
-        throw new Error(`Owned emulator did not shut down: ${d.name}`);
+    const identity = this.processIdentityOrNull(d.name);
+    if (identity && identity !== d.processIdentity)
+      throw new Error(`Owned process changed: ${d.name}`);
+    if (!this.current(d)) {
+      if (identity) throw new Error(`Owned emulator offline: ${d.name}`);
+      return;
+    }
+    if (!identity) throw new Error(`Cannot prove owned process: ${d.name}`);
+    this.assert(d);
+    command(this.bins.android, ["emulator", "stop", d.name], { timeout: 90000 });
+    if (this.list().some((x) => x.serial === d.serial))
+      throw new Error(`Owned emulator did not shut down: ${d.name}`);
   }
 }

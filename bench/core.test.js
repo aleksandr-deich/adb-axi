@@ -190,10 +190,13 @@ test("status and summary read external results without side effects or tools", (
     });
     const summary = invoke(["summary"]);
     assert.equal(summary.status, 0, summary.stderr);
-    assert.deepEqual(JSON.parse(summary.stdout).map((g) => [g.runs, g.failedAttempts]), [
-      [1, 0],
-      [0, 1],
-    ]);
+    assert.deepEqual(
+      JSON.parse(summary.stdout).map((g) => [g.runs, g.failedAttempts]),
+      [
+        [1, 0],
+        [0, 1],
+      ],
+    );
     const dry = invoke(["--tasks", "1", "--repeats", "1", "--max-runs", "1"]);
     assert.equal(dry.status, 0, dry.stderr);
     assert.equal(JSON.parse(dry.stdout).toRunCount, 1);
@@ -249,7 +252,19 @@ test("active lock refuses overlap and stale ownership authorizes targeted recove
     };
     try {
       assert.throws(() => acquireLock(lock, ["tablet"]), /different AVDs/);
-      assert.equal(acquireLock(lock, ["phone"]).previous.owned[0].name, "phone");
+      const rename = fs.renameSync;
+      fs.renameSync = (source, destination) => {
+        if (destination === path.join(lock, "owner.json")) {
+          assert.throws(() => acquireLock(lock, ["phone"]), /EEXIST/);
+          assert.equal(fs.existsSync(destination), true);
+        }
+        return rename(source, destination);
+      };
+      try {
+        assert.equal(acquireLock(lock, ["phone"]).previous.owned[0].name, "phone");
+      } finally {
+        fs.renameSync = rename;
+      }
     } finally {
       process.kill = kill;
     }
@@ -263,11 +278,23 @@ test("interrupted recovery requires the saved process identity", () => {
   d.resetDevice = () => events.push("reset");
   d.shutdownDevice = () => events.push("shutdown");
   for (const owned of [[], [{ name: "phone" }], [{ name: "phone", processIdentity: "101:old" }]])
-    d.boot({ owned }, false);
+    assert.throws(() => d.boot({ owned }, false), /Unresolved interrupted ownership/);
   assert.deepEqual(events, []);
-  d.boot({ owned: [{ name: "phone", processIdentity: d.processIdentity() }] }, false);
+  const phone = { name: "phone", serial: "emulator-5554", processIdentity: "101:old" };
+  d.owned.push(phone);
+  d.current = () => true;
+  let saved;
+  d.saveOwnership = (owned) => {
+    saved = structuredClone(owned);
+  };
+  d.refreshOwnership(phone);
+  assert.equal(saved[0].processIdentity, d.processIdentity());
+  d.owned = [];
+  d.boot({ owned: saved }, false);
   assert.deepEqual(events, ["reset", "shutdown"]);
   assert.deepEqual(d.owned, []);
+  d.list = () => [];
+  assert.throws(() => d.boot({ owned: saved }, false), /Owned emulator offline/);
 });
 test("reset-before-run restores interrupted app, UI holder and settings without device commands", () => {
   const d = new Devices({}, ["phone"]);
@@ -320,6 +347,14 @@ test("explicit verdict alone completes a slot and failed attempts do not dilute 
   assert.equal(g.runs, 1);
   assert.equal(g.failedAttempts, 1);
   assert.equal(g.successRate, 1);
+  assert.equal(
+    aggregate([
+      failed,
+      { ...slot, success: true, verdictProduced: true },
+      { ...slot, success: false, verdictProduced: true },
+    ])[0].runs,
+    1,
+  );
 });
 test("records are exclusive, aggregation counts verdicts and missing metrics", () =>
   temporary((dir) => {
@@ -327,6 +362,7 @@ test("records are exclusive, aggregation counts verdicts and missing metrics", (
       id: "one",
       task: "1",
       condition: "baseline",
+      repeat: 1,
       success: true,
       verdictProduced: true,
       inputTokens: 50,
@@ -337,7 +373,7 @@ test("records are exclusive, aggregation counts verdicts and missing metrics", (
     const file = writeRecord(dir, r);
     assert.deepEqual(JSON.parse(fs.readFileSync(file, "utf8")), r);
     assert.throws(() => writeRecord(dir, r));
-    const g = aggregate([r, { ...r, success: false }])[0];
+    const g = aggregate([r, { ...r, repeat: 2, success: false }])[0];
     assert.equal(g.successRate, 0.5);
     assert.equal(g.turns, 6);
     assert.equal(g.cost, 0.2);

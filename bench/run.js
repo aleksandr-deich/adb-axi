@@ -180,12 +180,15 @@ async function main() {
   const bins = Object.fromEntries(["adb", "android", "pi", "node", "npx"].map((t) => [t, find(t)]));
   const ownership = acquireLock(lock, [options.phone, options.tablet]);
   const devices = new Devices(bins, [options.phone, options.tablet]);
+  devices.saveOwnership = ownership.save;
   devices.androidLayout = (d) => command(bins.android, ["layout", `--device=${d.serial}`]);
   const work = progress.toRun.length
     ? fs.mkdtempSync(path.join(os.tmpdir(), "android-benchmark-"))
     : null;
+  let recovered = false;
   try {
     devices.boot(ownership.previous, !!progress.toRun.length, ownership.save);
+    recovered = true;
     if (!progress.toRun.length) return;
     const benchmarkDirty = !!command("git", ["status", "--porcelain"], { cwd: root }).trim();
     const toolVersions = {
@@ -269,6 +272,9 @@ async function main() {
           check({ devices, finalAnswer: record.finalAnswer, audit: controlled.audit }),
         );
         record.verdictProduced = typeof record.success === "boolean";
+        if (task.id === "8" && record.checks?.stopped && record.checks?.online) {
+          devices.refreshOwnership(devices.owned[0]);
+        }
         if (record.agentError) record.success = false;
       } catch (e) {
         if (e.metrics) Object.assign(record, e.metrics);
@@ -301,7 +307,7 @@ async function main() {
   } finally {
     try {
       devices.shutdown();
-      fs.rmSync(lock, { recursive: true });
+      if (recovered) fs.rmSync(lock, { recursive: true });
     } finally {
       if (work) fs.rmSync(work, { recursive: true, force: true });
     }

@@ -182,33 +182,38 @@ export function writeRecord(dir, record) {
   return file;
 }
 export function acquireLock(lock, names) {
-  let previous = null;
-  if (fs.existsSync(lock)) {
-    previous = JSON.parse(fs.readFileSync(path.join(lock, "owner.json"), "utf8"));
-    try {
-      process.kill(previous.pid, 0);
-      throw new Error("Benchmark runner is still active");
-    } catch (error) {
-      if (error.code !== "ESRCH") throw error;
-    }
-    if (JSON.stringify(previous.names) !== JSON.stringify(names))
-      throw new Error(
-        "Interrupted benchmark owns different AVDs; resume with its original AVD names",
-      );
-    fs.rmSync(lock, { recursive: true });
+  const claim = `${lock}.reclaim`;
+  fs.mkdirSync(claim);
+  try {
+    let previous = null;
+    if (fs.existsSync(lock)) {
+      previous = JSON.parse(fs.readFileSync(path.join(lock, "owner.json"), "utf8"));
+      try {
+        process.kill(previous.pid, 0);
+        throw new Error("Benchmark runner is still active");
+      } catch (error) {
+        if (error.code !== "ESRCH") throw error;
+      }
+      if (JSON.stringify(previous.names) !== JSON.stringify(names))
+        throw new Error(
+          "Interrupted benchmark owns different AVDs; resume with its original AVD names",
+        );
+    } else fs.mkdirSync(lock);
+    const owner = { pid: process.pid, names, owned: previous?.owned ?? [] };
+    const file = path.join(lock, "owner.json");
+    const temp = `${file}.tmp`;
+    fs.writeFileSync(temp, JSON.stringify({ ...owner, id: "owner" }));
+    fs.renameSync(temp, file);
+    return {
+      previous,
+      save(owned) {
+        fs.writeFileSync(temp, JSON.stringify({ ...owner, owned }));
+        fs.renameSync(temp, file);
+      },
+    };
+  } finally {
+    fs.rmdirSync(claim);
   }
-  fs.mkdirSync(lock);
-  const owner = { pid: process.pid, names, owned: previous?.owned ?? [] };
-  writeRecord(lock, { id: "owner", ...owner });
-  return {
-    previous,
-    save(owned) {
-      const file = path.join(lock, "owner.json");
-      const temp = `${file}.tmp`;
-      fs.writeFileSync(temp, JSON.stringify({ ...owner, owned }));
-      fs.renameSync(temp, file);
-    },
-  };
 }
 export function readRecords(dir) {
   if (!fs.existsSync(dir)) return [];
@@ -301,6 +306,7 @@ export function assertConsistency(records, current) {
 }
 export function aggregate(records) {
   const groups = new Map();
+  const completed = new Set();
   for (const r of records) {
     const key = `${r.task}/${r.condition}`;
     const g = groups.get(key) ?? {
@@ -320,6 +326,9 @@ export function aggregate(records) {
       groups.set(key, g);
       continue;
     }
+    const slot = `${key}/${r.repeat}`;
+    if (completed.has(slot)) continue;
+    completed.add(slot);
     g.runs++;
     g.successes += Number(r.success === true);
     for (const k of ["inputTokens", "cost", "turns", "wallTimeMs"])
