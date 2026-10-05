@@ -36,7 +36,7 @@ The repository ships an agent skill at [`skills/adb-axi/SKILL.md`](skills/adb-ax
 npx skills add aleksandr-deich/adb-axi --skill adb-axi -g
 ```
 
-`-g` installs the skill for all projects; drop it to install for the current project only. With the skill, adb-axi needs no global install: use the executable supplied by the environment, or `npx -y adb-axi` otherwise. The skill explains how agents can avoid unnecessary help and verification calls; command and flag details stay in live CLI help. The requirements above still apply.
+`-g` installs the skill for all projects; drop it to install for the current project only. With the skill, adb-axi needs no global install: run `npx -y adb-axi <command>`, or `adb-axi <command>` when adb-axi is already installed on PATH. The skill explains how agents can avoid unnecessary help and verification calls; command and flag details stay in live CLI help. The requirements above still apply.
 
 ## Start here
 
