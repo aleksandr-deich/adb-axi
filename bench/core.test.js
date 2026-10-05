@@ -20,6 +20,7 @@ import { checkTask } from "./success.js";
 import { Devices } from "./devices.js";
 import { environment } from "./run.js";
 import task8Reference from "./reference/8.js";
+import "./success.test.js";
 
 function temporary(fn) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "benchmark-test-"));

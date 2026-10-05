@@ -20,7 +20,23 @@ export default function reference({ android, adb, phone, wait }, skipRecover = f
   }
   return { unavailableState: "missing", recovered: true };
 }
-export function wrong(context) {
-  return reference(context, true);
+// Wrong outcome: stop and restart, but never inspect the unavailable state.
+export function wrong({ android, phone }) {
+  android(["emulator", "stop", phone.name]);
+  android(["emulator", "start", "--headless", "--cold", phone.name]);
+  return { unavailableState: "missing", recovered: true };
+}
+export function treatment({ android, axi, phone, wait }) {
+  axi(["devices", "--json"]);
+  android(["emulator", "stop", phone.name]);
+  wait(
+    () => !JSON.parse(axi(["devices", "--json"])).devices.some((d) => d.serial === phone.serial),
+  );
+  android(["emulator", "start", "--headless", "--cold", phone.name]);
+  axi(["wait", "boot", "-s", phone.name, "--json"]);
+  return { unavailableState: "missing", recovered: true };
+}
+export function wrongReport(answer) {
+  return { ...answer, unavailableState: "offline" };
 }
 export const freshWrongSetup = true;

@@ -1,6 +1,65 @@
 import fs from "node:fs";
 import path from "node:path";
 import { root } from "./core.js";
+// Recognize device-state output, not the executable that produced it. Unknown
+// formats are not evidence; in particular, an AVD inventory is not an attached list.
+export function deviceState(call, serial, name) {
+  if ((call.args ?? []).some((arg) => ["--help", "-h"].includes(arg))) return null;
+  const stdout = call.stdout ?? "";
+  const text = `${stdout}\n${call.stderr ?? ""}`;
+  if (call.status === 0) {
+    try {
+      const value = JSON.parse(stdout);
+      if (Array.isArray(value.devices)) {
+        const device = value.devices.find((d) => d.serial === serial || d.avd === name);
+        if (!device) return "missing";
+        if (device.state === "device") return "online";
+        if (device.state === "offline") return "offline";
+      }
+    } catch {
+      // Text listings and targeted errors below are also valid evidence.
+    }
+    const table = stdout.match(/^devices\[(\d+)\]\{([^}]+)\}:\s*\n?/m);
+    if (table) {
+      const fields = table[2].split(",");
+      const rows = stdout
+        .slice(table.index + table[0].length)
+        .split("\n")
+        .slice(0, Number(table[1]));
+      const serialColumn = fields.indexOf("serial");
+      const stateColumn = fields.indexOf("state");
+      if (
+        serialColumn >= 0 &&
+        stateColumn >= 0 &&
+        rows.length === Number(table[1]) &&
+        rows.every((line) => line.trim().split(",").length === fields.length)
+      ) {
+        const row = rows
+          .map((line) => line.trim().split(","))
+          .find((values) => values[serialColumn] === serial);
+        if (!row) return "missing";
+        if (row[stateColumn] === "device") return "online";
+        if (row[stateColumn] === "offline") return "offline";
+      }
+    }
+    if (/^List of devices attached\s*$/m.test(stdout)) {
+      const rows = stdout.split("\n").map((line) => line.trim().split(/\s+/));
+      const row = rows.find((fields) => fields[0] === serial);
+      if (!row) return "missing";
+      if (row[1] === "device") return "online";
+      if (row[1] === "offline") return "offline";
+    }
+  }
+  // Require identity and state in the same output line. A generic timeout or
+  // a command's usage examples cannot establish the target's unavailable state.
+  for (const line of text.split("\n")) {
+    if (!line.includes(serial) && !line.includes(name)) continue;
+    if (/\boffline\b/i.test(line)) return "offline";
+    if (/not found|\bmissing\b|no attached device has/i.test(line)) return "missing";
+    if (/\bunavailable\b/i.test(line)) return "unavailable";
+  }
+  return null;
+}
 export function setupTask(task, devices) {
   devices.reset();
   const phone = devices.owned[0];
@@ -137,7 +196,9 @@ export function checkTask(id, { devices, finalAnswer, audit }) {
       answer.original === original && answer.changed === opposite && answer.restored === original;
   } else if (id === "6") {
     checks.holderReport =
-      answer.holder === "com.android.cli.interact.instrumentation" && answer.layoutWorks === true;
+      typeof answer.holder === "string" &&
+      answer.holder.includes("com.android.cli.interact.instrumentation") &&
+      answer.layoutWorks === true;
     checks.diagnosed = /com.android.cli.interact/.test(output);
     const clear = calls.find(
       (c) =>
@@ -171,6 +232,10 @@ export function checkTask(id, { devices, finalAnswer, audit }) {
         }
       });
   } else if (id === "8") {
+    const lifecycle = (c) =>
+      c.status === 0 &&
+      !c.args.some((arg) => ["--help", "-h"].includes(arg)) &&
+      !/^(?:KO:|error:)/im.test(`${c.stdout ?? ""}\n${c.stderr ?? ""}`);
     const stop = calls.find(
       (c) =>
         ((c.tool === "android" &&
@@ -182,7 +247,7 @@ export function checkTask(id, { devices, finalAnswer, audit }) {
             c.args[1] === stoppedSerial &&
             c.args[2] === "emu" &&
             c.args[3] === "kill")) &&
-        c.status === 0,
+        lifecycle(c),
     );
     const restart = calls.find(
       (c) =>
@@ -192,32 +257,35 @@ export function checkTask(id, { devices, finalAnswer, audit }) {
         c.args[0] === "emulator" &&
         c.args[1] === "start" &&
         c.args.at(-1) === phone.name &&
-        c.status === 0,
+        lifecycle(c),
     );
-    checks.stopped = !!stop;
-    checks.observed =
-      !!stop &&
-      !!restart &&
-      calls.some(
-        (c) =>
-          c.tool === "adb" &&
-          c.time >= stop.time &&
-          c.time < restart.time &&
-          ((c.args[0] === "devices" &&
-            c.status === 0 &&
-            !(c.stdout ?? "").includes(stoppedSerial)) ||
-            (c.args[0] === "-s" &&
-              c.args[1] === stoppedSerial &&
-              /offline|not found|missing|unavailable/i.test(
-                `${c.stdout ?? ""}\n${c.stderr ?? ""}`,
-              ))),
-      );
+    const states = calls
+      .map((call) => ({ call, state: deviceState(call, stoppedSerial, phone.name) }))
+      .filter(({ state }) => state !== null);
+    const observations = states.filter(({ call, state }) => {
+      if (state === "online") return false;
+      const before = stop
+        ? call.time > stop.time
+        : states.some((s) => s.state === "online" && s.call.time < call.time);
+      const after = restart
+        ? call.time < restart.time
+        : states.some((s) => s.state === "online" && s.call.time > call.time);
+      return before && after;
+    });
+    // Some lifecycle calls bypass the bridge. An audited online -> unavailable
+    // -> online sequence plus the independent boot check can establish recovery.
+    checks.stopped = !!stop || observations.length > 0;
+    checks.observed = observations.length > 0;
+    const restarted = !!restart || observations.length > 0;
+    evidence.unavailableStates = [...new Set(observations.map((s) => s.state))];
     checks.online =
-      !!restart &&
+      restarted &&
       recoveredOnline &&
       devices.shell(phone, "getprop sys.boot_completed").trim() === "1";
     checks.report =
-      ["offline", "missing", "unavailable"].includes(answer.unavailableState) &&
+      (answer.unavailableState === "unavailable"
+        ? observations.length > 0
+        : evidence.unavailableStates.includes(answer.unavailableState)) &&
       answer.recovered === true;
   } else throw new Error("No success oracle");
   return {

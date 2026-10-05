@@ -21,11 +21,12 @@ export function evaluate(check, devices, answer, audit) {
 export async function selfCheck(options) {
   if (options.run || options.repeats !== 1)
     throw new Error("self-check never runs an agent; omit --run and use one repeat");
+  const version =
+    options.version ?? JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8")).version;
+  const tools = ["adb", "android", "node"];
+  if (options.tasks.some((id) => ["6", "8"].includes(id))) tools.push("npx");
   const bins = Object.fromEntries(
-    ["adb", "android", "node"].map((t) => [
-      t,
-      command("/bin/sh", ["-c", `command -v ${t}`]).trim(),
-    ]),
+    tools.map((t) => [t, command("/bin/sh", ["-c", `command -v ${t}`]).trim()]),
   );
   const lock = path.join(os.tmpdir(), "android-repeatable-benchmark.lock");
   fs.mkdirSync(lock);
@@ -43,16 +44,9 @@ export async function selfCheck(options) {
       const reference = await import(pathToFileURL(path.join(root, task.reference)).href);
       let count = 0;
       const created = [];
-      const context = () => {
+      const context = (condition = "baseline") => {
         const directory = path.join(work, `${id}-${count++}`);
-        const controlled = environment(
-          directory,
-          "baseline",
-          options.version,
-          bins,
-          devices.owned,
-          task.id,
-        );
+        const controlled = environment(directory, condition, version, bins, devices.owned, task.id);
         const run = (tool, args, extra = {}) => {
           const r = spawnSync(path.join(directory, "bin", tool), args, {
             env: controlled.env,
@@ -86,6 +80,7 @@ export async function selfCheck(options) {
           shell,
           wait,
           android: (args) => run("android", args),
+          axi: (args) => run("adb-axi", args),
           debug: path.join(root, "test/fixtures/apk/probe-debug.apk"),
           release: path.join(root, "test/fixtures/apk/probe-release.apk"),
         };
@@ -109,6 +104,24 @@ export async function selfCheck(options) {
         const answer = reference.default(correctContext);
         record.reference = evaluate(checker, devices, answer, correctContext.audit);
         record.referencePassed = record.reference.success === true;
+        if (reference.treatment) {
+          devices.reset();
+          setupTask(task, devices);
+          const treatmentContext = context("adb-axi");
+          const treatmentAnswer = reference.treatment(treatmentContext);
+          record.treatment = evaluate(checker, devices, treatmentAnswer, treatmentContext.audit);
+          record.referencePassed &&= record.treatment.success === true;
+          archive(treatmentContext, "treatment");
+          if (reference.wrongReport) {
+            record.wrongReport = evaluate(
+              checker,
+              devices,
+              reference.wrongReport(treatmentAnswer),
+              treatmentContext.audit,
+            );
+            record.referencePassed &&= record.wrongReport.success === false;
+          }
+        }
         // A forged correct-looking answer must not make untouched setup pass.
         devices.reset();
         setupTask(task, devices);
