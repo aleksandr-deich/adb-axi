@@ -46,6 +46,13 @@ export function wrongDisconnect({ audit, adb, phone }) {
   fs.writeFileSync(audit, calls.map((call) => JSON.stringify(call)).join("\n") + "\n");
   return { unavailableState: "missing", recovered: true };
 }
+export function wrongReboot({ adb, phone, wait }) {
+  adb(phone, ["reboot"]);
+  wait(() => !adb(null, ["devices"]).includes(`${phone.serial}\tdevice`));
+  wait(() => adb(null, ["devices"]).includes(`${phone.serial}\tdevice`));
+  wait(() => adb(phone, ["shell", "getprop sys.boot_completed"]).trim() === "1");
+  return { unavailableState: "missing", recovered: true };
+}
 export function wrongReport(answer) {
   return { ...answer, unavailableState: "offline" };
 }

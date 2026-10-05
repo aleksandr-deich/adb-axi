@@ -17,7 +17,7 @@ import {
 } from "./core.js";
 import { parsePi, runPi } from "./pi.js";
 import { checkTask } from "./success.js";
-import { Devices } from "./devices.js";
+import { Devices, emulatorPid } from "./devices.js";
 import { environment } from "./run.js";
 import task8Reference from "./reference/8.js";
 import "./success.test.js";
@@ -504,7 +504,8 @@ test("recovery and scoring follow the verified AVD onto its new serial", () =>
       { mode: 0o755 },
     );
     const d = new Devices({ adb: fake, android: "/nonexistent-android" }, ["owned"]);
-    const phone = { name: "owned", serial: "emulator-5554", task8BootId: "12345678-1234-1234-1234-123456789abc" };
+    const phone = { name: "owned", serial: "emulator-5554", task8BootId: "12345678-1234-1234-1234-123456789abc", task8EmulatorPid: "101" };
+    d.emulatorPid = () => "202";
     d.owned.push(phone);
     d.recover(phone);
     assert.equal(phone.serial, "emulator-5580");
@@ -571,6 +572,17 @@ test("recovery and scoring follow the verified AVD onto its new serial", () =>
     }
   }));
 
+test("host emulator PID lookup requires one real executable for the exact AVD", () => {
+  const processes = [
+    "101 /sdk/emulator/emulator -avd phone_backup -no-window",
+    "202 /sdk/qemu-system-aarch64 -avd phone -no-window",
+    "303 /bin/sh -c /sdk/emulator/emulator -avd phone",
+    "404 /sdk/emulator/emulator -avd tablet",
+  ].join("\n");
+  assert.equal(emulatorPid(processes, "phone"), "202");
+  assert.throws(() => emulatorPid(processes, "other"), /Cannot identify/);
+  assert.throws(() => emulatorPid(processes + "\n505 /sdk/emulator/emulator -avd phone", "phone"), /Cannot identify/);
+});
 test("task 8 reference confirms boot on the restarted AVD's new serial", () => {
   const phone = { name: "phone", serial: "emulator-5554" };
   let phase = "before";

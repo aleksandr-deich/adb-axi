@@ -8,7 +8,7 @@ import { checkTask, deviceState, setupTask } from "./success.js";
 
 const beforeBoot = "12345678-1234-1234-1234-123456789abc";
 const afterBoot = "abcdef01-1234-1234-1234-123456789abc";
-function score(fixture, calls = fixture.calls, answer = fixture.finalAnswer, finalBoot = afterBoot) {
+function score(fixture, calls = fixture.calls, answer = fixture.finalAnswer, finalBoot = afterBoot, finalPid = "202") {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "oracle-test-"));
   try {
     const audit = path.join(dir, "audit.jsonl");
@@ -18,8 +18,10 @@ function score(fixture, calls = fixture.calls, answer = fixture.finalAnswer, fin
         ...d,
         uiHolderPid: fixture.initialHolderPid,
         task8BootId: fixture.task8BootId,
+        task8EmulatorPid: fixture.task8EmulatorPid,
       })),
       current: () => true,
+      emulatorPid: () => finalPid,
       adb: () => "",
       shell: (_d, text) => text.includes("boot_id") ? finalBoot : "1",
     };
@@ -41,6 +43,7 @@ for (const task of ["6", "8"]) {
         for (const holder of [
           "unknown",
           "com.unrelated.instrumentation",
+          "com.unrelated.instrumentation (not com.android.cli.interact.instrumentation)",
           "COM.ANDROID.CLI.INTERACT.INSTRUMENTATION",
           42,
         ]) {
@@ -82,22 +85,40 @@ for (const task of ["6", "8"]) {
     });
   }
 }
-test("historical treatment observation needs an independently captured setup boot ID", () => {
+test("holder reports accept class and descriptive identity but reject contradictory packages", () => {
+  const fixture = JSON.parse(fs.readFileSync(new URL("./fixtures/pilot/6-adb-axi.json", import.meta.url)));
+  for (const holder of [
+    "com.android.cli.interact.instrumentation/com.android.cli.interact.instrumentation.InstrumentationServer",
+    "UI holder: com.android.cli.interact.instrumentation (Android CLI)",
+  ])
+    assert.equal(score(fixture, fixture.calls, JSON.stringify({ holder, layoutWorks: true })).success, true);
+  for (const holder of [
+    "com.unrelated.instrumentation (not com.android.cli.interact.instrumentation)",
+    "com.android.cli.interact.instrumentation and com.unrelated.instrumentation",
+    "not com.android.cli.interact.instrumentation",
+  ])
+    assert.equal(score(fixture, fixture.calls, JSON.stringify({ holder, layoutWorks: true })).success, false);
+});
+test("historical treatment observation needs independently captured host and boot identities", () => {
   const fixture = JSON.parse(fs.readFileSync(new URL("./fixtures/pilot/8-adb-axi.json", import.meta.url)));
   assert.equal(score(fixture).success, false);
-  assert.equal(score({ ...fixture, task8BootId: beforeBoot }).success, true);
-  assert.equal(score({ ...fixture, task8BootId: beforeBoot }, fixture.calls, fixture.finalAnswer, beforeBoot).success, false);
+  const captured = { ...fixture, task8BootId: beforeBoot, task8EmulatorPid: "101" };
+  assert.equal(score(captured).success, true);
+  assert.equal(score(captured, fixture.calls, fixture.finalAnswer, beforeBoot).success, false);
+  assert.equal(score(captured, fixture.calls, fixture.finalAnswer, afterBoot, "101").success, false);
 });
 test("task 8 setup captures and validates the owned phone boot identity", () => {
   const phone = { name: "phone", serial: "emulator-5554" };
-  const devices = { owned: [phone], reset: () => {}, shell: () => beforeBoot };
+  const devices = { owned: [phone], reset: () => {}, shell: () => beforeBoot, emulatorPid: () => "101" };
   setupTask({ id: "8", setup: "clean" }, devices);
   assert.equal(phone.task8BootId, beforeBoot);
+  assert.equal(phone.task8EmulatorPid, "101");
   devices.shell = () => "not-a-boot-id";
   assert.throws(() => setupTask({ id: "8", setup: "clean" }, devices), /Invalid initial phone boot ID/);
 });
 const base = {
   task8BootId: beforeBoot,
+  task8EmulatorPid: "101",
   task: "8",
   devices: [{ name: "phone", serial: "emulator-5554" }],
   finalAnswer: JSON.stringify({ unavailableState: "missing", recovered: true }),
@@ -137,7 +158,15 @@ test("unavailable observation is tool-neutral and report must match evidence", (
     }
   }
 });
-test("boot identity rejects transient disconnect and accepts a reboot with observation", () => {
+test("visible missing listing and raw offline output demand their respective reports", () => {
+  const listing = { time: 2, tool: "adb", args: ["devices", "-l"], status: 0, stdout: "List of devices attached\n" };
+  const offline = { ...listing, stdout: "List of devices attached\nemulator-5554 offline\n" };
+  assert.equal(score(base, [stop, listing, restart]).success, true);
+  assert.equal(score(base, [stop, listing, restart], JSON.stringify({ unavailableState: "offline", recovered: true })).success, false);
+  assert.equal(score(base, [stop, offline, restart], JSON.stringify({ unavailableState: "offline", recovered: true })).success, true);
+  assert.equal(score(base, [stop, offline, restart]).success, false);
+});
+test("process and boot identities reject disconnect or reboot but accept a restarted emulator", () => {
   const online = {
     time: 1,
     tool: "other",
@@ -148,6 +177,7 @@ test("boot identity rejects transient disconnect and accepts a reboot with obser
   const missing = { ...online, time: 2, stdout: '{"devices":[]}' };
   const recovered = { ...online, time: 3 };
   assert.equal(score(base, [online, missing, recovered], base.finalAnswer, beforeBoot).success, false);
+  assert.equal(score(base, [online, missing, recovered], base.finalAnswer, afterBoot, "101").success, false);
   assert.equal(score(base, [online, missing, recovered]).success, true);
   assert.equal(score(base, [online, missing, recovered], base.finalAnswer, "invalid").success, false);
   assert.equal(score(base, [missing, recovered]).success, false);

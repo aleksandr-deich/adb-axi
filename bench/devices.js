@@ -1,6 +1,18 @@
 import { spawnSync } from "node:child_process";
 import { command } from "./core.js";
 
+export function emulatorPid(processes, name) {
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const avd = new RegExp(`(?:^|\\s)-avd\\s+${escaped}(?=\\s|$)`);
+  const matches = processes.split("\n").flatMap((line) => {
+    const match = line.match(/^\s*([1-9]\d*)\s+(\S+)\s*(.*)$/);
+    if (!match || !/^(?:emulator|qemu-system-[\w.-]+)$/.test(match[2].split("/").at(-1)))
+      return [];
+    return avd.test(`${match[2]} ${match[3]}`) ? [match[1]] : [];
+  });
+  if (matches.length !== 1) throw new Error(`Cannot identify one emulator process for ${name}`);
+  return matches[0];
+}
 export class Devices {
   constructor(bins, names) {
     this.bins = bins;
@@ -50,6 +62,11 @@ export class Devices {
       d.night = this.shell(d, "cmd uimode night").trim();
       d.density = this.shell(d, "wm density").trim();
     }
+  }
+  emulatorPid(d) {
+    if (!this.owned.includes(d) || !this.current(d))
+      throw new Error("Unowned or offline emulator");
+    return emulatorPid(command("/bin/ps", ["-axo", "pid=,command="]), d.name);
   }
   assert(d) {
     if (

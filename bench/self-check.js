@@ -148,14 +148,18 @@ export async function selfCheck(options) {
           archive(wrongContext, "wrong");
         }
         record.wrongRejected = record.wrong.success === false;
-        if (reference.wrongDisconnect) {
+        for (const [kind, action] of [
+          ["disconnect", reference.wrongDisconnect],
+          ["reboot", reference.wrongReboot],
+        ]) {
+          if (!action) continue;
           devices.reset();
           setupTask(task, devices);
-          const disconnectContext = context();
-          const disconnectAnswer = reference.wrongDisconnect(disconnectContext);
-          record.disconnect = evaluate(checker, devices, disconnectAnswer, disconnectContext.audit);
-          record.wrongRejected &&= record.disconnect.success === false;
-          archive(disconnectContext, "disconnect");
+          const wrongContext = context();
+          const wrongAnswer = action(wrongContext);
+          record[kind] = evaluate(checker, devices, wrongAnswer, wrongContext.audit);
+          record.wrongRejected &&= record[kind].success === false;
+          archive(wrongContext, kind);
         }
         record.success =
           record.setupRejected &&

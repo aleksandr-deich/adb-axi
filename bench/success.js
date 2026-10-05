@@ -69,6 +69,7 @@ export function setupTask(task, devices) {
   if (task.id === "8") {
     phone.task8BootId = devices.shell(phone, "cat /proc/sys/kernel/random/boot_id").trim();
     if (!validBootId(phone.task8BootId)) throw new Error("Invalid initial phone boot ID");
+    phone.task8EmulatorPid = devices.emulatorPid(phone);
   }
   if (["debug", "ui-holder"].includes(task.setup)) {
     devices.adb(phone, ["install", path.join(root, "test/fixtures/apk/probe-debug.apk")]);
@@ -202,9 +203,16 @@ export function checkTask(id, { devices, finalAnswer, audit }) {
     checks.report =
       answer.original === original && answer.changed === opposite && answer.restored === original;
   } else if (id === "6") {
+    const holders =
+      typeof answer.holder === "string"
+        ? answer.holder.match(/\b(?:[a-z][\w]*\.)+[a-z][\w]*(?:\/[\w.$]+)?/g) ?? []
+        : [];
     checks.holderReport =
-      typeof answer.holder === "string" &&
-      answer.holder.includes("com.android.cli.interact.instrumentation") &&
+      holders.length > 0 &&
+      holders.every((holder) =>
+        /^com\.android\.cli\.interact\.instrumentation(?:[./][\w.$]+)?$/.test(holder),
+      ) &&
+      !/\bnot\s+com\.android\.cli\.interact\.instrumentation\b/i.test(answer.holder) &&
       answer.layoutWorks === true;
     checks.diagnosed = /com.android.cli.interact/.test(output);
     const clear = calls.find(
@@ -287,7 +295,9 @@ export function checkTask(id, { devices, finalAnswer, audit }) {
       devices.shell(phone, "getprop sys.boot_completed").trim() === "1" &&
       validBootId(phone.task8BootId) &&
       validBootId(finalBootId) &&
-      phone.task8BootId.toLowerCase() !== finalBootId.toLowerCase();
+      phone.task8BootId.toLowerCase() !== finalBootId.toLowerCase() &&
+      /^[1-9]\d*$/.test(phone.task8EmulatorPid ?? "") &&
+      devices.emulatorPid(phone) !== phone.task8EmulatorPid;
     checks.report =
       (answer.unavailableState === "unavailable"
         ? observations.length > 0
