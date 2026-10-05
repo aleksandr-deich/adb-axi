@@ -36,7 +36,7 @@ The repository ships an agent skill at [`skills/adb-axi/SKILL.md`](skills/adb-ax
 npx skills add aleksandr-deich/adb-axi --skill adb-axi -g
 ```
 
-`-g` installs the skill for all projects; drop it to install for the current project only. With the skill, adb-axi needs no global install: the skill tells the agent when to use adb-axi and runs it with `npx -y adb-axi`. The skill does not copy command details. It sends the agent to `npx -y adb-axi --help` and `npx -y adb-axi <command> --help` for current usage. The requirements above still apply.
+`-g` installs the skill for all projects; drop it to install for the current project only. With the skill, adb-axi needs no global install: the agent uses the executable supplied by its environment, or `npx -y adb-axi` otherwise, without a preliminary availability probe. Command and flag details stay in live help: agents ask a known command or family directly, consult the root index only to choose a command, and batch independent help requests. The skill adds short examples for using verified lifecycle evidence, querying a schema directly, and chaining operations with exit checks and guaranteed settings cleanup. The requirements above still apply.
 
 ## Start here
 
@@ -57,7 +57,7 @@ help[1]: Run `adb-axi logs --pkg dev.probe --since 1m` for recent app logs
 
 Crashes are counted since the target's latest mark from its current boot, or in the last 15 minutes when there is no usable mark. The window includes the mark's age by the host clock (`latest mark t1, set 3 d ago`), so an old mark from the same boot is visible even when the device clock is off. `adb-axi --device <serial|avd>` shows one device's foreground and crashes when several are online. With no device attached it says so (`count: "0 attached, 0 online"`, `target: "-"`) and exits 0. When several devices are online and none is selected, it lists them, shows `target: "-"` with the reason, and does not fail. A device read that fails shows `-` for that field, and the first help line points at `doctor` for that device.
 
-`adb-axi --help` lists every command; `adb-axi <command> --help` gives its arguments, its flags with their defaults, and examples.
+`adb-axi --help` lists every command; `adb-axi <command> --help` gives its arguments, its flags with their defaults, and examples. Family help such as `adb-axi app --help` shows compact usages with each subcommand's own flags, generated from the same command specs, and global flags once. Flags follow the complete command: `adb-axi app start com.example.notes --device emulator-5554`.
 
 ## The device model
 
@@ -163,7 +163,7 @@ The lifecycle commands require the package to be installed for the current Andro
 
 `wait log <regex>` polls until a log line matches; without `--since` it counts only lines logged after the wait began. It ignores adbd's echoes of shell commands as match evidence.
 
-`logs crash` counts Java crashes, ANRs and native crashes in the window (default 15 minutes) and says `crashes: 0 since <window>` when there are none. Each crash prints its kind, time, process, exception, message, first app frame and frame count; one prints as a block, several as a table, at most 5 with `shown: N of M crashes`. `--full` writes every crash's whole trace to a file. `--pkg` matches the process name in the report (the package or `<pkg>:<name>`), not uid or pid. An ANR has no stack in logcat, so it shows `app_frame: -` and `frames: 0`. Crashes that start before the window are not counted, even when their reports continue into it. Native crashes use the fatal signal's time when it is available.
+`logs crash` counts Java crashes, ANRs and native crashes in the window (default 15 minutes) and says `crashes: 0 since <window>` when there are none. Each crash prints its kind, time, process, exception, message, first app frame and frame count; one prints as a block, several as a table, at most 5 with `shown: N of M crashes`. For wrapped Java exceptions, `cause` and `cause_message` add the last direct `Caused by:` type and message, excluding suppressed branches; the existing `exception` and `message` still describe the outer exception. Only the deepest cause is shown, with fields cut at 500 characters and their total length reported, so even long chains stay compact. Cause fields are omitted when no displayed crash has a cause; in a mixed table, rows without one show `-`. `--full` writes every crash's whole trace, including all causes and suppressed exceptions, to a file. `--pkg` matches the process name in the report (the package or `<pkg>:<name>`), not uid or pid. An ANR has no stack in logcat, so it shows `app_frame: -` and `frames: 0`. Crashes that start before the window are not counted, even when their reports continue into it. Native crashes use the fatal signal's time when it is available.
 
 ### App data and shell
 

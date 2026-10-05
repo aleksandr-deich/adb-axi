@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { allCommands, REGISTRY } from "../../src/commands/registry.js";
 import { commandHelp, groupHelp, topLevelHelp } from "../../src/commands/help.js";
+import { flagUsage } from "../../src/core/args.js";
 import type { CommandSpec, GroupSpec } from "../../src/commands/types.js";
 import { unrunnableCommands, V02_PATTERNS } from "../helpers/help-lines.js";
 
@@ -123,6 +124,29 @@ describe("command registry", () => {
       if (entry.kind !== "group") continue;
       const subs = (groupHelp(entry).subcommands as { command: string }[]).map((c) => c.command);
       for (const sub of subs) expect(shipped.has(sub)).toBe(true);
+    }
+  });
+
+  it("generates family usages from positionals and command-specific flag specs", () => {
+    for (const entry of Object.values(REGISTRY.entries)) {
+      if (entry.kind !== "group") continue;
+      const help = groupHelp(entry);
+      const rows = help.subcommands as { command: string; usage: string }[];
+      for (const command of entry.subcommands.filter((command) => command.shipped)) {
+        const row = rows.find((row) => row.command === `adb-axi ${command.path.join(" ")}`);
+        expect(row?.usage).toContain("[global flags]");
+        expect(row?.usage).not.toContain("--device");
+        for (const flag of command.flags) {
+          expect(row?.usage).toContain(
+            flag.required === true ? flagUsage(flag) : `[${flagUsage(flag)}]`,
+          );
+        }
+        for (const arg of command.positionals) expect(row?.usage).toContain(`<${arg.name}>`);
+      }
+      expect(help.global_flags).toHaveLength(5);
+      if (entry.defaultCommand?.shipped) {
+        expect(help.flags).toHaveLength(entry.defaultCommand.flags.length);
+      }
     }
   });
 

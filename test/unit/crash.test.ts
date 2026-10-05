@@ -235,6 +235,44 @@ describe("matching by package name", () => {
 });
 
 describe("Java crash blocks", () => {
+  it("reads the wrapped-exception fixture without confusing suppressed causes", () => {
+    const text = readFileSync(join(FIXTURES_DIR, "crash/java-wrapped.txt"), "utf8");
+    expect(one(parseLogcat(text).lines)).toMatchObject({
+      exception: "java.lang.RuntimeException",
+      message: "Unable to start activity ComponentInfo{com.example.notes/.Main}",
+      rootCause: { exception: "java.lang.IllegalStateException", message: "bad state" },
+    });
+  });
+
+  it("keeps only the deepest direct cause in a long chain and joins its message", () => {
+    const crash = one([
+      runtime(0, 100, "FATAL EXCEPTION: main"),
+      runtime(0, 100, "java.lang.RuntimeException: outer"),
+      ...Array.from({ length: 100 }, (_, i) =>
+        runtime(0, 100, `Caused by: java.lang.RuntimeException: wrapper ${i}`),
+      ),
+      runtime(0, 100, "Caused by: java.lang.IllegalStateException: root"),
+      runtime(0, 100, "more detail"),
+      runtime(0, 100, "\tat com.example.Main.run(Main.kt:1)"),
+      runtime(0, 100, "\tSuppressed: java.io.IOException: cleanup"),
+      runtime(0, 100, "\tCaused by: java.io.EOFException: unrelated"),
+    ]);
+    expect(crash.rootCause).toEqual({
+      exception: "java.lang.IllegalStateException",
+      message: "root more detail",
+    });
+  });
+
+  it("omits causes when none exist and supports a cause without a message", () => {
+    expect(one([runtime(0, 100, "FATAL EXCEPTION: main")]).rootCause).toBeUndefined();
+    expect(
+      one([
+        runtime(0, 100, "FATAL EXCEPTION: main"),
+        runtime(0, 100, "java.lang.RuntimeException: outer"),
+        runtime(0, 100, "Caused by: java.lang.NullPointerException"),
+      ]).rootCause,
+    ).toEqual({ exception: "java.lang.NullPointerException", message: "" });
+  });
   it("joins a multi-line message, and keeps the exception class apart from it", () => {
     const crash = one([
       runtime(0, 100, "FATAL EXCEPTION: main"),

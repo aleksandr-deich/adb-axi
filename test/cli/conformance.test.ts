@@ -322,7 +322,14 @@ describe("conformance sweep", () => {
         expect(toon.exitCode).toBe(0);
         expect(data.command).toBe(`adb-axi ${commandWords(c.args)}`);
         expect(data.usage).toMatch(new RegExp(`^adb-axi ${commandWords(c.args)}\\b`));
-        const flags = data.flags as { flag: string; default: string; description: string }[];
+        const flags = [
+          ...(data.flags as object[]),
+          ...((data.global_flags as object[] | undefined) ?? []),
+        ] as {
+          flag: string;
+          default: string;
+          description: string;
+        }[];
         expect(flags.map((flag) => flag.flag.split(" ")[0])).toEqual(
           expect.arrayContaining(["--device", "--timeout", "--json", "--debug", "--help"]),
         );

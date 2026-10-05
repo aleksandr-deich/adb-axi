@@ -963,8 +963,13 @@ describe("doctor", () => {
       const help = await runCli(["doctor", "--help"], f.env);
       expect(help.exitCode).toBe(0);
       expect(help.stdout).toContain("command: adb-axi doctor");
-      expect(help.stdout).toContain("subcommands[1]{command,summary}:\n  adb-axi doctor ui,");
-      expect(help.stdout).not.toContain("--fix");
+      expect(help.stdout).toContain("subcommands[1]{command,usage,summary}:\n  adb-axi doctor ui,");
+      const data = decode(help.stdout.trimEnd()) as {
+        flags: { flag: string }[];
+        subcommands: { usage: string }[];
+      };
+      expect(data.flags).toEqual([]);
+      expect(data.subcommands[0]?.usage).toBe("adb-axi doctor ui [--fix] [global flags]");
       expect(f.calls()).toEqual([]);
     });
 

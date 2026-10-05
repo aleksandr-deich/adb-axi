@@ -128,6 +128,81 @@ const scanned = (text: string): number => parseLogcat(text).lines.length;
 
 describe("logs crash", () => {
   describe("a Java crash", () => {
+    it("prints the wrapped exception's root cause in compact TOON and JSON", async () => {
+      const text = readFileSync(join(FIXTURES_DIR, "crash/java-wrapped.txt"), "utf8");
+      const f = device({ window: { stdout: text } });
+      const { toon, data } = await crashSince(f, "--pkg", "com.example.notes");
+      expect(toon.exitCode).toBe(0);
+      expect(data.crash).toMatchObject({
+        exception: "java.lang.RuntimeException",
+        message: "Unable to start activity ComponentInfo{com.example.notes/.Main}",
+        cause: "java.lang.IllegalStateException",
+        cause_message: "bad state",
+      });
+      expect(toon.stdout).toMatchInlineSnapshot(`
+        "crashes: "1 since before-run (40 s, 10 lines scanned)"
+        crash:
+          kind: java
+          at: "2026-10-01 07:58:44.000"
+          process: com.example.notes
+          exception: java.lang.RuntimeException
+          message: "Unable to start activity ComponentInfo{com.example.notes/.Main}"
+          cause: java.lang.IllegalStateException
+          cause_message: bad state
+          app_frame: "com.example.notes.Main.onCreate(Main.kt:12)"
+          frames: 4
+        help[1]: Run the same command with \`--full\` to write the whole trace to a file
+        "
+      `);
+      const full = await runCli(
+        ["logs", "crash", "--since", "before-run", "--full", "--json"],
+        f.env,
+      );
+      const path = (JSON.parse(full.stdout) as { full: string }).full;
+      expect(readFileSync(path, "utf8")).toContain("suppressed cause");
+      expectClean(f);
+    });
+
+    it("bounds root-cause type and message even for long chains", async () => {
+      const messages = [
+        "FATAL EXCEPTION: main",
+        "Process: com.example.notes, PID: 100",
+        "java.lang.RuntimeException: outer",
+        ...Array.from(
+          { length: 100 },
+          (_, i) => `Caused by: java.lang.RuntimeException: wrapper ${i}`,
+        ),
+        `Caused by: ${"X".repeat(900)}: ${"y".repeat(900)}`,
+      ];
+      const f = device({
+        window: {
+          stdout: messages
+            .map((message) => logLine(1790834324000, 100, "E", "AndroidRuntime", message))
+            .join("\n"),
+        },
+      });
+      const { data } = await crashSince(f);
+      expect(data.crash).toMatchObject({
+        cause: `${"X".repeat(500)}... (truncated, 900 chars total)`,
+        cause_message: `${"y".repeat(500)}... (truncated, 900 chars total)`,
+      });
+      expect(JSON.stringify(data)).not.toContain("wrapper 99");
+      expectClean(f);
+    });
+
+    it("keeps mixed crashes tabular with absent causes marked explicitly", async () => {
+      const text = readFileSync(join(FIXTURES_DIR, "crash/java-wrapped.txt"), "utf8");
+      const f = device({ window: { stdout: text + captured("35", "logcat-crash-java.txt") } });
+      const { toon, data } = await crashSince(f);
+      expect(toon.stdout).toContain(
+        "crash[2]{kind,at,process,exception,message,cause,cause_message,app_frame,frames}:",
+      );
+      expect((data.crash as Record<string, unknown>[])[1]).toMatchObject({
+        cause: "-",
+        cause_message: "-",
+      });
+      expectClean(f);
+    });
     it.each([
       { api: "35" as const, at: "2026-10-01 07:58:44.594", frames: 22 },
       { api: "37" as const, at: "2026-10-01 07:56:25.610", frames: 23 },
