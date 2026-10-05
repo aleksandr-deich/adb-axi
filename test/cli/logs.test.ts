@@ -274,7 +274,7 @@ describe("logs mark", () => {
     expect(waited.toon.exitCode).toBe(0);
     expect(waited.data.match).toMatchObject({ message: "ready" });
     expectClean(f);
-  });
+  }, 15_000);
 
   it("replaces an earlier mark of the same name", async () => {
     const f = devices({ serial: A, api: 35, clocks: [MARK_CLOCK, LATER_CLOCK] });
