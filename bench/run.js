@@ -282,6 +282,13 @@ async function main() {
         if (e.metrics) Object.assign(record, e.metrics);
         record.error = String(e);
       } finally {
+        // Preserve setup identities even if the agent or oracle fails before
+        // producing a verdict. The oracle adds independently sampled final data.
+        if (task.id === "8")
+          record.task8InitialIdentity = {
+            bootId: devices.owned[0].task8BootId ?? null,
+            emulatorPid: devices.owned[0].task8EmulatorPid ?? null,
+          };
         fs.mkdirSync(results, { recursive: true });
         for (const [source, field, suffix] of [
           ["agent.jsonl", "agentOutput", "agent.jsonl"],

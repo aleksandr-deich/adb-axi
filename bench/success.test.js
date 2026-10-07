@@ -5,6 +5,7 @@ import path from "node:path";
 import { URL } from "node:url";
 import { test } from "node:test";
 import { checkTask, deviceState, setupTask } from "./success.js";
+import { writeRecord } from "./core.js";
 
 const beforeBoot = "12345678-1234-1234-1234-123456789abc";
 const afterBoot = "abcdef01-1234-1234-1234-123456789abc";
@@ -368,4 +369,149 @@ test("stop/start without observation, help, wrong target, and out-of-window outp
     [stop, { ...missing, stdout: "" }, restart],
   ])
     assert.equal(score(base, calls).success, false);
+});
+
+function crashScore(
+  messages,
+  answer = { exception: "java.lang.IllegalStateException", message: "probe crash requested" },
+) {
+  const logs = messages
+    .map((message) => `1791204402.000 123 123 E AndroidRuntime: ${message}`)
+    .join("\n");
+  return checkTask("3", {
+    devices: { owned: [{}], adb: () => logs },
+    audit: "/nonexistent",
+    finalAnswer: JSON.stringify(answer),
+  });
+}
+const fatal = ["FATAL EXCEPTION: main", "Process: dev.probe, PID: 123"];
+const cause = "java.lang.IllegalStateException: probe crash requested";
+test("task 3 accepts unwrapped and activity-start wrapped genuine crashes", () => {
+  for (const messages of [
+    [...fatal, cause],
+    [
+      ...fatal,
+      "java.lang.RuntimeException: Unable to start activity ComponentInfo{dev.probe/dev.probe.MainActivity}",
+      `Caused by: ${cause}`,
+    ],
+  ]) {
+    assert.equal(crashScore(messages).success, true);
+    assert.equal(
+      crashScore(messages, { exception: "RuntimeException", message: "probe crash requested" })
+        .success,
+      false,
+    );
+    assert.equal(
+      crashScore(messages, { exception: "IllegalStateException", message: "wrong" }).success,
+      false,
+    );
+  }
+});
+test("task 3 rejects fabricated, wrong-process, wrong-cause and cross-event evidence", () => {
+  for (const messages of [
+    [cause],
+    ["Process: dev.probe, PID: 123", cause],
+    ["FATAL EXCEPTION: main", cause],
+    ["FATAL EXCEPTION: main", "Process: dev.other, PID: 123", cause],
+    ["FATAL EXCEPTION: main", "Process: dev.probe, PID: 456", cause],
+    [...fatal, "java.lang.RuntimeException: Unable to start activity"],
+    [...fatal, `${cause} extra`],
+    [...fatal, "Suppressed: " + cause],
+    [...fatal, "Caused by: java.lang.IllegalArgumentException: probe crash requested"],
+    [...fatal, "FATAL EXCEPTION: main", cause],
+  ])
+    assert.equal(crashScore(messages).checks.crash, false);
+  const logs = [...fatal, cause]
+    .map(
+      (message, i) => `1791204402.000 ${i === 2 ? "456" : "123"} 123 E AndroidRuntime: ${message}`,
+    )
+    .join("\n");
+  assert.equal(
+    checkTask("3", {
+      devices: { owned: [{}], adb: () => logs },
+      audit: "/nonexistent",
+      finalAnswer: "{}",
+    }).checks.crash,
+    false,
+  );
+});
+test("task 8 retains each recovery conjunct and both identities in durable verdicts", () => {
+  const missing = {
+    time: 2,
+    tool: "adb",
+    args: ["-s", "emulator-5554", "get-state"],
+    status: 1,
+    stderr: "error: device 'emulator-5554' not found",
+  };
+  for (const [bootId, pid, failed] of [
+    [beforeBoot, "202", "bootIdChanged"],
+    [afterBoot, "101", "emulatorPidChanged"],
+    ["invalid", "202", "finalBootIdValid"],
+    [afterBoot, "", "finalEmulatorPidValid"],
+  ]) {
+    const verdict = score(base, [stop, missing, restart], base.finalAnswer, bootId, pid);
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "verdict-record-"));
+    let retained;
+    try {
+      const file = writeRecord(dir, { id: "recovery", ...verdict });
+      retained = JSON.parse(fs.readFileSync(file, "utf8"));
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+    assert.equal(retained.success, false);
+    assert.equal(retained.evidence.recovery.predicates[failed], false);
+    assert.deepEqual(retained.evidence.recovery.initial, {
+      serial: "emulator-5554",
+      bootId: beforeBoot,
+      emulatorPid: "101",
+    });
+    assert.equal(retained.evidence.recovery.final.bootId.value, bootId);
+    assert.equal(retained.evidence.recovery.final.emulatorPid.value, pid);
+    assert.equal(retained.evidence.recovery.predicates.bootCompleted, true);
+  }
+});
+test("task 8 unavailable or failed measurements remain explainable without suppressing other samples", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "recovery-test-"));
+  try {
+    const audit = path.join(dir, "audit");
+    fs.writeFileSync(
+      audit,
+      [
+        stop,
+        { time: 2, tool: "adb", args: [], status: 0, stdout: "List of devices attached\n" },
+        restart,
+      ]
+        .map(JSON.stringify)
+        .join("\n"),
+    );
+    for (const attached of [true, false, "error"]) {
+      const devices = {
+        owned: [{ ...base.devices[0], task8BootId: beforeBoot, task8EmulatorPid: "101" }],
+        current: () => {
+          if (attached === "error") throw new Error("identity query failed");
+          return attached;
+        },
+        adb: () => {
+          throw new Error("task 8 must not require logcat");
+        },
+        shell: () => {
+          throw new Error("boot query failed");
+        },
+        emulatorPid: () => "202",
+      };
+      const verdict = checkTask("8", { devices, audit, finalAnswer: base.finalAnswer });
+      const recovery = verdict.evidence.recovery;
+      assert.equal(verdict.success, false);
+      assert.equal(recovery.predicates.finalBootIdValid, null);
+      assert.equal(recovery.predicates.bootCompleted, null);
+      assert.match(
+        recovery.final.bootId.error,
+        attached === true ? /boot query failed/ : /measurement unavailable/,
+      );
+      assert.equal(recovery.predicates.emulatorPidChanged, attached === true ? true : null);
+      assert.equal(recovery.predicates.attached, attached === "error" ? null : attached);
+    }
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
