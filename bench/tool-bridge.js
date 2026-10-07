@@ -60,7 +60,27 @@ if (tool === "adb") {
     serial = args[1];
     forwarded = args.slice(2);
   }
-  if (!ownedSerials().includes(serial)) reject("Select a benchmark-owned emulator by serial");
+  // The persisted serial was positively owned at setup. Only a bare read-only
+  // get-state may use it while absent/offline; an online serial must still pass
+  // live AVD identity verification (ports can be reused by another emulator).
+  const unavailableQuery =
+    forwarded.length === 1 &&
+    forwarded[0] === "get-state" &&
+    /^emulator-\d+$/.test(serial ?? "") &&
+    config.devices.some((d) => d.serial === serial);
+  let unavailableOwned = false;
+  if (unavailableQuery) {
+    const listing = spawnSync(config.bins.adb, ["devices"], {
+      encoding: "utf8",
+      timeout: 10000,
+    });
+    if (listing.status !== 0 || !/^List of devices attached\s*$/m.test(listing.stdout ?? ""))
+      reject("Cannot verify benchmark-owned emulators");
+    const row = listing.stdout.split("\n").find((line) => line.split(/\s+/)[0] === serial);
+    unavailableOwned = !row || row.split(/\s+/)[1] === "offline";
+  }
+  if (!unavailableOwned && !ownedSerials().includes(serial))
+    reject("Select a benchmark-owned emulator by serial");
   if (["kill-server", "start-server", "connect", "disconnect", "reconnect"].includes(forwarded[0]))
     reject("Shared server operations are prohibited");
   forwarded = ["-s", serial, ...forwarded];

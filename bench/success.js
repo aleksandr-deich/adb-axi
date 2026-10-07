@@ -110,9 +110,34 @@ export function deviceState(call, serial, name) {
 const validBootId = (value) =>
   /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(value) &&
   !/^0{8}(?:-0{4}){3}-0{12}$/.test(value);
+// Keep exception evidence in the same fatal AndroidRuntime event and process.
+// A launch crash can wrap the requested exception in RuntimeException.
+function requestedCrash(logs) {
+  const events = new Map();
+  for (const line of logs.split("\n")) {
+    const runtime = line.match(/^\s*\d+\.\d+\s+(\d+)\s+\d+\s+E\s+AndroidRuntime:\s+(.+)$/);
+    if (!runtime) continue;
+    const pid = runtime[1];
+    const message = runtime[2].trimEnd();
+    if (/^FATAL EXCEPTION:/.test(message)) events.set(pid, { process: false, cause: false });
+    const event = events.get(pid);
+    if (!event) continue;
+    if (message === `Process: dev.probe, PID: ${pid}`) event.process = true;
+    if (
+      /^(?:Caused by: )?java\.lang\.IllegalStateException: probe crash requested\s*$/.test(message)
+    )
+      event.cause = true;
+    if (event.process && event.cause) return true;
+  }
+  return false;
+}
 export function setupTask(task, devices) {
-  devices.reset();
   const phone = devices.owned[0];
+  if (task.id === "8") {
+    phone.task8BootId = null;
+    phone.task8EmulatorPid = null;
+  }
+  devices.reset();
   if (task.id === "8") {
     phone.task8BootId = devices.shell(phone, "cat /proc/sys/kernel/random/boot_id").trim();
     if (!validBootId(phone.task8BootId)) throw new Error("Invalid initial phone boot ID");
@@ -139,7 +164,14 @@ export function setupTask(task, devices) {
 export function checkTask(id, { devices, finalAnswer, audit }) {
   const phone = devices.owned[0];
   const stoppedSerial = id === "8" ? phone.serial : null;
-  const recoveredOnline = id === "8" ? devices.current(phone) : false;
+  const measurement = (read) => {
+    try {
+      return { value: read(), error: null };
+    } catch (error) {
+      return { value: null, error: String(error) };
+    }
+  };
+  const attached = id === "8" ? measurement(() => devices.current(phone)) : null;
   const calls = fs.existsSync(audit)
     ? fs
         .readFileSync(audit, "utf8")
@@ -149,7 +181,7 @@ export function checkTask(id, { devices, finalAnswer, audit }) {
         .map((x) => JSON.parse(x))
     : [];
   const output = calls.map((c) => `${c.stdout ?? ""}\n${c.stderr ?? ""}`).join("\n");
-  const logs = devices.adb(phone, ["logcat", "-d", "-v", "epoch"]);
+  const logs = id === "8" ? "" : devices.adb(phone, ["logcat", "-d", "-v", "epoch"]);
   const foreground = (d) =>
     /(?:mResumedActivity|topResumedActivity).*dev\.probe/.test(
       devices.shell(d, "dumpsys activity activities"),
@@ -198,16 +230,7 @@ export function checkTask(id, { devices, finalAnswer, audit }) {
       answer.savedSurvived === true &&
       answer.unsavedReset === true;
   } else if (id === "3") {
-    const runtime = logs.match(
-      /^\s*\d+\.\d+\s+(\d+)\s+\d+\s+E\s+AndroidRuntime:\s+Process: dev\.probe, PID: (\d+)\s*$/m,
-    );
-    checks.crash =
-      !!runtime &&
-      runtime[1] === runtime[2] &&
-      new RegExp(
-        `^\\s*\\d+\\.\\d+\\s+${runtime[1]}\\s+\\d+\\s+E\\s+AndroidRuntime:\\s+java\\.lang\\.IllegalStateException: probe crash requested\\s*$`,
-        "m",
-      ).test(logs);
+    checks.crash = requestedCrash(logs);
     checks.report =
       ["IllegalStateException", "java.lang.IllegalStateException"].includes(answer.exception) &&
       answer.message === "probe crash requested";
@@ -334,18 +357,54 @@ export function checkTask(id, { devices, finalAnswer, audit }) {
     checks.stopped = observations.length > 0;
     checks.observed = observations.length > 0;
     evidence.unavailableStates = [...new Set(observations.map((s) => s.state))];
-    const finalBootId = recoveredOnline
-      ? devices.shell(phone, "cat /proc/sys/kernel/random/boot_id").trim()
-      : "";
-    checks.online =
-      observations.length > 0 &&
-      recoveredOnline &&
-      devices.shell(phone, "getprop sys.boot_completed").trim() === "1" &&
-      validBootId(phone.task8BootId) &&
-      validBootId(finalBootId) &&
-      phone.task8BootId.toLowerCase() !== finalBootId.toLowerCase() &&
-      /^[1-9]\d*$/.test(phone.task8EmulatorPid ?? "") &&
-      devices.emulatorPid(phone) !== phone.task8EmulatorPid;
+    const unavailable = {
+      value: null,
+      error: "Owned emulator not online; measurement unavailable",
+    };
+    const final = {
+      attached,
+      bootCompleted:
+        attached.value === true
+          ? measurement(() => devices.shell(phone, "getprop sys.boot_completed").trim())
+          : unavailable,
+      bootId:
+        attached.value === true
+          ? measurement(() => devices.shell(phone, "cat /proc/sys/kernel/random/boot_id").trim())
+          : unavailable,
+      emulatorPid:
+        attached.value === true ? measurement(() => devices.emulatorPid(phone)) : unavailable,
+    };
+    const initial = {
+      serial: stoppedSerial,
+      bootId: phone.task8BootId ?? null,
+      emulatorPid: phone.task8EmulatorPid ?? null,
+    };
+    // null means the measurement could not be made, distinct from a measured
+    // false. Sample every conjunct independently, even after an earlier failure.
+    const predicates = {
+      observedUnavailable: observations.length > 0,
+      attached: attached.value,
+      bootCompleted: final.bootCompleted.value === null ? null : final.bootCompleted.value === "1",
+      initialBootIdValid: initial.bootId === null ? null : validBootId(initial.bootId),
+      finalBootIdValid: final.bootId.value === null ? null : validBootId(final.bootId.value),
+      bootIdChanged:
+        final.bootId.value === null || initial.bootId === null
+          ? null
+          : initial.bootId.toLowerCase() !== final.bootId.value.toLowerCase(),
+      initialEmulatorPidValid:
+        initial.emulatorPid === null ? null : /^[1-9]\d*$/.test(initial.emulatorPid),
+      finalEmulatorPidValid:
+        final.emulatorPid.value === null ? null : /^[1-9]\d*$/.test(final.emulatorPid.value),
+      emulatorPidChanged:
+        final.emulatorPid.value === null || initial.emulatorPid === null
+          ? null
+          : final.emulatorPid.value !== initial.emulatorPid,
+    };
+    evidence.recovery = { initial, final: { serial: phone.serial, ...final }, predicates };
+    evidence.observations = observations.map(({ call, state }) => ({ time: call.time, state }));
+    evidence.stopTimes = stops.map((call) => call.time);
+    evidence.restartTimes = restarts.map((call) => call.time);
+    checks.online = Object.values(predicates).every((value) => value === true);
     checks.report =
       (answer.unavailableState === "unavailable"
         ? observations.length > 0

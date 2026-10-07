@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { decode } from "@toon-format/toon";
@@ -430,8 +430,24 @@ describe("wait boot", () => {
     }, 20_000);
 
     it("reports a device that never attached, and names the one that was asked for", async () => {
-      const f = scenario([listing(devices())]);
-      const { toon, data } = await both(["wait", "boot", "--device", TABLET, "--timeout", "2s"], f);
+      const f = scenario([]);
+      const calls = join(f.dir, "listing-calls");
+      // This case needs an immediate, invariant empty listing, not a simulated
+      // slow transport. Starting the TypeScript fake for every poll can exceed
+      // the final observation's 500 ms budget under CI load, changing the last
+      // state to "unknown" independently of the output format.
+      writeFileSync(
+        join(f.binDir, "adb"),
+        `#!/bin/sh
+printf '%s\\n' "$*" >> "$WAIT_BOOT_LISTING_CALLS"
+[ "$#" -eq 2 ] && [ "$1" = devices ] && [ "$2" = -l ] || exit 97
+printf 'List of devices attached\\n\\n'
+`,
+      );
+      const { toon, json, data } = await both(
+        ["wait", "boot", "--device", TABLET, "--timeout", "2s"],
+        { ...f, env: { ...f.env, WAIT_BOOT_LISTING_CALLS: calls } },
+      );
       expect(toon.exitCode).toBe(1);
       expect(data).toEqual({
         error: "emulator-5556 had not finished booting after 2 s",
@@ -439,7 +455,13 @@ describe("wait boot", () => {
         last: { state: "not attached", ...UNREAD },
         help: ["Run `adb-axi doctor --device emulator-5556` to see why"],
       });
-      expect(f.unmatched()).toEqual([]);
+      for (const run of [toon, json]) {
+        expect(run.durationMs).toBeGreaterThanOrEqual(2_000);
+        expect(run.durationMs).toBeLessThan(5_000);
+      }
+      const observed = readFileSync(calls, "utf8").trim().split("\n");
+      expect(observed.length).toBeGreaterThanOrEqual(2);
+      expect(observed.every((args) => args === "devices -l")).toBe(true);
     }, 20_000);
 
     it("falls back to a plain doctor hint when no device was ever chosen", async () => {

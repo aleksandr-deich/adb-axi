@@ -26,6 +26,7 @@ import { Devices, emulatorPid } from "./devices.js";
 import { environment } from "./run.js";
 import task8Reference from "./reference/8.js";
 import "./success.test.js";
+import "./tool-bridge.test.js";
 
 function temporary(fn) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "benchmark-test-"));
@@ -595,7 +596,7 @@ test("success scripts reject incorrect reports even when device evidence succeed
     const devices = {
       owned: [phone],
       adb: () =>
-        "123.450 100 100 I ProbeState: event=inc saved=3 volatile=3 rows=0 restored=false pid=100\n123.451 200 200 I ProbeState: event=start saved=3 volatile=0 rows=0 restored=true pid=200\n123.456 100 100 E AndroidRuntime: Process: dev.probe, PID: 100\n123.457 100 100 E AndroidRuntime: java.lang.IllegalStateException: probe crash requested",
+        "123.450 100 100 I ProbeState: event=inc saved=3 volatile=3 rows=0 restored=false pid=100\n123.451 200 200 I ProbeState: event=start saved=3 volatile=0 rows=0 restored=true pid=200\n123.455 100 100 E AndroidRuntime: FATAL EXCEPTION: main\n123.456 100 100 E AndroidRuntime: Process: dev.probe, PID: 100\n123.457 100 100 E AndroidRuntime: java.lang.IllegalStateException: probe crash requested",
       shell: (d, text) =>
         text.startsWith("pidof") ? "200" : "mResumedActivity dev.probe/.MainActivity",
     };
