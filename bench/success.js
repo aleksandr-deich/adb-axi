@@ -263,8 +263,17 @@ export function checkTask(id, { devices, finalAnswer, audit }) {
     checks.changedObserved = calls.some(
       (c) =>
         c.tool === "adb" &&
-        c.args.join(" ").includes("cmd uimode night") &&
-        new RegExp(`Night mode: ${opposite}`, "i").test(c.stdout ?? ""),
+        c.status === 0 &&
+        c.args[0] === "-s" &&
+        c.args[1] === phone.serial &&
+        c.args[2] === "shell" &&
+        c.args.slice(3).join(" ").includes("cmd uimode night") &&
+        // Cleanup scripts can print the queried value under a changed label.
+        // Use executed shell stdout, never the final report or wrapper prose.
+        new RegExp(
+          `^(?:Night mode:|changed[=:](?:\\s*Night mode:)?)\\s*${opposite}\\s*$`,
+          "im",
+        ).test(c.stdout ?? ""),
     );
     checks.restored = devices.shell(phone, "cmd uimode night").trim() === phone.night;
     const original = phone.night
@@ -404,7 +413,12 @@ export function checkTask(id, { devices, finalAnswer, audit }) {
     evidence.observations = observations.map(({ call, state }) => ({ time: call.time, state }));
     evidence.stopTimes = stops.map((call) => call.time);
     evidence.restartTimes = restarts.map((call) => call.time);
-    checks.online = Object.values(predicates).every((value) => value === true);
+    // Quick Boot may restore the same guest boot ID after a real host restart.
+    // Keep that diagnostic, but require the independently sampled host PID to
+    // change, along with unavailable-state evidence and a healthy guest.
+    checks.online = Object.entries(predicates).every(
+      ([name, value]) => name === "bootIdChanged" || value === true,
+    );
     checks.report =
       (answer.unavailableState === "unavailable"
         ? observations.length > 0
