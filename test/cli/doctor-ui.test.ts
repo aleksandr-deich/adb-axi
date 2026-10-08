@@ -135,6 +135,7 @@ function scenario(setup: Setup = {}): FakeAdb {
       ...(setup.rules ?? []),
       { match: ["devices", "-l"], respond: { stdout: setup.devices ?? DEVICES } },
       { match: ["-s", serial, "emu", "avd", "name"], respond: { stdout: "Pixel_10_Pro_XL\nOK\n" } },
+      { match: ["-s", serial, "shell", "am get-current-user"], respond: { stdout: "0\n" } },
       { match: ["-s", serial, "shell", SHELL.dumpsys], respond: setup.dumpsys ?? dumpsys() },
       { match: ["-s", serial, "shell", SHELL.ps], respond: setup.ps ?? ps() },
       { match: ["-s", serial, "shell", SHELL.logcat], respond: setup.logcat ?? NO_WEDGE },
@@ -508,7 +509,7 @@ describe("doctor ui", () => {
         rules: [
           { match: shell("kill 5443"), set: { server: "gone" }, respond: {} },
           {
-            match: shell("am force-stop com.android.cli.interact.instrumentation"),
+            match: shell("am force-stop --user 0 com.android.cli.interact.instrumentation"),
             set: { cli: "gone" },
             respond: {},
           },
@@ -526,7 +527,7 @@ describe("doctor ui", () => {
       expect(toon).toMatchInlineSnapshot(`
         "ok: doctor ui emulator-5554 -> uiautomation free (2 cleared)
         cleared[2]{pid,holder,was,action}:
-          5673,com.android.cli.interact.instrumentation (Android CLI),wedged,am force-stop com.android.cli.interact.instrumentation
+          5673,com.android.cli.interact.instrumentation (Android CLI),wedged,am force-stop --user 0 com.android.cli.interact.instrumentation
           5443,mobilecli DeviceServer (mobile-mcp),leaked,kill 5443
         "
       `);
@@ -537,7 +538,7 @@ describe("doctor ui", () => {
             pid: 5673,
             holder: "com.android.cli.interact.instrumentation (Android CLI)",
             was: "wedged",
-            action: "am force-stop com.android.cli.interact.instrumentation",
+            action: "am force-stop --user 0 com.android.cli.interact.instrumentation",
           },
           {
             pid: 5443,
@@ -550,16 +551,58 @@ describe("doctor ui", () => {
       expectAddressed(f);
     });
 
+    it("force-stops only the resolved current user", async () => {
+      const f = scenario({
+        state: { holder: "running" },
+        rules: [
+          { match: shell("am get-current-user"), respond: { stdout: "10\n" } },
+          { match: shell("am force-stop --user 10 com.example.notes.test"), respond: {} },
+          {
+            match: shell("am force-stop --user 10 com.example.notes"),
+            respond: {},
+            set: { holder: "gone" },
+          },
+          {
+            match: shell(SHELL.dumpsys),
+            when: { holder: "running" },
+            respond: dumpsys({ component: RUNNER, pid: 9021, processPackage: "com.example.notes" }),
+          },
+        ],
+      });
+      const { exitCode, data } = await cli(f, ["doctor", "ui", "--fix"]);
+      expect(exitCode).toBe(0);
+      expect(data.cleared).toEqual([
+        {
+          pid: 9021,
+          holder: "com.example.notes.test (am instrument)",
+          was: "leaked",
+          action:
+            "am force-stop --user 10 com.example.notes.test; am force-stop --user 10 com.example.notes",
+        },
+      ]);
+      expect(shellCalls(f).filter((command) => command.startsWith("am force-stop"))).toEqual([
+        "am force-stop --user 10 com.example.notes.test",
+        "am force-stop --user 10 com.example.notes",
+        "am force-stop --user 10 com.example.notes.test",
+        "am force-stop --user 10 com.example.notes",
+      ]);
+      expectAddressed(f);
+    });
+
     it("stops both the runner and target app process for a leaked test instrumentation", async () => {
       const f = scenario({
         state: { runner: "running", target: "running" },
         rules: [
           {
-            match: shell("am force-stop com.example.notes.test"),
+            match: shell("am force-stop --user 0 com.example.notes.test"),
             set: { runner: "gone" },
             respond: {},
           },
-          { match: shell("am force-stop com.example.notes"), set: { target: "gone" }, respond: {} },
+          {
+            match: shell("am force-stop --user 0 com.example.notes"),
+            set: { target: "gone" },
+            respond: {},
+          },
           {
             match: shell(SHELL.dumpsys),
             when: { target: "running" },
@@ -576,15 +619,16 @@ describe("doctor ui", () => {
             pid: 9021,
             holder: "com.example.notes.test (am instrument)",
             was: "leaked",
-            action: "am force-stop com.example.notes.test; am force-stop com.example.notes",
+            action:
+              "am force-stop --user 0 com.example.notes.test; am force-stop --user 0 com.example.notes",
           },
         ],
       });
       expect(shellCalls(f).filter((command) => command.startsWith("am force-stop"))).toEqual([
-        "am force-stop com.example.notes.test",
-        "am force-stop com.example.notes",
-        "am force-stop com.example.notes.test",
-        "am force-stop com.example.notes",
+        "am force-stop --user 0 com.example.notes.test",
+        "am force-stop --user 0 com.example.notes",
+        "am force-stop --user 0 com.example.notes.test",
+        "am force-stop --user 0 com.example.notes",
       ]);
       expectAddressed(f);
     });
@@ -599,8 +643,12 @@ describe("doctor ui", () => {
       const f = scenario({
         state: { orphan: "running" },
         rules: [
-          { match: shell("am force-stop b.leaked.test"), respond: {} },
-          { match: shell("am force-stop leaked.app"), set: { orphan: "gone" }, respond: {} },
+          { match: shell("am force-stop --user 0 b.leaked.test"), respond: {} },
+          {
+            match: shell("am force-stop --user 0 leaked.app"),
+            set: { orphan: "gone" },
+            respond: {},
+          },
           {
             match: shell(SHELL.dumpsys),
             when: { orphan: "running" },
@@ -626,7 +674,7 @@ describe("doctor ui", () => {
             pid: 9002,
             holder: "b.leaked.test (am instrument)",
             was: "leaked",
-            action: "am force-stop b.leaked.test; am force-stop leaked.app",
+            action: "am force-stop --user 0 b.leaked.test; am force-stop --user 0 leaked.app",
           },
         ],
         protected: [
@@ -639,10 +687,10 @@ describe("doctor ui", () => {
         help: ["Wait for `adb shell am instrument` (pid 6161) to finish, or stop it"],
       });
       expect(shellCalls(f).filter((command) => command.startsWith("am force-stop"))).toEqual([
-        "am force-stop b.leaked.test",
-        "am force-stop leaked.app",
-        "am force-stop b.leaked.test",
-        "am force-stop leaked.app",
+        "am force-stop --user 0 b.leaked.test",
+        "am force-stop --user 0 leaked.app",
+        "am force-stop --user 0 b.leaked.test",
+        "am force-stop --user 0 leaked.app",
       ]);
       expectAddressed(f);
     });

@@ -144,6 +144,7 @@ export async function readPackage(
   serial: string,
   pkg: string,
   options: ReadOptions,
+  userId = 0,
 ): Promise<PackageInfo | null> {
   assertPackageName(pkg);
   const result = await readShell(
@@ -153,7 +154,7 @@ export async function readPackage(
     `reading package ${pkg}`,
     options,
   );
-  return parseDumpsysPackage(result.stdout, pkg);
+  return parseDumpsysPackage(result.stdout, pkg, userId);
 }
 
 /**

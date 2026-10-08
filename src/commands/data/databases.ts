@@ -29,14 +29,18 @@ const COMPANION = /-(wal|shm|journal)$/;
  * directory has none. A `run-as` refusal becomes `APP_NOT_DEBUGGABLE` or
  * `APP_NOT_INSTALLED`.
  */
-export async function listDatabases(context: CommandContext, pkg: string): Promise<DatabaseFile[]> {
+export async function listDatabases(
+  context: CommandContext,
+  pkg: string,
+  userId: number,
+): Promise<DatabaseFile[]> {
   const step = `listing the databases of ${pkg}`;
   let stdout: string;
   try {
     ({ stdout } = await readShell(
       context.adb(),
       targetSerial(context),
-      `run-as ${pkg} ls -l databases`,
+      `run-as ${pkg} --user ${userId} ls -l databases`,
       step,
       readOptions(context),
     ));
