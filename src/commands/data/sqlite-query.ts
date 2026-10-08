@@ -163,7 +163,8 @@ function uniqueName(row: Row, name: string): string {
 /** SQLite's message from the query process, or what the process printed when it had none. */
 function sqlError(label: string, stderr: string, exitCode: number | null): AdbAxiError {
   const text = stderr.trim();
-  let reported: { message?: unknown; errstr?: unknown; errcode?: unknown } | undefined;
+  let reported:
+    { message?: unknown; errstr?: unknown; errcode?: unknown; code?: unknown } | undefined;
   try {
     reported = JSON.parse(text) as typeof reported;
   } catch {
@@ -173,6 +174,7 @@ function sqlError(label: string, stderr: string, exitCode: number | null): AdbAx
     typeof reported?.message === "string"
       ? reported.message
       : `the query process exited ${exitCode ?? "without a status"}`;
+  if (reported?.code === "INVALID_OUTPUT") return unreadable(label, message);
   const detail =
     typeof reported?.errstr === "string"
       ? `${message} (${reported.errstr}, code ${String(reported.errcode)})`

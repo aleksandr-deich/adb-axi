@@ -9,9 +9,9 @@
  * queries are bounded by the deadline, not by a memory cap.
  *
  * Output on stdout, one JSON array per line: the column names, then each row. Integers past
- * 2^53 are strings, so they stay exact, and blobs are strings of their bytes as Latin-1, as
- * `sqlite3 -json` printed them. On an SQLite error it prints `{message, errcode, errstr}` on
- * stderr and exits 1.
+ * 2^53 are strings, so they stay exact. Blobs decode valid UTF-8 sequences as characters and
+ * invalid bytes as Latin-1, as `sqlite3 -json` printed them. Errors print
+ * `{message, errcode, errstr}` on stderr, with `code` for output errors, and exit 1.
  *
  * Only `node:` imports: the file runs on its own, from `dist` or, under tsx and vitest,
  * as TypeScript with Node's type stripping.
@@ -86,10 +86,21 @@ function value(cell: unknown): Value {
   }
   if (typeof cell === "number") {
     if (Number.isFinite(cell)) return cell;
-    return Number.isNaN(cell) ? null : cell > 0 ? "Inf" : "-Inf";
+    throw Object.assign(new TypeError("query returned a non-finite numeric value"), {
+      code: "INVALID_OUTPUT",
+    });
   }
-  if (cell instanceof Uint8Array) return Buffer.from(cell).toString("latin1");
+  if (cell instanceof Uint8Array) return blobText(cell);
   throw new TypeError(`unexpected SQLite value of type ${typeof cell}`);
+}
+
+function blobText(bytes: Uint8Array): string {
+  return Buffer.from(bytes)
+    .toString("latin1")
+    .replace(
+      /[\xc2-\xdf][\x80-\xbf]|\xe0[\xa0-\xbf][\x80-\xbf]|[\xe1-\xec\xee-\xef][\x80-\xbf]{2}|\xed[\x80-\x9f][\x80-\xbf]|\xf0[\x90-\xbf][\x80-\xbf]{2}|[\xf1-\xf3][\x80-\xbf]{3}|\xf4[\x80-\x8f][\x80-\xbf]{2}/g,
+      (sequence) => Buffer.from(sequence, "latin1").toString("utf8"),
+    );
 }
 
 /** Write one line, waiting while the pipe is full so a large result never piles up here. */
@@ -127,7 +138,8 @@ if (database === undefined) throw new Error("usage: sqlite-child <database>");
 try {
   await run(database, readFileSync(0, "utf8"));
 } catch (error) {
-  const { message, errcode, errstr } = error as {
+  const { message, errcode, errstr, code } = error as {
+    code?: unknown;
     message?: unknown;
     errcode?: unknown;
     errstr?: unknown;
@@ -138,6 +150,7 @@ try {
       message: refused !== undefined && /not authorized/.test(text) ? `${text}: ${refused}` : text,
       errcode: typeof errcode === "number" ? errcode : null,
       errstr: typeof errstr === "string" ? errstr : null,
+      ...(code === "INVALID_OUTPUT" ? { code } : {}),
     })}\n`,
   );
   process.exitCode = 1;

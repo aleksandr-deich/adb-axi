@@ -431,8 +431,10 @@ describe("data db: reading", () => {
       "CREATE TABLE t(i, r, s, n); INSERT INTO t VALUES (7, 1.5, 'a,b \"q\"', NULL);",
     );
     const f = deviceWith({ "app.db": db });
-    const one = await both(f, [PKG, "SELECT i, r, s, n FROM t"]);
-    expect(one.data.rows).toEqual([{ i: 7, r: 1.5, s: 'a,b "q"', n: null }]);
+    const one = await both(f, [PKG, "SELECT i, r, s, n, X'C3A9' AS utf8, X'FF' AS invalid FROM t"]);
+    expect(one.data.rows).toEqual([
+      { i: 7, r: 1.5, s: 'a,b "q"', n: null, utf8: "é", invalid: "ÿ" },
+    ]);
     const none = await both(f, [PKG, "SELECT i FROM t WHERE i > 100"]);
     expect(none.toon.exitCode).toBe(0);
     expect(none.toon.stdout).toMatch(/\ncount: 0 rows\nrows: \[\]\n$/);
