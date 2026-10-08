@@ -1,0 +1,50 @@
+{
+  "task": "8",
+  "devices": [
+    {
+      "name": "Pixel_10_Pro_XL",
+      "serial": "emulator-5554"
+    },
+    {
+      "name": "medium_tablet",
+      "serial": "emulator-5556"
+    }
+  ],
+  "finalAnswer": "{\"unavailableState\":\"missing\",\"recovered\":true}",
+  "calls": [
+    {
+      "time": 1791206888196,
+      "tool": "android",
+      "args": ["emulator", "stop", "Pixel_10_Pro_XL"],
+      "status": 0,
+      "stdout": "\rWaiting for virtual device 'emulator-5554' to fully terminate (59 seconds left)\rWaiting for virtual device 'emulator-5554' to fully terminate (59 seconds left)\rWaiting for virtual device 'emulator-5554' to fully terminate (58 seconds left)\rWaiting for virtual device 'emulator-5554' to fully terminate (57 seconds left)\rWaiting for virtual device 'emulator-5554' to fully terminate (56 seconds left)\rWaiting for virtual device 'emulator-5554' to fully terminate (55 seconds left)\rWaiting for virtual device 'emulator-5554' to fully terminate (54 seconds left)\rWaiting for virtual device 'emulator-5554' to fully terminate (53 seconds left)\rWaiting for virtual device 'emulator-5554' to fully terminate (52 seconds left)\rWaiting for virtual device 'emulator-5554' to fully terminate (51 seconds left)\rWaiting for virtual device 'emulator-5554' to fully terminate (50 seconds left)\rWaiting for virtual device 'emulator-5554' to fully terminate (50 seconds left)\rWaiting for virtual device 'emulator-5554' to fully terminate (49 seconds left)\rWaiting for virtual device 'emulator-5554' to fully terminate (48 seconds left)\rWaiting for virtual device 'emulator-5554' to fully terminate (47 seconds left)\n",
+      "stderr": ""
+    },
+    {
+      "time": 1791206891910,
+      "tool": "adb",
+      "args": ["devices", "-l"],
+      "status": 0,
+      "stdout": "List of devices attached\nemulator-5556          device product:sdk_gtablet_arm64 model:Pixel_Tablet device:emu64a transport_id:4\n",
+      "stderr": ""
+    },
+    {
+      "time": 1791206892108,
+      "tool": "adb",
+      "args": ["devices", "-l"],
+      "status": 0,
+      "stdout": "List of devices attached\nemulator-5556          device product:sdk_gtablet_arm64 model:Pixel_Tablet device:emu64a transport_id:4\n",
+      "stderr": ""
+    },
+    {
+      "time": 1791206922601,
+      "tool": "android",
+      "args": ["emulator", "start", "Pixel_10_Pro_XL"],
+      "status": 0,
+      "stdout": "Emulator process 90348 started, log file location: '<redacted>'\n\nVirtual device successfully started as 'emulator-5554'\n",
+      "stderr": ""
+    }
+  ],
+  "initial": {},
+  "final": {}
+}

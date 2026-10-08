@@ -37,6 +37,56 @@ function score(
     fs.rmSync(dir, { recursive: true, force: true });
   }
 }
+// Replay recorded command evidence and retained final measurements, without
+// executing device commands or launching benchmark subjects.
+for (const [name, expected] of [
+  ["5-adb-axi-2", true],
+  ["5-adb-axi-4", true],
+  ["5-adb-axi-5", true],
+  ["8-adb-axi-1", true],
+  ["8-without-host-pid", false],
+]) {
+  test(`recorded ${name}: scorer result ${expected}`, () => {
+    const fixture = JSON.parse(
+      fs.readFileSync(new URL(`./fixtures/recorded/${name}.json`, import.meta.url)),
+    );
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "scorer-replay-"));
+    try {
+      const audit = path.join(dir, "audit.jsonl");
+      fs.writeFileSync(audit, fixture.calls.map((c) => JSON.stringify(c)).join("\n"));
+      const devices = {
+        owned: [
+          {
+            ...fixture.devices[0],
+            night: fixture.initial.night,
+            task8BootId: fixture.initial.bootId,
+            task8EmulatorPid: fixture.initial.emulatorPid,
+          },
+        ],
+        adb: () => "",
+        current: () => fixture.final.attached?.value ?? true,
+        emulatorPid: () => fixture.final.emulatorPid?.value ?? null,
+        shell: (_device, command) => {
+          if (command === "cmd uimode night") return fixture.final.night;
+          if (command.includes("boot_id")) return fixture.final.bootId?.value ?? "";
+          if (command.includes("sys.boot_completed"))
+            return fixture.final.bootCompleted?.value ?? "1";
+          throw new Error(`Unrecorded measurement: ${command}`);
+        },
+      };
+      assert.equal(
+        checkTask(fixture.task, {
+          devices,
+          audit,
+          finalAnswer: fixture.finalAnswer,
+        }).success,
+        expected,
+      );
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+}
 for (const task of ["6", "8"]) {
   for (const condition of ["baseline", "adb-axi"]) {
     const fixture = JSON.parse(
@@ -121,7 +171,7 @@ test("historical treatment observation needs independently captured host and boo
   assert.equal(score(fixture).success, false);
   const captured = { ...fixture, task8BootId: beforeBoot, task8EmulatorPid: "101" };
   assert.equal(score(captured).success, true);
-  assert.equal(score(captured, fixture.calls, fixture.finalAnswer, beforeBoot).success, false);
+  assert.equal(score(captured, fixture.calls, fixture.finalAnswer, beforeBoot).success, true);
   assert.equal(
     score(captured, fixture.calls, fixture.finalAnswer, afterBoot, "101").success,
     false,
@@ -326,7 +376,7 @@ test("process and boot identities reject disconnect or reboot but accept a resta
   const missing = { ...online, time: 2, stdout: '{"devices":[]}' };
   const recovered = { ...online, time: 3 };
   assert.equal(
-    score(base, [online, missing, recovered], base.finalAnswer, beforeBoot).success,
+    score(base, [online, missing, recovered], base.finalAnswer, beforeBoot, "101").success,
     false,
   );
   assert.equal(
@@ -458,7 +508,8 @@ test("task 8 retains each recovery conjunct and both identities in durable verdi
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
-    assert.equal(retained.success, false);
+    // A snapshot-preserved boot ID is diagnostic, not a failed host restart.
+    assert.equal(retained.success, failed === "bootIdChanged");
     assert.equal(retained.evidence.recovery.predicates[failed], false);
     assert.deepEqual(retained.evidence.recovery.initial, {
       serial: "emulator-5554",

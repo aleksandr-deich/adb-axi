@@ -1,0 +1,72 @@
+{
+  "task": "8",
+  "devices": [
+    {
+      "name": "Pixel_10_Pro_XL",
+      "serial": "emulator-5554"
+    },
+    {
+      "name": "medium_tablet",
+      "serial": "emulator-5556"
+    }
+  ],
+  "finalAnswer": "{\"unavailableState\":\"missing\",\"recovered\":true}",
+  "calls": [
+    {
+      "time": 1791383630575,
+      "tool": "android",
+      "args": ["emulator", "stop", "Pixel_10_Pro_XL"],
+      "status": 0,
+      "stdout": "\rWaiting for virtual device 'emulator-5554' to fully terminate (59 seconds left)\rWaiting for virtual device 'emulator-5554' to fully terminate (59 seconds left)\rWaiting for virtual device 'emulator-5554' to fully terminate (58 seconds left)\rWaiting for virtual device 'emulator-5554' to fully terminate (57 seconds left)\rWaiting for virtual device 'emulator-5554' to fully terminate (56 seconds left)\rWaiting for virtual device 'emulator-5554' to fully terminate (55 seconds left)\rWaiting for virtual device 'emulator-5554' to fully terminate (54 seconds left)\n",
+      "stderr": ""
+    },
+    {
+      "time": 1791383634403,
+      "tool": "adb",
+      "args": ["devices", "-l"],
+      "status": 0,
+      "stdout": "List of devices attached\nemulator-5556          device product:sdk_gtablet_arm64 model:Pixel_Tablet device:emu64a transport_id:30\n",
+      "stderr": ""
+    },
+    {
+      "time": 1791383634578,
+      "tool": "adb",
+      "args": ["devices", "-l"],
+      "status": 0,
+      "stdout": "List of devices attached\nemulator-5556          device product:sdk_gtablet_arm64 model:Pixel_Tablet device:emu64a transport_id:30\n",
+      "stderr": ""
+    },
+    {
+      "time": 1791383646910,
+      "tool": "android",
+      "args": ["emulator", "start", "Pixel_10_Pro_XL"],
+      "status": 0,
+      "stdout": "Emulator process 19839 started, log file location: '<redacted>'\n\nVirtual device successfully started as 'emulator-5554'\n",
+      "stderr": ""
+    }
+  ],
+  "initial": {
+    "serial": "emulator-5554",
+    "bootId": "63d8c9b4-1e6a-43a9-a7c8-afe61becadb2",
+    "emulatorPid": "15663"
+  },
+  "final": {
+    "serial": "emulator-5554",
+    "attached": {
+      "value": true,
+      "error": null
+    },
+    "bootCompleted": {
+      "value": "1",
+      "error": null
+    },
+    "bootId": {
+      "value": "63d8c9b4-1e6a-43a9-a7c8-afe61becadb2",
+      "error": null
+    },
+    "emulatorPid": {
+      "value": "19839",
+      "error": null
+    }
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "task": "5",
+  "devices": [
+    {
+      "name": "Pixel_10_Pro_XL",
+      "serial": "emulator-5554"
+    },
+    {
+      "name": "medium_tablet",
+      "serial": "emulator-5556"
+    }
+  ],
+  "finalAnswer": "{\"original\":\"no\",\"changed\":\"yes\",\"restored\":\"no\"}",
+  "calls": [
+    {
+      "time": 1791382030152,
+      "tool": "adb",
+      "args": ["-s", "emulator-5554", "shell", "cmd uimode night"],
+      "status": 0,
+      "stdout": "Night mode: no\n",
+      "stderr": ""
+    },
+    {
+      "time": 1791382039440,
+      "tool": "adb",
+      "args": [
+        "-s",
+        "emulator-5554",
+        "shell",
+        "original=$(cmd uimode night) || exit; original=${original##* }; case \"$original\" in yes) changed=no;; no|auto) changed=yes;; *) echo \"Unexpected mode: $original\"; exit 1;; esac; cleanup() { result=$?; trap - EXIT; cmd uimode night \"$original\" >/dev/null || result=1; restored=$(cmd uimode night) || result=1; restored=${restored##* }; echo \"restored=$restored\"; [ \"$restored\" = \"$original\" ] || result=1; exit \"$result\"; }; trap cleanup EXIT; echo \"original=$original\"; cmd uimode night \"$changed\" >/dev/null || exit; observed=$(cmd uimode night) || exit; observed=${observed##* }; echo \"changed=$observed\"; [ \"$observed\" = \"$changed\" ] || exit 1"
+      ],
+      "status": 0,
+      "stdout": "original=no\nchanged=yes\nrestored=no\n",
+      "stderr": ""
+    }
+  ],
+  "initial": {
+    "night": "Night mode: no"
+  },
+  "final": {
+    "night": "Night mode: no"
+  }
+}

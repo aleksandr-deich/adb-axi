@@ -1,0 +1,43 @@
+{
+  "task": "5",
+  "devices": [
+    {
+      "name": "Pixel_10_Pro_XL",
+      "serial": "emulator-5554"
+    },
+    {
+      "name": "medium_tablet",
+      "serial": "emulator-5556"
+    }
+  ],
+  "finalAnswer": "{\"original\":\"no\",\"changed\":\"yes\",\"restored\":\"no\"}",
+  "calls": [
+    {
+      "time": 1791382139246,
+      "tool": "adb",
+      "args": ["-s", "emulator-5554", "shell", "cmd uimode night"],
+      "status": 0,
+      "stdout": "Night mode: no\n",
+      "stderr": ""
+    },
+    {
+      "time": 1791382146469,
+      "tool": "adb",
+      "args": [
+        "-s",
+        "emulator-5554",
+        "shell",
+        "( original=$(cmd uimode night) || exit; original=${original##* }; case \"$original\" in yes) target=no;; no|auto) target=yes;; *) exit 1;; esac; cleanup() { status=$?; trap - EXIT; cmd uimode night \"$original\" >/dev/null || status=1; restored=$(cmd uimode night) || status=1; restored=${restored##* }; printf \"restored: %s\\n\" \"$restored\"; [ \"$restored\" = \"$original\" ] || status=1; exit \"$status\"; }; trap cleanup EXIT; printf \"original: %s\\n\" \"$original\"; cmd uimode night \"$target\" >/dev/null || exit; changed=$(cmd uimode night) || exit; changed=${changed##* }; printf \"changed: %s\\n\" \"$changed\"; [ \"$changed\" = \"$target\" ] || exit 1 )"
+      ],
+      "status": 0,
+      "stdout": "original: no\nchanged: yes\nrestored: no\n",
+      "stderr": ""
+    }
+  ],
+  "initial": {
+    "night": "Night mode: no"
+  },
+  "final": {
+    "night": "Night mode: no"
+  }
+}
