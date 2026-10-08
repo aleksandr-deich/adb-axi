@@ -1389,8 +1389,8 @@ describe("app uninstall", () => {
     "does not trust Success after reverting a system update for user %s (keep-data %s)",
     async (userId, keepData) => {
       const systemDump = (dump: Response): Response => ({
-        stdout: dump.stdout
-          ?.replace("flags=[ HAS_CODE ]", "flags=[ SYSTEM HAS_CODE ]")
+        stdout: (dump.stdout ?? "")
+          .replace("flags=[ HAS_CODE ]", "flags=[ SYSTEM HAS_CODE ]")
           .replace("User 0:", `User ${userId}:`),
       });
       const { toon, data, fake } = await both(

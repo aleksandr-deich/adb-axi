@@ -88,7 +88,7 @@ function device(rules: Rule[], env: Record<string, string | undefined> = {}): Fa
   return fake;
 }
 
-needsSqlite3("lists and copies only the resolved current user's database", async () => {
+it("lists and copies only the resolved current user's database", async () => {
   const db = makeDb("CREATE TABLE note(title); INSERT INTO note VALUES ('secondary');");
   const f = device([
     { match: ["-s", SERIAL, "shell", "am get-current-user"], respond: { stdout: "10\n" } },
