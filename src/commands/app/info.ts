@@ -2,6 +2,7 @@ import { readForeground } from "../../android/foreground.js";
 import { assertPackageName } from "../../android/component.js";
 import { readPackage } from "../../android/packages.js";
 import { pidof } from "../../android/pidof.js";
+import { readCurrentUser } from "../../android/users.js";
 import { readShell } from "../../android/read.js";
 import { AdbAxiError } from "../../core/errors.js";
 import { defineCommand } from "../define.js";
@@ -30,10 +31,11 @@ export const appInfo = defineCommand({
     const serial = targetSerial(context);
     const options = readOptions(context);
     const adb = context.adb();
+    const userId = await readCurrentUser(adb, serial, options);
 
     // Not installed is an answer. A record that says `installed=false` is a package
     // uninstalled with its data kept, which is not installed either.
-    const record = await readPackage(adb, serial, pkg, options);
+    const record = await readPackage(adb, serial, pkg, options, userId);
     if (record === null || !record.installed) {
       return { app: { package: pkg, installed: false } };
     }
@@ -48,7 +50,7 @@ export const appInfo = defineCommand({
         debuggable: record.debuggable,
         pid: pids[0] ?? UNKNOWN,
         foreground: resumed?.package === pkg,
-        data_size: record.debuggable ? await dataSize(context, pkg) : UNKNOWN,
+        data_size: record.debuggable ? await dataSize(context, pkg, userId) : UNKNOWN,
       },
     };
   },
@@ -58,12 +60,12 @@ export const appInfo = defineCommand({
  * The size of a debuggable app's data directory. Only `run-as` can read it, so a refusal
  * is an unknown size, not a failure of the command.
  */
-async function dataSize(context: CommandContext, pkg: string): Promise<string> {
+async function dataSize(context: CommandContext, pkg: string, userId: number): Promise<string> {
   try {
     const result = await readShell(
       context.adb(),
       targetSerial(context),
-      `run-as ${pkg} du -sk .`,
+      `run-as ${pkg} --user ${userId} du -sk .`,
       `measuring the data of ${pkg}`,
       readOptions(context),
     );

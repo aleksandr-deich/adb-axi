@@ -3,11 +3,12 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { execOut } from "../../adb/execout.js";
 import { assertPackageName } from "../../android/component.js";
+import { readCurrentUser } from "../../android/users.js";
 import { AdbAxiError } from "../../core/errors.js";
 import { render, runHint, shellWords, type Output } from "../../core/output.js";
 import { truncateField, writeFullOutput, MAX_FIELD_CHARS } from "../../core/truncate.js";
 import { lifecycleCommand } from "../app/process.js";
-import { targetSerial } from "../app/shared.js";
+import { readOptions, targetSerial } from "../app/shared.js";
 import { defineCommand } from "../define.js";
 import type { CommandContext } from "../types.js";
 import { listDatabases, runAsRefusal, type DatabaseFile } from "./databases.js";
@@ -77,14 +78,24 @@ export const dataDb = defineCommand({
           },
         );
       }
-      return listing(context, pkg, await listDatabases(context, pkg));
+      const userId = await readCurrentUser(
+        context.adb(),
+        targetSerial(context),
+        readOptions(context),
+      );
+      return listing(context, pkg, await listDatabases(context, pkg, userId));
     }
 
     assertReadOnlySql(sql);
     assertQueryRuntime();
-    const databases = await listDatabases(context, pkg);
+    const userId = await readCurrentUser(
+      context.adb(),
+      targetSerial(context),
+      readOptions(context),
+    );
+    const databases = await listDatabases(context, pkg, userId);
     const database = pick(context, pkg, databases, requested);
-    return query(context, { pkg, database, sql, full });
+    return query(context, { pkg, database, sql, full, userId });
   },
 });
 
@@ -159,6 +170,7 @@ function pick(
 
 interface QueryPlan {
   pkg: string;
+  userId: number;
   database: DatabaseFile;
   sql: string;
   full: boolean;
@@ -206,14 +218,14 @@ async function copyDatabase(
   const { pkg, database } = plan;
   let walCopied = false;
   if (database.walSize !== null) {
-    const wal = await pull(context, pkg, `${database.name}-wal`);
+    const wal = await pull(context, pkg, `${database.name}-wal`, plan.userId);
     if (wal.length > 0) {
       if (!isWal(wal)) throw notSqlite(context, pkg, `${database.name}-wal`, wal, "a WAL file");
       writeFileSync(join(dir, "db-wal"), wal);
       walCopied = true;
     }
   }
-  const main = await pull(context, pkg, database.name);
+  const main = await pull(context, pkg, database.name, plan.userId);
   if (main.length === 0 || !main.subarray(0, SQLITE_HEADER.length).equals(SQLITE_HEADER)) {
     throw notSqlite(context, pkg, database.name, main, "a SQLite database");
   }
@@ -225,11 +237,11 @@ async function copyDatabase(
  * The bytes of one file in `databases/`. `exec-out` has no stderr and exits 0 whatever
  * the remote command did (S1), so a failure arrives as these bytes: callers validate them.
  */
-function pull(context: CommandContext, pkg: string, name: string): Promise<Buffer> {
+function pull(context: CommandContext, pkg: string, name: string, userId: number): Promise<Buffer> {
   return execOut(
     context.adb(),
     targetSerial(context),
-    ["run-as", pkg, "cat", shellWords([`databases/${name}`])],
+    ["run-as", pkg, "--user", String(userId), "cat", shellWords([`databases/${name}`])],
     {
       deadline: context.deadline,
       step: `copying databases/${name} of ${pkg}`,

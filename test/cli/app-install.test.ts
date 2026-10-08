@@ -145,6 +145,7 @@ interface World {
   rules?: Rule[];
   api?: Response;
   installedApk?: string | Response;
+  userId?: number;
 }
 
 /** One online emulator whose package state is a variable that installs and uninstalls move. */
@@ -161,6 +162,7 @@ function world(options: World): FakeAdb {
         respond,
       })),
       ...(options.rules ?? []),
+      { match: shell("am get-current-user"), respond: { stdout: `${options.userId ?? 0}\n` } },
       { match: shell(SDK), respond: options.api ?? { stdout: "35\n" } },
       { match: shell(APK_PATH), respond: { stdout: "package:/data/app/notes/base.apk\n" } },
       {
@@ -271,6 +273,7 @@ describe("app install", () => {
     // `-r` keeps the data; the device is read before the install and after it.
     expect(calls(fake)).toEqual([
       `shell ${SDK}`,
+      "shell am get-current-user",
       `shell ${DUMPSYS}`,
       `install -r ${APK}`,
       `shell ${DUMPSYS}`,
@@ -357,6 +360,7 @@ describe("app install", () => {
         rules: [
           { match: ["devices", "-l"], respond: { stdout: ONE_ONLINE } },
           { match: shell(SDK), respond: { stdout: "35\n" } },
+          { match: shell("am get-current-user"), respond: { stdout: "0\n" } },
           {
             match: shell("dumpsys package dev.probe"),
             when: { pkg: "absent" },
@@ -431,6 +435,7 @@ describe("app install", () => {
       expect(JSON.parse(json.stdout)).toEqual({ ...data, noop: true });
       expect(calls(fake)).toEqual([
         `shell ${SDK}`,
+        "shell am get-current-user",
         `shell ${DUMPSYS}`,
         `shell ${APK_PATH}`,
         `exec-out ${CAT_APK}`,
@@ -795,9 +800,37 @@ describe("app install", () => {
         dumps: { old: V56, new: V57 },
         rules: [
           installs(APK),
-          { match: shell(`pm clear ${PKG}`), respond: { stdout: "Success\n" } },
+          { match: shell(`pm clear --user 0 ${PKG}`), respond: { stdout: "Success\n" } },
         ],
       });
+
+    it("clears only the resolved current user's data", async () => {
+      const secondary = { stdout: V57.stdout?.replace("User 0:", "User 10:") ?? "" };
+      const fake = world({
+        userId: 10,
+        start: "new",
+        dumps: { new: secondary },
+        rules: [
+          installs(APK),
+          { match: shell(`pm clear --user 10 ${PKG}`), respond: { stdout: "Success\n" } },
+        ],
+      });
+      const run = await runCli(["app", "install", APK, "--clean-data", "--json"], fake.env);
+      expect(run.exitCode).toBe(0);
+      expect((JSON.parse(run.stdout) as Record<string, unknown>).ok).toBe(
+        `install ${PKG} -> 1.4.0 (57) with data wiped`,
+      );
+      expect(calls(fake)).toEqual([
+        `shell ${SDK}`,
+        "shell am get-current-user",
+        `shell ${DUMPSYS}`,
+        `install -r ${APK}`,
+        `shell ${DUMPSYS}`,
+        `shell pm clear --user 10 ${PKG}`,
+        `shell ${DUMPSYS}`,
+      ]);
+      expectClean(fake);
+    });
 
     it("installs with -r, clears the data, then verifies the version", async () => {
       const { toon, data, fake } = await both(make, ["app", "install", APK, "--clean-data"]);
@@ -805,10 +838,11 @@ describe("app install", () => {
       expect(data.ok).toBe("install com.example.notes -> 1.4.0 (57) with data wiped");
       expect(calls(fake)).toEqual([
         `shell ${SDK}`,
+        "shell am get-current-user",
         `shell ${DUMPSYS}`,
         `install -r ${APK}`,
         `shell ${DUMPSYS}`,
-        `shell pm clear ${PKG}`,
+        `shell pm clear --user 0 ${PKG}`,
         `shell ${DUMPSYS}`,
       ]);
       expectClean(fake);
@@ -822,7 +856,7 @@ describe("app install", () => {
             dumps: { old: V56, new: V57 },
             rules: [
               installs(APK),
-              { match: shell(`pm clear ${PKG}`), respond: { stdout: "Failed\n" } },
+              { match: shell(`pm clear --user 0 ${PKG}`), respond: { stdout: "Failed\n" } },
             ],
           }),
         ["app", "install", APK, "--clean-data"],
@@ -839,7 +873,7 @@ describe("app install", () => {
             dumps: { old: V56, new: V57 },
             rules: [
               installs(APK),
-              { match: shell(`pm clear ${PKG}`), respond: { stderr: "boom\n", exit: 1 } },
+              { match: shell(`pm clear --user 0 ${PKG}`), respond: { stderr: "boom\n", exit: 1 } },
             ],
           }),
         ["app", "install", APK, "--clean-data"],
@@ -874,7 +908,7 @@ describe("app install", () => {
             installedApk: APK,
             rules: [
               installs(APK),
-              { match: shell(`pm clear ${PKG}`), respond: { stdout: "Success\n" } },
+              { match: shell(`pm clear --user 0 ${PKG}`), respond: { stdout: "Success\n" } },
             ],
           }),
         ["app", "install", APK, "--clean-data", "--if-changed"],
@@ -884,10 +918,11 @@ describe("app install", () => {
       expect(data.install).not.toHaveProperty("shortcut");
       expect(calls(fake)).toEqual([
         `shell ${SDK}`,
+        "shell am get-current-user",
         `shell ${DUMPSYS}`,
         `install -r ${APK}`,
         `shell ${DUMPSYS}`,
-        `shell pm clear ${PKG}`,
+        `shell pm clear --user 0 ${PKG}`,
         `shell ${DUMPSYS}`,
       ]);
       expectClean(fake);
@@ -1144,9 +1179,42 @@ describe("app install", () => {
 
 describe("app uninstall", () => {
   const uninstalls = (command: string, respond: Response, to = "absent"): Rule => ({
-    match: shell(command),
+    match: shell(command.replace(/^pm uninstall/, "pm uninstall --user 0")),
     respond,
     set: { pkg: to },
+  });
+
+  it("checks and removes only the current user's installation when absent for user 0", async () => {
+    const secondary = {
+      stdout: `${V57.stdout?.replace("installed=true", "installed=false") ?? ""}    User 10: installed=true\n`,
+    };
+    const removed = {
+      stdout: secondary.stdout.replace("User 10: installed=true", "User 10: installed=false"),
+    };
+    const fake = world({
+      userId: 10,
+      start: "current",
+      dumps: { current: secondary, removed },
+      rules: [
+        {
+          match: shell(`pm uninstall --user 10 ${PKG}`),
+          respond: { stdout: "Success\n" },
+          set: { pkg: "removed" },
+        },
+      ],
+    });
+    const run = await runCli(["app", "uninstall", PKG, "--json"], fake.env);
+    expect(run.exitCode).toBe(0);
+    expect((JSON.parse(run.stdout) as Record<string, unknown>).ok).toBe(
+      `uninstall ${PKG} -> removed`,
+    );
+    expect(calls(fake)).toEqual([
+      "shell am get-current-user",
+      `shell ${DUMPSYS}`,
+      `shell pm uninstall --user 10 ${PKG}`,
+      `shell ${DUMPSYS}`,
+    ]);
+    expectClean(fake);
   });
 
   it("removes an installed package and checks that it is gone", async () => {
@@ -1163,8 +1231,9 @@ describe("app uninstall", () => {
     expect(toonLines(toon)).toEqual(["ok: uninstall com.example.notes -> removed"]);
     expect(data).toEqual({ ok: "uninstall com.example.notes -> removed" });
     expect(calls(fake)).toEqual([
+      "shell am get-current-user",
       `shell ${DUMPSYS}`,
-      `shell pm uninstall ${PKG}`,
+      `shell pm uninstall --user 0 ${PKG}`,
       `shell ${DUMPSYS}`,
     ]);
     expectClean(fake);
@@ -1181,7 +1250,7 @@ describe("app uninstall", () => {
     ]);
     expect(data).toEqual({ ok: "uninstall com.example.notes -> already not installed (no-op)" });
     // Raw adb would fail with DELETE_FAILED_INTERNAL_ERROR; uninstall is never even sent.
-    expect(calls(fake)).toEqual([`shell ${DUMPSYS}`]);
+    expect(calls(fake)).toEqual(["shell am get-current-user", `shell ${DUMPSYS}`]);
   });
 
   it("is the same no-op for a package kept after `uninstall -k`", async () => {
@@ -1191,7 +1260,7 @@ describe("app uninstall", () => {
     );
     expect(toon.exitCode).toBe(0);
     expect(data.ok).toBe("uninstall com.example.notes -> already not installed (no-op)");
-    expect(calls(fake)).toEqual([`shell ${DUMPSYS}`]);
+    expect(calls(fake)).toEqual(["shell am get-current-user", `shell ${DUMPSYS}`]);
   });
 
   it("replays a real device: the missing-package failure never reaches the user", async () => {
@@ -1214,7 +1283,7 @@ describe("app uninstall", () => {
     );
     expect(toon.exitCode).toBe(0);
     expect(data.ok).toBe("uninstall com.example.notes -> removed with data kept");
-    expect(calls(fake)).toContain(`shell pm uninstall -k ${PKG}`);
+    expect(calls(fake)).toContain(`shell pm uninstall --user 0 -k ${PKG}`);
   });
 
   it("forgets the install record of a package it removes", async () => {
@@ -1286,7 +1355,7 @@ describe("app uninstall", () => {
           dumps: { current: V57 },
           rules: [
             {
-              match: shell(`pm uninstall ${PKG}`),
+              match: shell(`pm uninstall --user 0 ${PKG}`),
               respond: {
                 stdout: "Failure [DELETE_FAILED_DEVICE_POLICY_MANAGER]\n",
                 exit: 1,
@@ -1311,22 +1380,49 @@ describe("app uninstall", () => {
     });
   });
 
-  it("does not trust a Success that leaves the package installed (a system app's update)", async () => {
-    const { toon, data } = await both(
-      () =>
-        world({
-          start: "current",
-          dumps: { current: V57 },
-          rules: [{ match: shell(`pm uninstall ${PKG}`), respond: { stdout: "Success\n" } }],
-        }),
-      ["app", "uninstall", PKG],
-    );
-    expect(toon.exitCode).toBe(1);
-    expect(data).toMatchObject({
-      code: "UNINSTALL_FAILED",
-      reason: "the package manager reported success",
-    });
-  });
+  it.each([
+    [0, false],
+    [0, true],
+    [10, false],
+    [10, true],
+  ] as const)(
+    "does not trust Success after reverting a system update for user %s (keep-data %s)",
+    async (userId, keepData) => {
+      const systemDump = (dump: Response): Response => ({
+        stdout: (dump.stdout ?? "")
+          .replace("flags=[ HAS_CODE ]", "flags=[ SYSTEM HAS_CODE ]")
+          .replace("User 0:", `User ${userId}:`),
+      });
+      const { toon, data, fake } = await both(
+        () =>
+          world({
+            userId,
+            start: "current",
+            dumps: { current: systemDump(V57), factory: systemDump(V56) },
+            rules: [
+              {
+                match: shell(`pm uninstall${keepData ? " -k" : ""} ${PKG}`),
+                respond: { stdout: "Success\n" },
+                set: { pkg: "factory" },
+              },
+            ],
+          }),
+        ["app", "uninstall", PKG, ...(keepData ? ["--keep-data"] : [])],
+      );
+      expect(toon.exitCode).toBe(1);
+      expect(data).toMatchObject({
+        code: "UNINSTALL_FAILED",
+        reason: "the package manager reported success",
+      });
+      expect(calls(fake)).toEqual([
+        "shell am get-current-user",
+        `shell ${DUMPSYS}`,
+        `shell pm uninstall${keepData ? " -k" : ""} ${PKG}`,
+        `shell ${DUMPSYS}`,
+      ]);
+      expect(data.help).toContainEqual(expect.stringContaining("for all users"));
+    },
+  );
 
   it("succeeds when pm complains but the package is gone afterwards", async () => {
     const { toon, data } = await both(
@@ -1352,7 +1448,7 @@ describe("app uninstall", () => {
     const fake = world({
       start: "current",
       dumps: { current: V57 },
-      rules: [{ match: shell(`pm uninstall ${PKG}`), respond: { hang: true } }],
+      rules: [{ match: shell(`pm uninstall --user 0 ${PKG}`), respond: { hang: true } }],
     });
     const run = await runCli(["app", "uninstall", PKG, "--timeout", "2s"], fake.env);
     expect(run.exitCode).toBe(1);

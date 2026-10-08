@@ -1,6 +1,7 @@
 import type { AdbClient } from "../../adb/run.js";
 import { parseDumpsysPackage, type PackageInfo } from "../../android/packages.js";
 import { pidof } from "../../android/pidof.js";
+import { readCurrentUser } from "../../android/users.js";
 import { readProcesses, type ProcessRecord } from "../../android/processes.js";
 import { invalidOutput, readShell, type ReadOptions } from "../../android/read.js";
 import { AdbAxiError } from "../../core/errors.js";
@@ -76,18 +77,7 @@ export async function requireInstalled(
   context: CommandContext,
   pkg: string,
 ): Promise<InstalledPackage> {
-  const current = await readShell(
-    context.adb(),
-    targetSerial(context),
-    "am get-current-user",
-    "reading the current Android user",
-    readOptions(context),
-  );
-  const user = current.stdout.trim();
-  if (!/^\d+$/.test(user) || !Number.isSafeInteger(Number(user))) {
-    throw invalidOutput("reading the current Android user", current.stdout);
-  }
-  const userId = Number(user);
+  const userId = await readCurrentUser(context.adb(), targetSerial(context), readOptions(context));
   const result = await readShell(
     context.adb(),
     targetSerial(context),

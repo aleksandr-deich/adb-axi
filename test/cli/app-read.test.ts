@@ -1,7 +1,9 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { decode } from "@toon-format/toon";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { allCommands, REGISTRY } from "../../src/commands/registry.js";
-import { createFakeAdb, type FakeAdb } from "../fake-adb/harness.js";
+import { createFakeAdb, FIXTURES_DIR, type FakeAdb } from "../fake-adb/harness.js";
 import type { Response, Rule } from "../fake-adb/scenario.js";
 import { runCli, type CliRun } from "../helpers/run.js";
 import { sharedWithToon } from "../helpers/json.js";
@@ -43,7 +45,11 @@ function deviceWithRules(rules: Rule[]): FakeAdb {
   fake = createFakeAdb({
     description: "One online emulator answering the app read commands",
     synthetic: true,
-    rules: [{ match: ["devices", "-l"], respond: { stdout: ONE_ONLINE } }, ...rules],
+    rules: [
+      { match: ["devices", "-l"], respond: { stdout: ONE_ONLINE } },
+      ...rules,
+      { match: ["-s", SERIAL, "shell", "am get-current-user"], respond: { stdout: "0\n" } },
+    ],
   });
   return fake;
 }
@@ -424,7 +430,35 @@ describe("app list", () => {
 describe("app info", () => {
   const DEBUG_DUMP = { stdoutFile: "captured/35/dumpsys-package-debug.txt" };
   const RELEASE_DUMP = { stdoutFile: "captured/35/dumpsys-package-release.txt" };
-  const DU = "run-as dev.probe du -sk .";
+  const DU = "run-as dev.probe --user 0 du -sk .";
+
+  it("measures the resolved current user's data, not the owner's", async () => {
+    const dump = readFileSync(
+      join(FIXTURES_DIR, "captured/35/dumpsys-package-debug.txt"),
+      "utf8",
+    ).replace("User 0:", "User 10:");
+    const f = device({
+      "am get-current-user": { stdout: "10\n" },
+      "dumpsys package dev.probe": { stdout: dump },
+      [PIDOF]: PROBE_STOPPED,
+      [FOREGROUND]: LAUNCHER_FRONT,
+      "run-as dev.probe --user 10 du -sk .": { stdout: "72\t.\n" },
+    });
+    const run = await runCli(["app", "info", "dev.probe", "--json"], f.env);
+    expect(run.exitCode).toBe(0);
+    expect((JSON.parse(run.stdout) as Record<string, unknown>).app).toMatchObject({
+      installed: true,
+      data_size: "72 KB",
+    });
+    expect(shellCommands(f)).toEqual([
+      "am get-current-user",
+      "dumpsys package dev.probe",
+      PIDOF,
+      FOREGROUND,
+      "run-as dev.probe --user 10 du -sk .",
+    ]);
+    expectClean(f);
+  });
 
   it("reports a running, foreground, debuggable app with its data size", async () => {
     const f = device({
@@ -517,7 +551,9 @@ describe("app info", () => {
     expect(toon.exitCode).toBe(0);
     expect(toon.stdout).toBe("app:\n  package: dev.probe.missing\n  installed: false\n");
     expect(data).toEqual({ app: { package: "dev.probe.missing", installed: false } });
-    expect(shellCommands(f)).toEqual(twice(["dumpsys package dev.probe.missing"]));
+    expect(shellCommands(f)).toEqual(
+      twice(["am get-current-user", "dumpsys package dev.probe.missing"]),
+    );
     // The help says so, since the lifecycle commands fail with APP_NOT_INSTALLED instead.
     const help = await runCli(["app", "info", "--help"], f.env);
     expect(help.stdout).toContain("`installed: false` with exit 0");

@@ -45,13 +45,20 @@ function scratchDir(): string {
   return dir;
 }
 
-const lsCall = (pkg = PKG): string[] => ["-s", SERIAL, "shell", `run-as ${pkg} ls -l databases`];
-const catCall = (name: string, pkg = PKG): string[] => [
+const lsCall = (pkg = PKG, userId = 0): string[] => [
+  "-s",
+  SERIAL,
+  "shell",
+  `run-as ${pkg} --user ${userId} ls -l databases`,
+];
+const catCall = (name: string, pkg = PKG, userId = 0): string[] => [
   "-s",
   SERIAL,
   "exec-out",
   "run-as",
   pkg,
+  "--user",
+  String(userId),
   "cat",
   `databases/${name}`,
 ];
@@ -70,12 +77,48 @@ function device(rules: Rule[], env: Record<string, string | undefined> = {}): Fa
     {
       description: "One online emulator answering run-as reads of an app's databases",
       synthetic: true,
-      rules: [{ match: ["devices", "-l"], respond: { stdout: ONE_ONLINE } }, ...rules],
+      rules: [
+        { match: ["devices", "-l"], respond: { stdout: ONE_ONLINE } },
+        ...rules,
+        { match: ["-s", SERIAL, "shell", "am get-current-user"], respond: { stdout: "0\n" } },
+      ],
     },
     { env },
   );
   return fake;
 }
+
+it("lists and copies only the resolved current user's database", async () => {
+  const db = makeDb("CREATE TABLE note(title); INSERT INTO note VALUES ('secondary');");
+  const f = device([
+    { match: ["-s", SERIAL, "shell", "am get-current-user"], respond: { stdout: "10\n" } },
+    { match: lsCall(PKG, 10), respond: { stdout: lsOutput({ "app.db": statSync(db).size }) } },
+    { match: catCall("app.db", PKG, 10), respond: { stdoutFile: db } },
+  ]);
+  const listed = await runCli(["data", "db", PKG, "--json"], f.env);
+  expect(listed.exitCode).toBe(0);
+  expect((JSON.parse(listed.stdout) as Record<string, unknown>).databases).toEqual([
+    { name: "app.db", size: "8 KB", wal: false },
+  ]);
+  const queried = await runCli(["data", "db", PKG, "SELECT title FROM note", "--json"], f.env);
+  expect(queried.exitCode).toBe(0);
+  expect((JSON.parse(queried.stdout) as Record<string, unknown>).rows).toEqual([
+    { title: "secondary" },
+  ]);
+  expect(
+    f
+      .calls()
+      .filter((c) => c.argv[2] === "shell" || c.argv[2] === "exec-out")
+      .map((c) => c.argv),
+  ).toEqual([
+    ["-s", SERIAL, "shell", "am get-current-user"],
+    lsCall(PKG, 10),
+    ["-s", SERIAL, "shell", "am get-current-user"],
+    lsCall(PKG, 10),
+    catCall("app.db", PKG, 10),
+  ]);
+  expect(f.unmatched()).toEqual([]);
+});
 
 /** A device whose `databases/` holds these files, each served from a file on the host. */
 function deviceWith(

@@ -6,6 +6,7 @@ import {
   type Forward,
 } from "../../android/holders.js";
 import { runShell } from "../../adb/shell.js";
+import { readCurrentUser } from "../../android/users.js";
 import { AdbAxiError } from "../../core/errors.js";
 import { listDevices } from "../../device/list.js";
 import { avdName } from "../../device/facts.js";
@@ -116,15 +117,15 @@ function holderPackages(holder: ClassifiedHolder): string[] {
   return [...new Set(packages)];
 }
 
-function clearCommands(holder: ClassifiedHolder): string[] {
+function clearCommands(holder: ClassifiedHolder, userId: number): string[] {
   if (holder.found.kind === "server") return [`kill ${holder.found.pid}`];
-  return holderPackages(holder).map((pkg) => `am force-stop ${pkg}`);
+  return holderPackages(holder).map((pkg) => `am force-stop --user ${userId} ${pkg}`);
 }
 
 function clearWords(holder: ClassifiedHolder): string {
   return holder.found.kind === "server"
     ? `kill pid ${holder.found.pid}`
-    : joinWords(clearCommands(holder).map((command) => command.replace("am ", "")));
+    : joinWords(holderPackages(holder).map((pkg) => `force-stop ${pkg}`));
 }
 
 function sameHolder(a: ClassifiedHolder, b: ClassifiedHolder): boolean {
@@ -189,6 +190,7 @@ async function fix(context: CommandContext): Promise<Output> {
     return { ok: okLine("doctor ui", serial, noop("uiautomation free")) };
   }
 
+  const userId = await readCurrentUser(context.adb(), serial, readOptions(context));
   const livePackages = new Set(before.filter(isLive).flatMap(holderPackages));
   const blocked = before.filter(
     (holder) => !isLive(holder) && holderPackages(holder).some((pkg) => livePackages.has(pkg)),
@@ -196,7 +198,7 @@ async function fix(context: CommandContext): Promise<Output> {
   const targets = before.filter((holder) => !isLive(holder) && !blocked.includes(holder));
   for (const holder of targets) {
     // A failed kill shows in the re-check, which is what decides the outcome.
-    for (const command of clearCommands(holder)) {
+    for (const command of clearCommands(holder, userId)) {
       await runShell(context.adb(), serial, command, {
         deadline: context.deadline,
         step: `clearing ${holder.label}`,
@@ -211,7 +213,7 @@ async function fix(context: CommandContext): Promise<Output> {
       pid: pidCell(holder),
       holder: holder.label,
       was: holder.state,
-      action: clearCommands(holder).join("; "),
+      action: clearCommands(holder, userId).join("; "),
     }));
   const clearedField = cleared.length > 0 ? { cleared } : {};
 

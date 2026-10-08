@@ -5,6 +5,7 @@ import type { AdbClient } from "../../adb/run.js";
 import { assertPackageName } from "../../android/component.js";
 import { readPackage, type PackageInfo } from "../../android/packages.js";
 import { parsePmFailure } from "../../android/pm-result.js";
+import { readCurrentUser } from "../../android/users.js";
 import { invalidOutput, readShell, type ReadOptions } from "../../android/read.js";
 import { formatDuration } from "../../core/args.js";
 import { Deadline } from "../../core/deadline.js";
@@ -84,7 +85,10 @@ async function runInstall(context: CommandContext): Promise<Output> {
       },
     );
   }
-  const before = read.ok ? await readPackage(adb, serial, read.info.package, options) : null;
+  const userId = read.ok ? await readCurrentUser(adb, serial, options) : 0;
+  const before = read.ok
+    ? await readPackage(adb, serial, read.info.package, options, userId)
+    : null;
   const previous = before?.installed === true ? before : null;
 
   let shortcut: string | undefined;
@@ -117,11 +121,11 @@ async function runInstall(context: CommandContext): Promise<Output> {
   }
 
   const info = read.info;
-  let installed = await waitForVersion(context, adb, serial, info, options);
+  let installed = await waitForVersion(context, adb, serial, info, options, userId);
   if (clean) {
-    await clearData(adb, serial, info.package, options);
+    await clearData(adb, serial, info.package, options, userId);
     // The package must survive the wipe at the version just installed.
-    installed = await waitForVersion(context, adb, serial, info, options);
+    installed = await waitForVersion(context, adb, serial, info, options, userId);
   }
 
   // A swap between a debug and a release build keeps the version, so say what did change.
@@ -354,6 +358,7 @@ async function waitForVersion(
   serial: string,
   info: ApkInfo,
   options: ReadOptions,
+  userId: number,
 ): Promise<PackageInfo> {
   assertPackageName(info.package);
   let latest: PackageInfo | null | undefined;
@@ -363,7 +368,7 @@ async function waitForVersion(
       const reads =
         remainingMs < MAX_INTERVAL_MS ? { deadline: new Deadline(MAX_INTERVAL_MS) } : options;
       try {
-        latest = await readPackage(adb, serial, info.package, reads);
+        latest = await readPackage(adb, serial, info.package, reads, userId);
       } catch (error) {
         // A read cut off by the deadline ends the wait; the last full read is the evidence.
         if (error instanceof AdbAxiError && error.code === "TIMEOUT") {
@@ -398,9 +403,10 @@ async function clearData(
   serial: string,
   pkg: string,
   options: ReadOptions,
+  userId: number,
 ): Promise<void> {
   const step = `wiping the data of ${pkg}`;
-  const result = await readShell(adb, serial, `pm clear ${pkg}`, step, options);
+  const result = await readShell(adb, serial, `pm clear --user ${userId} ${pkg}`, step, options);
   if (!/^Success\b/m.test(result.stdout)) throw invalidOutput(step, result.stdout);
 }
 
