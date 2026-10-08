@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { decode } from "@toon-format/toon";
@@ -6,7 +6,12 @@ import { afterEach, describe, expect, it } from "vitest";
 import { isShippedPath, REGISTRY } from "../../src/commands/registry.js";
 import { isProcessAlive } from "../../src/core/exec.js";
 import { createFakeAdb, type FakeAdb } from "../fake-adb/harness.js";
-import type { Response, Rule } from "../fake-adb/scenario.js";
+import {
+  UNMATCHED_EXIT,
+  UNMATCHED_PREFIX,
+  type Response,
+  type Rule,
+} from "../fake-adb/scenario.js";
 import { runCli, type CliRun } from "../helpers/run.js";
 import { sharedWithToon } from "../helpers/json.js";
 
@@ -81,6 +86,67 @@ function shell(response: Response, options: Partial<Rule> = {}, serial = SERIAL)
 
 function listing(response: Response, options: Partial<Rule> = {}): Rule {
   return { match: ["devices", "-l"], respond: response, ...options };
+}
+
+/**
+ * The same scripted adb as `scenario`, answered by a shell script instead of the TypeScript
+ * fake, for cases that check the last observation of a wait that runs out. The final look,
+ * taken at the deadline, has 500 ms for its one to three adb calls. Starting the TypeScript
+ * fake costs about 50 ms of CPU per call, which a loaded host stretches past that budget: the
+ * look then times out and reports nothing read, whatever the scenario says. A shell answers in
+ * a few milliseconds. Calls are logged like the fake's, in order, so `calls()` and
+ * `unmatched()` still hold; only exact arguments, `stdout`, `times` and `then` are supported.
+ */
+function quickScenario(rules: Rule[]): FakeAdb {
+  const f = scenario(rules);
+  const q = shellQuote;
+  const answer = (index: number, rule: Rule, response: Response | undefined): string => {
+    const { stdout = "", ...rest } = response ?? {};
+    if (Object.keys(rest).length > 0) throw new Error("quickScenario answers with stdout only");
+    return `answer ${String(index)} ${q(JSON.stringify(rule.match))} ${q(stdout)}`;
+  };
+  const branches = rules.map((rule, index) => {
+    const { match, respond, times, then, ...rest } = rule;
+    if (Object.keys(rest).length > 0 || !match.every((arg) => typeof arg === "string")) {
+      throw new Error("quickScenario matches exact adb arguments only");
+    }
+    const test = [
+      `[ "$#" -eq ${String(match.length)} ]`,
+      ...match.map((arg, i) => `[ "$${String(i + 1)}" = ${q(arg)} ]`),
+    ].join(" && ");
+    if (times === undefined) return `if ${test}; then ${answer(index, rule, respond)}; fi`;
+    const uses = `"$FAKE_ADB_STATE.${String(index)}"`;
+    return [
+      `if ${test}; then`,
+      `  n=0; [ -f ${uses} ] && read -r n < ${uses}`,
+      `  if [ "$n" -lt ${String(times)} ]; then echo $((n + 1)) > ${uses}; ${answer(index, rule, respond)}; fi`,
+      ...(then === undefined ? [] : [`  ${answer(index, rule, then)}`]),
+      `fi`,
+    ].join("\n");
+  });
+  writeFileSync(
+    join(f.binDir, "adb"),
+    `#!/bin/sh
+# The script has no millisecond clock: every call is logged at 0, in the order it ran.
+log() { printf '{"event":"start","pid":%s,"tool":"adb","argv":%s,"androidSerial":null,"at":0}\\n' $$ "$1" >> "$FAKE_ADB_LOG"; }
+answer() {
+  log "$2"
+  printf '%s' "$3"
+  printf '{"event":"end","pid":%s,"at":0,"rule":%s,"exit":0}\\n' $$ "$1" >> "$FAKE_ADB_LOG"
+  exit 0
+}
+${branches.join("\n")}
+printf '${UNMATCHED_PREFIX} adb %s\\n' "$*" >&2
+log '["${UNMATCHED_PREFIX}"]'
+printf '{"event":"end","pid":%s,"at":0,"rule":null,"exit":${String(UNMATCHED_EXIT)},"unmatched":true}\\n' $$ >> "$FAKE_ADB_LOG"
+exit ${String(UNMATCHED_EXIT)}
+`,
+  );
+  return f;
+}
+
+function shellQuote(value: string): string {
+  return `'${value.replaceAll("'", `'\\''`)}'`;
 }
 
 interface Both {
@@ -264,7 +330,7 @@ describe("wait boot", () => {
   });
 
   it("does not switch to a different device after the selected device disconnects", async () => {
-    const f = scenario([
+    const f = quickScenario([
       listing(devices(line(SERIAL, "device")), { times: 1 }),
       listing(devices(line(TABLET, "device"))),
       {
@@ -308,8 +374,10 @@ describe("wait boot", () => {
 
   describe("WAIT_TIMEOUT", () => {
     it("carries the last observation: state, boot_completed and uptime_s", async () => {
-      const f = scenario([listing(devices(line(TABLET, "device"))), shell(BOOTING, {}, TABLET)]);
-      // Each look starts a few fake adb processes, so the deadline must outlast a slow runner's spawns.
+      const f = quickScenario([
+        listing(devices(line(TABLET, "device"))),
+        shell(BOOTING, {}, TABLET),
+      ]);
       const { toon, data } = await both(["wait", "boot", "--device", TABLET, "--timeout", "3s"], f);
       expect(toon.exitCode).toBe(1);
       expect(toon.stdout).toBe(
@@ -342,7 +410,7 @@ describe("wait boot", () => {
     }, 20_000);
 
     it("carries which service still did not answer after the boot flag", async () => {
-      const f = scenario([
+      const f = quickScenario([
         listing(devices(line(SERIAL, "device"))),
         shell(boot(1, "1141.19 3978.79", { pkg: 20 })),
       ]);
@@ -363,7 +431,7 @@ describe("wait boot", () => {
     }, 20_000);
 
     it("says so when a fresh device was ready but had not answered for the settle yet", async () => {
-      const f = scenario([listing(devices(line(SERIAL, "device"))), shell(fresh("585"))]);
+      const f = quickScenario([listing(devices(line(SERIAL, "device"))), shell(fresh("585"))]);
       // Two independent deadlines can see different last observations on a slow runner.
       const { toon, data } = await once(["wait", "boot", "--timeout", "5s"], f);
       expect(toon.exitCode).toBe(1);
@@ -383,7 +451,7 @@ describe("wait boot", () => {
     }, 20_000);
 
     it("reports an offline device as the last state, with the boot unknown", async () => {
-      const f = scenario([listing(devices(line(SERIAL, "offline")))]);
+      const f = quickScenario([listing(devices(line(SERIAL, "offline")))]);
       const { toon, data } = await both(["wait", "boot", "--timeout", "2s"], f);
       expect(toon.exitCode).toBe(1);
       expect(data).toMatchObject({
@@ -401,7 +469,7 @@ describe("wait boot", () => {
     ])(
       "reports the last state for offline and %s attachments",
       async (other, state) => {
-        const f = scenario([listing(devices(line(SERIAL, "offline"), line(TABLET, other)))]);
+        const f = quickScenario([listing(devices(line(SERIAL, "offline"), line(TABLET, other)))]);
         const { toon, data } = await both(["wait", "boot", "--timeout", "1s"], f);
         expect(toon.exitCode).toBe(1);
         expect(data).toMatchObject({
@@ -414,7 +482,7 @@ describe("wait boot", () => {
     );
 
     it("names the environment-selected device in the timeout and doctor hint", async () => {
-      const f = scenario([listing(devices())]);
+      const f = quickScenario([listing(devices())]);
       const run = await runCli(["wait", "boot", "--timeout", "1s"], {
         ...f.env,
         ANDROID_SERIAL: TABLET,
@@ -430,23 +498,10 @@ describe("wait boot", () => {
     }, 20_000);
 
     it("reports a device that never attached, and names the one that was asked for", async () => {
-      const f = scenario([]);
-      const calls = join(f.dir, "listing-calls");
-      // This case needs an immediate, invariant empty listing, not a simulated
-      // slow transport. Starting the TypeScript fake for every poll can exceed
-      // the final observation's 500 ms budget under CI load, changing the last
-      // state to "unknown" independently of the output format.
-      writeFileSync(
-        join(f.binDir, "adb"),
-        `#!/bin/sh
-printf '%s\\n' "$*" >> "$WAIT_BOOT_LISTING_CALLS"
-[ "$#" -eq 2 ] && [ "$1" = devices ] && [ "$2" = -l ] || exit 97
-printf 'List of devices attached\\n\\n'
-`,
-      );
+      const f = quickScenario([listing(devices())]);
       const { toon, json, data } = await both(
         ["wait", "boot", "--device", TABLET, "--timeout", "2s"],
-        { ...f, env: { ...f.env, WAIT_BOOT_LISTING_CALLS: calls } },
+        f,
       );
       expect(toon.exitCode).toBe(1);
       expect(data).toEqual({
@@ -459,9 +514,10 @@ printf 'List of devices attached\\n\\n'
         expect(run.durationMs).toBeGreaterThanOrEqual(2_000);
         expect(run.durationMs).toBeLessThan(5_000);
       }
-      const observed = readFileSync(calls, "utf8").trim().split("\n");
+      expect(f.unmatched()).toEqual([]);
+      const observed = f.calls();
       expect(observed.length).toBeGreaterThanOrEqual(2);
-      expect(observed.every((args) => args === "devices -l")).toBe(true);
+      expect(observed.every((call) => call.argv.join(" ") === "devices -l")).toBe(true);
     }, 20_000);
 
     it("falls back to a plain doctor hint when no device was ever chosen", async () => {
