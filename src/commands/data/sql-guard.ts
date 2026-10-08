@@ -2,8 +2,8 @@ import { AdbAxiError } from "../../core/errors.js";
 
 /**
  * The statement kinds `data db` runs. Every one only reads: `WITH` can still lead into a
- * write, which the query process's authorizer then refuses. What is kept out early, before
- * anything touches the device, is everything that could reach a file on the host
+ * write, which the read-only connection then refuses. What is kept out early, before
+ * anything touches the device, includes statement kinds that could reach a host file
  * (`VACUUM INTO`, `ATTACH`) and sqlite3 shell dot-commands (`.shell`, `.output`, ...), which
  * are not SQL.
  */
