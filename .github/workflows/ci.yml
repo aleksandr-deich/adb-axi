@@ -46,4 +46,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run check
+        env:
+          # These fake-adb suites spend most of their time waiting on real deadlines.
+          # Four file workers avoid the two-worker macOS queue without concurrent cases.
+          VITEST_MAX_WORKERS: "4"
       - run: npm pack --dry-run
