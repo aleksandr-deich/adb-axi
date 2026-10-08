@@ -108,7 +108,7 @@ State that adb-axi keeps (log marks, install records, cached AVD names) lives pe
 | `app list [--all] [--grep <re>]`                             | Installed packages with a count                                                |
 | `app info <pkg>`                                             | One package: installed, version, debuggable, pid, foreground, data size        |
 | `app install <apk> [--clean-data] [--if-changed]`            | Installs and waits until the new version is live, keeping app data by default  |
-| `app uninstall <pkg> [--keep-data]`                          | Uninstalls a package; scope and exceptions are described under [Apps](#apps)    |
+| `app uninstall <pkg> [--keep-data]`                          | Uninstalls a package; scope and exceptions are described under [Apps](#apps)   |
 | `app start <pkg>[/<activity>] [--fresh] [--activity <name>]` | Starts an app and reports what is in front and how it launched                 |
 | `app stop <pkg>`                                             | Force-stops an app and verifies its process is gone                            |
 | `app clear <pkg> [--full]`                                   | Clears the app's data and verifies it                                          |
