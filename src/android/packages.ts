@@ -48,6 +48,7 @@ export interface PackageInfo {
   versionName: string | null;
   versionCode: number | null;
   debuggable: boolean;
+  system: boolean;
   /** The selected user's UID, not merely the package's app id. */
   uid: number | null;
   minSdk: number | null;
@@ -86,6 +87,7 @@ export function parsePackageRecords(stdout: string, userId = 0): Map<string, Pac
         versionName: null,
         versionCode: null,
         debuggable: false,
+        system: false,
         uid: null,
         minSdk: null,
         targetSdk: null,
@@ -117,7 +119,9 @@ export function parsePackageRecords(stdout: string, userId = 0): Map<string, Pac
     }
     const flags = /^flags=\[(.*)\]$/.exec(text);
     if (flags?.[1] !== undefined) {
-      info.debuggable = flags[1].trim().split(/\s+/).includes("DEBUGGABLE");
+      const values = flags[1].trim().split(/\s+/);
+      info.debuggable = values.includes("DEBUGGABLE");
+      info.system = values.includes("SYSTEM");
       continue;
     }
     const user = /^User (\d+): .*\binstalled=(true|false)\b/.exec(text);

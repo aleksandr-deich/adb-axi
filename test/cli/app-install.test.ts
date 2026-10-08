@@ -1380,24 +1380,49 @@ describe("app uninstall", () => {
     });
   });
 
-  it("does not trust a Success that leaves the package installed (a system app's update)", async () => {
-    const { toon, data } = await both(
-      () =>
-        world({
-          start: "current",
-          dumps: { current: V57 },
-          rules: [
-            { match: shell(`pm uninstall --user 0 ${PKG}`), respond: { stdout: "Success\n" } },
-          ],
-        }),
-      ["app", "uninstall", PKG],
-    );
-    expect(toon.exitCode).toBe(1);
-    expect(data).toMatchObject({
-      code: "UNINSTALL_FAILED",
-      reason: "the package manager reported success",
-    });
-  });
+  it.each([
+    [0, false],
+    [0, true],
+    [10, false],
+    [10, true],
+  ] as const)(
+    "does not trust Success after reverting a system update for user %s (keep-data %s)",
+    async (userId, keepData) => {
+      const systemDump = (dump: Response): Response => ({
+        stdout: dump.stdout
+          ?.replace("flags=[ HAS_CODE ]", "flags=[ SYSTEM HAS_CODE ]")
+          .replace("User 0:", `User ${userId}:`),
+      });
+      const { toon, data, fake } = await both(
+        () =>
+          world({
+            userId,
+            start: "current",
+            dumps: { current: systemDump(V57), factory: systemDump(V56) },
+            rules: [
+              {
+                match: shell(`pm uninstall${keepData ? " -k" : ""} ${PKG}`),
+                respond: { stdout: "Success\n" },
+                set: { pkg: "factory" },
+              },
+            ],
+          }),
+        ["app", "uninstall", PKG, ...(keepData ? ["--keep-data"] : [])],
+      );
+      expect(toon.exitCode).toBe(1);
+      expect(data).toMatchObject({
+        code: "UNINSTALL_FAILED",
+        reason: "the package manager reported success",
+      });
+      expect(calls(fake)).toEqual([
+        "shell am get-current-user",
+        `shell ${DUMPSYS}`,
+        `shell pm uninstall${keepData ? " -k" : ""} ${PKG}`,
+        `shell ${DUMPSYS}`,
+      ]);
+      expect(data.help).toContainEqual(expect.stringContaining("for all users"));
+    },
+  );
 
   it("succeeds when pm complains but the package is gone afterwards", async () => {
     const { toon, data } = await both(

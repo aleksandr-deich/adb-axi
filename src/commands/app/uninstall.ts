@@ -11,7 +11,8 @@ import { readOptions, targetSerial } from "./shared.js";
 
 export const appUninstall = defineCommand({
   path: ["app", "uninstall"],
-  summary: "Remove a package; a package that is not installed is a no-op",
+  summary:
+    "Remove a package for the current user; absent packages are a no-op. System-app updates revert to the factory version for all users (platform behaviour)",
   positionals: [
     { name: "pkg", description: "Package name, for example com.example.notes", required: true },
   ],
@@ -44,7 +45,7 @@ export const appUninstall = defineCommand({
     const result = await runShell(
       adb,
       serial,
-      `pm uninstall --user ${userId}${keepData ? " -k" : ""} ${pkg}`,
+      `pm uninstall${record.system ? "" : ` --user ${userId}`}${keepData ? " -k" : ""} ${pkg}`,
       {
         deadline: context.deadline,
         step: `uninstalling ${pkg}`,
@@ -67,7 +68,7 @@ export const appUninstall = defineCommand({
           ...(failure?.message == null ? {} : { detail: failure.message }),
         },
         help: [
-          "A system app cannot be removed (only replaced by its factory version) and a device policy can also block removal",
+          "A system app cannot be removed; uninstalling its update reverts it to the factory version for all users (platform behaviour). A device policy can also block removal",
           runHint(["app", "info", pkg], "for the version that is installed now"),
         ],
       });
