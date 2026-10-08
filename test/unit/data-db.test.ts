@@ -1,6 +1,11 @@
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import { describe, expect, it } from "vitest";
 import { formatSize } from "../../src/commands/data/db.js";
-import { parseSqliteJson, SqliteJsonError } from "../../src/commands/data/sqlite-json.js";
+import { readRows, runQuery } from "../../src/commands/data/sqlite-query.js";
+import { Deadline } from "../../src/core/deadline.js";
 import { assertReadOnlySql, statementHeads } from "../../src/commands/data/sql-guard.js";
 
 describe("statementHeads", () => {
@@ -37,50 +42,62 @@ describe("assertReadOnlySql", () => {
   );
 });
 
-describe("parseSqliteJson", () => {
-  it("reads rows in column order and nothing as no rows", () => {
-    expect(parseSqliteJson("")).toEqual([]);
-    expect(parseSqliteJson("[]")).toEqual([]);
-    expect(parseSqliteJson('[{"b":1,"a":"x"},\n{"b":2,"a":null}]\n')).toEqual([
+describe("readRows", () => {
+  it("reads rows in column order and a column line alone as no rows", () => {
+    expect(readRows("app.db", '["b","a"]\n')).toEqual([]);
+    expect(readRows("app.db", '["b","a"]\n[1,"x"]\n[2,null]\n')).toEqual([
       { b: 1, a: "x" },
       { b: 2, a: null },
     ]);
-    expect(Object.keys(parseSqliteJson('[{"b":1,"a":2}]')[0] ?? {})).toEqual(["b", "a"]);
-  });
-
-  it("decodes string escapes", () => {
-    expect(parseSqliteJson('[{"s":"a\\"b\\\\c\\n\\u00e9\\t"}]')).toEqual([{ s: 'a"b\\c\né\t' }]);
+    expect(Object.keys(readRows("app.db", '["b","a"]\n[1,2]\n')[0] ?? {})).toEqual(["b", "a"]);
   });
 
   it("keeps big integers exact, renames repeated columns, and keeps __proto__ a column", () => {
-    const [row] = parseSqliteJson(
-      '[{"id":9007199254740993,"id":2,"id":3,"__proto__":4,"f":1.5e3}]',
+    const [row] = readRows(
+      "app.db",
+      '["id","id","id","__proto__","f"]\n["9007199254740993",2,3,4,1500]\n',
     );
     expect(Object.keys(row ?? {})).toEqual(["id", "id_2", "id_3", "__proto__", "f"]);
     expect(row).toMatchObject({ id: "9007199254740993", id_2: 2, id_3: 3, f: 1500 });
     expect(Object.getOwnPropertyDescriptor(row, "__proto__")?.value).toBe(4);
   });
 
-  it.each(['[{"x":oops}]', '[{"x":Inf}]', '[{"x":NaN}]', '[{"x":01}]', '[{"x":1e999}]'])(
-    "rejects non-JSON values in %j",
+  it.each(["", '["a"]\n[1', '{"a":1}', '["a"]\n{"a":1}', '["a"]\n[1,2]', "[1]"])(
+    "rejects malformed %j as INVALID_OUTPUT",
     (text) => {
-      expect(() => parseSqliteJson(text)).toThrow(SqliteJsonError);
+      expect(() => readRows("app.db", text)).toThrow(
+        expect.objectContaining({ code: "INVALID_OUTPUT" }),
+      );
     },
   );
+});
 
-  it.each(['[{"a":1}]\n[{"a":2}]\n', "[]\n[]", '[{"a":1}]\n[]'])(
-    "rejects a second result set in %j",
-    (text) => {
-      expect(() => parseSqliteJson(text)).toThrow(SqliteJsonError);
-    },
-  );
-
-  it.each(['[{"a":1', '[{"a" 1}]', '{"a":1}', '[{"a":"x]', '[{"a":1}x'])(
-    "rejects malformed %j",
-    (text) => {
-      expect(() => parseSqliteJson(text)).toThrow(SqliteJsonError);
-    },
-  );
+describe("runQuery", () => {
+  it("refuses an ATTACH of another host database, even past the statement check", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "adb-axi-query-test-"));
+    try {
+      const host = join(dir, "host.db");
+      const other = new DatabaseSync(host);
+      other.exec("CREATE TABLE secret(v); INSERT INTO secret VALUES ('host sentinel');");
+      other.close();
+      const copy = join(dir, "copy.db");
+      new DatabaseSync(copy).close();
+      const request = {
+        database: copy,
+        workDir: dir,
+        env: process.env,
+        deadline: new Deadline(20_000),
+        step: "querying the copy of app.db",
+        label: "app.db",
+      };
+      await expect(runQuery({ ...request, sql: `ATTACH '${host}' AS h` })).rejects.toMatchObject({
+        code: "SQL_ERROR",
+        message: expect.stringContaining("not authorized") as unknown,
+      });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("formatSize", () => {

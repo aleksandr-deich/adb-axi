@@ -638,15 +638,18 @@ describe("doctor", () => {
   });
 
   describe("ime", () => {
-    it("is ok with the standard keyboard, and names any other keyboard", async () => {
-      expect((await doctor(scenario())).rows.ime?.detail).toBe("standard keyboard");
-      const f = scenario({
-        probes: { ime: { stdout: "com.touchtype.swiftkey/com.touchtype.KeyboardService\n" } },
-      });
+    it.each([
+      { stdout: STOCK_IME, detail: "standard keyboard" },
+      {
+        stdout: "com.touchtype.swiftkey/com.touchtype.KeyboardService\n",
+        detail: "com.touchtype.swiftkey",
+      },
+    ])("is ok with the keyboard $detail", async ({ stdout, detail }) => {
+      const f = scenario({ probes: { ime: { stdout } } });
       expect((await doctor(f)).rows.ime).toEqual({
         check: "ime",
         status: "ok",
-        detail: "com.touchtype.swiftkey",
+        detail,
       });
     });
 
@@ -667,35 +670,30 @@ describe("doctor", () => {
       expectHelpShipped(data.help);
     });
 
-    it("fails when no default keyboard is set", async () => {
-      for (const stdout of ["null\n", "\n"]) {
-        const f = scenario({ probes: { ime: { stdout } } });
-        const { toon, rows } = await doctor(f);
-        expect(toon.exitCode).toBe(1);
-        expect(rows.ime).toEqual({
-          check: "ime",
-          status: "failed",
-          detail: "no default keyboard is set, typing goes nowhere",
-        });
-      }
+    it.each(["null\n", "\n"])("fails when no default keyboard is set (%j)", async (stdout) => {
+      const f = scenario({ probes: { ime: { stdout } } });
+      const { toon, rows } = await doctor(f);
+      expect(toon.exitCode).toBe(1);
+      expect(rows.ime).toEqual({
+        check: "ime",
+        status: "failed",
+        detail: "no default keyboard is set, typing goes nowhere",
+      });
     });
   });
 
   describe("clock", () => {
-    it("warns when the device clock is more than a minute from the host's", async () => {
-      const behind = await doctor(
-        scenario({ probes: { clock: { clockOffsetMs: -3 * 86_400_000 } } }),
-      );
-      expect(behind.toon.exitCode).toBe(0);
-      expect(behind.rows.clock).toEqual({
+    it.each([
+      { clockOffsetMs: -3 * 86_400_000, offset: "3 d behind" },
+      { clockOffsetMs: 5 * 60_000, offset: "5 min ahead of" },
+    ])("warns when the device clock is $offset the host", async ({ clockOffsetMs, offset }) => {
+      const { toon, rows } = await doctor(scenario({ probes: { clock: { clockOffsetMs } } }));
+      expect(toon.exitCode).toBe(0);
+      expect(rows.clock).toEqual({
         check: "clock",
         status: "warn",
-        detail: "3 d behind the host; log times and log marks use the device clock",
+        detail: `${offset} the host; log times and log marks use the device clock`,
       });
-      const ahead = await doctor(scenario({ probes: { clock: { clockOffsetMs: 5 * 60_000 } } }));
-      expect(ahead.rows.clock?.detail).toBe(
-        "5 min ahead of the host; log times and log marks use the device clock",
-      );
     });
 
     it("is ok within a minute, either way", async () => {

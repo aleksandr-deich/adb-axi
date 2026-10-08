@@ -8,7 +8,7 @@ Physical phones are supported for the core commands: devices, doctor, the app li
 
 ## Install
 
-Requirements: Node 22 or newer, and the Android SDK platform-tools. Devices must run Android 10 (API 29) or newer.
+Requirements: Node 24.12 or newer, and the Android SDK platform-tools. Devices must run Android 10 (API 29) or newer.
 
 ```sh
 npm install --global adb-axi
@@ -26,7 +26,7 @@ npm install --global ./adb-axi-*.tgz
 adb-axi --version
 ```
 
-adb is found on `PATH`, then in `$ANDROID_HOME/platform-tools`, `$ANDROID_SDK_ROOT/platform-tools` and `~/Library/Android/sdk/platform-tools`. When none has it, every command fails with `ADB_NOT_FOUND` and lists the places it searched. `data db` also needs a host `sqlite3`, found the same way.
+adb is found on `PATH`, then in `$ANDROID_HOME/platform-tools`, `$ANDROID_SDK_ROOT/platform-tools` and `~/Library/Android/sdk/platform-tools`. When none has it, every command fails with `ADB_NOT_FOUND` and lists the places it searched.
 
 ## Agent skill
 
@@ -169,10 +169,10 @@ The lifecycle commands require the package to be installed for the current Andro
 
 `data db <pkg>` lists a debuggable app's databases (`name`, `size`, `wal`). `data db <pkg> "<sql>" [--db <name>]` runs one read-only statement (`SELECT`, `WITH`, `VALUES`, `EXPLAIN` or `PRAGMA`) on a host copy and prints the rows; `--db` is required when the app has several databases.
 
-- **Copy:** the database and its `-wal` file are copied with `run-as` and read with the host `sqlite3`, so rows still only in the WAL are included. The files are copied one at a time while the app runs, so a write made during the copy can be missed. The copied bytes are checked, because `exec-out` exits 0 even when it prints an error instead of the file.
-- **Read-only:** write statements, `ATTACH`, `VACUUM INTO`, multiple statements and sqlite3 dot-commands are refused before any device call. A `WITH` or `PRAGMA` that attempts a write is rejected by the read-only connection, and sqlite3 safe mode blocks host-file functions.
+- **Copy:** the database and its `-wal` file are copied with `run-as` and read with the SQLite built into Node.js, so rows still only in the WAL are included. The files are copied one at a time while the app runs, so a write made during the copy can be missed. The copied bytes are checked, because `exec-out` exits 0 even when it prints an error instead of the file.
+- **Read-only:** write statements, `ATTACH`, `VACUUM INTO`, multiple statements and sqlite3 dot-commands are refused before any device call. The query runs in its own Node.js process on a read-only connection: a `WITH` or `PRAGMA` that attempts a write is refused, as are `ATTACH` and pragmas that do more than report. That SQLite has no host-file functions or modules (`readfile`, `fsdir`, `zipfile`); FTS and R-Tree tables still read. Queries cannot reach any pre-existing host file. SQLite's own scratch files stay inside adb-axi's private per-query directory, which is removed afterwards. Very large queries are bounded by the deadline, not by a memory cap.
 - **Rows:** the first 50 are printed, with `shown: 50 of N rows` when more exist. Cells over 500 characters are cut. `--full` writes all rows with uncut cells to a file, only when something was cut. Results larger than 64 MB fail even with `--full`.
-- **Errors:** `APP_NOT_DEBUGGABLE` (`run-as` refused, as for release builds), `DB_NOT_FOUND` (names the databases that exist), `INVALID_OUTPUT`, `SQL_ERROR` (sqlite3's message) and `SQLITE_NOT_FOUND`.
+- **Errors:** `APP_NOT_DEBUGGABLE` (`run-as` refused, as for release builds), `DB_NOT_FOUND` (names the databases that exist), `INVALID_OUTPUT`, `SQL_ERROR` (SQLite's message) and `NODE_TOO_OLD` (Node.js older than 24.12).
 
 `shell -- '<cmd>'` runs one command string in the device shell through `shell_v2`, so the remote exit code is real. adb-axi's own flags, such as `--device`, go before `--`: everything after it runs on the device. A non-zero exit is exit 1 with `code: REMOTE_EXIT`, the remote `exit` and its `stderr`.
 

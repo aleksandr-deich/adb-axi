@@ -1,6 +1,6 @@
 # Repeatable Android agent benchmark
 
-This is a sequential, local benchmark, not CI and not part of the npm package (`package.json` publishes only `dist`, `LICENSE`, and the root README). Run from the repository root on macOS with Node 22+, Pi, the Android CLI, SDK platform-tools and `/usr/bin/sqlite3`. Provision the phone and tablet AVDs first. The harness boots them itself and refuses already-running target AVDs. No physical device or other AVD is a target. `Pixel_10_Pro_XL_Sasha` and `small_phone` are prohibited even as overrides.
+This is a sequential, local benchmark, not CI and not part of the npm package (`package.json` publishes only `dist`, `LICENSE`, and the root README). Run from the repository root on macOS with Node 24.12+, Pi, the Android CLI, SDK platform-tools and `/usr/bin/sqlite3`. Provision the phone and tablet AVDs first. The harness boots them itself and refuses already-running target AVDs. No physical device or other AVD is a target. `Pixel_10_Pro_XL_Sasha` and `small_phone` are prohibited even as overrides.
 
 ## Commands and spend guard
 
