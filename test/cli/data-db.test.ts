@@ -472,12 +472,23 @@ describe("data db: reading", () => {
     const f = deviceWith({ "app.db": db }, { TMPDIR: tmp });
     const seen = new Set<string>();
     const modes = new Set<number>();
-    const watcher = watch(tmp, { recursive: true }, (_event, filename) => {
+    const directoryWatchers = new Map<string, ReturnType<typeof watch>>();
+    const watcher = watch(tmp, (_event, filename) => {
       if (filename === null) return;
       seen.add(filename);
-      const dir = join(tmp, filename.split(/[\\/]/)[0] ?? "");
+      const dir = join(tmp, filename);
       const stat = statSync(dir, { throwIfNoEntry: false });
-      if (stat !== undefined) modes.add(stat.mode & 0o777);
+      if (stat?.isDirectory() && !directoryWatchers.has(filename)) {
+        modes.add(stat.mode & 0o777);
+        // Watch directly while adb copies the database. Linux's recursive watcher can
+        // miss SQLite scratch files that are created and immediately unlinked.
+        directoryWatchers.set(
+          filename,
+          watch(dir, (_event, child) => {
+            if (child !== null) seen.add(join(filename, child));
+          }),
+        );
+      }
     });
     try {
       const sql =
@@ -493,6 +504,7 @@ describe("data db: reading", () => {
       expect(f.unmatched()).toEqual([]);
     } finally {
       watcher.close();
+      for (const child of directoryWatchers.values()) child.close();
     }
   });
 
