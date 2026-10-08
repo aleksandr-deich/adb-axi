@@ -377,6 +377,14 @@ describe("data db: choosing the database", () => {
     expect(data).toMatchObject({ code: "DB_NOT_FOUND", databases: ["a.db"] });
   });
 
+  it("resolves x.db without --db when Room's .lck lock file sits next to it", async () => {
+    const x = makeDb("CREATE TABLE t(v); INSERT INTO t VALUES ('from x');", "x.db");
+    const f = deviceWith({ "x.db": x, "x.db.lck": x });
+    const { data } = await both(f, [PKG, "SELECT v FROM t"]);
+    expect(data.rows).toEqual([{ v: "from x" }]);
+    expect(data.db).toMatch(/^x\.db \(no WAL, copied \d\d:\d\d:\d\d\)$/);
+  });
+
   it("fails with DB_NOT_FOUND when the app has no databases at all", async () => {
     const f = device([
       {

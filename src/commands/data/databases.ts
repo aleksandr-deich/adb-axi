@@ -20,12 +20,12 @@ export interface DatabaseFile {
  */
 const LS_LINE = /^-\S*\s+\d+\s+\S+\s+\S+\s+(\d+)\s+\d{4}-\d\d-\d\d\s+\d\d:\d\d(?::\d\d)?\s+(.+)$/;
 
-/** Files SQLite keeps next to a database; they are never databases themselves. */
-const COMPANION = /-(wal|shm|journal)$/;
+/** Files SQLite and Room keep next to a database; they are never databases themselves. */
+const COMPANION = /(-(wal|shm|journal)|\.lck)$/;
 
 /**
  * List the app's databases through `run-as`: every regular file in `databases/` except
- * SQLite's own `-wal`, `-shm` and `-journal` companions. An app without a `databases/`
+ * the `-wal`, `-shm` and `-journal` companions and Room's `.lck` lock file. An app without a `databases/`
  * directory has none. A `run-as` refusal becomes `APP_NOT_DEBUGGABLE` or
  * `APP_NOT_INSTALLED`.
  */
