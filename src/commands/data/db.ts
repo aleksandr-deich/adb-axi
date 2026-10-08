@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { execOut } from "../../adb/execout.js";
@@ -168,6 +168,7 @@ async function query(context: CommandContext, plan: QueryPlan): Promise<Output> 
   const { database, sql } = plan;
   const dir = mkdtempSync(join(tmpdir(), "adb-axi-db-"));
   try {
+    chmodSync(dir, 0o700);
     const walCopied = await copyDatabase(context, plan, dir);
     const copiedAt = new Date();
     const rows = await runQuery({

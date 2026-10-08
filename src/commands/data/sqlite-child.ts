@@ -4,7 +4,9 @@
  * functions (`fsdir`, `zipfile`, `readfile`, ...) and loads no extensions, read-only, in
  * defensive mode, and with an authorizer that blocks host-file operations. A virtual table the
  * copied schema declares can therefore only use the modules compiled in (FTS, R-Tree,
- * dbstat, ...), and the query cannot attach another file or change where SQLite writes.
+ * dbstat, ...). Queries cannot reach any pre-existing host file. SQLite's own scratch files
+ * stay inside adb-axi's private per-query directory, which is removed afterwards. Very large
+ * queries are bounded by the deadline, not by a memory cap.
  *
  * Output on stdout, one JSON array per line: the column names, then each row. Integers past
  * 2^53 are strings, so they stay exact, and blobs are strings of their bytes as Latin-1, as
@@ -109,14 +111,6 @@ async function run(database: string, sql: string): Promise<void> {
     // As the sqlite3 shell and Android's SQLite do: app schemas and queries use them.
     enableDoubleQuotedStringLiterals: true,
   });
-  const maxHeapBytes = 512 * 1024 * 1024;
-  db.exec(`PRAGMA temp_store=MEMORY; PRAGMA hard_heap_limit=${maxHeapBytes};`);
-  if (db.prepare("PRAGMA temp_store").get()?.temp_store !== 2) {
-    throw new Error("data db could not enable memory-only temporary storage");
-  }
-  if (db.prepare("PRAGMA hard_heap_limit").get()?.hard_heap_limit !== maxHeapBytes) {
-    throw new Error("data db could not configure the SQLite memory limit");
-  }
   db.setAuthorizer(authorize);
   const statement = db.prepare(sql);
   statement.setReadBigInts(true);

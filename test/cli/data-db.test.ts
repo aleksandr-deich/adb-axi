@@ -8,6 +8,7 @@ import {
   readFileSync,
   rmSync,
   statSync,
+  watch,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -461,6 +462,36 @@ describe("data db: reading", () => {
     expect(schema.data.rows).toEqual([
       { cid: 0, name: "v", type: "", notnull: 0, dflt_value: null, pk: 0 },
     ]);
+  });
+
+  it("spills a large sort only inside the private query directory and removes it", async () => {
+    const tmp = scratchDir();
+    const db = makeDb("CREATE TABLE t(v);");
+    const f = deviceWith({ "app.db": db }, { TMPDIR: tmp });
+    const seen = new Set<string>();
+    const modes = new Set<number>();
+    const watcher = watch(tmp, { recursive: true }, (_event, filename) => {
+      if (filename === null) return;
+      seen.add(filename);
+      const dir = join(tmp, filename.split(/[\\/]/)[0] ?? "");
+      const stat = statSync(dir, { throwIfNoEntry: false });
+      if (stat !== undefined) modes.add(stat.mode & 0o777);
+    });
+    try {
+      const sql =
+        "WITH RECURSIVE c(x) AS (SELECT 1 UNION ALL SELECT x+1 FROM c WHERE x<65536) " +
+        "SELECT count(*) AS n FROM (SELECT printf('%01024d',x) AS v FROM c ORDER BY v DESC)";
+      const run = await runCli(["data", "db", PKG, sql, "--json"], f.env);
+      expect(run.exitCode).toBe(0);
+      expect(JSON.parse(run.stdout)).toMatchObject({ rows: [{ n: 65536 }] });
+      expect([...seen].some((name) => /[/\\]etilqs_/.test(name))).toBe(true);
+      expect([...seen].every((name) => /^adb-axi-db-[^/\\]+(?:[/\\]|$)/.test(name))).toBe(true);
+      expect([...modes]).toEqual([0o700]);
+      expect(readdirSync(tmp)).toEqual([]);
+      expect(f.unmatched()).toEqual([]);
+    } finally {
+      watcher.close();
+    }
   });
 
   it("never leaves the copy on the host, and sends no host path to adb", async () => {
