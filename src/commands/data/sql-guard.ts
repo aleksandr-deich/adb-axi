@@ -2,10 +2,10 @@ import { AdbAxiError } from "../../core/errors.js";
 
 /**
  * The statement kinds `data db` runs. Every one only reads: `WITH` can still lead into a
- * write, which the read-only connection then refuses with sqlite3's own message. What is
- * kept out is everything that could write a file on the host even against a read-only
- * database (`VACUUM INTO`, `ATTACH`) and the sqlite3 shell's dot-commands (`.shell`,
- * `.output`, `.import`, ...), which can run programs and write files.
+ * write, which the query process's authorizer then refuses. What is kept out early, before
+ * anything touches the device, is everything that could reach a file on the host
+ * (`VACUUM INTO`, `ATTACH`) and sqlite3 shell dot-commands (`.shell`, `.output`, ...), which
+ * are not SQL.
  */
 const READ_KEYWORDS = new Set(["SELECT", "WITH", "VALUES", "EXPLAIN", "PRAGMA"]);
 

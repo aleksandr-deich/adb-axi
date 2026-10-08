@@ -11,7 +11,7 @@ export interface SdkToolSearch {
 }
 
 /**
- * Find an Android SDK platform-tools executable (adb, sqlite3): `PATH`, then
+ * Find an Android SDK platform-tools executable (adb): `PATH`, then
  * `$ANDROID_HOME/platform-tools`, then `$ANDROID_SDK_ROOT/platform-tools`, then
  * `~/Library/Android/sdk/platform-tools` (7.3).
  */

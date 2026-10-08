@@ -11,9 +11,8 @@ import { targetSerial } from "../app/shared.js";
 import { defineCommand } from "../define.js";
 import type { CommandContext } from "../types.js";
 import { listDatabases, runAsRefusal, type DatabaseFile } from "./databases.js";
-import { locateSqlite3, runQuery } from "./host-sqlite.js";
-import { parseSqliteJson, SqliteJsonError, type Row } from "./sqlite-json.js";
 import { assertReadOnlySql } from "./sql-guard.js";
+import { assertQueryRuntime, runQuery, type Row } from "./sqlite-query.js";
 
 /** Rows shown by default, as many as the log line cap (7.8). */
 const MAX_ROWS = 50;
@@ -82,10 +81,10 @@ export const dataDb = defineCommand({
     }
 
     assertReadOnlySql(sql);
-    const sqlite3 = locateSqlite3(context.env);
+    assertQueryRuntime();
     const databases = await listDatabases(context, pkg);
     const database = pick(context, pkg, databases, requested);
-    return query(context, { pkg, database, sql, sqlite3, full });
+    return query(context, { pkg, database, sql, full });
   },
 });
 
@@ -162,7 +161,6 @@ interface QueryPlan {
   pkg: string;
   database: DatabaseFile;
   sql: string;
-  sqlite3: string;
   full: boolean;
 }
 
@@ -172,8 +170,7 @@ async function query(context: CommandContext, plan: QueryPlan): Promise<Output> 
   try {
     const walCopied = await copyDatabase(context, plan, dir);
     const copiedAt = new Date();
-    const stdout = await runQuery({
-      sqlite3: plan.sqlite3,
+    const rows = await runQuery({
       database: join(dir, "db"),
       sql,
       workDir: dir,
@@ -182,7 +179,6 @@ async function query(context: CommandContext, plan: QueryPlan): Promise<Output> 
       step: `querying the copy of ${database.name}`,
       label: database.name,
     });
-    const rows = readRows(database.name, stdout);
     return present(
       context,
       plan,
@@ -270,21 +266,6 @@ function notSqlite(
       ],
     },
   );
-}
-
-function readRows(name: string, stdout: string): Row[] {
-  try {
-    return parseSqliteJson(stdout);
-  } catch (error) {
-    if (!(error instanceof SqliteJsonError)) throw error;
-    throw new AdbAxiError(
-      "INVALID_OUTPUT",
-      `sqlite3 printed a result for ${name} adb-axi cannot read`,
-      {
-        fields: { detail: error.message },
-      },
-    );
-  }
 }
 
 /** The result as TOON rows, capped at 50, with the whole result in a file for `--full`. */

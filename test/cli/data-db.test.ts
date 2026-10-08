@@ -1,6 +1,5 @@
-import { execFileSync, spawn } from "node:child_process";
+import { spawn } from "node:child_process";
 import {
-  chmodSync,
   copyFileSync,
   existsSync,
   mkdirSync,
@@ -13,11 +12,12 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import { decode } from "@toon-format/toon";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { findSdkTool } from "../../src/adb/locate.js";
 import { isProcessAlive } from "../../src/core/exec.js";
 import { createFakeAdb, FIXTURES_DIR, type FakeAdb } from "../fake-adb/harness.js";
+import { buildZip } from "../helpers/apk-builder.js";
 import type { Response, Rule } from "../fake-adb/scenario.js";
 import { runCli, type CliRun } from "../helpers/run.js";
 import { sharedWithToon } from "../helpers/json.js";
@@ -29,12 +29,6 @@ const PKG = "dev.probe";
 const ONE_ONLINE = `List of devices attached\n${SERIAL}          device product:sdk_gphone64_arm64 model:sdk_gphone64_arm64 device:emu64a transport_id:1\n\n`;
 const CAPTURED = join(FIXTURES_DIR, "captured", "35");
 const MARGIN_MS = 1500;
-
-/** The host sqlite3 the tests run for real, found the way adb-axi finds it. */
-const SQLITE3 = findSdkTool("sqlite3").path;
-const needsSqlite3 = it.skipIf(SQLITE3 === undefined);
-const NO_SQLITE3_REASON = "host sqlite3 is not installed, so the real-sqlite3 cases are skipped";
-if (SQLITE3 === undefined) console.warn(NO_SQLITE3_REASON);
 
 let fake: FakeAdb | undefined;
 const scratch: string[] = [];
@@ -102,40 +96,44 @@ function deviceWith(
   );
 }
 
-/** Make a database with the real sqlite3, as a file in a scratch directory. */
+/** Make a database with real SQLite, as a file in a scratch directory. */
 function makeDb(sql: string, name = "app.db"): string {
   const path = join(scratchDir(), name);
-  execFileSync(SQLITE3 ?? "sqlite3", [path], { input: sql });
+  const db = new DatabaseSync(path);
+  db.exec(sql);
+  db.close();
   return path;
 }
 
 /**
  * A database as an app with an open connection leaves it: the newest row is only in the
- * `-wal` file. Real sqlite3 writes it; the process is killed with the connection open (so
- * it never checkpoints and deletes the log) after the files are copied.
+ * `-wal` file. Real SQLite in a Node.js process writes it; the process is killed with the
+ * connection open (so it never checkpoints and deletes the log) after the files are copied.
  */
 async function makeWalDb(): Promise<{ db: string; wal: string }> {
   const dir = scratchDir();
   const live = join(dir, "live.db");
-  const child = spawn(SQLITE3 ?? "sqlite3", [live], { stdio: ["pipe", "pipe", "inherit"] });
-  let seen = "";
+  const sql = [
+    "PRAGMA journal_mode=WAL;",
+    "CREATE TABLE note(id INTEGER PRIMARY KEY, title TEXT);",
+    "INSERT INTO note(title) VALUES ('checkpointed');",
+    "PRAGMA wal_checkpoint(TRUNCATE);",
+    "INSERT INTO note(title) VALUES ('only in the wal');",
+  ].join("\n");
+  // Runs the SQL, says so, and keeps the connection open until it is killed.
+  const writer =
+    'new (require("node:sqlite").DatabaseSync)(process.argv[1]).exec(process.argv[2]);' +
+    'console.log("ready"); setInterval(() => {}, 1000);';
+  const child = spawn(process.execPath, ["-e", writer, live, sql], {
+    stdio: ["ignore", "pipe", "inherit"],
+  });
   const ready = new Promise<void>((resolve) => {
+    let seen = "";
     child.stdout.on("data", (chunk: Buffer) => {
       seen += chunk.toString("utf8");
       if (seen.includes("ready")) resolve();
     });
   });
-  child.stdin.write(
-    [
-      "PRAGMA journal_mode=WAL;",
-      "CREATE TABLE note(id INTEGER PRIMARY KEY, title TEXT);",
-      "INSERT INTO note(title) VALUES ('checkpointed');",
-      "PRAGMA wal_checkpoint(TRUNCATE);",
-      "INSERT INTO note(title) VALUES ('only in the wal');",
-      "SELECT 'ready';",
-      "",
-    ].join("\n"),
-  );
   await ready;
   const db = join(dir, "copy.db");
   copyFileSync(live, db);
@@ -351,7 +349,7 @@ describe("data db: choosing the database", () => {
     });
   });
 
-  needsSqlite3("runs on the database named by --db when there are several", async () => {
+  it("runs on the database named by --db when there are several", async () => {
     const a = makeDb("CREATE TABLE t(v); INSERT INTO t VALUES ('from a');", "a.db");
     const b = makeDb("CREATE TABLE t(v); INSERT INTO t VALUES ('from b');", "b.db");
     const f = deviceWith({ "a.db": a, "b.db": b });
@@ -362,7 +360,7 @@ describe("data db: choosing the database", () => {
 });
 
 describe("data db: reading", () => {
-  needsSqlite3("returns the row that is only in the WAL of a real device capture", async () => {
+  it("returns the row that is only in the WAL of a real device capture", async () => {
     const f = deviceWith({
       "probe.db": join(CAPTURED, "exec-out-probe-db.bin"),
       "probe.db-wal": join(CAPTURED, "exec-out-probe-db-wal.bin"),
@@ -376,14 +374,14 @@ describe("data db: reading", () => {
     expect(f.unmatched()).toEqual([]);
   });
 
-  needsSqlite3("returns the newest row of a WAL database made with real sqlite3", async () => {
+  it("returns the newest row of a WAL database made with real SQLite", async () => {
     const { db, wal } = await makeWalDb();
     // The premise: the main file alone does not have the newest row.
     const alone = join(scratchDir(), "alone.db");
     copyFileSync(db, alone);
-    expect(execFileSync(SQLITE3 ?? "sqlite3", [alone, "SELECT title FROM note"]).toString()).toBe(
-      "checkpointed\n",
-    );
+    const premise = new DatabaseSync(alone, { readOnly: true });
+    expect(premise.prepare("SELECT title FROM note").all()).toEqual([{ title: "checkpointed" }]);
+    premise.close();
 
     const f = deviceWith({ "app.db": db, "app.db-wal": wal });
     const { data } = await both(f, [PKG, "SELECT id, title FROM note ORDER BY id DESC"]);
@@ -406,7 +404,7 @@ describe("data db: reading", () => {
     ]);
   });
 
-  needsSqlite3("leaves the copy's wal alone when the log is empty", async () => {
+  it("leaves the copy's wal alone when the log is empty", async () => {
     const db = makeDb("CREATE TABLE t(v); INSERT INTO t VALUES (1);");
     const empty = join(scratchDir(), "empty-wal");
     writeFileSync(empty, "");
@@ -416,7 +414,7 @@ describe("data db: reading", () => {
     expect(data.db).toMatch(/^app\.db \(no WAL, /);
   });
 
-  needsSqlite3("keeps every cell type and says 0 rows explicitly", async () => {
+  it("keeps every cell type and says 0 rows explicitly", async () => {
     const db = makeDb(
       "CREATE TABLE t(i, r, s, n); INSERT INTO t VALUES (7, 1.5, 'a,b \"q\"', NULL);",
     );
@@ -429,7 +427,7 @@ describe("data db: reading", () => {
     expect(none.data).toMatchObject({ count: "0 rows", rows: [] });
   });
 
-  needsSqlite3("keeps integers beyond 2^53 exact and same-named columns apart", async () => {
+  it("keeps integers beyond 2^53 exact and same-named columns apart", async () => {
     const db = makeDb(
       "CREATE TABLE a(id); CREATE TABLE b(id); INSERT INTO a VALUES (9223372036854775807); INSERT INTO b VALUES (2);",
     );
@@ -438,26 +436,23 @@ describe("data db: reading", () => {
     expect(data.rows).toEqual([{ id: "9223372036854775807", id_2: 2 }]);
   });
 
-  needsSqlite3(
-    "reads SQL that starts with a comment or lacks its final semicolon, from stdin",
-    async () => {
-      const db = makeDb("CREATE TABLE t(v); INSERT INTO t VALUES (1), (2);");
-      const f = deviceWith({ "app.db": db });
-      for (const sql of [
-        "/* count */ SELECT count(*) AS n FROM t",
-        "SELECT count(*) AS n FROM t -- c",
-      ]) {
-        const { data } = await both(f, [PKG, sql]);
-        expect(data.rows).toEqual([{ n: 2 }]);
-      }
-      const schema = await both(f, [PKG, "PRAGMA table_info(t)"]);
-      expect(schema.data.rows).toEqual([
-        { cid: 0, name: "v", type: "", notnull: 0, dflt_value: null, pk: 0 },
-      ]);
-    },
-  );
+  it("reads SQL that starts with a comment or lacks its final semicolon, from stdin", async () => {
+    const db = makeDb("CREATE TABLE t(v); INSERT INTO t VALUES (1), (2);");
+    const f = deviceWith({ "app.db": db });
+    for (const sql of [
+      "/* count */ SELECT count(*) AS n FROM t",
+      "SELECT count(*) AS n FROM t -- c",
+    ]) {
+      const { data } = await both(f, [PKG, sql]);
+      expect(data.rows).toEqual([{ n: 2 }]);
+    }
+    const schema = await both(f, [PKG, "PRAGMA table_info(t)"]);
+    expect(schema.data.rows).toEqual([
+      { cid: 0, name: "v", type: "", notnull: 0, dflt_value: null, pk: 0 },
+    ]);
+  });
 
-  needsSqlite3("never leaves the copy on the host, and sends no host path to adb", async () => {
+  it("never leaves the copy on the host, and sends no host path to adb", async () => {
     const tmp = scratchDir();
     const db = makeDb("CREATE TABLE t(v);");
     const f = deviceWith({ "app.db": db }, { TMPDIR: tmp });
@@ -465,32 +460,23 @@ describe("data db: reading", () => {
     await runCli(["data", "db", PKG, "SELEC"], f.env);
     expect(readdirSync(tmp)).toEqual([]);
   });
-
-  needsSqlite3("ignores the user's sqlite3 init file", async () => {
-    const home = scratchDir();
-    writeFileSync(join(home, ".sqliterc"), ".mode csv\n.headers off\n");
-    const db = makeDb("CREATE TABLE t(v); INSERT INTO t VALUES (1);");
-    const f = deviceWith({ "app.db": db }, { HOME: home });
-    const { data } = await both(f, [PKG, "SELECT v FROM t"]);
-    expect(data.rows).toEqual([{ v: 1 }]);
-  });
 });
 
 describe("data db: errors", () => {
-  needsSqlite3("carries sqlite3's message as SQL_ERROR", async () => {
+  it("carries SQLite's message as SQL_ERROR", async () => {
     const db = makeDb("CREATE TABLE t(v);");
     const f = deviceWith({ "app.db": db });
     const { toon, data } = await both(f, [PKG, "SELECT nope FROM t"]);
     expect(toon.exitCode).toBe(1);
     expect(data).toMatchObject({
-      error: "sqlite3 rejected the query on app.db: no such column: nope",
+      error: "SQLite rejected the query on app.db: no such column: nope",
       code: "SQL_ERROR",
     });
     expect(String(data.detail)).toContain("no such column: nope");
     expect(Object.keys(data)).toEqual(["error", "code", "detail", "help"]);
   });
 
-  needsSqlite3("refuses writefile in a SELECT without writing to the host", async () => {
+  it("refuses writefile in a SELECT without writing to the host", async () => {
     const path = join(scratchDir(), "leak.txt");
     const f = deviceWith({ "app.db": makeDb("CREATE TABLE t(v);") });
     const { toon, data } = await both(f, [PKG, `SELECT writefile('${path}', 'leak')`]);
@@ -499,7 +485,7 @@ describe("data db: errors", () => {
     expect(existsSync(path)).toBe(false);
   });
 
-  needsSqlite3("fails with SQL_ERROR for a database sqlite3 cannot open", async () => {
+  it("fails with SQL_ERROR for a database SQLite cannot open", async () => {
     const corrupt = join(scratchDir(), "bad.db");
     writeFileSync(
       corrupt,
@@ -511,17 +497,14 @@ describe("data db: errors", () => {
     expect(data.code).toBe("SQL_ERROR");
   });
 
-  needsSqlite3(
-    "refuses a write that gets past the statement check, with sqlite3's message",
-    async () => {
-      const db = makeDb("CREATE TABLE t(v); INSERT INTO t VALUES (1);");
-      const f = deviceWith({ "app.db": db });
-      const { toon, data } = await both(f, [PKG, "WITH x AS (SELECT 1) DELETE FROM t"]);
-      expect(toon.exitCode).toBe(1);
-      expect(data.code).toBe("SQL_ERROR");
-      expect(String(data.error)).toMatch(/syntax error|readonly/i);
-    },
-  );
+  it("refuses a write that gets past the statement check, with SQLite's message", async () => {
+    const db = makeDb("CREATE TABLE t(v); INSERT INTO t VALUES (1);");
+    const f = deviceWith({ "app.db": db });
+    const { toon, data } = await both(f, [PKG, "WITH x AS (SELECT 1) DELETE FROM t"]);
+    expect(toon.exitCode).toBe(1);
+    expect(data.code).toBe("SQL_ERROR");
+    expect(String(data.error)).toMatch(/syntax error|read-?only/i);
+  });
 
   it.each([
     ["INSERT INTO t VALUES (1)", "INSERT is not a read"],
@@ -553,8 +536,7 @@ describe("data db: errors", () => {
   });
 
   it("treats a ; or a leading . inside quotes and comments as text, not as a statement", async () => {
-    const db = SQLITE3 === undefined ? "" : makeDb("CREATE TABLE t(v); INSERT INTO t VALUES (1);");
-    if (SQLITE3 === undefined) return;
+    const db = makeDb("CREATE TABLE t(v); INSERT INTO t VALUES (1);");
     const f = deviceWith({ "app.db": db });
     const { data } = await both(f, [
       PKG,
@@ -634,39 +616,58 @@ describe("data db: errors", () => {
       detail: "run-as: package not debuggable: dev.probe",
     });
   });
+});
 
-  it("fails with SQLITE_NOT_FOUND, naming where it looked, when no host sqlite3 exists", async () => {
-    const home = scratchDir();
-    const f = device([], { HOME: home, ANDROID_HOME: undefined, ANDROID_SDK_ROOT: undefined });
-    // PATH holds only the fake adb, so there is no sqlite3 anywhere.
-    const env = { ...f.env, PATH: f.binDir };
-    const run = await runCli(["data", "db", PKG, "SELECT 1"], env);
-    expect(run.exitCode).toBe(1);
-    const error = errorOf(run);
-    expect(error).toMatchObject({ code: "SQLITE_NOT_FOUND" });
-    expect(error.searched).toEqual([
-      "PATH (1 directories)",
-      "$ANDROID_HOME/platform-tools ($ANDROID_HOME is not set)",
-      "$ANDROID_SDK_ROOT/platform-tools ($ANDROID_SDK_ROOT is not set)",
-      join(home, "Library", "Android", "sdk", "platform-tools", "sqlite3"),
+describe("data db: host files", () => {
+  /**
+   * An app database whose schema declares a `zipfile` table over a file on the host, as an
+   * app can ship it: the schema row is written directly, since this SQLite has no `zipfile`.
+   */
+  function withHostZipTable(zip: string): string {
+    const path = join(scratchDir(), "app.db");
+    const db = new DatabaseSync(path, { defensive: false });
+    db.exec(
+      "CREATE TABLE notes(v); INSERT INTO notes VALUES ('app row'); PRAGMA writable_schema=ON;",
+    );
+    db.prepare(
+      "INSERT INTO sqlite_schema(type, name, tbl_name, rootpage, sql) VALUES ('table', 'archive', 'archive', 0, ?)",
+    ).run(`CREATE VIRTUAL TABLE archive USING zipfile('${zip}')`);
+    db.close();
+    return path;
+  }
+
+  function hostZip(): string {
+    const zip = join(scratchDir(), "host.zip");
+    writeFileSync(zip, buildZip([{ name: "s.txt", data: Buffer.from("host zip sentinel") }]));
+    return zip;
+  }
+
+  it("refuses a zipfile table the copied schema points at a host file, without its content", async () => {
+    const f = deviceWith({ "app.db": withHostZipTable(hostZip()) });
+    const { toon, json, data } = await both(f, [
+      PKG,
+      "SELECT CAST(data AS TEXT) AS content FROM archive",
     ]);
-    noDeviceReads(f);
+    expect(toon.exitCode).toBe(1);
+    expect(data.code).toBe("SQL_ERROR");
+    expect(json.stdout).not.toContain("host zip sentinel");
   });
 
-  needsSqlite3("finds sqlite3 in the SDK like adb, when it is not on PATH", async () => {
-    const sdk = scratchDir();
-    mkdirSync(join(sdk, "platform-tools"));
-    const wrapper = join(sdk, "platform-tools", "sqlite3");
-    writeFileSync(wrapper, `#!/bin/sh\nexec '${SQLITE3}' "$@"\n`);
-    chmodSync(wrapper, 0o755);
-    const db = makeDb("CREATE TABLE t(v); INSERT INTO t VALUES (5);");
-    const f = deviceWith({ "app.db": db }, { ANDROID_HOME: sdk });
-    const run = await runCli(["data", "db", PKG, "SELECT v FROM t", "--json"], {
-      ...f.env,
-      PATH: f.binDir,
-    });
-    expect(run.exitCode).toBe(0);
-    expect(JSON.parse(run.stdout)).toMatchObject({ rows: [{ v: 5 }] });
+  it("refuses fsdir on a host directory", async () => {
+    const dir = scratchDir();
+    writeFileSync(join(dir, "host-sentinel.txt"), "host file sentinel");
+    const f = deviceWith({ "app.db": makeDb("CREATE TABLE t(v);") });
+    const { toon, json, data } = await both(f, [PKG, `SELECT name, data FROM fsdir('${dir}')`]);
+    expect(toon.exitCode).toBe(1);
+    expect(data.code).toBe("SQL_ERROR");
+    expect(json.stdout).not.toContain("host-sentinel");
+  });
+
+  it("still reads an ordinary table of a database whose schema declares a zipfile table", async () => {
+    const f = deviceWith({ "app.db": withHostZipTable(hostZip()) });
+    const { toon, data } = await both(f, [PKG, "SELECT v FROM notes"]);
+    expect(toon.exitCode).toBe(0);
+    expect(data.rows).toEqual([{ v: "app row" }]);
   });
 });
 
@@ -695,7 +696,7 @@ describe("data db: deadlines", () => {
     },
   );
 
-  needsSqlite3("gives every adb call a deadline: the whole command ends at --timeout", async () => {
+  it("gives every adb call a deadline: the whole command ends at --timeout", async () => {
     const db = makeDb("CREATE TABLE t(v);");
     const f = device([
       { match: lsCall(), respond: { stdout: lsOutput({ "app.db": statSync(db).size }) } },
@@ -707,7 +708,7 @@ describe("data db: deadlines", () => {
     expect(run.durationMs).toBeLessThan(TIMEOUT_MS + 4_000 + MARGIN_MS);
   });
 
-  needsSqlite3("kills a sqlite3 query that outlives the deadline", async () => {
+  it("kills a query that outlives the deadline", async () => {
     const db = makeDb("CREATE TABLE t(v);");
     const f = deviceWith({ "app.db": db });
     // A recursive query that never finishes.
@@ -728,7 +729,7 @@ describe("data db: row cap and --full", () => {
   const MANY = (n: number): string =>
     `CREATE TABLE t(id INTEGER PRIMARY KEY, v TEXT); WITH RECURSIVE c(x) AS (SELECT 1 UNION ALL SELECT x + 1 FROM c WHERE x < ${n}) INSERT INTO t(v) SELECT 'row ' || x FROM c;`;
 
-  needsSqlite3("shows 50 rows of a larger result, says so, and points at --full", async () => {
+  it("shows 50 rows of a larger result, says so, and points at --full", async () => {
     const f = deviceWith({ "app.db": makeDb(MANY(120)) });
     const { toon, data } = await both(f, [PKG, "SELECT id, v FROM t ORDER BY id"]);
     expect(toon.exitCode).toBe(0);
@@ -742,7 +743,7 @@ describe("data db: row cap and --full", () => {
     expect(toon.stdout).toContain("rows[50]{id,v}:");
   });
 
-  needsSqlite3("shows exactly 50 rows with no shown line and no --full help", async () => {
+  it("shows exactly 50 rows with no shown line and no --full help", async () => {
     const f = deviceWith({ "app.db": makeDb(MANY(50)) });
     const { data } = await both(f, [PKG, "SELECT id FROM t"]);
     expect(data.rows).toHaveLength(50);
@@ -750,7 +751,7 @@ describe("data db: row cap and --full", () => {
     expect(data).not.toHaveProperty("help");
   });
 
-  needsSqlite3("writes every row to a file with --full, with default file attributes", async () => {
+  it("writes every row to a file with --full, with default file attributes", async () => {
     const f = deviceWith({ "app.db": makeDb(MANY(120)) });
     const toon = await runCli(
       ["data", "db", PKG, "SELECT id, v FROM t ORDER BY id", "--full"],
@@ -788,7 +789,7 @@ describe("data db: row cap and --full", () => {
     expect(jsonData.full).not.toBe(path);
   });
 
-  needsSqlite3("writes no file for --full when nothing was cut", async () => {
+  it("writes no file for --full when nothing was cut", async () => {
     const f = deviceWith({ "app.db": makeDb(MANY(3)) });
     const { data } = await both(f, [PKG, "SELECT id FROM t", "--full"]);
     expect(data.rows).toHaveLength(3);
@@ -796,7 +797,7 @@ describe("data db: row cap and --full", () => {
     expect(existsSync(join(f.home, "out"))).toBe(false);
   });
 
-  needsSqlite3("cuts a long cell and keeps it whole in the --full file", async () => {
+  it("cuts a long cell and keeps it whole in the --full file", async () => {
     const long = "x".repeat(600);
     const f = deviceWith({
       "app.db": makeDb(`CREATE TABLE t(v); INSERT INTO t VALUES ('${long}');`),

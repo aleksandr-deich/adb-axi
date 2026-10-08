@@ -14,7 +14,7 @@ Do not use it for UI input (taps, typing, swipes) or for reading what is on scre
 
 ## Current guidance lives in the CLI
 
-Command and flag details come from the live CLI, not this installed file. Run commands as `npx -y adb-axi <command>`, or as `adb-axi <command>` when adb-axi is already installed on PATH. No preliminary availability probe is needed.
+Command and flag details come from the live CLI, not this installed file. Run commands as `npx -y adb-axi <command>`, or as `adb-axi <command>` when adb-axi is already installed on PATH; either needs Node.js 24.12 or newer. No preliminary availability probe is needed.
 
 - Know the relevant command? Ask `npx -y adb-axi <command> --help` directly. Family help such as `npx -y adb-axi app --help` includes compact usages and command-specific flags.
 - Read `npx -y adb-axi --help` only when you need the command index to choose a command.

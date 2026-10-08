@@ -52,7 +52,7 @@ describe("npm package", () => {
   });
 
   it("declares the Node floor, the license and the bin", () => {
-    expect(pkg.engines.node).toBe(">=22");
+    expect(pkg.engines.node).toBe(">=24.12");
     expect(pkg.license).toBe("MIT");
     expect(pkg.bin).toEqual({ "adb-axi": "dist/bin/adb-axi.js" });
   });
