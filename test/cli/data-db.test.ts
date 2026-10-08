@@ -360,6 +360,17 @@ describe("data db: choosing the database", () => {
 });
 
 describe("data db: reading", () => {
+  it("reads an R-Tree table from the app database", async () => {
+    const db = makeDb(
+      "CREATE VIRTUAL TABLE bounds USING rtree(id,minX,maxX); INSERT INTO bounds VALUES (1,2,3);",
+    );
+    const f = deviceWith({ "app.db": db });
+    const { toon, data } = await both(f, [PKG, "SELECT * FROM bounds"]);
+    expect(toon.exitCode).toBe(0);
+    expect(data.rows).toEqual([{ id: 1, minX: 2, maxX: 3 }]);
+    expect(f.unmatched()).toEqual([]);
+  });
+
   it("returns the row that is only in the WAL of a real device capture", async () => {
     const f = deviceWith({
       "probe.db": join(CAPTURED, "exec-out-probe-db.bin"),

@@ -2,7 +2,7 @@
  * The process `data db` runs one query in: `node sqlite-child.js <database>`, with the SQL
  * on stdin. It opens the copy with Node's built-in SQLite, which has no host-file modules or
  * functions (`fsdir`, `zipfile`, `readfile`, ...) and loads no extensions, read-only, in
- * defensive mode, and with an authorizer that allows nothing but reads. A virtual table the
+ * defensive mode, and with an authorizer that blocks host-file operations. A virtual table the
  * copied schema declares can therefore only use the modules compiled in (FTS, R-Tree,
  * dbstat, ...), and the query cannot attach another file or change where SQLite writes.
  *
@@ -57,6 +57,9 @@ function authorize(action: number, arg1: string | null): number {
     case constants.SQLITE_READ:
     case constants.SQLITE_FUNCTION:
     case constants.SQLITE_RECURSIVE:
+    case constants.SQLITE_INSERT:
+    case constants.SQLITE_UPDATE:
+    case constants.SQLITE_DELETE:
       return constants.SQLITE_OK;
     case constants.SQLITE_PRAGMA:
       if (arg1 !== null && READ_PRAGMAS.has(arg1.toLowerCase())) return constants.SQLITE_OK;
@@ -106,6 +109,14 @@ async function run(database: string, sql: string): Promise<void> {
     // As the sqlite3 shell and Android's SQLite do: app schemas and queries use them.
     enableDoubleQuotedStringLiterals: true,
   });
+  const maxHeapBytes = 512 * 1024 * 1024;
+  db.exec(`PRAGMA temp_store=MEMORY; PRAGMA hard_heap_limit=${maxHeapBytes};`);
+  if (db.prepare("PRAGMA temp_store").get()?.temp_store !== 2) {
+    throw new Error("data db could not enable memory-only temporary storage");
+  }
+  if (db.prepare("PRAGMA hard_heap_limit").get()?.hard_heap_limit !== maxHeapBytes) {
+    throw new Error("data db could not configure the SQLite memory limit");
+  }
   db.setAuthorizer(authorize);
   const statement = db.prepare(sql);
   statement.setReadBigInts(true);

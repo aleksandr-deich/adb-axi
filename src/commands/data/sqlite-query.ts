@@ -51,9 +51,10 @@ export interface QueryRequest {
 /**
  * Run one query against the copy in its own Node.js process and return its rows. The SQL
  * goes in on stdin. The process opens the copy read-only with Node's built-in SQLite, which
- * has no host-file functions or modules, and an authorizer that allows only reads, so neither
- * the query nor the copied schema can read, list or write a host file other than the copy
- * (see `sqlite-child.ts`). Its own process lets the deadline kill a query that never ends.
+ * has no host-file functions or modules, blocks host-file operations, and uses memory-only
+ * temporary storage. Neither the query nor the copied schema can read, list or write host
+ * files outside the copy and its companions (see `sqlite-child.ts`). Its own process lets
+ * the deadline kill a query that never ends.
  */
 export async function runQuery(request: QueryRequest): Promise<Row[]> {
   const result = await exec({
@@ -61,7 +62,13 @@ export async function runQuery(request: QueryRequest): Promise<Row[]> {
     args: ["--no-warnings", CHILD, request.database],
     deadlineMs: request.deadline.remainingMs(),
     cwd: request.workDir,
-    env: request.env,
+    env: {
+      ...request.env,
+      TMPDIR: request.workDir,
+      SQLITE_TMPDIR: request.workDir,
+      TMP: request.workDir,
+      TEMP: request.workDir,
+    },
     input: request.sql,
     maxOutputBytes: MAX_RESULT_BYTES,
   });
@@ -172,7 +179,10 @@ function sqlError(label: string, stderr: string, exitCode: number | null): AdbAx
       : text;
   return new AdbAxiError("SQL_ERROR", `SQLite rejected the query on ${label}: ${message}`, {
     ...(detail === "" ? {} : { fields: { detail: detail.slice(0, 500) } }),
-    help: ["Check the table and column names with `SELECT name, sql FROM sqlite_master`"],
+    help:
+      reported?.errcode === 7
+        ? ["Narrow the query, for example with `WHERE` or `LIMIT`; SQLite ran out of memory"]
+        : ["Check the table and column names with `SELECT name, sql FROM sqlite_master`"],
   });
 }
 
