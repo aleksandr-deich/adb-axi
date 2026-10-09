@@ -40,9 +40,7 @@ export async function resolveScope(
     });
   }
   const facts =
-    known !== undefined && known.api !== null
-      ? known
-      : await readShellFacts(adb, device, options);
+    known !== undefined && known.api !== null ? known : await readShellFacts(adb, device, options);
   if (facts.api === null) throw invalidOutput("reading the Android version", "");
   if (facts.api >= PID_LIST_BELOW_API) {
     if (record.uid === null) throw invalidOutput(`reading the uid of ${pkg}`, "");
