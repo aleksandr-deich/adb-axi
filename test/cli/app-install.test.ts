@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import {
   chmodSync,
   closeSync,
@@ -17,7 +18,13 @@ import { readApkFile } from "../../src/apk/index.js";
 import { isShippedPath, REGISTRY } from "../../src/commands/registry.js";
 import { createFakeAdb, FIXTURES_DIR, type FakeAdb } from "../fake-adb/harness.js";
 import type { Response, Rule } from "../fake-adb/scenario.js";
-import { buildApk, digestOf, withZip64End } from "../helpers/apk-builder.js";
+import {
+  buildApk,
+  buildZip,
+  digestOf,
+  repeatedStringManifest,
+  withZip64End,
+} from "../helpers/apk-builder.js";
 import { runCli, type CliRun } from "../helpers/run.js";
 import { sharedWithToon } from "../helpers/json.js";
 
@@ -28,6 +35,7 @@ const DUMPSYS = `dumpsys package ${PKG}`;
 const SDK = "getprop ro.build.version.sdk";
 const APK_PATH = `pm path ${PKG}`;
 const CAT_APK = "cat /data/app/notes/base.apk";
+const SHA_APK = "sha256sum /data/app/notes/base.apk";
 const INSTALL_OK = { stdout: "Performing Streamed Install\nSuccess\n" };
 const CERT_A = Buffer.from("certificate A");
 const CERT_B = Buffer.from("certificate B");
@@ -148,6 +156,9 @@ interface World {
   userId?: number;
 }
 
+const sha256 = (path: string): string =>
+  createHash("sha256").update(readFileSync(path)).digest("hex");
+
 /** One online emulator whose package state is a variable that installs and uninstalls move. */
 function world(options: World): FakeAdb {
   const fake = createFakeAdb({
@@ -165,6 +176,17 @@ function world(options: World): FakeAdb {
       { match: shell("am get-current-user"), respond: { stdout: `${options.userId ?? 0}\n` } },
       { match: shell(SDK), respond: options.api ?? { stdout: "35\n" } },
       { match: shell(APK_PATH), respond: { stdout: "package:/data/app/notes/base.apk\n" } },
+      {
+        match: shell(`pm path --user ${options.userId ?? 0} ${PKG}`),
+        respond: { stdout: "package:/data/app/notes/base.apk\n" },
+      },
+      {
+        // The base APK holds the bytes of the last APK installed, the committed one by default.
+        match: shell(SHA_APK),
+        respond: {
+          stdout: `${sha256(typeof options.installedApk === "string" ? options.installedApk : APK)}  /data/app/notes/base.apk\n`,
+        },
+      },
       {
         match: ["-s", SERIAL, "exec-out", CAT_APK],
         respond:
@@ -826,6 +848,8 @@ describe("app install", () => {
         `shell ${DUMPSYS}`,
         `install -r ${APK}`,
         `shell ${DUMPSYS}`,
+        `shell pm path --user 10 ${PKG}`,
+        `shell ${SHA_APK}`,
         `shell pm clear --user 10 ${PKG}`,
         `shell ${DUMPSYS}`,
       ]);
@@ -842,6 +866,8 @@ describe("app install", () => {
         `shell ${DUMPSYS}`,
         `install -r ${APK}`,
         `shell ${DUMPSYS}`,
+        `shell pm path --user 0 ${PKG}`,
+        `shell ${SHA_APK}`,
         `shell pm clear --user 0 ${PKG}`,
         `shell ${DUMPSYS}`,
       ]);
@@ -899,6 +925,54 @@ describe("app install", () => {
       },
     );
 
+    // Android reads the first `package` attribute, and its raw string (AOSP `ResXMLParser::
+    // indexOfAttribute`, `XmlBlock.getAttributeValue`); `aapt2 dump packagename` reads
+    // com.example.other from both. Either the parse matches Android or nothing is wiped.
+    it.each([
+      ["whose package attribute has two string values", { packageRawValue: "com.example.other" }],
+      ["with two package attributes", { earlierPackage: "com.example.other" }],
+    ])("never wipes another app for a manifest %s", async (_name, crafted) => {
+      const apk = join(apkDir, "two-names.apk");
+      writeFileSync(apk, buildApk({ package: PKG, versionCode: 57, ...crafted }));
+      const { toon, data, fake } = await both(
+        () =>
+          world({
+            start: "new",
+            dumps: { new: V57 },
+            rules: [
+              installs(apk),
+              { match: shell(`pm clear --user 0 ${PKG}`), respond: { stdout: "Success\n" } },
+            ],
+          }),
+        ["app", "install", apk, "--clean-data"],
+      );
+      expect(toon.exitCode).toBe(1);
+      expect(data).toMatchObject({ code: "INSTALL_FAILED_INVALID_APK", apk: "two-names.apk" });
+      expect(calls(fake)).toEqual([]);
+    });
+
+    it("refuses a tiny APK whose string pool repeats one long string, without running out of memory", async () => {
+      const apk = join(apkDir, "repeated-strings.apk");
+      const manifest = repeatedStringManifest(64 * 1024, 128 * 1024, 8);
+      writeFileSync(
+        apk,
+        buildZip([{ name: "AndroidManifest.xml", data: manifest, deflate: true }]),
+      );
+      expect(readFileSync(apk).length).toBeLessThan(1024);
+      const fake = world({ start: "old", dumps: { old: V56 } });
+      const run = await runCli(["app", "install", apk, "--clean-data", "--json"], {
+        ...fake.env,
+        // Far below what decoding every pool entry needs, so a regression fails fast.
+        NODE_OPTIONS: "--max-old-space-size=256",
+      });
+      expect(run.exitCode).toBe(1);
+      expect(JSON.parse(run.stdout)).toMatchObject({
+        code: "INSTALL_FAILED_INVALID_APK",
+        detail: "the manifest strings are too large to read",
+      });
+      expect(calls(fake)).toEqual([]);
+    });
+
     it("takes precedence over --if-changed even when the same version and signer are installed", async () => {
       const { toon, data, fake } = await both(
         () =>
@@ -922,6 +996,8 @@ describe("app install", () => {
         `shell ${DUMPSYS}`,
         `install -r ${APK}`,
         `shell ${DUMPSYS}`,
+        `shell pm path --user 0 ${PKG}`,
+        `shell ${SHA_APK}`,
         `shell pm clear --user 0 ${PKG}`,
         `shell ${DUMPSYS}`,
       ]);

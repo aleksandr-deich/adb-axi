@@ -30,6 +30,10 @@ export interface ManifestSpec {
   withoutResourceMap?: boolean;
   /** Name the root element something other than `manifest`. */
   rootName?: string;
+  /** Point the `package` attribute's raw string here while its typed value keeps `package`. */
+  packageRawValue?: string;
+  /** Put another `package` attribute, naming this, before the real one. */
+  earlierPackage?: string;
 }
 
 function u16(value: number): Buffer {
@@ -151,11 +155,15 @@ export function buildManifest(spec: ManifestSpec): Buffer {
       });
     }
   }
+  if (spec.earlierPackage !== undefined) {
+    const value = index(spec.earlierPackage);
+    attrs.push({ ns: NONE, name: index("package"), raw: value, type: 0x03, data: value });
+  }
   const packageValue = index(spec.package);
   attrs.push({
     ns: NONE,
     name: index("package"),
-    raw: packageValue,
+    raw: spec.packageRawValue === undefined ? packageValue : index(spec.packageRawValue),
     type: 0x03,
     data: packageValue,
   });
@@ -213,6 +221,56 @@ export function buildManifest(spec: ManifestSpec): Buffer {
 
   const pool = stringPool(strings, utf16);
   const body = Buffer.concat([pool, resourceMap, startElement, endElement]);
+  return Buffer.concat([u16(0x0003), u16(8), u32(8 + body.length), body]);
+}
+
+/**
+ * A `<manifest>` whose string pool has `count` offsets that all point at one UTF-16 string
+ * of `chars` characters, and whose root element has `attributes` attributes, each named by
+ * a different one of those offsets. It deflates to a few hundred bytes.
+ */
+export function repeatedStringManifest(count: number, chars: number, attributes: number): Buffer {
+  const long = Buffer.alloc(4 + chars * 2, 0x61);
+  long.writeUInt16LE(0x8000 | (chars >>> 16), 0);
+  long.writeUInt16LE(chars & 0xffff, 2);
+  const data = Buffer.concat([long, poolString("manifest", true)]);
+  const offsets = [...Array<number>(count).fill(0), long.length];
+  const headerSize = 28;
+  const stringsStart = headerSize + offsets.length * 4;
+  const pool = Buffer.concat([
+    u16(0x0001),
+    u16(headerSize),
+    u32(stringsStart + data.length),
+    u32(offsets.length),
+    u32(0),
+    u32(0),
+    u32(stringsStart),
+    u32(0),
+    ...offsets.map(u32),
+    data,
+  ]);
+  const attributeBytes = Buffer.concat(
+    Array.from({ length: attributes }, (_, name) =>
+      Buffer.concat([u32(NONE), u32(name), u32(NONE), u16(8), Buffer.from([0, 0x10]), u32(0)]),
+    ),
+  );
+  const startElement = Buffer.concat([
+    u16(0x0102),
+    u16(16),
+    u32(36 + attributeBytes.length),
+    u32(1),
+    u32(NONE),
+    u32(NONE),
+    u32(count),
+    u16(20),
+    u16(20),
+    u16(attributes),
+    u16(0),
+    u16(0),
+    u16(0),
+    attributeBytes,
+  ]);
+  const body = Buffer.concat([pool, startElement]);
   return Buffer.concat([u16(0x0003), u16(8), u32(8 + body.length), body]);
 }
 

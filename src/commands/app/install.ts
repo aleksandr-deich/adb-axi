@@ -1,4 +1,5 @@
-import { statSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { createReadStream, statSync } from "node:fs";
 import { basename, resolve } from "node:path";
 import { ApkError, bufferSource, readApkFile, readApkInfo, type ApkInfo } from "../../apk/index.js";
 import type { AdbClient } from "../../adb/run.js";
@@ -85,6 +86,8 @@ async function runInstall(context: CommandContext): Promise<Output> {
       },
     );
   }
+  // Taken before the install, so the wipe below is tied to the very bytes adb installs.
+  const digest = read.ok && clean ? await fileDigest(apkPath) : null;
   const userId = read.ok ? await readCurrentUser(adb, serial, options) : 0;
   const before = read.ok
     ? await readPackage(adb, serial, read.info.package, options, userId)
@@ -122,7 +125,8 @@ async function runInstall(context: CommandContext): Promise<Output> {
 
   const info = read.info;
   let installed = await waitForVersion(context, adb, serial, info, options, userId);
-  if (clean) {
+  if (digest !== null) {
+    await confirmInstalledFile(adb, serial, info.package, apkName, digest, options, userId);
     await clearData(adb, serial, info.package, options, userId);
     // The package must survive the wipe at the version just installed.
     installed = await waitForVersion(context, adb, serial, info, options, userId);
@@ -225,20 +229,8 @@ async function decideShortcut(
     capMs: Math.min(30_000, options.deadline.remainingMs() / 2, options.capMs ?? Infinity),
   };
   try {
-    const paths = await readShell(
-      adb,
-      serial,
-      `pm path ${info.package}`,
-      "reading the installed APK path",
-      evidenceOptions,
-    );
-    const files = paths.stdout
-      .trim()
-      .split(/\r?\n/)
-      .map((line) => /^package:(\/[^\r\n]+\.apk)$/.exec(line)?.[1]);
-    const bases = files.filter((path) => path?.endsWith("/base.apk"));
-    const path = bases.length === 1 ? bases[0] : files.length === 1 ? files[0] : undefined;
-    if (path === undefined || files.some((file) => file === undefined)) {
+    const path = await installedApkPath(adb, serial, `pm path ${info.package}`, evidenceOptions);
+    if (path === undefined) {
       return { kind: "skipped", reason: "the installed APK path cannot be established" };
     }
     const bytes = await adb.device(serial, ["exec-out", shellWords(["cat", path])], {
@@ -281,6 +273,67 @@ async function decideShortcut(
     }
     throw error;
   }
+}
+
+/** The package's base APK on the device, from `pm path`, or `undefined` when it is unclear. */
+async function installedApkPath(
+  adb: AdbClient,
+  serial: string,
+  command: string,
+  options: ReadOptions,
+): Promise<string | undefined> {
+  const paths = await readShell(adb, serial, command, "reading the installed APK path", options);
+  const files = paths.stdout
+    .trim()
+    .split(/\r?\n/)
+    .map((line) => /^package:(\/[^\r\n]+\.apk)$/.exec(line)?.[1]);
+  const bases = files.filter((path) => path?.endsWith("/base.apk"));
+  const path = bases.length === 1 ? bases[0] : files.length === 1 ? files[0] : undefined;
+  return path === undefined || files.some((file) => file === undefined) ? undefined : path;
+}
+
+/** The SHA-256 of a host file, lowercase hex. */
+async function fileDigest(path: string): Promise<string> {
+  const hash = createHash("sha256");
+  for await (const chunk of createReadStream(path)) hash.update(chunk as Buffer);
+  return hash.digest("hex");
+}
+
+/**
+ * Before a wipe, prove that `pkg` now runs the APK just installed: its base APK on the device
+ * must hold the same bytes. adb-axi names the package from its own reading of the manifest,
+ * and Android installs the package its own reading names; this catches any difference
+ * between the two before it can wipe some other app.
+ */
+async function confirmInstalledFile(
+  adb: AdbClient,
+  serial: string,
+  pkg: string,
+  apkName: string,
+  digest: string,
+  options: ReadOptions,
+  userId: number,
+): Promise<void> {
+  assertPackageName(pkg);
+  const refuse = (reason: string): AdbAxiError =>
+    new AdbAxiError(
+      "CLEAR_REFUSED",
+      `${apkName} was installed, but adb-axi did not wipe ${pkg} because ${reason}`,
+      {
+        fields: { apk: apkName, package: pkg },
+        help: [
+          runHint(["app", "info", pkg], "for the version the device has installed"),
+          `Wipe ${pkg} only once it is known to be the package ${apkName} installs`,
+        ],
+      },
+    );
+  const path = await installedApkPath(adb, serial, `pm path --user ${userId} ${pkg}`, options);
+  if (path === undefined) throw refuse("its installed APK cannot be found on the device");
+  const step = `checking the installed APK of ${pkg}`;
+  const result = await readShell(adb, serial, shellWords(["sha256sum", path]), step, options);
+  const installed = /^([0-9a-f]{64})\s/.exec(result.stdout)?.[1];
+  if (installed === undefined) throw invalidOutput(step, result.stdout);
+  if (installed !== digest) throw refuse(`the APK it runs is not ${apkName}`);
 }
 
 async function readApi(
