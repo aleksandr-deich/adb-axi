@@ -97,8 +97,8 @@ function readRoot(
   const attributeSize = bytes.readUInt16LE(body + 10);
   const attributeCount = bytes.readUInt16LE(body + 12);
 
-  // Android takes the first attribute with a name (`ResXMLParser::indexOfAttribute`); one
-  // named twice could be read either way, so the manifest is refused instead.
+  // Android takes the first attribute with a name (`ResXMLParser::indexOfAttribute`). A
+  // package named twice could be read either way, so the manifest is refused instead.
   const fields = new Map<Field, Attribute>();
   for (let index = 0; index < attributeCount; index++) {
     const at = body + attributeStart + index * attributeSize;
@@ -124,8 +124,10 @@ function readRoot(
       field = "versionName";
     }
     if (field === undefined) continue;
-    if (fields.has(field)) throw new ApkError(`the manifest has more than one ${field} attribute`);
-    fields.set(field, attribute);
+    if (field === "package" && fields.has(field)) {
+      throw new ApkError("the manifest has more than one package attribute");
+    }
+    if (!fields.has(field)) fields.set(field, attribute);
   }
 
   const packageAttribute = fields.get("package");
