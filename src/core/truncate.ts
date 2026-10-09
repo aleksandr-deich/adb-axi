@@ -1,6 +1,7 @@
+import { randomBytes } from "node:crypto";
+import { linkSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { existsSync } from "node:fs";
-import { adbAxiHome, isErrno, writeFileAtomic } from "./state.js";
+import { adbAxiHome, isErrno } from "./state.js";
 
 /** Default caps for `logs` and `shell` output. */
 export const MAX_LINES = 50;
@@ -107,24 +108,28 @@ function cutToBytes(line: string, maxBytes: number): string {
 
 /**
  * Write complete output for `--full` to `<ADB_AXI_HOME>/out/<stem>.txt` and return the
- * absolute path. Existing paths get a `-2`, `-3`, ... suffix; callers needing safe
- * concurrent writes must supply an exclusive-create writer (as `logs --full` does).
+ * absolute path. A name that is taken gets a `-2`, `-3`, ... suffix. Each file is written
+ * in full under a private temporary name and then linked to its final name, which fails
+ * rather than replaces when the name is taken: concurrent runs never share a path, and no
+ * path ever holds partial output.
  */
-export function writeFullOutput(
-  stem: string,
-  content: string,
-  write: (path: string, content: string) => void = writeFileAtomic,
-): string {
+export function writeFullOutput(stem: string, content: string): string {
   const dir = join(adbAxiHome(), "out");
   const safeStem = stem.replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^[.-]+/, "") || "output";
-  for (let n = 1; ; n++) {
-    const path = join(dir, `${safeStem}${n === 1 ? "" : `-${n}`}.txt`);
-    if (existsSync(path)) continue;
-    try {
-      write(path, content);
-      return path;
-    } catch (error) {
-      if (!isErrno(error, "EEXIST")) throw error;
+  mkdirSync(dir, { recursive: true });
+  const tmp = join(dir, `.full-${process.pid}-${randomBytes(6).toString("hex")}.tmp`);
+  try {
+    writeFileSync(tmp, content, { flag: "wx", flush: true });
+    for (let n = 1; ; n++) {
+      const path = join(dir, `${safeStem}${n === 1 ? "" : `-${n}`}.txt`);
+      try {
+        linkSync(tmp, path);
+        return path;
+      } catch (error) {
+        if (!isErrno(error, "EEXIST")) throw error;
+      }
     }
+  } finally {
+    rmSync(tmp, { force: true });
   }
 }

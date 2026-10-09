@@ -1,6 +1,6 @@
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { execOut } from "../../adb/execout.js";
 import { assertPackageName } from "../../android/component.js";
 import { readCurrentUser } from "../../android/users.js";
@@ -294,10 +294,6 @@ function present(context: CommandContext, plan: QueryPlan, rows: Row[], label: s
     out.full = writeFullOutput(
       `db-${plan.database.name}-${clock(new Date()).replaceAll(":", "")}`,
       `${render({ rows }, context.mode)}\n`,
-      (path, content) => {
-        mkdirSync(dirname(path), { recursive: true });
-        writeFileSync(path, content, { flag: "wx" });
-      },
     );
   } else {
     out.help = [
