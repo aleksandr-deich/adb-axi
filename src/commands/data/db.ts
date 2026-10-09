@@ -5,6 +5,7 @@ import { execOut } from "../../adb/execout.js";
 import { assertPackageName } from "../../android/component.js";
 import { readCurrentUser } from "../../android/users.js";
 import { AdbAxiError } from "../../core/errors.js";
+import { onInterrupt } from "../../core/interrupt.js";
 import { render, runHint, shellWords, type Output } from "../../core/output.js";
 import { truncateField, writeFullOutput, MAX_FIELD_CHARS } from "../../core/truncate.js";
 import { lifecycleCommand } from "../app/process.js";
@@ -179,6 +180,10 @@ interface QueryPlan {
 async function query(context: CommandContext, plan: QueryPlan): Promise<Output> {
   const { database, sql } = plan;
   const dir = mkdtempSync(join(tmpdir(), "adb-axi-db-"));
+  const removeDir = (): void => {
+    rmSync(dir, { recursive: true, force: true });
+  };
+  const stopRemoveOnInterrupt = onInterrupt(removeDir);
   try {
     chmodSync(dir, 0o700);
     const walCopied = await copyDatabase(context, plan, dir);
@@ -199,7 +204,8 @@ async function query(context: CommandContext, plan: QueryPlan): Promise<Output> 
       `${database.name} (${walCopied ? "with" : "no"} WAL, copied ${clock(copiedAt)})`,
     );
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    stopRemoveOnInterrupt();
+    removeDir();
   }
 }
 

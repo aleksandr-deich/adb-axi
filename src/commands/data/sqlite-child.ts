@@ -1,12 +1,14 @@
 /**
- * The process `data db` runs one query in: `node sqlite-child.js <database>`, with the SQL
- * on stdin. It opens the copy with Node's built-in SQLite, which has no host-file modules or
- * functions (`fsdir`, `zipfile`, `readfile`, ...) and loads no extensions, read-only, in
- * defensive mode, and with an authorizer that blocks host-file operations. A virtual table the
- * copied schema declares can therefore only use the modules compiled in (FTS, R-Tree,
- * dbstat, ...). Queries cannot reach any pre-existing host file. SQLite's own scratch files
+ * The process `data db` runs one query in: `node sqlite-child.js <database> <deadline-ms>`,
+ * with the SQL on stdin. It opens the copy with Node's built-in SQLite, which has no
+ * host-file modules or functions (`fsdir`, `zipfile`, `readfile`, ...) and loads no
+ * extensions, read-only, in defensive mode, and with an authorizer that blocks host-file
+ * operations. A virtual table the copied schema declares can therefore only use the modules
+ * compiled in (FTS, R-Tree, dbstat, ...). Queries cannot reach any pre-existing host file. SQLite's own scratch files
  * stay inside adb-axi's private per-query directory, which is removed afterwards. Very large
- * queries are bounded by the deadline, not by a memory cap.
+ * queries are bounded by the deadline, not by a memory cap. The process kills itself when
+ * its own deadline passes, so a query never outlives adb-axi for long, even when nothing is
+ * left to kill it.
  *
  * Output on stdout, one JSON array per line: the column names, then each row. Integers past
  * 2^53 are strings, so they stay exact. Blobs decode valid UTF-8 sequences as characters and
@@ -18,6 +20,7 @@
  */
 import { readFileSync } from "node:fs";
 import { constants, DatabaseSync } from "node:sqlite";
+import { Worker } from "node:worker_threads";
 
 /** Pragmas that only report, as `PRAGMA x` or `pragma_x(...)`. FTS5 reads `data_version` itself. */
 const READ_PRAGMAS = new Set([
@@ -133,8 +136,25 @@ async function run(database: string, sql: string): Promise<void> {
   db.close();
 }
 
-const [database] = process.argv.slice(2);
-if (database === undefined) throw new Error("usage: sqlite-child <database>");
+/**
+ * Kill this process once `ms` have passed. A step of a query runs inside SQLite without
+ * returning to JavaScript, so the timer runs on a thread of its own; it does not keep the
+ * process alive once the query is done.
+ */
+function killAfter(ms: number): void {
+  const watchdog = new Worker(
+    `setTimeout(() => process.kill(process.pid, "SIGKILL"), require("node:worker_threads").workerData);`,
+    { eval: true, workerData: ms },
+  );
+  watchdog.unref();
+}
+
+const [database, deadline] = process.argv.slice(2);
+const deadlineMs = Number(deadline);
+if (database === undefined || !Number.isSafeInteger(deadlineMs) || deadlineMs < 0) {
+  throw new Error("usage: sqlite-child <database> <deadline-ms>");
+}
+killAfter(deadlineMs);
 try {
   await run(database, readFileSync(0, "utf8"));
 } catch (error) {

@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { onInterrupt } from "./interrupt.js";
 
 export interface ExecOptions {
   /** The executable. Always spawned directly with an argument array, never through a shell. */
@@ -11,6 +12,11 @@ export interface ExecOptions {
   /** Bytes written to the child's stdin, which is then closed. Without it stdin is closed at once. */
   input?: string | Uint8Array;
   maxOutputBytes?: number;
+  /**
+   * Kill the child with SIGKILL when SIGINT or SIGTERM ends adb-axi. Only for a child that
+   * adb-axi alone owns and that has no use once adb-axi is gone, such as a query process.
+   */
+  killOnInterrupt?: boolean;
 }
 
 interface ExecCommon {
@@ -58,6 +64,12 @@ export function exec(options: ExecOptions): Promise<ExecResult> {
       windowsHide: true,
     });
 
+    const stopKillOnInterrupt = options.killOnInterrupt
+      ? onInterrupt(() => {
+          child.kill("SIGKILL");
+        })
+      : undefined;
+
     const common = (): ExecCommon => ({
       stdout: Buffer.concat(stdout),
       stderr: Buffer.concat(stderr),
@@ -68,6 +80,7 @@ export function exec(options: ExecOptions): Promise<ExecResult> {
     const finish = (result: ExecResult): void => {
       if (settled) return;
       settled = true;
+      stopKillOnInterrupt?.();
       clearTimeout(deadlineTimer);
       clearTimeout(drainTimer);
       child.stdout.destroy();
