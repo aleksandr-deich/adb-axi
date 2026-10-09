@@ -4,11 +4,11 @@
  * host-file modules or functions (`fsdir`, `zipfile`, `readfile`, ...) and loads no
  * extensions, read-only, in defensive mode, and with an authorizer that blocks host-file
  * operations. A virtual table the copied schema declares can therefore only use the modules
- * compiled in (FTS, R-Tree, dbstat, ...). Queries cannot reach any pre-existing host file. SQLite's own scratch files
- * stay inside adb-axi's private per-query directory, which is removed afterwards. Very large
- * queries are bounded by the deadline, not by a memory cap. The process kills itself when
- * its own deadline passes, so a query never outlives adb-axi for long, even when nothing is
- * left to kill it.
+ * compiled in (FTS, R-Tree, dbstat, ...). Queries cannot reach any pre-existing host file.
+ * SQLite's own scratch files stay inside adb-axi's private per-query directory, which is
+ * removed afterwards. Very large queries are bounded by the deadline, not by a memory cap.
+ * The process kills itself when its own deadline passes, so a query never outlives adb-axi
+ * for long, even when nothing is left to kill it.
  *
  * Output on stdout, one JSON array per line: the column names, then each row. Integers past
  * 2^53 are strings, so they stay exact. Blobs decode valid UTF-8 sequences as characters and
