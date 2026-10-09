@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { readShellFacts } from "../../device/facts.js";
+import { readShellFacts, type DeviceFacts } from "../../device/facts.js";
 import type { CommandContext } from "../types.js";
 import { isPackageName } from "../../android/component.js";
 import type { ProcessName } from "../../android/ps.js";
@@ -61,20 +61,31 @@ export function marksPath(serial: string, env: NodeJS.ProcessEnv): string {
   return join(deviceStateDir(serial, env), "marks.json");
 }
 
-/** Refresh the boot identity before any mark is stored or used, after validating input. */
-export async function refreshMarks(context: CommandContext): Promise<void> {
+/**
+ * Refresh the boot identity before any mark is stored or used, after validating input.
+ * Returns the facts it read, or `undefined` when the device did not answer, so the command
+ * never reads them twice.
+ */
+export async function refreshMarks(context: CommandContext): Promise<DeviceFacts | undefined> {
   const target = context.target;
   if (target === undefined) throw new Error("Marks need a resolved device");
-  let bootId: string | null = null;
+  let facts: DeviceFacts | undefined;
   try {
-    const facts = await readShellFacts(context.adb(), target.device, {
+    facts = await readShellFacts(context.adb(), target.device, {
       deadline: context.deadline,
       env: context.env,
     });
-    bootId = facts.bootId;
   } catch (error) {
     if (!(error instanceof AdbAxiError)) throw error;
   }
+  bindTargetMarks(context, facts?.bootId ?? null);
+  return facts;
+}
+
+/** Bind the target's marks to the boot ID this command read, `null` when it could not. */
+export function bindTargetMarks(context: CommandContext, bootId: string | null): void {
+  const target = context.target;
+  if (target === undefined) throw new Error("Marks need a resolved device");
   context.marksVerified = bootId !== null;
   const note = bindMarks(target.serial, context.env, bootId);
   if (note !== undefined) context.marksNote = note;
