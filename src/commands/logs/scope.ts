@@ -5,7 +5,7 @@ import { appPids, belongsTo } from "../../android/ps.js";
 import { invalidOutput, type ReadOptions } from "../../android/read.js";
 import { AdbAxiError } from "../../core/errors.js";
 import { runHint } from "../../core/output.js";
-import { readShellFacts } from "../../device/facts.js";
+import { readShellFacts, type DeviceFacts } from "../../device/facts.js";
 import type { AttachedDevice } from "../../device/list.js";
 import type { LogWindow } from "./window.js";
 
@@ -26,6 +26,8 @@ export async function resolveScope(
   pkg: string,
   window: LogWindow,
   options: ReadOptions & { env: NodeJS.ProcessEnv },
+  /** The device's facts when the command already read them; read here otherwise. */
+  known: DeviceFacts | undefined,
 ): Promise<Scope> {
   const serial = device.serial;
   const record = await readPackage(adb, serial, pkg, options);
@@ -34,7 +36,7 @@ export async function resolveScope(
       help: [runHint(["app", "list"], "to see the installed packages")],
     });
   }
-  const facts = await readShellFacts(adb, device, options);
+  const facts = known ?? (await readShellFacts(adb, device, options));
   if (facts.api === null) throw invalidOutput("reading the Android version", "");
   if (facts.api >= PID_LIST_BELOW_API) {
     if (record.uid === null) throw invalidOutput(`reading the uid of ${pkg}`, "");

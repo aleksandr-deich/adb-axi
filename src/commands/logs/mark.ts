@@ -9,7 +9,7 @@ import {
   appProcesses,
   assertMarkName,
   assertMarkVerified,
-  refreshMarks,
+  bindTargetMarks,
   writeMark,
 } from "./marks.js";
 import { PID_LIST_BELOW_API } from "./scope.js";
@@ -38,6 +38,7 @@ export const logsMark = defineCommand({
 
     // On API 29 and 30 `logs --pkg` is a pid list, so the mark keeps the app processes
     // that are running now. They are read before the clock, so the window starts after them.
+    // The same facts carry the boot ID the marks are bound to.
     const facts = await readShellFacts(adb, device, {
       deadline: context.deadline,
       env: context.env,
@@ -49,7 +50,7 @@ export const logsMark = defineCommand({
         : [];
 
     const now = await readDeviceClock(adb, serial, options);
-    await refreshMarks(context);
+    bindTargetMarks(context, facts.bootId);
     const shown = formatDeviceTime(now.epochMs, now.utcOffsetMinutes);
     const name =
       given === undefined ? `mark-${shown.slice(11, 19).replaceAll(":", "")}` : String(given);

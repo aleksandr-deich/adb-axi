@@ -83,7 +83,7 @@ export const logsDump = defineCommand({
     if (device === undefined) throw new TypeError("logs ran without a resolved device");
 
     const now = await readDeviceClock(adb, serial, options);
-    await refreshMarks(context);
+    const facts = await refreshMarks(context);
     const window = resolveWindow(
       serial,
       context.env,
@@ -94,7 +94,7 @@ export const logsDump = defineCommand({
     const scope =
       pkg === undefined
         ? undefined
-        : await resolveScope(adb, device, pkg, window, { ...options, env: context.env });
+        : await resolveScope(adb, device, pkg, window, { ...options, env: context.env }, facts);
     const scanned = await readWindowLines(
       adb,
       serial,

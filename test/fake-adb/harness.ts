@@ -15,6 +15,8 @@ import { UNMATCHED_EXIT, type LogEntry, type Scenario } from "./scenario.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const FAKE_SCRIPT = join(HERE, "fake-adb.ts");
+/** Where Node keeps compiled code when a program enables the cache without naming a directory. */
+const COMPILE_CACHE = join(tmpdir(), "node-compile-cache");
 export const FIXTURES_DIR = resolve(HERE, "..", "fixtures");
 export const SCENARIOS_DIR = join(FIXTURES_DIR, "scenarios");
 
@@ -84,11 +86,13 @@ export function createFakeAdb(scenario: Scenario | string, options: FakeAdbOptio
   const statePath = join(dir, "state.json");
   writeFileSync(logPath, "");
 
+  // Every call is a new Node process, which would strip and compile the fake's TypeScript
+  // again: about half of its start-up CPU. Node's compile cache keeps that work across calls.
   for (const tool of FAKE_TOOLS) {
     const wrapper = join(binDir, tool);
     writeFileSync(
       wrapper,
-      `#!/bin/sh\nexec ${shellQuote(process.execPath)} ${shellQuote(FAKE_SCRIPT)} ${tool} "$@"\n`,
+      `#!/bin/sh\nexport NODE_COMPILE_CACHE=${shellQuote(COMPILE_CACHE)}\nexec ${shellQuote(process.execPath)} ${shellQuote(FAKE_SCRIPT)} ${tool} "$@"\n`,
     );
     chmodSync(wrapper, 0o755);
   }
