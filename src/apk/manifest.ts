@@ -11,6 +11,8 @@ export interface ManifestInfo {
 const RES_XML = 0x0003;
 const RES_STRING_POOL = 0x0001;
 const RES_XML_RESOURCE_MAP = 0x0180;
+const RES_XML_FIRST_NODE = 0x0100;
+const RES_XML_LAST_NODE = 0x017f;
 const RES_XML_START_ELEMENT = 0x0102;
 
 const UTF8_FLAG = 1 << 8;
@@ -58,6 +60,8 @@ function readManifest(bytes: Buffer): ManifestInfo {
   let strings = new StringPool(bytes);
   let resourceIds: number[] = [];
   let cursor = bytes.readUInt16LE(2);
+  // Like `ResXMLTree::setTo`, take string pools and resource maps only before the first node.
+  let inNodes = false;
 
   while (cursor + 8 <= end) {
     const type = bytes.readUInt16LE(cursor);
@@ -65,15 +69,17 @@ function readManifest(bytes: Buffer): ManifestInfo {
     const size = bytes.readUInt32LE(cursor + 4);
     if (size < 8 || cursor + size > end) throw new ApkError("AndroidManifest.xml is truncated");
 
-    if (type === RES_STRING_POOL) {
+    if (type >= RES_XML_FIRST_NODE && type <= RES_XML_LAST_NODE) inNodes = true;
+    if (type === RES_STRING_POOL && !inNodes) {
       strings = new StringPool(bytes, cursor);
-    } else if (type === RES_XML_RESOURCE_MAP) {
+    } else if (type === RES_XML_RESOURCE_MAP && !inNodes) {
       resourceIds = [];
       for (let at = cursor + headerSize; at + 4 <= cursor + size; at += 4) {
         resourceIds.push(bytes.readUInt32LE(at));
       }
     } else if (type === RES_XML_START_ELEMENT) {
-      return readRoot(bytes, cursor, strings, resourceIds);
+      if (headerSize < 16) throw new ApkError("AndroidManifest.xml is not valid binary XML");
+      return readRoot(bytes, cursor + headerSize, strings, resourceIds);
     }
     cursor += size;
   }
@@ -84,11 +90,10 @@ type Field = "package" | "versionCode" | "versionCodeMajor" | "versionName";
 
 function readRoot(
   bytes: Buffer,
-  chunk: number,
+  body: number,
   strings: StringPool,
   resourceIds: readonly number[],
 ): ManifestInfo {
-  const body = chunk + 16;
   // The name is not quoted back: a crafted one can be any length.
   if (strings.at(bytes.readUInt32LE(body + 4)) !== "manifest") {
     throw new ApkError("the root element of AndroidManifest.xml is not <manifest>");
