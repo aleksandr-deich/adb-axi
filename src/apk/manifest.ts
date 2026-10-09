@@ -136,7 +136,7 @@ function readRoot(
   const versionCodeMajor = integerValue(fields.get("versionCodeMajor"));
   const versionNameAttribute = fields.get("versionName");
   const versionName =
-    versionNameAttribute === undefined ? null : stringValue(versionNameAttribute, strings);
+    versionNameAttribute?.type === TYPE_STRING ? stringValue(versionNameAttribute, strings) : null;
 
   // `versionCodeMajor` is the high 32 bits of the long version code (API 28+).
   const combined = (BigInt(versionCodeMajor) << 32n) | BigInt(versionCode);

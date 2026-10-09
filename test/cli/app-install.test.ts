@@ -973,6 +973,34 @@ describe("app install", () => {
       expect(calls(fake)).toEqual([]);
     });
 
+    it.each([
+      ["runs a different APK", (): Partial<World> => ({ installedApk: APK_OTHER_KEY })],
+      [
+        "has no base APK",
+        (): Partial<World> => ({
+          rules: [{ match: shell(`pm path --user 0 ${PKG}`), respond: { stdout: "" } }],
+        }),
+      ],
+    ])("refuses the wipe when the installed package %s", async (_name, evidence) => {
+      const { toon, data, fake } = await both(() => {
+        const { rules = [], ...rest } = evidence();
+        return world({
+          start: "old",
+          dumps: { old: V56, new: V57 },
+          ...rest,
+          rules: [
+            ...rules,
+            installs(APK),
+            { match: shell(`pm clear --user 0 ${PKG}`), respond: { stdout: "Success\n" } },
+          ],
+        });
+      }, ["app", "install", APK, "--clean-data"]);
+      expect(toon.exitCode).toBe(1);
+      expect(data).toMatchObject({ code: "CLEAR_REFUSED", package: PKG });
+      expect(calls(fake)).toContain(`install -r ${APK}`);
+      expect(calls(fake)).not.toContain(`shell pm clear --user 0 ${PKG}`);
+    });
+
     it("takes precedence over --if-changed even when the same version and signer are installed", async () => {
       const { toon, data, fake } = await both(
         () =>
