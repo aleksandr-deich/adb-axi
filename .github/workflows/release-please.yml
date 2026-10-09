@@ -1,0 +1,25 @@
+# Opens and updates the release PR from the conventional-commit titles on main, and
+# tags the release and creates its GitHub release when that PR merges. It never
+# publishes to npm: the maintainer runs `npm publish` by hand with 2FA.
+name: release-please
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: release-please
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@v5
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json

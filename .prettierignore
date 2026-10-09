@@ -5,3 +5,4 @@ coverage/
 test/fixtures/captured/
 test/device/probe-app/
 .claude/settings.local.json
+CHANGELOG.md
