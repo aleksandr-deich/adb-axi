@@ -26,7 +26,10 @@ export async function resolveScope(
   pkg: string,
   window: LogWindow,
   options: ReadOptions & { env: NodeJS.ProcessEnv },
-  /** The device's facts when the command already read them; read here otherwise. */
+  /**
+   * The device's facts when the command already read them; read here otherwise, and
+   * read again when the earlier read had no Android version.
+   */
   known: DeviceFacts | undefined,
 ): Promise<Scope> {
   const serial = device.serial;
@@ -36,7 +39,10 @@ export async function resolveScope(
       help: [runHint(["app", "list"], "to see the installed packages")],
     });
   }
-  const facts = known ?? (await readShellFacts(adb, device, options));
+  const facts =
+    known !== undefined && known.api !== null
+      ? known
+      : await readShellFacts(adb, device, options);
   if (facts.api === null) throw invalidOutput("reading the Android version", "");
   if (facts.api >= PID_LIST_BELOW_API) {
     if (record.uid === null) throw invalidOutput(`reading the uid of ${pkg}`, "");
