@@ -16,10 +16,21 @@ Do not use it for UI input (taps, typing, swipes) or for reading what is on scre
 
 Command and flag details come from the live CLI, not this installed file. Run commands as `npx -y adb-axi <command>`, or as `adb-axi <command>` when adb-axi is already installed on PATH; either needs Node.js 24.12 or newer. No preliminary availability probe is needed.
 
+Output is short and the first line is the verdict. Do not pipe it through `tail` or `head`.
+
 - Know the relevant command? Ask `npx -y adb-axi <command> --help` directly. Family help such as `npx -y adb-axi app --help` includes compact usages and command-specific flags.
 - Read `npx -y adb-axi --help` only when you need the command index to choose a command.
 - Batch independent help requests in one shell turn: `npx -y adb-axi app start --help && npx -y adb-axi logs crash --help`.
 - `npx -y adb-axi` with no command reads live state; it is not a prerequisite for help or a known operation.
+
+## App-build loop
+
+Typical usages (flags go after the command; confirm details with `--help`):
+
+- `npx -y adb-axi app install <apk> --clean-data` installs and wipes app data; omit `--clean-data` to keep data.
+- `npx -y adb-axi app start <pkg>`, `npx -y adb-axi app stop <pkg>` and `npx -y adb-axi app clear <pkg>`.
+- `npx -y adb-axi app death <pkg>` kills and restores the app in one call, with before and after evidence. It sends HOME itself, so run it with the app in front and do not press HOME or sleep first.
+- `npx -y adb-axi data db <pkg> '<sql>'` runs one read-only query on a debuggable app's database.
 
 ## Fewer turns, same checks
 
