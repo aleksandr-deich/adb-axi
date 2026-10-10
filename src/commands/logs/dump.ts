@@ -1,5 +1,3 @@
-import { mkdirSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
 import { assertPackageName } from "../../android/component.js";
 import { refreshMarks } from "./marks.js";
 import { readDeviceClock } from "../../android/clock.js";
@@ -166,10 +164,6 @@ export const logsDump = defineCommand({
               ? writeFullOutput(
                   `logs-${window.label}-${clockTime(now.epochMs, now.utcOffsetMinutes).slice(0, 8).replaceAll(":", "")}`,
                   lines.map((line) => `${formatFullLine(line, now.utcOffsetMinutes)}\n`).join(""),
-                  (path, content) => {
-                    mkdirSync(dirname(path), { recursive: true });
-                    writeFileSync(path, content, { flag: "wx" });
-                  },
                 )
               : "not written: nothing was cut",
           }

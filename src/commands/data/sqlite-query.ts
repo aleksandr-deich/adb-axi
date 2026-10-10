@@ -10,6 +10,13 @@ export type Row = Record<string, Cell>;
 /** The most output of a query adb-axi collects; past it the query needs a narrower SELECT. */
 const MAX_RESULT_BYTES = 64 * 1024 * 1024;
 
+/**
+ * How much longer than the command's deadline the query process gives itself. adb-axi kills
+ * it at the deadline and reports the timeout; the process's own deadline only ends a query
+ * that adb-axi can no longer kill.
+ */
+const CHILD_DEADLINE_GRACE_MS = 2000;
+
 /** The first Node.js with what the query process needs from `node:sqlite` (`setAuthorizer`, `defensive`). */
 export const SQLITE_NODE = [24, 12] as const;
 
@@ -54,13 +61,16 @@ export interface QueryRequest {
  * has no host-file functions or modules and blocks host-file operations. Queries cannot
  * reach any pre-existing host file. SQLite's own scratch files stay inside adb-axi's private
  * per-query directory, which is removed afterwards by the caller. Very large queries are
- * bounded by the deadline, not by a memory cap (see `sqlite-child.ts`).
+ * bounded by the deadline, not by a memory cap (see `sqlite-child.ts`). The process is
+ * killed with adb-axi on SIGINT or SIGTERM, and ends itself shortly after the deadline even
+ * when nothing kills it.
  */
 export async function runQuery(request: QueryRequest): Promise<Row[]> {
+  const deadlineMs = request.deadline.remainingMs();
   const result = await exec({
     file: process.execPath,
-    args: ["--no-warnings", CHILD, request.database],
-    deadlineMs: request.deadline.remainingMs(),
+    args: ["--no-warnings", CHILD, request.database, String(deadlineMs + CHILD_DEADLINE_GRACE_MS)],
+    deadlineMs,
     cwd: request.workDir,
     env: {
       ...request.env,
@@ -71,6 +81,7 @@ export async function runQuery(request: QueryRequest): Promise<Row[]> {
     },
     input: request.sql,
     maxOutputBytes: MAX_RESULT_BYTES,
+    killOnInterrupt: true,
   });
 
   switch (result.kind) {

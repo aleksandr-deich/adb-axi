@@ -256,6 +256,41 @@ describe("shell", () => {
     expect(existsSync(parsed.full ?? "")).toBe(true);
   });
 
+  it("gives concurrent --full runs for one device each their own file", async () => {
+    const runs = 8;
+    fake = createFakeAdb({
+      description: "One online emulator answering a different line for each of several commands",
+      synthetic: true,
+      rules: [
+        {
+          match: ["devices", "-l"],
+          respond: {
+            stdout:
+              "List of devices attached\nemulator-5554          device product:sdk_gphone16k_arm64 model:sdk_gphone16k_arm64 device:emu64a16k transport_id:1\n\n",
+          },
+        },
+        ...Array.from({ length: runs }, (_, i) => ({
+          match: ["-s", "emulator-5554", "shell", `echo run ${i}`],
+          respond: { stdout: `run ${i}\n` },
+        })),
+      ],
+    });
+    const f = fake;
+    const results = await Promise.all(
+      Array.from({ length: runs }, (_, i) =>
+        runCli(["shell", "--full", "--json", "--", `echo run ${i}`], f.env),
+      ),
+    );
+    const paths = results.map((result, i) => {
+      expect(result.exitCode).toBe(0);
+      const full = (JSON.parse(result.stdout) as Record<string, string>).full ?? "";
+      expect(readFileSync(full, "utf8")).toBe(`run ${i}\n`);
+      return full;
+    });
+    expect(new Set(paths).size).toBe(runs);
+    expect(f.unmatched()).toEqual([]);
+  });
+
   it("truncates and saves stdout and stderr of a failure separately", async () => {
     const f = withFake();
     const toon = await runCli(

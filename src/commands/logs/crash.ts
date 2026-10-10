@@ -1,5 +1,3 @@
-import { mkdirSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
 import { refreshMarks } from "./marks.js";
 import { readDeviceClock, formatDeviceTime } from "../../android/clock.js";
 import { assertPackageName } from "../../android/component.js";
@@ -81,10 +79,6 @@ export const logsCrash = defineCommand({
             full: writeFullOutput(
               `crash-${window.label}-${clockTime(now.epochMs, now.utcOffsetMinutes).slice(0, 8).replaceAll(":", "")}`,
               crashes.map((crash) => traceText(crash, now.utcOffsetMinutes)).join(""),
-              (path, content) => {
-                mkdirSync(dirname(path), { recursive: true });
-                writeFileSync(path, content, { flag: "wx" });
-              },
             ),
           }
         : {}),

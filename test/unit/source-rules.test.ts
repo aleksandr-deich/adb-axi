@@ -26,7 +26,12 @@ const sources = files(join(ROOT, "src"), (path) => path.endsWith(".ts"));
 
 describe("source rules", () => {
   it("sleeps only inside the poll loop and the process runner (no fixed sleeps)", () => {
-    const allowed = new Set(["src/core/poll.ts", "src/core/exec.ts"]);
+    // The query process cannot use exec's deadline: it is the process exec runs.
+    const allowed = new Set([
+      "src/core/poll.ts",
+      "src/core/exec.ts",
+      "src/commands/data/sqlite-child.ts",
+    ]);
     const offenders = sources
       .filter((path) => /\bset(Timeout|Interval)\s*\(/.test(readFileSync(path, "utf8")))
       .map((path) => relative(ROOT, path))

@@ -43,8 +43,8 @@
     "prepack": "npm run build"
   },
   "dependencies": {
-    "@toon-format/toon": "^2.3.1",
-    "axi-sdk-js": "^0.1.12"
+    "@toon-format/toon": "2.3.1",
+    "axi-sdk-js": "0.1.12"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
