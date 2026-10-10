@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.2.1](https://github.com/aleksandr-deich/adb-axi/compare/v0.2.0...v0.2.1) (2026-10-10)
+
+
+### Bug Fixes
+
+* **logs:** read device facts once per command and cache the fake adb's compiled code ([#41](https://github.com/aleksandr-deich/adb-axi/issues/41)) ([bd06002](https://github.com/aleksandr-deich/adb-axi/commit/bd060026959aa52d42b677f91e8b45da031b6194))
+* read the APK package name the way Android does before --clean-data ([#39](https://github.com/aleksandr-deich/adb-axi/issues/39)) ([a079fd2](https://github.com/aleksandr-deich/adb-axi/commit/a079fd2e7092f5421429db9ac52ab65d09c937dd))
+* unique --full export files, clean data db interrupts, and pinned runtime deps ([#42](https://github.com/aleksandr-deich/adb-axi/issues/42)) ([a6c3cad](https://github.com/aleksandr-deich/adb-axi/commit/a6c3cadae905e9cefcb91f44f3236e681da1902f))
+
 ## [0.2.0](https://github.com/aleksandr-deich/adb-axi/compare/v0.1.3...v0.2.0) (2026-10-08)
 
 ### Bug Fixes
