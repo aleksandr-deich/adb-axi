@@ -7,6 +7,7 @@ import {
   lastKnownAvd,
   lastKnownLabel,
   readShellFacts,
+  unavailableAvdName,
   type DeviceFacts,
   type FactsOptions,
 } from "../device/facts.js";
@@ -53,6 +54,7 @@ export interface Row {
   extra: Partial<Record<ExtraField, string>>;
   /** Some of the device's own reads failed, so what they would have told is unknown. */
   degraded: boolean;
+  avdUnavailableReason?: string;
 }
 
 async function runDevices(context: CommandContext): Promise<Output> {
@@ -106,7 +108,13 @@ export async function readRow(
   const facts = await settle(() => readShellFacts(adb, device, options));
   if (facts === undefined) {
     const unknown = unknownFacts(device);
-    return { device, facts: unknown, extra: extraValues(device, unknown, fields), degraded };
+    return {
+      device,
+      facts: unknown,
+      extra: extraValues(device, unknown, fields),
+      degraded,
+      avdUnavailableReason: `${device.serial}: AVD name unavailable; name lookup was not attempted because device facts could not be read`,
+    };
   }
   const [avd, extra] = await Promise.all([
     settle(() => avdName(adb, device.serial, facts.bootId, options)),
@@ -169,6 +177,16 @@ function helpFor(
   );
   if (named?.facts.avd) {
     help.push(runHint(["<command>", "--device", named.facts.avd], "to target one by AVD name"));
+  }
+  for (const row of rows) {
+    if (row.device.serial.startsWith("emulator-") && row.facts.avd === null) {
+      help.push(row.avdUnavailableReason ?? unavailableAvdName(row.device.serial));
+      if (context.isShipped(["doctor"])) {
+        help.push(
+          runHint(["doctor", "--device", row.device.serial], "to diagnose name availability"),
+        );
+      }
+    }
   }
   const stuck = rows.find((row) => row.device.state !== ONLINE);
   if (stuck) {

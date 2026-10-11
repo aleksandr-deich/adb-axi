@@ -712,7 +712,7 @@ describe("doctor", () => {
     const WEDGE_SEARCH = "logcat -d -v epoch -e 'Cannot call disconnect.. while connecting'";
     const ANDROID_CLI = "com.android.cli.interact.instrumentation/.InstrumentationServer";
 
-    it("warns for the Android CLI's resident UI server, which only blocks instrumentation tests", async () => {
+    it("warns for the Android CLI's resident UI server and its consequences", async () => {
       const f = scenario({
         probes: { processes: { stdout: instrumentation(ANDROID_CLI) } },
         rules: [
@@ -728,7 +728,7 @@ describe("doctor", () => {
         check: "instrumentation",
         status: "warn",
         detail:
-          "the Android CLI's UI server holds UiAutomation; harmless, but instrumentation tests cannot start while it runs",
+          "the Android CLI's UI server holds UiAutomation; it blocks instrumented tests and makes accessibility show as enabled; doctor ui --fix clears it",
       });
       expect(data.help).toEqual([
         `Run \`adb-axi doctor ui --device ${SERIAL}\` to see what holds UiAutomation`,

@@ -77,6 +77,10 @@ function tabletGoingDown(tabletConsole: Rule["respond"], onlineFirst = false): F
         respond: { stdout: "Pixel_10_Pro_XL\r\nOK\r\n" },
       },
       { match: ["-s", "emulator-5556", "emu", "avd", "name"], respond: tabletConsole },
+      {
+        match: ["-s", "emulator-5556", "shell", "getprop ro.boot.qemu.avd_name"],
+        respond: { stdout: "" },
+      },
     ],
   });
   // What adb-axi cached when it last saw the tablet online.
@@ -169,10 +173,13 @@ describe("an offline emulator's last-known AVD name", () => {
               "List of devices attached\nemulator-5554          offline transport_id:1\nemulator-5556          offline transport_id:2\n\n",
           },
         },
-        ...["emulator-5554", "emulator-5556"].map((serial) => ({
-          match: ["-s", serial, "emu", "avd", "name"],
-          respond: GONE,
-        })),
+        ...["emulator-5554", "emulator-5556"].flatMap((serial) => [
+          { match: ["-s", serial, "emu", "avd", "name"], respond: GONE },
+          {
+            match: ["-s", serial, "shell", "getprop ro.boot.qemu.avd_name"],
+            respond: { stdout: "" },
+          },
+        ]),
       ],
     });
     const f = fake;
@@ -197,7 +204,12 @@ describe("an offline emulator's last-known AVD name", () => {
       help: ["Run `adb-axi logs --device <serial>` to pick one by serial"],
     });
     expect(f.unmatched()).toEqual([]);
-    expect(deviceCalls(f).every((argv) => argv[2] === "emu")).toBe(true);
+    expect(
+      deviceCalls(f).every(
+        (argv) =>
+          argv[2] === "emu" || (argv[2] === "shell" && argv[3] === "getprop ro.boot.qemu.avd_name"),
+      ),
+    ).toBe(true);
   });
 
   it("does not label an online emulator with a previous occupant's name when its console fails", async () => {
@@ -220,6 +232,10 @@ describe("an offline emulator's last-known AVD name", () => {
         {
           match: ["-s", "emulator-5556", "emu", "avd", "name"],
           respond: { stderr: "console unavailable", exit: 1 },
+        },
+        {
+          match: ["-s", "emulator-5556", "shell", "getprop ro.boot.qemu.avd_name"],
+          respond: { stdout: "" },
         },
       ],
     });
@@ -333,9 +349,10 @@ describe("device selection through a command", () => {
     );
     expect(exitCode).toBe(1);
     expect(decode(stdout.trimEnd())).toMatchObject({
-      error: "reading the AVD name of emulator-5556 did not finish before the 1 s deadline",
+      error:
+        "reading the AVD name property of emulator-5556 did not finish before the 1 s deadline",
       code: "TIMEOUT",
-      step: "reading the AVD name of emulator-5556",
+      step: "reading the AVD name property of emulator-5556",
     });
     expect(durationMs).toBeLessThan(1000 + MARGIN_MS + 500);
     for (const call of f.calls()) {

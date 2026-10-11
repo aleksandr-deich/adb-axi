@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { runShell } from "../adb/shell.js";
 import type { AdbClient } from "../adb/run.js";
-import type { Deadline } from "../core/deadline.js";
+import { Deadline } from "../core/deadline.js";
 import { AdbAxiError } from "../core/errors.js";
 import { deviceStateDir, readJson, writeJsonAtomic } from "../core/state.js";
 import { ONLINE, type AttachedDevice } from "./list.js";
@@ -149,9 +149,10 @@ interface AvdCache {
 }
 
 /**
- * The AVD name of an emulator, from `emu avd name`. Empty output or a non-zero exit (H6)
- * means unknown, never an error. Names are cached per serial and emulator boot, so a
- * different emulator started later on the same port is read again.
+ * Resolve emulator names through the console, reserving time for ro.boot.qemu.avd_name
+ * if it fails. A property timeout propagates so an incomplete lookup cannot look unique;
+ * a console timeout propagates only if the property supplies no name. Other failures mean
+ * unknown. Names are cached per boot so port reuse cannot identify a previous emulator.
  */
 export async function avdName(
   adb: AdbClient,
@@ -166,29 +167,46 @@ export async function avdName(
     if (cached?.boot_id === bootId && typeof cached.avd === "string") return cached.avd;
   }
 
-  let name: string | null;
+  let name: string | null = null;
+  let consoleTimeout: AdbAxiError | undefined;
   try {
     const result = await adb.device(serial, ["emu", "avd", "name"], {
-      deadline: options.deadline,
+      deadline: new Deadline(
+        Math.min(FACTS_CAP_MS, Math.floor(options.deadline.remainingMs() / 2)),
+      ),
       step: `reading the AVD name of ${serial}`,
-      capMs: FACTS_CAP_MS,
     });
     name = result.exitCode === 0 ? parseAvdName(result.stdout.toString("utf8")) : null;
   } catch (error) {
-    // A console that does not answer in time is a real failure; anything else (the
-    // console refusing, the emulator going away) reads as an unknown AVD name.
-    if (error instanceof AdbAxiError && error.code === "TIMEOUT") throw error;
-    return null;
+    if (error instanceof AdbAxiError && error.code === "TIMEOUT") consoleTimeout = error;
   }
+  if (name === null) {
+    try {
+      const result = await runShell(adb, serial, "getprop ro.boot.qemu.avd_name", {
+        deadline: options.deadline,
+        step: `reading the AVD name property of ${serial}`,
+        capMs: FACTS_CAP_MS,
+      });
+      if (result.exitCode === 0) name = parseAvdName(result.stdout);
+    } catch (error) {
+      if (error instanceof AdbAxiError && error.code === "TIMEOUT") throw error;
+    }
+  }
+  if (name === null && consoleTimeout !== undefined) throw consoleTimeout;
   if (name !== null && bootId !== null) {
     writeJsonAtomic(cachePath, { boot_id: bootId, avd: name } satisfies AvdCache);
   }
   return name;
 }
 
+/** Why a live name is unknown, without claiming that a particular console auth failed. */
+export function unavailableAvdName(serial: string): string {
+  return `${serial}: AVD name unavailable; the emulator console and ro.boot.qemu.avd_name could not provide a name`;
+}
+
 /**
  * The AVD name adb-axi last saw on this serial, whatever emulator boot it was read in, or
- * `null`. Only for an emulator that is not online and whose console does not answer, so it
+ * `null`. Only for an emulator that is not online and whose live name is unavailable, so it
  * is never mistaken for the live name: callers print it with `lastKnownLabel`.
  */
 export function lastKnownAvd(serial: string, env?: NodeJS.ProcessEnv): string | null {

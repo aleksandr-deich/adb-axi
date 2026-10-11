@@ -2,7 +2,14 @@ import type { AdbClient } from "../adb/run.js";
 import type { Deadline } from "../core/deadline.js";
 import { AdbAxiError } from "../core/errors.js";
 import { runHint } from "../core/output.js";
-import { avdName, lastKnownAvd, lastKnownLabel, readFacts, type DeviceFacts } from "./facts.js";
+import {
+  avdName,
+  lastKnownAvd,
+  lastKnownLabel,
+  readFacts,
+  unavailableAvdName,
+  type DeviceFacts,
+} from "./facts.js";
 import { listDevices, ONLINE, type AttachedDevice } from "./list.js";
 
 export interface Target {
@@ -87,8 +94,8 @@ async function byName(
     return { serial: bySerial.serial, device: bySerial };
   }
 
-  // Not a serial: try it as an AVD name. Only the emulator console is asked, which answers
-  // even while the device itself is busy. A console that hangs is a TIMEOUT, not "no such AVD".
+  // Not a serial: try emulator names only, from the console with a device-property fallback.
+  // A physical device is never a candidate, even if it reports the same property.
   const emulators = devices.filter((device) => device.serial.startsWith("emulator-"));
   const facts = { deadline: options.deadline, env: options.env };
   const names = await Promise.all(
@@ -166,6 +173,13 @@ async function byName(
       return [entry.device.serial, entry.avd ?? (last === undefined ? null : lastKnownLabel(last))];
     }),
   );
+  const unavailable = names.filter((entry) => entry.avd === null);
+  const nameHelp = unavailable.flatMap(({ device }) => [
+    unavailableAvdName(device.serial),
+    ...(options.isShipped(["doctor"])
+      ? [runHint(["doctor", "--device", device.serial], "to diagnose name availability")]
+      : []),
+  ]);
   throw new AdbAxiError(
     "DEVICE_NOT_FOUND",
     `no attached device has the serial or AVD name ${wanted}`,
@@ -177,15 +191,17 @@ async function byName(
           state: device.state,
         })),
       },
-      help:
-        devices.length === 0
+      help: [
+        ...(devices.length === 0
           ? ["Start the emulator or connect the device, then run the command again"]
           : [
               runHint(
                 withDevice(options.commandArgs, "<serial or avd>"),
                 "with one of the devices above",
               ),
-            ],
+            ]),
+        ...nameHelp,
+      ],
     },
   );
 }
