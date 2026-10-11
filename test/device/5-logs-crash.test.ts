@@ -36,9 +36,11 @@ describe("logs crash", () => {
     await axi.probe("native");
     await axi.waitLog(DIED, "before-native");
 
+    // Android may relaunch the crashed task with the same intent, which crashes it again.
     const { count, crash } = await axi.crashes("before-native");
-    expect(count).toBe(1);
-    expect(crash).toMatchObject({ kind: "native", process: PKG, exception: "SIGSEGV" });
+    expect(count).toBeGreaterThanOrEqual(1);
+    const first = Array.isArray(crash) ? crash[0] : crash;
+    expect(first).toMatchObject({ kind: "native", process: PKG, exception: "SIGSEGV" });
   });
 
   test("an ANR is reported, and its report is in the system buffer", async () => {
