@@ -205,6 +205,35 @@ const shellCalls = (f: FakeAdb): string[] =>
     .map((call) => call.argv[3] ?? "");
 
 describe("doctor ui", () => {
+  it("explains resident-helper test and accessibility consequences and clears it with --fix", async () => {
+    const f = scenario({
+      state: { helper: "present" },
+      rules: [
+        {
+          match: shell(SHELL.dumpsys),
+          when: { helper: "present" },
+          respond: dumpsys({ component: ANDROID_CLI, pid: 3773 }),
+        },
+        { match: shell(SHELL.dumpsys), when: { helper: "gone" }, respond: dumpsys() },
+        {
+          match: shell("am force-stop --user 0 com.android.cli.interact.instrumentation"),
+          set: { helper: "gone" },
+          respond: {},
+        },
+      ],
+    });
+    const report = await cli(f, ["doctor", "ui"]);
+    expect(report.exitCode).toBe(0);
+    expect((report.data.holders as Record<string, unknown>[])[0]?.state).toBe("resident");
+    const help = (report.data.help as string[]).join("\n");
+    expect(help).toContain("blocks instrumented tests");
+    expect(help).toContain("makes accessibility show as enabled");
+    expect(help).toContain(`adb-axi doctor ui --fix --device ${SERIAL}`);
+    const fixed = await cli(f, ["doctor", "ui", "--fix"]);
+    expect(fixed.exitCode).toBe(0);
+    expect(fixed.data.ok).toContain("uiautomation free (1 cleared)");
+    expectAddressed(f);
+  });
   describe("report", () => {
     it("reports UiAutomation free when nothing holds it, without reading the log or the host", async () => {
       const f = scenario({
@@ -277,7 +306,7 @@ describe("doctor ui", () => {
           },
         ],
         help: [
-          `The Android CLI keeps its UI server between \`android\` commands; that is harmless, but it blocks instrumentation tests (Gradle connected* tasks, \`am instrument\`), so run \`adb-axi doctor ui --fix --device ${SERIAL}\` before starting them`,
+          `The Android CLI keeps its UI server between \`android\` commands; it blocks instrumented tests (Gradle connected* tasks, \`am instrument\`) and makes accessibility show as enabled; run \`adb-axi doctor ui --fix --device ${SERIAL}\` to clear it`,
         ],
       });
       expectAddressed(f);

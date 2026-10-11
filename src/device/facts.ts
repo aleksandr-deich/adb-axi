@@ -149,8 +149,8 @@ interface AvdCache {
 }
 
 /**
- * The AVD name of an emulator, from `emu avd name`. Empty output or a non-zero exit (H6)
- * means unknown, never an error. Names are cached per serial and emulator boot, so a
+ * The AVD name of an emulator, from its console or ro.boot.qemu.avd_name. If neither
+ * provides a name, it is unknown (a console timeout still propagates). Cached per boot, so a
  * different emulator started later on the same port is read again.
  */
 export async function avdName(
@@ -166,7 +166,8 @@ export async function avdName(
     if (cached?.boot_id === bootId && typeof cached.avd === "string") return cached.avd;
   }
 
-  let name: string | null;
+  let name: string | null = null;
+  let consoleTimeout: AdbAxiError | undefined;
   try {
     const result = await adb.device(serial, ["emu", "avd", "name"], {
       deadline: options.deadline,
@@ -175,15 +176,30 @@ export async function avdName(
     });
     name = result.exitCode === 0 ? parseAvdName(result.stdout.toString("utf8")) : null;
   } catch (error) {
-    // A console that does not answer in time is a real failure; anything else (the
-    // console refusing, the emulator going away) reads as an unknown AVD name.
-    if (error instanceof AdbAxiError && error.code === "TIMEOUT") throw error;
-    return null;
+    if (error instanceof AdbAxiError && error.code === "TIMEOUT") consoleTimeout = error;
   }
+  if (name === null) {
+    try {
+      const result = await runShell(adb, serial, "getprop ro.boot.qemu.avd_name", {
+        deadline: options.deadline,
+        step: `reading the AVD name property of ${serial}`,
+        capMs: FACTS_CAP_MS,
+      });
+      if (result.exitCode === 0) name = parseAvdName(result.stdout);
+    } catch {
+      // Offline devices and unavailable shells cannot supply a fallback name.
+    }
+  }
+  if (name === null && consoleTimeout !== undefined) throw consoleTimeout;
   if (name !== null && bootId !== null) {
     writeJsonAtomic(cachePath, { boot_id: bootId, avd: name } satisfies AvdCache);
   }
   return name;
+}
+
+/** Why a live name is unknown, without claiming that a particular console auth failed. */
+export function unavailableAvdName(serial: string): string {
+  return `${serial}: AVD name unavailable; the emulator console and ro.boot.qemu.avd_name could not provide a name`;
 }
 
 /**

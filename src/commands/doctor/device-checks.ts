@@ -267,7 +267,7 @@ export async function checkInstrumentation(checks: DeviceChecks): Promise<CheckR
       if (classified.every((holder) => holder.state === "resident")) {
         return warn(
           "instrumentation",
-          "the Android CLI's UI server holds UiAutomation; harmless, but instrumentation tests cannot start while it runs",
+          "the Android CLI's UI server holds UiAutomation; it blocks instrumented tests and makes accessibility show as enabled; doctor ui --fix clears it",
           next,
         );
       }

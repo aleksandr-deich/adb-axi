@@ -9,7 +9,7 @@ import type { HostProcess } from "../../host/processes.js";
 
 /**
  * `resident` is the Android CLI's UI server idling between `android` commands: no host
- * client, but kept on purpose. It only blocks instrumentation tests.
+ * client, but kept on purpose. It blocks instrumented tests and shows accessibility as enabled.
  */
 export type HolderState = "live" | "resident" | "leaked" | "wedged";
 

@@ -136,14 +136,14 @@ function sameHolder(a: ClassifiedHolder, b: ClassifiedHolder): boolean {
 }
 
 const isLive = (holder: ClassifiedHolder): boolean => holder.state === "live";
-/** Leaked and wedged holders make UiAutomation unusable; a resident one only blocks tests. */
+/** Leaked and wedged holders make UiAutomation unusable; resident holders block tests too. */
 const isStuck = (holder: ClassifiedHolder): boolean =>
   holder.state === "leaked" || holder.state === "wedged";
 
 /** What a resident Android CLI server blocks, and how to clear it when that matters. */
 function residentNote(context: CommandContext): string {
   const fix = commandLine(["doctor", "ui", "--fix", "--device", targetSerial(context)]);
-  return `The Android CLI keeps its UI server between \`android\` commands; that is harmless, but it blocks instrumentation tests (Gradle connected* tasks, \`am instrument\`), so run \`${fix}\` before starting them`;
+  return `The Android CLI keeps its UI server between \`android\` commands; it blocks instrumented tests (Gradle connected* tasks, \`am instrument\`) and makes accessibility show as enabled; run \`${fix}\` to clear it`;
 }
 
 /** What would release each live holder, without repeats. */

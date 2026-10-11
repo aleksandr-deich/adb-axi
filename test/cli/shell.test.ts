@@ -466,6 +466,8 @@ describe("shell", () => {
       code: "DEVICE_NOT_FOUND",
       help: [
         "Run `adb-axi shell --device <serial or avd> -- '<command>'` with one of the devices above",
+        "emulator-5554: AVD name unavailable; the emulator console and ro.boot.qemu.avd_name could not provide a name",
+        "Run `adb-axi doctor --device emulator-5554` to diagnose name availability",
       ],
     });
   });

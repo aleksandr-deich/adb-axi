@@ -712,6 +712,24 @@ describe("doctor", () => {
     const WEDGE_SEARCH = "logcat -d -v epoch -e 'Cannot call disconnect.. while connecting'";
     const ANDROID_CLI = "com.android.cli.interact.instrumentation/.InstrumentationServer";
 
+    it("names resident-helper consequences and the clearing command in doctor", async () => {
+      const f = scenario({
+        probes: { processes: { stdout: instrumentation(ANDROID_CLI) } },
+        rules: [
+          {
+            match: ["-s", SERIAL, "shell", WEDGE_SEARCH],
+            respond: { stdout: "--------- beginning of main\n" },
+          },
+        ],
+      });
+      const { rows } = await doctor(f);
+      expect(rows.instrumentation?.status).toBe("warn");
+      expect(rows.instrumentation?.detail).toContain("blocks instrumented tests");
+      expect(rows.instrumentation?.detail).toContain("makes accessibility show as enabled");
+      expect(rows.instrumentation?.detail).toContain("doctor ui --fix clears it");
+      expectAddressed(f);
+    });
+
     it("warns for the Android CLI's resident UI server, which only blocks instrumentation tests", async () => {
       const f = scenario({
         probes: { processes: { stdout: instrumentation(ANDROID_CLI) } },
@@ -728,7 +746,7 @@ describe("doctor", () => {
         check: "instrumentation",
         status: "warn",
         detail:
-          "the Android CLI's UI server holds UiAutomation; harmless, but instrumentation tests cannot start while it runs",
+          "the Android CLI's UI server holds UiAutomation; it blocks instrumented tests and makes accessibility show as enabled; doctor ui --fix clears it",
       });
       expect(data.help).toEqual([
         `Run \`adb-axi doctor ui --device ${SERIAL}\` to see what holds UiAutomation`,

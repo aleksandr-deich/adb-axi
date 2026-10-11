@@ -7,6 +7,7 @@ import {
   lastKnownAvd,
   lastKnownLabel,
   readShellFacts,
+  unavailableAvdName,
   type DeviceFacts,
   type FactsOptions,
 } from "../device/facts.js";
@@ -169,6 +170,16 @@ function helpFor(
   );
   if (named?.facts.avd) {
     help.push(runHint(["<command>", "--device", named.facts.avd], "to target one by AVD name"));
+  }
+  for (const row of rows) {
+    if (row.device.serial.startsWith("emulator-") && row.facts.avd === null) {
+      help.push(unavailableAvdName(row.device.serial));
+      if (context.isShipped(["doctor"])) {
+        help.push(
+          runHint(["doctor", "--device", row.device.serial], "to diagnose name availability"),
+        );
+      }
+    }
   }
   const stuck = rows.find((row) => row.device.state !== ONLINE);
   if (stuck) {
