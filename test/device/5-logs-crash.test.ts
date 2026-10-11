@@ -36,9 +36,8 @@ describe("logs crash", () => {
     await axi.probe("native");
     await axi.waitLog(DIED, "before-native");
 
-    // Android may relaunch the crashed task with the same intent, which crashes it again.
     const { count, crash } = await axi.crashes("before-native");
-    expect(count).toBeGreaterThanOrEqual(1);
+    expect(count).toBe(1);
     expect(crash).toMatchObject({ kind: "native", process: PKG, exception: "SIGSEGV" });
   });
 

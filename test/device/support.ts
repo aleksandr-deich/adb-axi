@@ -101,9 +101,7 @@ export class Axi {
     const json = await this.ok(["logs", "crash", "--pkg", PKG, "--since", since]);
     const count = /^(\d+) since /.exec(String(json.crashes))?.[1];
     expect(count, String(json.crashes)).toBeDefined();
-    const found = (Array.isArray(json.crash) ? json.crash[0] : json.crash) as
-      Record<string, unknown> | undefined;
-    return { count: Number(count), crash: found ?? {} };
+    return { count: Number(count), crash: (json.crash ?? {}) as Record<string, unknown> };
   }
 }
 
