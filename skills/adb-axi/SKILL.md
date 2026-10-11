@@ -10,7 +10,7 @@ Agent ergonomic wrapper around adb. Prefer this over raw `adb` for Android devic
 
 Use adb-axi for device state and health, the app lifecycle including process-death checks, logs and crashes, debuggable app databases, UiAutomation holder diagnosis, and choosing one device when several are attached.
 
-Do not use it for UI input (taps, typing, swipes) or for reading what is on screen; use a UI tool for those. `android layout` leaves a helper connected on the device: accessibility shows as enabled, and instrumented tests are blocked while it is connected. Before handing the device back or running instrumented tests, finish active UI commands, then run `npx -y adb-axi doctor ui --fix --device <serial>` to clear resident, leaked or wedged holders; live holders are protected. This can stop instrumentation runners and their target app processes; it is not a restoration of the user's own accessibility services. Final check: leave the device as found, or say what changed.
+Do not use it for UI input (taps, typing, swipes) or for reading what is on screen; use a UI tool for those. A UI-automation holder left connected can leave accessibility showing as enabled and block instrumented tests. Before handing the device back or running instrumented tests, finish active UI commands, then run `npx -y adb-axi doctor ui --fix --device <serial>` to clear resident, leaked or wedged holders; live holders are protected. This can stop instrumentation runners and their target app processes; it is not a restoration of the user's own accessibility services. Final check: leave the device as found, or say what changed.
 
 For device configuration such as dark mode or display density, run the setting command through `npx -y adb-axi shell`.
 
@@ -37,22 +37,6 @@ Typical usages (flags go after the command; confirm details with `--help`):
 - `npx -y adb-axi app start <pkg>`, `npx -y adb-axi app stop <pkg>` and `npx -y adb-axi app clear <pkg>`.
 - `npx -y adb-axi app death <pkg>` kills and restores the app in one call, with before and after evidence. It sends HOME itself, so run it with the app in front and do not press HOME or sleep first.
 - `npx -y adb-axi data db <pkg> '<sql>'` runs one read-only query on a debuggable app's database.
-
-## Connected tests: protect app data
-
-**Warning:** Gradle `connectedAndroidTest`, `connected<Variant>AndroidTest` and similar device test tasks uninstall the app and test APKs after the run by default, deleting the app's device data.
-
-To skip post-run uninstall, use `./gradlew connectedDebugAndroidTest -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true`. Verified in [AGP 8.13.0 sources](https://dl.google.com/dl/android/maven2/com/android/tools/build/gradle/8.13.0/gradle-8.13.0-sources.jar) with the Unified Test Platform (UTP) runner; check support for other AGP versions/runners. This controls teardown only, not pre-run installation or data clearing by tests. Do not treat it as a data-preservation guarantee.
-
-For tests against existing device data, build without a connected test task, install both APKs with replacement (no uninstall or clear), then run `adb shell am instrument` through adb-axi. Use the project's APK paths and instrumentation component:
-
-```sh
-adb -s emulator-5554 install -r -t app-debug.apk &&
-adb -s emulator-5554 install -r -t app-debug-androidTest.apk &&
-npx -y adb-axi shell --device emulator-5554 --timeout 5m -- 'am instrument -w com.example.notes.test/androidx.test.runner.AndroidJUnitRunner'
-```
-
-`-r` keeps existing data; `-t` permits test-only APKs. If installation fails, resolve it without uninstalling the app whose data matters. Tests can still change or clear data; inspect the instrumentation results for test failures, not just the shell exit code.
 
 ## Fewer turns, same checks
 
