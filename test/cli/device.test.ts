@@ -346,8 +346,7 @@ describe("device selection through a command", () => {
     );
     expect(exitCode).toBe(1);
     expect(decode(stdout.trimEnd())).toMatchObject({
-      error:
-        "reading the AVD name property of emulator-5556 did not finish before the 1 s deadline",
+      error: "reading the AVD name property of emulator-5556 did not finish before the 1 s deadline",
       code: "TIMEOUT",
       step: "reading the AVD name property of emulator-5556",
     });
