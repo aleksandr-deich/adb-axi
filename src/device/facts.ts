@@ -209,9 +209,7 @@ export function unavailableAvdName(serial: string): string {
 export function lastKnownAvd(serial: string, env?: NodeJS.ProcessEnv): string | null {
   if (!serial.startsWith("emulator-")) return null;
   const cached = readCache(join(deviceStateDir(serial, env), "avd.json"));
-  return typeof cached?.avd === "string" && parseAvdName(cached.avd) === cached.avd
-    ? cached.avd
-    : null;
+  return typeof cached?.avd === "string" && parseAvdName(cached.avd) === cached.avd ? cached.avd : null;
 }
 
 /** How a last-known AVD name prints, so it never reads as the emulator's current name. */
