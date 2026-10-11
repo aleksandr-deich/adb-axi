@@ -712,25 +712,7 @@ describe("doctor", () => {
     const WEDGE_SEARCH = "logcat -d -v epoch -e 'Cannot call disconnect.. while connecting'";
     const ANDROID_CLI = "com.android.cli.interact.instrumentation/.InstrumentationServer";
 
-    it("names resident-helper consequences and the clearing command in doctor", async () => {
-      const f = scenario({
-        probes: { processes: { stdout: instrumentation(ANDROID_CLI) } },
-        rules: [
-          {
-            match: ["-s", SERIAL, "shell", WEDGE_SEARCH],
-            respond: { stdout: "--------- beginning of main\n" },
-          },
-        ],
-      });
-      const { rows } = await doctor(f);
-      expect(rows.instrumentation?.status).toBe("warn");
-      expect(rows.instrumentation?.detail).toContain("blocks instrumented tests");
-      expect(rows.instrumentation?.detail).toContain("makes accessibility show as enabled");
-      expect(rows.instrumentation?.detail).toContain("doctor ui --fix clears it");
-      expectAddressed(f);
-    });
-
-    it("warns for the Android CLI's resident UI server, which only blocks instrumentation tests", async () => {
+    it("warns for the Android CLI's resident UI server and its consequences", async () => {
       const f = scenario({
         probes: { processes: { stdout: instrumentation(ANDROID_CLI) } },
         rules: [

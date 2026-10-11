@@ -422,7 +422,7 @@ describe("resolveTarget", () => {
     );
     expect(error).toMatchObject({
       code: "TIMEOUT",
-      step: "reading the AVD name of emulator-5556",
+      step: "reading the AVD name property of emulator-5556",
     });
     expect(performance.now() - started).toBeLessThan(800 + 750);
     const hung = f.calls().find((call) => call.argv[1] === "emulator-5556");

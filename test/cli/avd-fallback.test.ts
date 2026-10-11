@@ -41,7 +41,7 @@ it.each([
   async (_, console) => {
     const f = setup(console, { stdout: "notessa_decoy\n" });
     const result = await runCli(
-      ["shell", "--device", "notessa_decoy", "--timeout", "15s", "--json", "--", "echo hi"],
+      ["shell", "--device", "notessa_decoy", "--timeout", "1s", "--json", "--", "echo hi"],
       f.env,
     );
     expect(result.exitCode).toBe(0);

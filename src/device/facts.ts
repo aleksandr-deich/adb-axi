@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { runShell } from "../adb/shell.js";
 import type { AdbClient } from "../adb/run.js";
-import type { Deadline } from "../core/deadline.js";
+import { Deadline } from "../core/deadline.js";
 import { AdbAxiError } from "../core/errors.js";
 import { deviceStateDir, readJson, writeJsonAtomic } from "../core/state.js";
 import { ONLINE, type AttachedDevice } from "./list.js";
@@ -170,9 +170,8 @@ export async function avdName(
   let consoleTimeout: AdbAxiError | undefined;
   try {
     const result = await adb.device(serial, ["emu", "avd", "name"], {
-      deadline: options.deadline,
+      deadline: new Deadline(Math.min(FACTS_CAP_MS, Math.floor(options.deadline.remainingMs() / 2))),
       step: `reading the AVD name of ${serial}`,
-      capMs: FACTS_CAP_MS,
     });
     name = result.exitCode === 0 ? parseAvdName(result.stdout.toString("utf8")) : null;
   } catch (error) {
@@ -186,8 +185,8 @@ export async function avdName(
         capMs: FACTS_CAP_MS,
       });
       if (result.exitCode === 0) name = parseAvdName(result.stdout);
-    } catch {
-      // Offline devices and unavailable shells cannot supply a fallback name.
+    } catch (error) {
+      if (error instanceof AdbAxiError && error.code === "TIMEOUT") throw error;
     }
   }
   if (name === null && consoleTimeout !== undefined) throw consoleTimeout;

@@ -330,7 +330,7 @@ describe("devices", () => {
       { serial: "emulator-5554", avd: "-", state: "device", api: "-", form: "-" },
     ]);
     expect(json.help).toEqual([
-      "emulator-5554: AVD name unavailable; the emulator console and ro.boot.qemu.avd_name could not provide a name",
+      "emulator-5554: AVD name unavailable; name lookup was not attempted because device facts could not be read",
       "Run `adb-axi doctor --device emulator-5554` to diagnose name availability",
       "A device that could not be read shows `-` for what it could not tell",
     ]);
