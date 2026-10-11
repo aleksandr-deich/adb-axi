@@ -4,6 +4,8 @@ Truthful, token-efficient adb for agents. adb-axi wraps Android's `adb` with com
 
 It covers the device-state side of Android work: devices and their health, the app lifecycle including process-death checks, run-scoped logs and crashes, and app databases. UI driving is out of scope; pair it with a UI tool such as agent-device.
 
+When reading the screen with `android layout`, its helper stays connected on the device: accessibility shows as enabled, and instrumented tests are blocked while it is connected. Before handing the device back or running instrumented tests, finish active UI commands, then run `adb-axi doctor ui --fix --device <serial>` to clear resident, leaked or wedged holders; live holders are protected. This can stop instrumentation runners and their target app processes; it is not a restoration of the user's own accessibility services. Final check: leave the device as found, or say what changed.
+
 Physical phones are supported for the core commands: devices, doctor, the app lifecycle, logs and crashes, app data and shell. Anything that needs the emulator console reports itself as unavailable on a phone: a phone has no AVD name (`avd` is `-` in `devices`, so select it by serial), and `doctor` reports `console_token` as `no console on a physical device`.
 
 ## Install
@@ -79,6 +81,8 @@ devices[2]{serial,avd,form}:
 help[2]: Run `adb-axi logs --pkg com.example.notes --device <serial or avd>`,Or export ANDROID_SERIAL=<serial> in this shell
 ```
 
+With several devices, run `adb-axi devices`, then pass `--device <serial>` on each command for the intended device. If AVD names show `-`, run `adb-axi doctor --device <serial>` to diagnose; a physical phone has no AVD name.
+
 The target's state is checked from `adb devices -l` before anything else is sent to it, so nothing can block on adb's `- waiting for device -`: an offline device is `DEVICE_OFFLINE`, an unauthorized one `DEVICE_UNAUTHORIZED`, and a serial or AVD name that is not attached `DEVICE_NOT_FOUND`, all immediately. An AVD name used by two emulators is `DEVICE_AMBIGUOUS`, including when two unavailable emulators match only by their last-known names; the error lists their serials so you can pick one. An unavailable emulator may not tell its AVD name; it then shows the name adb-axi last saw on its serial as `<avd> (last known)`, and selecting it by that name reports its unavailable state (`DEVICE_OFFLINE` or `DEVICE_UNAUTHORIZED`). An online emulator whose console cannot be read is never identified by a cached name. A device that goes away while a command runs on it (adb says `error: closed`) is `DEVICE_OFFLINE` or `DEVICE_NOT_FOUND` from what `adb devices` says right after; the command is never sent again. Every adb call then names the device explicitly (`adb -s <serial> ...`) with an argument list, never a host shell string.
 
 Flags go after the command. `adb-axi -s emulator-5554 logs` exits 2 and prints the corrected command, `adb-axi logs --device emulator-5554`, without touching adb. The home view is the exception: `adb-axi --device emulator-5554` (or `-s`, `--timeout`, `--debug`) works without a command.
@@ -153,6 +157,28 @@ The lifecycle commands require the package to be installed for the current Andro
 - **Restore:** starts the root activity of the app's task in recents with `am start -W -n` and nothing else: no launcher category, flags or `monkey`, which all start a fresh task. `launch` is the system's own launch state, or `unknown`; `new_process` comes from comparing pids before and after. A process that is still running is brought forward as it is (`new_process: false`).
 - **Death:** `kill` then `restore` under one 30 s deadline, with the pids and launch evidence of both. `--compare` uses `agent-device snapshot --json` to diff the visible text, only when the app is in front before the kill and after the restore. If it is not in front at either point, agent-device is unavailable, or a snapshot fails or is not a valid UI tree, the kill and restore still run, and `COMPARE_UNAVAILABLE` carries their evidence.
 
+### Connected tests and app data
+
+**Warning:** Gradle `connectedAndroidTest`, `connected<Variant>AndroidTest` and similar device test tasks uninstall the app and test APKs after the run by default, deleting the app's device data.
+
+To leave APKs installed after the run:
+
+```sh
+./gradlew connectedDebugAndroidTest -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true
+```
+
+The property defaults to `false`. Its teardown behavior is verified in [AGP 8.13.0 sources](https://dl.google.com/dl/android/maven2/com/android/tools/build/gradle/8.13.0/gradle-8.13.0-sources.jar) with the Unified Test Platform (UTP) runner, and the [current AGP option definition](https://android.googlesource.com/platform/tools/base/+/refs/heads/mirror-goog-studio-main/build-system/gradle-core/src/main/java/com/android/build/gradle/options/BooleanOption.kt) still defines it. Check support for other AGP versions/runners. It controls post-run uninstall only: it does not prevent a pre-run installation from clearing data, or tests from doing so. It is not a data-preservation guarantee.
+
+For tests against existing device data, build without a connected test task, install both APKs with replacement (no uninstall or clear), then run `adb shell am instrument` through adb-axi. Substitute the project's APK paths and instrumentation component:
+
+```sh
+adb -s emulator-5554 install -r -t app-debug.apk &&
+adb -s emulator-5554 install -r -t app-debug-androidTest.apk &&
+adb-axi shell --device emulator-5554 --timeout 5m -- 'am instrument -w com.example.notes.test/androidx.test.runner.AndroidJUnitRunner'
+```
+
+`-r` keeps existing data; `-t` permits test-only APKs. If installation fails, resolve it without uninstalling the app whose data matters. This avoids Gradle's install/teardown lifecycle, not data changes or clearing by the tests themselves. Inspect the instrumentation results for test failures, not just the shell exit code.
+
 ### Logs and crashes
 
 `logs mark [name]` stores the device's own clock under a name, per device, so `logs`, `logs crash` and `wait log` can cover exactly one run without host and device clock skew shifting the window. Without a name it uses `mark-<HHMMSS>` from device time. Take marks one at a time per device: simultaneous `logs mark` calls can lose one. `--since` takes a mark name or a duration back from now. When the device's boot ID can be read, marks are bound to it: a new boot or an emulator reusing the serial drops earlier marks with a one-time `marks_note` (also on errors). Older marks without a boot ID are dropped too. When the boot ID cannot be read, existing marks are kept but not used: the home view falls back to its no-mark window (with a notice if marks were stored), and named windows or new marks return `MARK_UNVERIFIED`. Retry marking once the boot ID is readable, or use a duration such as `--since 5m`.
@@ -166,6 +192,8 @@ The lifecycle commands require the package to be installed for the current Andro
 `logs crash` counts Java crashes, ANRs and native crashes in the window (default 15 minutes) and says `crashes: 0 since <window>` when there are none. Each crash prints its kind, time, process, exception, message, first app frame and frame count; one prints as a block, several as a table, at most 5 with `shown: N of M crashes`. For wrapped Java exceptions, `cause` and `cause_message` add the last direct `Caused by:` type and message, excluding suppressed branches; the existing `exception` and `message` still describe the outer exception. Only the deepest cause is shown, with fields cut at 500 characters and their total length reported, so even long chains stay compact. Cause fields are omitted when no displayed crash has a cause; in a mixed table, rows without one show `-`. `--full` writes every crash's whole trace, including all causes and suppressed exceptions, to a file. `--pkg` matches the process name in the report (the package or `<pkg>:<name>`), not uid or pid. An ANR has no stack in logcat, so it shows `app_frame: -` and `frames: 0`. Crashes that start before the window are not counted, even when their reports continue into it. Native crashes use the fatal signal's time when it is available.
 
 ### App data and shell
+
+Only when you need a single database's schema, query it directly: `adb-axi data db com.example.notes 'SELECT name, sql FROM sqlite_master WHERE type = "table"'`. With several databases, the CLI names them and asks for `--db`.
 
 `data db <pkg>` resolves the current Android user once and lists that user's debuggable app databases (`name`, `size`, `wal`); database and WAL copying use the same resolved user. `data db <pkg> "<sql>" [--db <name>]` runs one read-only statement (`SELECT`, `WITH`, `VALUES`, `EXPLAIN` or `PRAGMA`) on a host copy and prints the rows; the sole database is selected automatically, and `--db` is required when the app has several databases. SQLite's `-wal`, `-shm` and `-journal` companions and Room's `.lck` lock files do not count as databases for listing or selection.
 
@@ -183,6 +211,11 @@ adb-axi shell --device emulator-5554 -- 'cmd uimode night && wm density'
 ```
 
 `cmd uimode night` prints `Night mode: yes` or `no`, and `wm density` prints the physical density and any override. When testing a change, install an EXIT trap in a subshell before mutating settings, verify the result, and restore the values you read even if the check fails. Do not assume the defaults (`night no` and `density reset`) were the original values; propagate both verification and cleanup failures.
+
+## Short device-check recipes
+
+- Crashes: run `adb-axi logs mark before-repro --device emulator-5554`, reproduce the problem through the UI, then run `adb-axi logs crash --since before-repro --pkg com.example.notes --device emulator-5554`.
+- Process death: put the app and state to test in front through the UI, run `adb-axi app death com.example.notes --device emulator-5554`, then read `death.pid_restored` and `death.new_process` for the restored process. Check the restored UI state separately; a new pid alone does not prove state preservation.
 
 ## Walkthrough: does an app survive process death?
 
