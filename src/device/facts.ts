@@ -149,9 +149,10 @@ interface AvdCache {
 }
 
 /**
- * The AVD name of an emulator, from its console or ro.boot.qemu.avd_name. If neither
- * provides a name, it is unknown (a console timeout still propagates). Cached per boot, so a
- * different emulator started later on the same port is read again.
+ * Resolve emulator names through the console, reserving time for ro.boot.qemu.avd_name
+ * if it fails. A property timeout propagates so an incomplete lookup cannot look unique;
+ * a console timeout propagates only if the property supplies no name. Other failures mean
+ * unknown. Names are cached per boot so port reuse cannot identify a previous emulator.
  */
 export async function avdName(
   adb: AdbClient,
@@ -205,7 +206,7 @@ export function unavailableAvdName(serial: string): string {
 
 /**
  * The AVD name adb-axi last saw on this serial, whatever emulator boot it was read in, or
- * `null`. Only for an emulator that is not online and whose console does not answer, so it
+ * `null`. Only for an emulator that is not online and whose live name is unavailable, so it
  * is never mistaken for the live name: callers print it with `lastKnownLabel`.
  */
 export function lastKnownAvd(serial: string, env?: NodeJS.ProcessEnv): string | null {
