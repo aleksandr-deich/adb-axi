@@ -96,7 +96,7 @@ export class Axi {
     return time ?? "";
   }
 
-  /** How many crashes `logs crash` counts for the probe since a mark, and the first one. */
+  /** Count probe crashes since a mark and return the CLI's crash payload, or {} if absent. */
   async crashes(since: string): Promise<{ count: number; crash: Record<string, unknown> }> {
     const json = await this.ok(["logs", "crash", "--pkg", PKG, "--since", since]);
     const count = /^(\d+) since /.exec(String(json.crashes))?.[1];
