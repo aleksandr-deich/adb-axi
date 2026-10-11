@@ -352,6 +352,45 @@ describe("doctor ui", () => {
       expectAddressed(f);
     });
 
+    it.each(["shell", "exec-out"])(
+      "detects and protects a connected %s reader renamed to uiautomator",
+      async (transport) => {
+        const f = scenario({ ps: ps([9747, "uiautomator"]) });
+        const host = [
+          ...HOST_NOISE,
+          { pid: 4300, args: `adb -s ${SERIAL} ${transport} uiautomator dump /dev/stdout` },
+        ];
+        const report = await cli(f, ["doctor", "ui"], host);
+        expect(report.exitCode).toBe(0);
+        expect(report.data.uiautomation).toBe("in use");
+        expect(report.data.holders).toEqual([
+          {
+            pid: 9747,
+            holder: "uiautomator (adb uiautomator)",
+            state: "live",
+            why: `adb ${transport} uiautomator pid 4300 on the host`,
+          },
+        ]);
+        const fixed = await cli(f, ["doctor", "ui", "--fix"], host);
+        expect(fixed.exitCode).toBe(1);
+        expect(fixed.data).toMatchObject({
+          code: "HOLDER_PROTECTED",
+          protected: [
+            {
+              pid: 9747,
+              holder: "uiautomator (adb uiautomator)",
+              why: `adb ${transport} uiautomator pid 4300 on the host`,
+            },
+          ],
+          help: [`Wait for \`adb ${transport} uiautomator\` (pid 4300) to finish`],
+        });
+        expect(shellCalls(f).filter((command) => /^(?:kill|am force-stop)/.test(command))).toEqual(
+          [],
+        );
+        expectAddressed(f);
+      },
+    );
+
     it("counts only the holder's own pid as wedged", async () => {
       const f = scenario({
         dumpsys: dumpsys({ component: AGENT_DEVICE, pid: 5673 }),

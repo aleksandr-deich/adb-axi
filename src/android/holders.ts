@@ -136,6 +136,14 @@ export function parseAppProcessServers(stdout: string): AppProcessServer[] | nul
     const match = /^\s*(\d+)\s+(.*)$/.exec(row);
     if (match?.[1] === undefined || match[2] === undefined) continue;
     const words = match[2].trim().split(/\s+/);
+    if (words.length === 1 && words[0] === "uiautomator") {
+      servers.push({
+        kind: "server",
+        pid: Number(match[1]),
+        className: "com.android.commands.uiautomator.Launcher",
+      });
+      continue;
+    }
     if (!/^(?:\S*\/)?app_process(?:32|64)?$/.test(words[0] ?? "")) continue;
     const rest = words.slice(1).filter((word) => !word.startsWith("-"));
     const className = rest[1];

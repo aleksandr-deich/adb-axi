@@ -59,6 +59,23 @@ describe("parseAppProcessServers", () => {
     ]);
   });
 
+  it("recognizes only the exact renamed uiautomator process", () => {
+    expect(
+      parseAppProcessServers(
+        [
+          "  PID ARGS",
+          " 9747 uiautomator",
+          " 9748 uiautomator-helper",
+          " 9749 sh -c uiautomator dump",
+          " 9750 unrelated uiautomator",
+          " 9751 uiautomator dump",
+        ].join("\n"),
+      ),
+    ).toEqual<AppProcessServer[]>([
+      { kind: "server", pid: 9747, className: "com.android.commands.uiautomator.Launcher" },
+    ]);
+  });
+
   it("refuses output without the ps header", () => {
     expect(parseAppProcessServers("")).toBeNull();
     expect(parseAppProcessServers("bad option -o ARGS\n")).toBeNull();
