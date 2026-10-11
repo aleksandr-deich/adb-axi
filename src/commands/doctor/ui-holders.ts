@@ -78,10 +78,16 @@ const MOBILECLI: Tool = {
 };
 
 const UIAUTOMATOR: Tool = {
-  label: () => "uiautomator (adb shell uiautomator)",
-  client: (process) => isAdbShell(process, /\buiautomator\b/),
-  clientName: () => "adb shell uiautomator",
-  release: (process) => `Wait for \`adb shell uiautomator\`${pidOf(process)} to finish`,
+  label: () => "uiautomator (adb uiautomator)",
+  client: (process) =>
+    isAdbShell(process, /\buiautomator\b/) ||
+    (program(process) === "adb" &&
+      words(process).includes("exec-out") &&
+      /\buiautomator\b/.test(process.args)),
+  clientName: (process) =>
+    `adb ${words(process).includes("exec-out") ? "exec-out" : "shell"} uiautomator`,
+  release: (process) =>
+    `Wait for \`adb ${process !== undefined && words(process).includes("exec-out") ? "exec-out" : "shell"} uiautomator\`${pidOf(process)} to finish`,
 };
 
 const ANDROID_CLI: Tool = {

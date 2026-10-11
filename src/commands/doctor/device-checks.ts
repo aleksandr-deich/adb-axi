@@ -233,8 +233,6 @@ export async function checkInstrumentation(checks: DeviceChecks): Promise<CheckR
     const next = checks.context.isShipped(["doctor", "ui"])
       ? hint(checks, ["doctor", "ui"], [], "to see what holds UiAutomation")
       : hint(checks, ["app", "stop"], [first], "to end its instrumentation");
-    // The Android CLI keeps its UI server between commands. Unless it is wedged, it only
-    // stands in the way of instrumentation tests.
     if (holding.every((holder) => holder.package === ANDROID_CLI_PACKAGE)) {
       const wedged = await readWedgedPids(checks.adb, checks.serial, reads(checks));
       const [host, devices, avd] = await Promise.all([
@@ -267,7 +265,7 @@ export async function checkInstrumentation(checks: DeviceChecks): Promise<CheckR
       if (classified.every((holder) => holder.state === "resident")) {
         return warn(
           "instrumentation",
-          "the Android CLI's UI server holds UiAutomation; it blocks instrumented tests and makes accessibility show as enabled; doctor ui --fix clears it",
+          "the Android CLI's UI server holds UiAutomation with no host client; its connection can interfere with other readers and can be what blocks instrumented tests and makes accessibility show as enabled; doctor ui --fix clears it",
           next,
         );
       }

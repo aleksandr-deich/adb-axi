@@ -306,7 +306,7 @@ describe("doctor ui", () => {
           },
         ],
         help: [
-          `The Android CLI keeps its UI server between \`android\` commands; it blocks instrumented tests (Gradle connected* tasks, \`am instrument\`) and makes accessibility show as enabled; run \`adb-axi doctor ui --fix --device ${SERIAL}\` to clear it`,
+          `The Android CLI's UI server holds UiAutomation with no host client; its connection can interfere with other readers and can be what blocks instrumented tests (Gradle connected* tasks, \`am instrument\`) and makes accessibility show as enabled; run \`adb-axi doctor ui --fix --device ${SERIAL}\` to clear it`,
         ],
       });
       expectAddressed(f);
