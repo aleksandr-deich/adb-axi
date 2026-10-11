@@ -297,10 +297,7 @@ describe("device selection through a command", () => {
   it("targets a device by AVD name and by serial", async () => {
     const f = withFake("multi-device.json", ECHO_RULES);
     for (const selector of ["Pixel_Tablet", "emulator-5556"]) {
-      const { stdout, exitCode } = await runCli(
-        ["shell", "--device", selector, "--", "echo hi"],
-        f.env,
-      );
+      const { stdout, exitCode } = await runCli(["shell", "--device", selector, "--", "echo hi"], f.env);
       expect(exitCode).toBe(0);
       expect(stdout).toContain("hi from emulator-5556");
     }
@@ -349,7 +346,8 @@ describe("device selection through a command", () => {
     );
     expect(exitCode).toBe(1);
     expect(decode(stdout.trimEnd())).toMatchObject({
-      error: "reading the AVD name property of emulator-5556 did not finish before the 1 s deadline",
+      error:
+        "reading the AVD name property of emulator-5556 did not finish before the 1 s deadline",
       code: "TIMEOUT",
       step: "reading the AVD name property of emulator-5556",
     });

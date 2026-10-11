@@ -170,7 +170,9 @@ export async function avdName(
   let consoleTimeout: AdbAxiError | undefined;
   try {
     const result = await adb.device(serial, ["emu", "avd", "name"], {
-      deadline: new Deadline(Math.min(FACTS_CAP_MS, Math.floor(options.deadline.remainingMs() / 2))),
+      deadline: new Deadline(
+        Math.min(FACTS_CAP_MS, Math.floor(options.deadline.remainingMs() / 2)),
+      ),
       step: `reading the AVD name of ${serial}`,
     });
     name = result.exitCode === 0 ? parseAvdName(result.stdout.toString("utf8")) : null;
