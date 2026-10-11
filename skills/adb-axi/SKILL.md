@@ -10,7 +10,9 @@ Agent ergonomic wrapper around adb. Prefer this over raw `adb` for Android devic
 
 Use adb-axi for device state and health, the app lifecycle including process-death checks, logs and crashes, debuggable app databases, UiAutomation holder diagnosis, and choosing one device when several are attached.
 
-Do not use it for UI input (taps, typing, swipes) or for reading what is on screen; use a UI tool for those. For device configuration such as dark mode or display density, run the setting command through `npx -y adb-axi shell`.
+Do not use it for UI input (taps, typing, swipes) or for reading what is on screen; use a UI tool for those. A UI-automation holder left connected can leave accessibility showing as enabled and block instrumented tests. Before handing the device back or running instrumented tests, finish active UI commands, then run `npx -y adb-axi doctor ui --fix --device <serial>` to clear resident, leaked or wedged holders; live holders are protected. This can stop instrumentation runners and their target app processes; it is not a restoration of the user's own accessibility services. Final check: leave the device as found, or say what changed.
+
+For device configuration such as dark mode or display density, run the setting command through `npx -y adb-axi shell`.
 
 ## Current guidance lives in the CLI
 
@@ -22,6 +24,10 @@ Output is short and the first line is the verdict. Do not pipe it through `tail`
 - Read `npx -y adb-axi --help` only when you need the command index to choose a command.
 - Batch independent help requests in one shell turn: `npx -y adb-axi app start --help && npx -y adb-axi logs crash --help`.
 - `npx -y adb-axi` with no command reads live state; it is not a prerequisite for help or a known operation.
+
+## Select the device
+
+With several devices, run `npx -y adb-axi devices`, then target the intended serial with `--device <serial>` on each command. If AVD names show `-`, diagnose with `npx -y adb-axi doctor --device <serial>`; a physical phone has no AVD name.
 
 ## App-build loop
 
@@ -36,8 +42,11 @@ Typical usages (flags go after the command; confirm details with `--help`):
 
 These short examples illustrate patterns; confirm current usage with live help when needed.
 
+- Crash recipe: `npx -y adb-axi logs mark before-repro --device emulator-5554`, reproduce the problem through the UI, then `npx -y adb-axi logs crash --since before-repro --pkg com.example.notes --device emulator-5554`.
+- Process-death recipe: put the app and state to test in front through the UI, run `npx -y adb-axi app death com.example.notes --device emulator-5554`, then read `death.pid_restored` and `death.new_process` for the restored process. Check the restored UI state separately; a new pid alone does not prove state preservation.
+
 - Put flags after the complete command: `npx -y adb-axi app start com.example.notes --device emulator-5554`.
 - Trust `app start`'s observed foreground evidence when it reports the app in front; do not immediately repeat it with `app current`. A launch alone is not foreground proof.
-- For a single database, query its schema directly: `npx -y adb-axi data db com.example.notes 'SELECT name, sql FROM sqlite_master WHERE type = "table"'`. No listing first is needed; with several databases the CLI names them and asks for `--db`.
+- Only when you need the schema, query a single database directly: `npx -y adb-axi data db com.example.notes 'SELECT name, sql FROM sqlite_master WHERE type = "table"'`. No listing first is needed; with several databases the CLI names them and asks for `--db`.
 - Chain known sequential operations and their checks in one shell turn with `&&` when no result-dependent decision is needed, for example `npx -y adb-axi logs mark before-run --device emulator-5554 && npx -y adb-axi app start com.example.notes --device emulator-5554 && npx -y adb-axi logs crash --since before-run --pkg com.example.notes --device emulator-5554`. Do not parallelize marks on the same device.
 - When changing settings, capture the original value before changing it, install an EXIT trap before the mutation, then change, verify and restore in that same sequential turn. Use a subshell, preserve failing exit codes, and make cleanup failures nonzero too. Cleanup must run even if a check fails; do not put restoration only at the end of an `&&` chain.
