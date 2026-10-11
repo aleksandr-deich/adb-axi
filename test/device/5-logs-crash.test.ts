@@ -31,7 +31,7 @@ describe("logs crash", () => {
   });
 
   test("a native crash is reported from its tombstone", async () => {
-    await axi.ok(["app", "stop", PKG]);
+    await axi.ok(["app", "start", PKG, "--fresh"]);
     await axi.mark("before-native");
     await axi.probe("native");
     await axi.waitLog(DIED, "before-native");
