@@ -29,7 +29,7 @@ These need what one CI emulator does not have. Run them by hand before a release
 
 ### UiAutomation holder (`doctor ui`)
 
-A resident holder needs the Android CLI. See [Devices and health](../../README.md#devices-and-health) for holder states and cleanup behavior. With one emulator (here `emulator-5554`):
+A resident holder needs the Android CLI. With one emulator (here `emulator-5554`):
 
 ```
 android layout --device=emulator-5554 > /dev/null    # leaves com.android.cli.interact.instrumentation resident
