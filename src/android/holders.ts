@@ -19,8 +19,8 @@ export interface Holder {
 }
 
 /**
- * The Android CLI's UI instrumentation (`android layout`, `android screen`). It stays
- * resident between `android` commands, which is normal and serves the next one.
+ * The Android CLI's UI instrumentation (`android layout`, `android screen`). Its
+ * UiAutomation connection can remain after the host command exits.
  */
 export const ANDROID_CLI_PACKAGE = "com.android.cli.interact.instrumentation";
 
@@ -126,7 +126,9 @@ export const PS_ARGS_COMMAND = "ps -A -o PID,ARGS";
  * The `app_process` processes in `ps -A -o PID,ARGS`: a header, then `<pid> <argv...>`.
  * `app_process [options] <dir> <class> [args]` keeps `app_process` (or `app_process64`)
  * as its name unless `--nice-name` is given (AOSP `app_main.cpp`); the class is the first
- * argument after the options and the directory. A missing header reads as `null`.
+ * argument after the options and the directory. The exact single-word name `uiautomator`
+ * also identifies its Launcher after renaming; command lines merely containing that word
+ * do not. A missing header reads as `null`.
  */
 export function parseAppProcessServers(stdout: string): AppProcessServer[] | null {
   const rows = stdout.split(/\r?\n/).filter((line) => line.trim() !== "");

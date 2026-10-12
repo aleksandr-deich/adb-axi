@@ -8,8 +8,8 @@ import {
 import type { HostProcess } from "../../host/processes.js";
 
 /**
- * `resident` is the Android CLI's UI server idling between `android` commands: no host
- * client, but kept on purpose. It blocks instrumented tests and shows accessibility as enabled.
+ * `resident` identifies the Android CLI's UI server holding UiAutomation with no matching
+ * host client. It does not establish whether the connection is healthy or harmless.
  */
 export type HolderState = "live" | "resident" | "leaked" | "wedged";
 
@@ -193,8 +193,7 @@ function mayUseHolder(process: HostProcess, found: Found): boolean {
 /**
  * Classify every holder. Live: a host client of its tool may be using it, or its liveness
  * could not be read. Wedged: its own pid logged the wedge signature. Resident: the Android
- * CLI's server with no `android` command running, as it is kept between commands. Leaked:
- * none of these.
+ * CLI's server with no matching host client. Leaked: none of these.
  * A live holder is never reported as anything else, so `--fix` cannot touch it.
  */
 export function classifyHolders(evidence: Evidence): ClassifiedHolder[] {
