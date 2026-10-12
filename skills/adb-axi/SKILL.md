@@ -27,7 +27,7 @@ Output is short and the first line is the verdict. Do not pipe it through `tail`
 
 ## Select the device
 
-For physical devices or multiple online devices, consult [the device model](https://github.com/aleksandr-deich/adb-axi#the-device-model) for selection rules and missing-AVD-name guidance. Use `npx -y adb-axi --help` for the current selection policy and flags.
+Before choosing a target, run `npx -y adb-axi --help` for authoritative device-selection rules and flags.
 
 ## App-build loop
 
