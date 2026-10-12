@@ -141,6 +141,7 @@ const STUCK_SERVER = [
 /** Errors of choosing the device that are findings of the `device` check. */
 const SELECTION_CODES = new Set([
   "DEVICE_AMBIGUOUS",
+  "DEVICE_SELECTION_REQUIRED",
   "DEVICE_NOT_FOUND",
   "DEVICE_OFFLINE",
   "DEVICE_UNAUTHORIZED",
