@@ -867,7 +867,7 @@ describe("doctor", () => {
         ),
         token: null,
       });
-      const { toon, rows, data } = await doctor(f);
+      const { toon, rows, data } = await doctor(f, ["--device", phone]);
       expect(toon.exitCode).toBe(0);
       expect(data.target).toBe(phone);
       expect(rows.console_token).toEqual({

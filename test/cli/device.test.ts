@@ -274,6 +274,57 @@ describe("an offline emulator's last-known AVD name", () => {
 });
 
 describe("device selection through a command", () => {
+  it("refuses a lone physical device until it is explicitly selected", async () => {
+    const serial = "physical-test-serial";
+    fake = createFakeAdb({
+      synthetic: true,
+      rules: [
+        {
+          match: ["devices", "-l"],
+          respond: { stdout: `List of devices attached\n${serial} device\n` },
+        },
+        {
+          match: ["-s", serial, "shell", "getprop sys.boot_completed"],
+          respond: { stdout: "1\n" },
+        },
+      ],
+    });
+    const refused = await runCli(["shell", "--", "getprop sys.boot_completed"], fake.env);
+    expect(refused.exitCode).toBe(1);
+    expect(decode(refused.stdout.trimEnd())).toEqual({
+      error: `physical device ${serial} requires explicit selection; pass --device ${serial}`,
+      code: "DEVICE_SELECTION_REQUIRED",
+      serial,
+      help: [`Run \`adb-axi shell --device ${serial} -- '<command>'\``],
+    });
+    expect(fake.calls().map((call) => call.argv)).toEqual([["devices", "-l"]]);
+
+    for (const flag of ["--device", "-s"]) {
+      const selected = await runCli(
+        ["shell", flag, serial, "--", "getprop sys.boot_completed"],
+        fake.env,
+      );
+      expect(selected.exitCode).toBe(0);
+      expect(decode(selected.stdout.trimEnd())).toEqual({ exit: 0, stdout: "1" });
+    }
+    const fromEnv = await runCli(["shell", "--", "getprop sys.boot_completed"], {
+      ...fake.env,
+      ANDROID_SERIAL: serial,
+    });
+    expect(fromEnv.exitCode).toBe(0);
+    expect(decode(fromEnv.stdout.trimEnd())).toEqual({ exit: 0, stdout: "1" });
+    expect(fake.unmatched()).toEqual([]);
+  });
+
+  it("auto-selects a lone online emulator", async () => {
+    const f = withFake("one-online.json", ECHO_RULES);
+    const result = await runCli(["shell", "--", "echo hi"], f.env);
+    expect(result.exitCode).toBe(0);
+    expect(decode(result.stdout.trimEnd())).toEqual({ exit: 0, stdout: "hi from emulator-5554" });
+    expect(deviceCalls(f)).toEqual([["-s", "emulator-5554", "shell", "echo hi"]]);
+    expect(f.unmatched()).toEqual([]);
+  });
+
   it("fails with DEVICE_AMBIGUOUS when two devices are online and none is selected", async () => {
     const f = withFake("multi-device.json");
     const toon = await runCli(["logs", "--pkg", "com.example.notes"], f.env);

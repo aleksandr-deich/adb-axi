@@ -21,6 +21,7 @@ const FATAL_CODES = new Set(["ADB_NOT_FOUND", "ADB_SERVER_UNREACHABLE"]);
 /** Errors of choosing the target; the home view reports them instead of failing. */
 const SELECTION_CODES = new Set([
   "DEVICE_AMBIGUOUS",
+  "DEVICE_SELECTION_REQUIRED",
   "DEVICE_NOT_FOUND",
   "DEVICE_OFFLINE",
   "DEVICE_UNAUTHORIZED",

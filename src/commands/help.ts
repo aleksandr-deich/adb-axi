@@ -20,6 +20,7 @@ export function topLevelHelp(registry: Registry): Output {
       flagRow(flag.name === "--timeout" ? { ...flag, default: "per command" } : flag),
     ),
     help: [
+      "Only a lone online emulator is auto-selected; physical devices require --device <serial> or ANDROID_SERIAL",
       "Flags go after the command, for example `adb-axi app start <pkg> --device <serial|avd>`",
       runHint(["<command>", "--help"], "for its arguments, flags and examples"),
     ],

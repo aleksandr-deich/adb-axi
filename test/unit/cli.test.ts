@@ -223,7 +223,7 @@ describe("dispatch", () => {
         subcommands[1]{command,usage,summary}:
           adb-axi app start,"adb-axi app start <pkg> [--fresh] [global flags]",Start an app in the test registry
         global_flags[5]{flag,default,description}:
-          "--device <serial|avd>, -s","$ANDROID_SERIAL, else the only online device",Target device by serial or AVD name
+          "--device <serial|avd>, -s","$ANDROID_SERIAL, else the only online emulator",Target device by serial or AVD name
           "--timeout <dur>",per command,"Deadline for the whole command, for example 500ms, 30s or 5m"
           "--json","-",Print the same data as JSON
           "--debug","-",Print the underlying adb calls on stderr

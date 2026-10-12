@@ -67,7 +67,9 @@ Several emulators at once is the normal case, so adb-axi never guesses which dev
 
 1. `--device <serial|avd>` (alias `-s`), as a serial such as `emulator-5556` or an AVD name such as `Pixel_Tablet`;
 2. the `ANDROID_SERIAL` environment variable;
-3. the only online device.
+3. the only online device, but only if it is an emulator.
+
+A lone online physical device is never auto-selected. Pass `--device <serial>` (or set `ANDROID_SERIAL`) explicitly, for read-only commands as well as commands that change device state. Without a selector, the error reports the phone's serial and the exact `--device <serial>` flag to pass.
 
 Anything else fails at once, before any work:
 
