@@ -160,7 +160,8 @@ interface Both {
 
 /** Run a command as TOON and as `--json`; the two must carry the same data field for field. */
 export async function both(args: string[], f: FakeAdb): Promise<Both> {
-  const statePath = f.env.FAKE_ADB_STATE!;
+  const statePath = f.env.FAKE_ADB_STATE;
+  if (statePath === undefined) throw new Error("Missing FAKE_ADB_STATE");
   const jsonStatePath = `${statePath}.json`;
   if (existsSync(statePath)) copyFileSync(statePath, jsonStatePath);
   else rmSync(jsonStatePath, { force: true });
