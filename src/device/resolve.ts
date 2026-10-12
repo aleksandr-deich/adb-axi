@@ -33,9 +33,8 @@ export interface ResolveOptions {
 }
 
 /**
- * Pick the one device a command acts on (7.2), first match wins: `--device` (serial, then
- * AVD name), `ANDROID_SERIAL`, the only online device. Anything else fails at once, and the
- * target's state is checked before any work so nothing can block on a missing device.
+ * Device-selection rules are documented in README.md under "The device model".
+ * Check the target's state before acting on it so adb cannot block on a missing device.
  */
 export async function resolveTarget(options: ResolveOptions): Promise<Target> {
   const devices = options.devices ?? (await listDevices(options.adb, options.deadline));
@@ -49,6 +48,16 @@ export async function resolveTarget(options: ResolveOptions): Promise<Target> {
   const online = devices.filter((device) => device.state === ONLINE);
   const only = online[0];
   if (online.length === 1 && only) {
+    if (!only.serial.startsWith("emulator-")) {
+      throw new AdbAxiError(
+        "DEVICE_SELECTION_REQUIRED",
+        `physical device ${only.serial} requires explicit selection; pass --device ${only.serial}`,
+        {
+          fields: { serial: only.serial },
+          help: [runHint(withDevice(options.commandArgs, only.serial))],
+        },
+      );
+    }
     return { serial: only.serial, device: only, selectedBy: "only-online" };
   }
   if (online.length > 1) {

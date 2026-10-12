@@ -10,6 +10,7 @@ export const ERROR_CATALOGUE = {
   ADB_NOT_FOUND: "No adb executable in any searched location",
   ADB_SERVER_UNREACHABLE: "The adb server did not answer within the deadline",
   DEVICE_AMBIGUOUS: "Several devices match and none was selected",
+  DEVICE_SELECTION_REQUIRED: "A physical device requires explicit selection",
   DEVICE_OFFLINE: "The target device is offline",
   DEVICE_UNAUTHORIZED: "USB debugging is not authorized on the target device",
   DEVICE_NOT_FOUND: "The serial or AVD name is not attached",
