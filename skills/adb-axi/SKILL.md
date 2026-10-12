@@ -27,7 +27,7 @@ Output is short and the first line is the verdict. Do not pipe it through `tail`
 
 ## Select the device
 
-With several devices, run `npx -y adb-axi devices`, then target the intended serial with `--device <serial>` on each command. If AVD names show `-`, diagnose with `npx -y adb-axi doctor --device <serial>`; a physical phone has no AVD name.
+For physical devices or multiple online devices, consult [the device model](https://github.com/aleksandr-deich/adb-axi#the-device-model) for selection rules and missing-AVD-name guidance. Use `npx -y adb-axi --help` for the current selection policy and flags.
 
 ## App-build loop
 
