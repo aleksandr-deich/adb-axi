@@ -19,8 +19,8 @@ export interface Holder {
 }
 
 /**
- * The Android CLI's UI instrumentation (`android layout`, `android screen`). It stays
- * resident between `android` commands, which is normal and serves the next one.
+ * The Android CLI's UI instrumentation (`android layout`, `android screen`). Its
+ * UiAutomation connection can remain after the host command exits.
  */
 export const ANDROID_CLI_PACKAGE = "com.android.cli.interact.instrumentation";
 
@@ -126,7 +126,9 @@ export const PS_ARGS_COMMAND = "ps -A -o PID,ARGS";
  * The `app_process` processes in `ps -A -o PID,ARGS`: a header, then `<pid> <argv...>`.
  * `app_process [options] <dir> <class> [args]` keeps `app_process` (or `app_process64`)
  * as its name unless `--nice-name` is given (AOSP `app_main.cpp`); the class is the first
- * argument after the options and the directory. A missing header reads as `null`.
+ * argument after the options and the directory. The uiautomator launcher can replace its
+ * command line with just `uiautomator`; only that exact name is recognized as the launcher
+ * when its class is no longer visible. A missing header reads as `null`.
  */
 export function parseAppProcessServers(stdout: string): AppProcessServer[] | null {
   const rows = stdout.split(/\r?\n/).filter((line) => line.trim() !== "");
@@ -136,6 +138,14 @@ export function parseAppProcessServers(stdout: string): AppProcessServer[] | nul
     const match = /^\s*(\d+)\s+(.*)$/.exec(row);
     if (match?.[1] === undefined || match[2] === undefined) continue;
     const words = match[2].trim().split(/\s+/);
+    if (words.length === 1 && words[0] === "uiautomator") {
+      servers.push({
+        kind: "server",
+        pid: Number(match[1]),
+        className: "com.android.commands.uiautomator.Launcher",
+      });
+      continue;
+    }
     if (!/^(?:\S*\/)?app_process(?:32|64)?$/.test(words[0] ?? "")) continue;
     const rest = words.slice(1).filter((word) => !word.startsWith("-"));
     const className = rest[1];

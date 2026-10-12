@@ -728,7 +728,7 @@ describe("doctor", () => {
         check: "instrumentation",
         status: "warn",
         detail:
-          "the Android CLI's UI server holds UiAutomation; it blocks instrumented tests and makes accessibility show as enabled; doctor ui --fix clears it",
+          "the Android CLI's UI server holds UiAutomation with no host client; its connection can interfere with other readers and can be what blocks instrumented tests and makes accessibility show as enabled; doctor ui --fix clears it",
       });
       expect(data.help).toEqual([
         `Run \`adb-axi doctor ui --device ${SERIAL}\` to see what holds UiAutomation`,

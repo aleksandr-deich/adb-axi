@@ -59,6 +59,23 @@ describe("parseAppProcessServers", () => {
     ]);
   });
 
+  it("recognizes only the exact renamed uiautomator process", () => {
+    expect(
+      parseAppProcessServers(
+        [
+          "  PID ARGS",
+          " 9747 uiautomator",
+          " 9748 uiautomator-helper",
+          " 9749 sh -c uiautomator dump",
+          " 9750 unrelated uiautomator",
+          " 9751 uiautomator dump",
+        ].join("\n"),
+      ),
+    ).toEqual<AppProcessServer[]>([
+      { kind: "server", pid: 9747, className: "com.android.commands.uiautomator.Launcher" },
+    ]);
+  });
+
   it("refuses output without the ps header", () => {
     expect(parseAppProcessServers("")).toBeNull();
     expect(parseAppProcessServers("bad option -o ARGS\n")).toBeNull();
@@ -285,6 +302,45 @@ describe("classifyHolders", () => {
         host: host({ pid: 4300, args: `adb -s ${SERIAL} shell uiautomator dump` }),
       }),
     ).toEqual({ state: "live", why: "adb shell uiautomator pid 4300 on the host" });
+  });
+
+  it("protects a target-matching exec-out uiautomator reader and names its transport", () => {
+    const server: AppProcessServer = {
+      kind: "server",
+      pid: 5501,
+      className: "com.android.commands.uiautomator.Launcher",
+    };
+    const [holder] = classifyHolders(
+      evidence({
+        servers: [server],
+        host: host({ pid: 4300, args: `adb -s ${SERIAL} exec-out uiautomator dump /dev/stdout` }),
+      }),
+    );
+    expect(holder).toMatchObject({
+      state: "live",
+      label: "uiautomator (adb uiautomator)",
+      why: "adb exec-out uiautomator pid 4300 on the host",
+      release: "Wait for `adb exec-out uiautomator` (pid 4300) to finish",
+    });
+  });
+
+  it("does not protect a uiautomator holder with a reader targeting another device", () => {
+    const server: AppProcessServer = {
+      kind: "server",
+      pid: 5501,
+      className: "com.android.commands.uiautomator.Launcher",
+    };
+    for (const transport of ["shell", "exec-out"]) {
+      expect(
+        one({
+          servers: [server],
+          host: host({
+            pid: 4300,
+            args: `adb -s emulator-5998 ${transport} uiautomator dump /dev/stdout`,
+          }),
+        }),
+      ).toEqual({ state: "leaked", why: "no host client" });
+    }
   });
 
   it("leaves out servers and instrumentations that do not hold UiAutomation", () => {
