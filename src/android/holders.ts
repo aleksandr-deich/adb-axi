@@ -126,7 +126,9 @@ export const PS_ARGS_COMMAND = "ps -A -o PID,ARGS";
  * The `app_process` processes in `ps -A -o PID,ARGS`: a header, then `<pid> <argv...>`.
  * `app_process [options] <dir> <class> [args]` keeps `app_process` (or `app_process64`)
  * as its name unless `--nice-name` is given (AOSP `app_main.cpp`); the class is the first
- * argument after the options and the directory. A missing header reads as `null`.
+ * argument after the options and the directory. The uiautomator launcher can replace its
+ * command line with just `uiautomator`; only that exact name is recognized as the launcher
+ * when its class is no longer visible. A missing header reads as `null`.
  */
 export function parseAppProcessServers(stdout: string): AppProcessServer[] | null {
   const rows = stdout.split(/\r?\n/).filter((line) => line.trim() !== "");

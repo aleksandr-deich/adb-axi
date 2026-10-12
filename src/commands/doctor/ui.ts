@@ -139,7 +139,7 @@ const isLive = (holder: ClassifiedHolder): boolean => holder.state === "live";
 const isStuck = (holder: ClassifiedHolder): boolean =>
   holder.state === "leaked" || holder.state === "wedged";
 
-/** What a resident Android CLI server blocks, and how to clear it when that matters. */
+/** Possible effects of a resident Android CLI connection, and how to clear it. */
 function residentNote(context: CommandContext): string {
   const fix = commandLine(["doctor", "ui", "--fix", "--device", targetSerial(context)]);
   return `The Android CLI's UI server holds UiAutomation with no host client; its connection can interfere with other readers and can be what blocks instrumented tests (Gradle connected* tasks, \`am instrument\`) and makes accessibility show as enabled; run \`${fix}\` to clear it`;

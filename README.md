@@ -2,7 +2,7 @@
 
 Truthful, token-efficient adb for agents. adb-axi wraps Android's `adb` with compact [TOON](https://github.com/toon-format/toon) output, a deadline on every device call, exit codes that mean what they say, and structured errors that name the next step. It follows the [AXI](https://github.com/kunchenguid/axi) (Agent eXperience Interface) conventions.
 
-It covers the device-state side of Android work: devices and their health, the app lifecycle including process-death checks, run-scoped logs and crashes, and app databases. UI driving is out of scope; pair it with a UI tool such as agent-device.
+It covers the device-state side of Android work: devices and their health, the app lifecycle including process-death checks, run-scoped logs and crashes, and app databases. Screen reading and UI driving are out of scope; use `android layout` for shared screen reads and a UI tool such as agent-device for input.
 
 A UI-automation holder left connected can leave accessibility showing as enabled and block instrumented tests. Before handing the device back or running instrumented tests, finish active UI commands, then run `adb-axi doctor ui --fix --device <serial>` to clear resident, leaked or wedged holders; live holders are protected. This can stop instrumentation runners and their target app processes; it is not a restoration of the user's own accessibility services. Final check: leave the device as found, or say what changed.
 
