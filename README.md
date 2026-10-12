@@ -233,6 +233,18 @@ The death is proven by the pid, the restore by `launch: cold` and a new pid, and
 
 These transcripts are real adb-axi output, recorded against the scripted fake adb the tests use, so they show the shape of the data rather than one particular device.
 
+## Evaluation
+
+<!-- evaluation:start -->
+
+adb-axi has been measured against plain `adb` with coding agents doing the device work. Designs, numbers and limits are in [docs/evaluation.md](docs/evaluation.md).
+
+- **Device bug-fix episodes** (0.2.1, 30 runs): no reliability or effort difference; both arms fixed every bug. adb-axi shortened upgrade-crash diagnosis, did process-death checks in one command and read stored data in every run. In 14 of 15 runs the separate `android layout` screen reader left a helper connected that shows accessibility as enabled; `doctor ui --fix` clears it.
+- **App builds** (0.1.3 and 0.2.0, 10 runs): no whole-run difference; process death took a median of 2 turns against 4.
+- **Scripted 8-task benchmark** (0.1.2 and 0.1.3, 160 runs): a regression signal, not a ranking. Tokens and cost level with plain `adb`; 13% more turns in 0.1.3, down from 27%.
+
+<!-- evaluation:end -->
+
 ## Development
 
 ```sh
