@@ -74,16 +74,21 @@ describe("logs crash", () => {
     }
     await axi.ok([
       "shell",
-      "dumpsys input | grep -E 'Focused|DispatchEnabled|DispatchFrozen|WaitQueue|OutboundQueue'",
+      "dumpsys input | grep -A 2 -E 'Focused|DispatchEnabled|DispatchFrozen|WaitQueue|OutboundQueue'",
     ]);
     const since = await axi.mark("before-anr");
     await axi.probe("anr");
     await axi.waitLog("event=anr blocking", "before-anr");
     // Input sent while the main thread is blocked times out into the ANR (about 5 to 15 s).
-    await axi.ok(["shell", "input keyboard -d 0 keyevent KEYCODE_DPAD_DOWN", "--timeout", "60s"]);
     await axi.ok([
       "shell",
-      "dumpsys input | grep -E 'Focused|DispatchEnabled|DispatchFrozen|WaitQueue|OutboundQueue'",
+      "input keyboard -d 0 keyevent KEYCODE_DPAD_DOWN & input keyboard -d 0 keyevent KEYCODE_DPAD_UP; wait",
+      "--timeout",
+      "60s",
+    ]);
+    await axi.ok([
+      "shell",
+      "dumpsys input | grep -A 2 -E 'Focused|DispatchEnabled|DispatchFrozen|WaitQueue|OutboundQueue'",
     ]);
     await axi.waitLog(String.raw`ANR in dev\.probe`, "before-anr", "60s");
 
