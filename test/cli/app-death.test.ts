@@ -274,6 +274,88 @@ const killedFront = {
 };
 
 describe("app kill", () => {
+  it("waits for pidof exit evidence after the API 29 bracketed process row", async () => {
+    const { toon, data, fake } = await both(["app", "kill", "dev.probe"], () =>
+      probeDevice({
+        phase: "previous",
+        package: { stdout: captured("dumpsys-package-debug.txt").replaceAll("10213", "10116") },
+        rules: [
+          {
+            match: shell(KERNEL_UIDS),
+            when: { app: "previous" },
+            respond: { stdout: "PID UID NAME\n3618 10116 dev.probe\n" },
+          },
+          {
+            match: shell(PIDOF),
+            when: { app: "previous" },
+            respond: PIDOF_OF(3618),
+          },
+          {
+            match: shell(KERNEL_UIDS),
+            when: { app: "dead" },
+            respond: { stdout: "PID UID NAME\n3618 10116 [dev.probe]\n" },
+            times: 2,
+          },
+          {
+            match: shell(PIDOF),
+            when: { app: "dead" },
+            respond: PIDOF_OF(3618),
+            times: 1,
+          },
+        ],
+      }),
+    );
+    expect(toon.exitCode, JSON.stringify(data)).toBe(0);
+    expect(data).toMatchObject({
+      kill: { pid_before: 3618, pid_after: null, method: "am kill" },
+    });
+    const afterKill = shellCommands(fake).slice(shellCommands(fake).indexOf(AM_KILL) + 1);
+    expect(afterKill.filter((command) => command === PIDOF)).toHaveLength(2);
+    expect(afterKill).not.toContain("run-as dev.probe --user 0 kill -9 3618");
+    expectClean(fake);
+  });
+
+  it("does not target a bracketed process belonging to another UID", async () => {
+    const { toon, data, fake } = await both(["app", "kill", "dev.probe"], () =>
+      probeDevice({
+        phase: "dead",
+        rules: [
+          {
+            match: shell(KERNEL_UIDS),
+            respond: { stdout: "PID UID NAME\n3618 10116 [dev.probe]\n" },
+          },
+          { match: shell(PIDOF), respond: PIDOF_OF(3618) },
+        ],
+      }),
+    );
+    expect(toon.exitCode, JSON.stringify(data)).toBe(0);
+    expect(data).toEqual({ ok: "kill dev.probe -> already not running (no-op)" });
+    expect(shellCommands(fake)).not.toContain(AM_KILL);
+    expect(shellCommands(fake).some((command) => command.startsWith("run-as "))).toBe(false);
+    expectClean(fake);
+  });
+
+  it.each(["[dev.probe", "[dev.probe];id", "[worker;id]"])(
+    "rejects the malformed target-UID process name %s without killing",
+    async (name) => {
+      const { toon, data, fake } = await both(["app", "kill", "dev.probe"], () =>
+        probeDevice({
+          phase: "previous",
+          rules: [
+            {
+              match: shell(KERNEL_UIDS),
+              respond: { stdout: `PID UID NAME\n8235 10213 ${name}\n` },
+            },
+          ],
+        }),
+      );
+      expect(toon.exitCode).toBe(1);
+      expect(data).toMatchObject({ code: "INVALID_OUTPUT" });
+      expect(shellCommands(fake)).toEqual([CURRENT_USER, PACKAGE, KERNEL_UIDS]);
+      expectClean(fake);
+    },
+  );
+
   it("ignores a malformed PID for a known foreign UID", async () => {
     const { toon, data, fake } = await both(["app", "kill", "dev.probe"], () =>
       probeDevice({
