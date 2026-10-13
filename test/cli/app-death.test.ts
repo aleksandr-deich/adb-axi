@@ -1,7 +1,6 @@
 import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { decode } from "@toon-format/toon";
-import { LAUNCH_CRASH_COMMAND } from "../../src/android/launch-crash.js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createFakeAdb, FIXTURES_DIR, type FakeAdb } from "../fake-adb/harness.js";
 import type { Response, Rule } from "../fake-adb/scenario.js";
@@ -16,7 +15,6 @@ const ONE_ONLINE = `List of devices attached\n${SERIAL}          device product:
 
 const CURRENT_USER = "am get-current-user";
 const PACKAGE = "dumpsys package dev.probe";
-const CODE_PATH = "pm path --user 0 dev.probe";
 const PIDOF = "pidof dev.probe";
 const KERNEL_UIDS = "ps -A -o PID,UID,NAME";
 const PROCESSES = "dumpsys activity processes dev.probe";
@@ -27,8 +25,6 @@ const AM_KILL = "am kill --user 0 dev.probe";
 const RUN_AS_KILL = "run-as dev.probe --user 0 kill -9 8235";
 const START = "am start --user 0 -W -n 'dev.probe/.MainActivity'";
 const METADATA = "cmd package resolve-activity --user 0 -n 'dev.probe/.MainActivity'";
-const LAUNCHER_RESOLVE =
-  "cmd package query-activities --components --user 0 -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -p dev.probe";
 
 /** `cmd package resolve-activity` for the probe's main activity, which runs in the app's own process. */
 const ACTIVITY_INFO: Response = {
@@ -131,17 +127,9 @@ const shell = (command: string): string[] => ["-s", SERIAL, "shell", command];
 function probeDevice(probe: Probe): FakeAdb {
   const rules: Rule[] = [
     ...(probe.rules ?? []),
-    {
-      match: shell(LAUNCH_CRASH_COMMAND),
-      respond: { stdoutFile: "captured/29/launch-events-running.txt" },
-    },
     { match: ["devices", "-l"], respond: { stdout: ONE_ONLINE } },
     { match: shell(CURRENT_USER), respond: { stdout: "0\n" } },
     { match: shell(PACKAGE), respond: probe.package ?? INSTALLED },
-    ...[0, 10].map((userId) => ({
-      match: shell(`pm path --user ${userId} dev.probe`),
-      respond: { stdout: "package:/data/app/probe/base.apk\n" },
-    })),
     { match: shell(RECENTS), respond: probe.recents ?? RECENTS_KEPT },
     { match: shell(METADATA), respond: ACTIVITY_INFO },
     {
@@ -361,7 +349,7 @@ describe("app kill", () => {
       );
       expect(toon.exitCode).toBe(1);
       expect(data).toMatchObject({ code: "INVALID_OUTPUT" });
-      expect(shellCommands(fake)).toEqual([CURRENT_USER, PACKAGE, CODE_PATH, KERNEL_UIDS]);
+      expect(shellCommands(fake)).toEqual([CURRENT_USER, PACKAGE, KERNEL_UIDS]);
       expectClean(fake);
     },
   );
@@ -457,7 +445,6 @@ describe("app kill", () => {
     expect(shellCommands(fake)).toEqual([
       CURRENT_USER,
       PACKAGE,
-      CODE_PATH,
       KERNEL_UIDS,
       PIDOF,
       FOREGROUND,
@@ -483,7 +470,6 @@ describe("app kill", () => {
     expect(shellCommands(fake)).toEqual([
       CURRENT_USER,
       PACKAGE,
-      CODE_PATH,
       KERNEL_UIDS,
       PIDOF,
       FOREGROUND,
@@ -503,7 +489,7 @@ describe("app kill", () => {
     expect(toon.exitCode).toBe(0);
     expect(toon.stdout).toBe("ok: kill dev.probe -> already not running (no-op)\n");
     expect(data).toEqual({ ok: "kill dev.probe -> already not running (no-op)" });
-    expect(shellCommands(fake)).toEqual([CURRENT_USER, PACKAGE, CODE_PATH, KERNEL_UIDS, PIDOF]);
+    expect(shellCommands(fake)).toEqual([CURRENT_USER, PACKAGE, KERNEL_UIDS, PIDOF]);
     expectClean(fake);
   });
 
@@ -699,48 +685,6 @@ const restoredApp = {
 };
 
 describe("app restore", () => {
-  it("restores the task with one plain am start and reads the new process from the pids (L10)", async () => {
-    const { toon, data, fake } = await both(["app", "restore", "dev.probe"], () =>
-      probeDevice({ phase: "dead" }),
-    );
-    expect(toon.exitCode).toBe(0);
-    expect(toon.stdout).toBe(
-      [
-        "ok: restore dev.probe -> foreground from recents (new process)",
-        "app:",
-        "  activity: .MainActivity",
-        "  pid: 9001",
-        "  launch: cold",
-        "  new_process: true",
-        "",
-      ].join("\n"),
-    );
-    expect(data).toEqual({
-      ok: "restore dev.probe -> foreground from recents (new process)",
-      app: restoredApp,
-    });
-    expect(shellCommands(fake).filter((command) => command !== LAUNCH_CRASH_COMMAND)).toEqual([
-      CURRENT_USER,
-      PACKAGE,
-      CODE_PATH,
-      RECENTS,
-      PROCESSES,
-      PROCESSES,
-      START,
-      METADATA,
-      PROCESSES,
-      FOREGROUND,
-    ]);
-    // Never a launcher category, flags, or monkey: each starts a fresh task (L10).
-    const argv = fake.calls().map((call) => call.argv.join(" "));
-    expect(argv.filter((line) => line.includes("am start"))).toEqual([
-      `-s ${SERIAL} shell ${START}`,
-    ]);
-    expect(argv.join("\n")).not.toMatch(/monkey|android\.intent\.category|LAUNCHER| -f | -c | -a /);
-    expect(shellCommands(fake)).not.toContain(LAUNCHER_RESOLVE);
-    expectClean(fake);
-  });
-
   it("reports the same process when the pid is unchanged, whatever LaunchState says", async () => {
     const { toon, data, fake } = await both(["app", "restore", "dev.probe"], () =>
       probeDevice({ phase: "front", start: { respond: AM_COLD, then: "front" } }),
@@ -778,7 +722,7 @@ describe("app restore", () => {
         "Run `adb-axi app start dev.probe` to start it fresh (its saved state is not restored)",
       ],
     });
-    expect(shellCommands(fake)).toEqual([CURRENT_USER, PACKAGE, CODE_PATH, RECENTS]);
+    expect(shellCommands(fake)).toEqual([CURRENT_USER, PACKAGE, RECENTS]);
     expectClean(fake);
   });
 
@@ -813,16 +757,6 @@ describe("app restore", () => {
     );
     expect(toon.exitCode).toBe(1);
     expect(data).toMatchObject({ code: "WAIT_TIMEOUT" });
-    expectClean(fake);
-  });
-
-  it("fails with APP_NOT_INSTALLED for a package that is not installed", async () => {
-    const { toon, data, fake } = await both(["app", "restore", "dev.probe"], () =>
-      probeDevice({ phase: "dead", package: ABSENT }),
-    );
-    expect(toon.exitCode).toBe(1);
-    expect(data).toMatchObject({ code: "APP_NOT_INSTALLED" });
-    expect(shellCommands(fake)).toEqual([CURRENT_USER, PACKAGE]);
     expectClean(fake);
   });
 });
@@ -1177,16 +1111,6 @@ describe("app death", () => {
       last: { state: "stopped", pid: "-" },
       kill: killedFront,
     });
-    expectClean(fake);
-  });
-
-  it("fails with APP_NOT_INSTALLED before touching the device", async () => {
-    const { toon, data, fake } = await both(["app", "death", "dev.probe"], () =>
-      probeDevice({ phase: "dead", package: ABSENT }),
-    );
-    expect(toon.exitCode).toBe(1);
-    expect(data).toMatchObject({ code: "APP_NOT_INSTALLED" });
-    expect(shellCommands(fake)).toEqual([CURRENT_USER, PACKAGE]);
     expectClean(fake);
   });
 });

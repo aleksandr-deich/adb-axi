@@ -38,6 +38,7 @@ export class Axi {
   readonly serial: string;
   private readonly bin: string;
   private readonly env: NodeJS.ProcessEnv;
+  private readonly home: string;
   private readonly transcript: string;
   private readonly failureLog: string;
 
@@ -49,13 +50,20 @@ export class Axi {
     this.serial = device.serial;
     this.bin = device.bin;
     this.env = { ...process.env, ADB_AXI_HOME: home };
+    this.home = home;
     this.transcript = join(device.transcripts, `${name}.txt`);
     this.failureLog = join(device.transcripts, `${name}.logcat.txt`);
     beforeEach(({ task, onTestFailed }) => {
-      this.env.ADB_AXI_HOME = mkdtempSync(join(home, "test-"));
+      this.freshHome();
       appendFileSync(this.transcript, `# test: ${task.name}\n`);
       onTestFailed(() => this.saveDeviceLog(task.name));
     });
+  }
+
+  freshHome(): string {
+    const home = mkdtempSync(join(this.home, "test-"));
+    this.env.ADB_AXI_HOME = home;
+    return home;
   }
 
   /** Run one command; the exit code is the caller's to check. */
@@ -149,12 +157,15 @@ export class Axi {
   }
 
   async pidsOf(name: string): Promise<number[]> {
-    const json = await this.ok(["shell", `ps -A -o PID,NAME | grep -F ' ${name}' || true`]);
+    const json = await this.ok([
+      "shell",
+      `ps -A -o PID,NAME | awk '$2 == "${name}" || $2 == "[${name}]" {print}'`,
+    ]);
     expect(typeof json.stdout).toBe("string");
     return (json.stdout as string)
       .split("\n")
       .map((line) => line.trim().split(/\s+/))
-      .filter((columns) => columns[1] === name)
+      .filter((columns) => columns[1] === name || columns[1] === `[${name}]`)
       .map((columns) => Number(columns[0]));
   }
 

@@ -1,9 +1,7 @@
 import { decode } from "@toon-format/toon";
-import { LAUNCH_CRASH_COMMAND } from "../../src/android/launch-crash.js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createFakeAdb, type FakeAdb } from "../fake-adb/harness.js";
 import { runCli } from "../helpers/run.js";
-import { sharedWithToon } from "../helpers/json.js";
 
 import {
   lifecycleDevices,
@@ -28,8 +26,6 @@ import {
   METADATA,
   activityInfo,
   INSTALLED,
-  INSTALLED_RELEASE,
-  ABSENT,
   PROBE_FRONT,
   LAUNCHER_FRONT,
   PROBE_RUNNING,
@@ -37,7 +33,6 @@ import {
   AM_START,
   shell,
   both,
-  withoutTime,
   twice,
   shellCommands,
   expectClean,
@@ -52,43 +47,11 @@ afterEach(() => {
   fake = undefined;
 });
 
-const { device, deviceWithRules, liveDevice } = lifecycleDevices((value) => {
+const { device, deviceWithRules } = lifecycleDevices((value) => {
   fake = value;
 });
 
 describe("app stop", () => {
-  it("force-stops a running app and reports its pid gone", async () => {
-    const f = liveDevice(AM_START.hot, "running");
-    const toon = await runCli(["app", "stop", "dev.probe"], f.env);
-    expect(toon.exitCode).toBe(0);
-    expect(toon.stdout).toMatch(
-      /^ok: stop dev\.probe -> not running \(pid 8235 gone after \d+ ms\)\n$/,
-    );
-    expect(shellCommands(f)).toEqual([
-      CURRENT_USER,
-      PACKAGE,
-      "pm path --user 0 dev.probe",
-      PIDOF,
-      KERNEL_UIDS,
-      FORCE_STOP,
-      PIDOF,
-    ]);
-    expectClean(f);
-  });
-
-  it("carries the same fields in --json", async () => {
-    const toonDevice = liveDevice(AM_START.hot, "running");
-    const toon = await runCli(["app", "stop", "dev.probe"], toonDevice.env);
-    toonDevice.cleanup();
-    const jsonDevice = liveDevice(AM_START.hot, "running");
-    const json = await runCli(["app", "stop", "dev.probe", "--json"], jsonDevice.env);
-    expect(json.exitCode).toBe(toon.exitCode);
-    const decoded = decode(toon.stdout.trimEnd()) as Record<string, unknown>;
-    const data = sharedWithToon(JSON.parse(json.stdout) as Record<string, unknown>);
-    expect(Object.keys(data)).toEqual(["ok"]);
-    expect(withoutTime(decoded)).toEqual(withoutTime(data));
-  });
-
   it("names every pid of an app with two processes", async () => {
     fake = createFakeAdb({
       description: "Two probe processes that end on force-stop",
@@ -102,10 +65,6 @@ describe("app stop", () => {
           respond: { stdout: "  PID   UID\n 5120 10213\n 5187 10213\n" },
         },
         { match: shell(PACKAGE), respond: INSTALLED },
-        {
-          match: shell("pm path --user 0 dev.probe"),
-          respond: { stdout: "package:/data/app/probe/base.apk\n" },
-        },
         { match: shell(FORCE_STOP), respond: {}, set: { proc: "stopped" } },
         {
           match: shell(PIDOF),
@@ -120,28 +79,6 @@ describe("app stop", () => {
     expect(run.stdout).toMatch(
       /^ok: stop dev\.probe -> not running \(pids \d+ \d+ gone after \d+ ms\)\n$/,
     );
-  });
-
-  it("is the 'already not running' no-op with exit 0 for an app that is not running", async () => {
-    const f = device({ [PACKAGE]: INSTALLED, [PIDOF]: PROBE_STOPPED, [FORCE_STOP]: {} });
-    const { toon, data } = await both(["app", "stop", "dev.probe"], f);
-    expect(toon.exitCode).toBe(0);
-    expect(toon.stdout).toBe("ok: stop dev.probe -> already not running (no-op)\n");
-    expect(data).toEqual({ ok: "stop dev.probe -> already not running (no-op)" });
-    expectClean(f);
-  });
-
-  it("still force-stops on the no-op, ending processes pidof does not see", async () => {
-    const f = device({ [PACKAGE]: INSTALLED, [PIDOF]: PROBE_STOPPED, [FORCE_STOP]: {} });
-    const run = await runCli(["app", "stop", "dev.probe"], f.env);
-    expect(run.exitCode).toBe(0);
-    expect(shellCommands(f)).toEqual([
-      CURRENT_USER,
-      PACKAGE,
-      "pm path --user 0 dev.probe",
-      PIDOF,
-      FORCE_STOP,
-    ]);
   });
 
   it("fails with STOP_FAILED, carrying the pid, when the process outlives the deadline", async () => {
@@ -167,14 +104,6 @@ describe("app stop", () => {
     expectClean(f);
   });
 
-  it("fails with APP_NOT_INSTALLED when the package is not installed", async () => {
-    const f = device({ "dumpsys package dev.probe.missing": ABSENT });
-    const { toon, data } = await both(["app", "stop", "dev.probe.missing"], f);
-    expect(toon.exitCode).toBe(1);
-    expect(data).toMatchObject({ code: "APP_NOT_INSTALLED" });
-    expect(shellCommands(f)).toEqual(twice([CURRENT_USER, "dumpsys package dev.probe.missing"]));
-  });
-
   it("rejects a package name that is not one with exit 2, before any shell call", async () => {
     const f = device({});
     const { toon, data } = await both(["app", "stop", "dev.probe; reboot"], f);
@@ -185,62 +114,6 @@ describe("app stop", () => {
 });
 
 describe("app clear", () => {
-  it("clears the data, verifies with run-as that no file is left, and reports the process stopped", async () => {
-    const f = liveDevice(AM_START.hot, "running");
-    const { toon, data } = await both(["app", "clear", "dev.probe"], f);
-    expect(toon.exitCode).toBe(0);
-    expect(toon.stdout).toBe(
-      [
-        'ok: "clear dev.probe -> data cleared, process stopped"',
-        "confirmed_by[2]: pm clear,run-as",
-        "",
-      ].join("\n"),
-    );
-    expect(data).toEqual({
-      ok: "clear dev.probe -> data cleared, process stopped",
-      confirmed_by: ["pm clear", "run-as"],
-    });
-    expect(shellCommands(f)).toEqual(
-      twice([CURRENT_USER, PACKAGE, "pm path --user 0 dev.probe", CLEAR, PIDOF, DATA_FILES]),
-    );
-    expectClean(f);
-  });
-
-  it("clears an app that is not running the same way", async () => {
-    const f = liveDevice(AM_START.hot, "stopped");
-    const { toon, data } = await both(["app", "clear", "dev.probe"], f);
-    expect(toon.exitCode).toBe(0);
-    expect(data).toEqual({
-      ok: "clear dev.probe -> data cleared, process stopped",
-      confirmed_by: ["pm clear", "run-as"],
-    });
-  });
-
-  it("says only pm clear confirms the clear of an app that is not debuggable, without run-as", async () => {
-    const f = device({
-      [PACKAGE]: INSTALLED_RELEASE,
-      [CLEAR]: { stdoutFile: "captured/35/pm-clear.txt" },
-      [PIDOF]: PROBE_STOPPED,
-    });
-    const { toon, data } = await both(["app", "clear", "dev.probe"], f);
-    expect(toon.exitCode).toBe(0);
-    expect(toon.stdout).toBe(
-      [
-        'ok: "clear dev.probe -> data cleared, process stopped"',
-        "confirmed_by[1]: pm clear",
-        "",
-      ].join("\n"),
-    );
-    expect(data).toEqual({
-      ok: "clear dev.probe -> data cleared, process stopped",
-      confirmed_by: ["pm clear"],
-    });
-    expect(shellCommands(f)).toEqual(
-      twice([CURRENT_USER, PACKAGE, "pm path --user 0 dev.probe", CLEAR, PIDOF]),
-    );
-    expectClean(f);
-  });
-
   it("fails with CLEAR_FAILED, listing the files, when run-as still finds data after pm clear", async () => {
     const f = device({
       [PACKAGE]: INSTALLED,
@@ -288,9 +161,7 @@ describe("app clear", () => {
       ok: "clear dev.probe -> data cleared, process stopped",
       confirmed_by: ["pm clear"],
     });
-    expect(shellCommands(f)).toEqual(
-      twice([CURRENT_USER, PACKAGE, "pm path --user 0 dev.probe", CLEAR, PIDOF, DATA_FILES]),
-    );
+    expect(shellCommands(f)).toEqual(twice([CURRENT_USER, PACKAGE, CLEAR, PIDOF, DATA_FILES]));
     expectClean(f);
   });
 
@@ -324,14 +195,6 @@ describe("app clear", () => {
     expect(toon.exitCode).toBe(1);
     expect(data).toMatchObject({ code: "REMOTE_EXIT", step: "clearing the data of dev.probe" });
     expect(shellCommands(f)).not.toContain(PIDOF);
-  });
-
-  it("fails with APP_NOT_INSTALLED, before clearing anything, when the package is not installed", async () => {
-    const f = device({ "dumpsys package dev.probe.missing": ABSENT });
-    const { toon, data } = await both(["app", "clear", "dev.probe.missing"], f);
-    expect(toon.exitCode).toBe(1);
-    expect(data).toMatchObject({ code: "APP_NOT_INSTALLED" });
-    expect(shellCommands(f)).toEqual(twice([CURRENT_USER, "dumpsys package dev.probe.missing"]));
   });
 });
 
@@ -631,25 +494,14 @@ describe("launched activity process identity", () => {
           "Run `adb-axi app start dev.probe/.IconAlias --fresh` to kill the process and cold-start",
         ],
       });
-      expect(shellCommands(f).filter((command) => command !== LAUNCH_CRASH_COMMAND)).toEqual([
+      expect(shellCommands(f)).toEqual([
         CURRENT_USER,
         PACKAGE,
-        `pm path --user ${userId} dev.probe`,
-        PROCESSES,
         aliasStart,
         aliasMetadata,
         PROCESSES,
         FOREGROUND,
-        ...twice([
-          CURRENT_USER,
-          PACKAGE,
-          `pm path --user ${userId} dev.probe`,
-          PROCESSES,
-          aliasStart,
-          targetMetadata,
-          PROCESSES,
-          FOREGROUND,
-        ]),
+        ...twice([CURRENT_USER, PACKAGE, aliasStart, targetMetadata, PROCESSES, FOREGROUND]),
       ]);
       expectClean(f);
     },

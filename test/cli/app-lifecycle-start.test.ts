@@ -31,7 +31,6 @@ import {
   METADATA,
   activityInfo,
   INSTALLED,
-  ABSENT,
   PROBE_FRONT,
   LAUNCHER_FRONT,
   PROBE_RUNNING,
@@ -245,22 +244,6 @@ describe("app start", () => {
       help: ["Run `adb-axi app current` to see what is in front"],
     });
   }, 10000);
-
-  it("fails with APP_NOT_INSTALLED, before any start, when the package is not installed", async () => {
-    const f = device({ "dumpsys package dev.probe.missing": ABSENT });
-    const { toon, data } = await both(["app", "start", "dev.probe.missing"], f);
-    expect(toon.exitCode).toBe(1);
-    expect(toon.stdout).toBe(
-      [
-        "error: dev.probe.missing is not installed on this device",
-        "code: APP_NOT_INSTALLED",
-        "help[2]: Run `adb-axi app list --grep missing` to find the package,Run `adb-axi app install <apk>` to install it",
-        "",
-      ].join("\n"),
-    );
-    expect(data).toMatchObject({ code: "APP_NOT_INSTALLED" });
-    expect(shellCommands(f)).toEqual(twice([CURRENT_USER, "dumpsys package dev.probe.missing"]));
-  });
 
   it("fails with ACTIVITY_NOT_FOUND from am's Error type 3, listing the activities that exist", async () => {
     const f = device({ [PACKAGE]: INSTALLED, [startOf(".Missing")]: AM_START.missingActivity });

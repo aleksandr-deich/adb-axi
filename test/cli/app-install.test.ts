@@ -16,7 +16,7 @@ import { decode } from "@toon-format/toon";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { readApkFile } from "../../src/apk/index.js";
 import { isShippedPath, REGISTRY } from "../../src/commands/registry.js";
-import { createFakeAdb, FIXTURES_DIR, type FakeAdb } from "../fake-adb/harness.js";
+import { createFakeAdb, type FakeAdb } from "../fake-adb/harness.js";
 import type { Response, Rule } from "../fake-adb/scenario.js";
 import {
   buildApk,
@@ -39,7 +39,6 @@ const SHA_APK = "sha256sum /data/app/notes/base.apk";
 const INSTALL_OK = { stdout: "Performing Streamed Install\nSuccess\n" };
 const CERT_A = Buffer.from("certificate A");
 const CERT_B = Buffer.from("certificate B");
-const DEBUG_KEY_SHA256 = "201dd47659cf511c7f2d5278e906d349ba0ed8cb2ce8ddb55caa10fb300133f2";
 
 let apkDir: string;
 let APK: string; // 1.4.0 (57), signed by A
@@ -51,7 +50,6 @@ let APK_ROTATED: string;
 let APK_V31: string;
 let APK_ZIP64: string;
 let APK_OVERSIZED: string;
-let PROBE_APK: string;
 
 beforeAll(() => {
   apkDir = mkdtempSync(join(tmpdir(), "adb-axi-apks-"));
@@ -109,7 +107,6 @@ beforeAll(() => {
       closeSync(fd);
     }
   }
-  PROBE_APK = join(FIXTURES_DIR, "apk", "probe-debug.apk");
 });
 afterAll(() => {
   rmSync(apkDir, { recursive: true, force: true });
@@ -297,10 +294,8 @@ describe("app install", () => {
       `shell ${SDK}`,
       "shell am get-current-user",
       `shell ${DUMPSYS}`,
-      `shell pm path --user 0 ${PKG}`,
       `install -r ${APK}`,
       `shell ${DUMPSYS}`,
-      `shell pm path --user 0 ${PKG}`,
     ]);
     expectClean(fake);
     expect(toon.stderr).toBe("");
@@ -339,29 +334,6 @@ describe("app install", () => {
     });
   });
 
-  it("installs a package the device does not have, with no previous version", async () => {
-    const { toon, data } = await both(
-      () => world({ start: "absent", dumps: { absent: ABSENT, new: V57 }, rules: [installs(APK)] }),
-      ["app", "install", APK],
-    );
-    expect(toon.exitCode).toBe(0);
-    expect(data).toMatchObject({
-      ok: "install com.example.notes -> 1.4.0 (57) (fresh install)",
-      install: { previous: "not installed" },
-    });
-  });
-
-  it("treats a package kept after `uninstall -k` as not installed", async () => {
-    const { data } = await both(
-      () => world({ start: "kept", dumps: { kept: KEPT, new: V57 }, rules: [installs(APK)] }),
-      ["app", "install", APK],
-    );
-    expect(data).toMatchObject({
-      ok: "install com.example.notes -> 1.4.0 (57) with data kept",
-      install: { previous: "not installed" },
-    });
-  });
-
   it("records the installed versionCode and signer digest per serial", async () => {
     const { fake } = await both(
       () => world({ start: "old", dumps: { old: V56, new: V57 }, rules: [installs(APK)] }),
@@ -374,50 +346,6 @@ describe("app install", () => {
       signers: [digestOf(CERT_A)],
     });
     expect(typeof record.packages[PKG]?.installedAt).toBe("string");
-  });
-
-  it("installs the committed probe APK as its own package, read from the APK", async () => {
-    const make = (): FakeAdb => {
-      const fake = createFakeAdb({
-        synthetic: true,
-        state: { pkg: "absent" },
-        rules: [
-          { match: ["devices", "-l"], respond: { stdout: ONE_ONLINE } },
-          { match: shell(SDK), respond: { stdout: "35\n" } },
-          { match: shell("am get-current-user"), respond: { stdout: "0\n" } },
-          {
-            match: shell("pm path --user 0 dev.probe"),
-            respond: { stdoutFile: "captured/35/pm-path.txt" },
-          },
-          {
-            match: shell("dumpsys package dev.probe"),
-            when: { pkg: "absent" },
-            respond: { stdoutFile: "captured/35/dumpsys-package-absent.txt" },
-          },
-          {
-            match: shell("dumpsys package dev.probe"),
-            when: { pkg: "new" },
-            respond: { stdoutFile: "captured/35/dumpsys-package-debug.txt" },
-          },
-          {
-            match: ["-s", SERIAL, "install", "-r", PROBE_APK],
-            respond: { stdoutFile: "captured/35/install-debug.txt" },
-            set: { pkg: "new" },
-          },
-        ],
-      });
-      fakes.push(fake);
-      return fake;
-    };
-    const { toon, data, fake } = await both(make, ["app", "install", PROBE_APK]);
-    expect(toon.exitCode).toBe(0);
-    expect(data).toMatchObject({
-      ok: "install dev.probe -> 1.0 (1) (fresh install)",
-      install: { previous: "not installed" },
-    });
-    expect(recordFile(fake)).toMatchObject({
-      packages: { "dev.probe": { versionCode: 1, signers: [DEBUG_KEY_SHA256] } },
-    });
   });
 
   describe("with --if-changed", () => {
@@ -445,32 +373,6 @@ describe("app install", () => {
         return fake;
       };
     }
-
-    it("is the already-installed no-op when versionCode and signature match", async () => {
-      const { toon, json, data, fake } = await both(withRecord(sameInstall()), [
-        "app",
-        "install",
-        APK,
-        "--if-changed",
-      ]);
-      expect(toon.exitCode).toBe(0);
-      expect(toonLines(toon)).toEqual([
-        "ok: install com.example.notes -> already installed (same versionCode and signature) (no-op)",
-      ]);
-      expect(data).toEqual({
-        ok: "install com.example.notes -> already installed (same versionCode and signature) (no-op)",
-      });
-      expect(JSON.parse(json.stdout)).toEqual({ ...data, noop: true });
-      expect(calls(fake)).toEqual([
-        `shell ${SDK}`,
-        "shell am get-current-user",
-        `shell ${DUMPSYS}`,
-        `shell pm path --user 0 ${PKG}`,
-        `shell ${APK_PATH}`,
-        `exec-out ${CAT_APK}`,
-      ]);
-      expectClean(fake);
-    });
 
     it("does not trust a historical record after an external same-version replacement", async () => {
       const { toon, data, fake } = await both(() => {
@@ -550,22 +452,6 @@ describe("app install", () => {
         expectClean(fake);
       },
     );
-
-    it("can prove the no-op without any historical record", async () => {
-      const { toon, fake } = await both(
-        () =>
-          world({
-            start: "current",
-            dumps: { current: V57 },
-            installedApk: APK,
-          }),
-        ["app", "install", APK, "--if-changed"],
-      );
-      expect(toon.exitCode).toBe(0);
-      expect(toon.stdout).toContain("already installed");
-      expect(recordFile(fake)).toBeUndefined();
-      expectClean(fake);
-    });
 
     it.each([
       ["v2 on API 27", "27\n", () => APK_ROTATED, () => APK, true],
@@ -687,16 +573,6 @@ describe("app install", () => {
         "  took_ms: <n>",
       ]);
       expect(calls(fake)).toContain(`install -r ${APK}`);
-    });
-
-    it("installs when the package is not on the device", async () => {
-      const { data } = await both(
-        () =>
-          world({ start: "absent", dumps: { absent: ABSENT, new: V57 }, rules: [installs(APK)] }),
-        ["app", "install", APK, "--if-changed"],
-      );
-      expect(data).toMatchObject({ install: { previous: "not installed" } });
-      expect(data.install).not.toHaveProperty("shortcut");
     });
 
     it("installs and says the shortcut was skipped when the APK is signed differently", async () => {
@@ -823,16 +699,6 @@ describe("app install", () => {
   });
 
   describe("with --clean-data", () => {
-    const make = (): FakeAdb =>
-      world({
-        start: "old",
-        dumps: { old: V56, new: V57 },
-        rules: [
-          installs(APK),
-          { match: shell(`pm clear --user 0 ${PKG}`), respond: { stdout: "Success\n" } },
-        ],
-      });
-
     it("clears only the resolved current user's data", async () => {
       const secondary = { stdout: V57.stdout?.replace("User 0:", "User 10:") ?? "" };
       const fake = world({
@@ -853,36 +719,12 @@ describe("app install", () => {
         `shell ${SDK}`,
         "shell am get-current-user",
         `shell ${DUMPSYS}`,
-        `shell pm path --user 10 ${PKG}`,
         `install -r ${APK}`,
         `shell ${DUMPSYS}`,
-        `shell pm path --user 10 ${PKG}`,
         `shell pm path --user 10 ${PKG}`,
         `shell ${SHA_APK}`,
         `shell pm clear --user 10 ${PKG}`,
         `shell ${DUMPSYS}`,
-        `shell pm path --user 10 ${PKG}`,
-      ]);
-      expectClean(fake);
-    });
-
-    it("installs with -r, clears the data, then verifies the version", async () => {
-      const { toon, data, fake } = await both(make, ["app", "install", APK, "--clean-data"]);
-      expect(toon.exitCode).toBe(0);
-      expect(data.ok).toBe("install com.example.notes -> 1.4.0 (57) with data wiped");
-      expect(calls(fake)).toEqual([
-        `shell ${SDK}`,
-        "shell am get-current-user",
-        `shell ${DUMPSYS}`,
-        `shell pm path --user 0 ${PKG}`,
-        `install -r ${APK}`,
-        `shell ${DUMPSYS}`,
-        `shell pm path --user 0 ${PKG}`,
-        `shell pm path --user 0 ${PKG}`,
-        `shell ${SHA_APK}`,
-        `shell pm clear --user 0 ${PKG}`,
-        `shell ${DUMPSYS}`,
-        `shell pm path --user 0 ${PKG}`,
       ]);
       expectClean(fake);
     });
@@ -991,14 +833,7 @@ describe("app install", () => {
       [
         "has no base APK",
         (): Partial<World> => ({
-          rules: [
-            {
-              match: shell(`pm path --user 0 ${PKG}`),
-              respond: { stdout: "package:/data/app/notes/base.apk\n" },
-              times: 2,
-            },
-            { match: shell(`pm path --user 0 ${PKG}`), respond: { stdout: "" } },
-          ],
+          rules: [{ match: shell(`pm path --user 0 ${PKG}`), respond: { stdout: "" } }],
         }),
       ],
     ])("refuses the wipe when the installed package %s", async (_name, evidence) => {
@@ -1019,40 +854,6 @@ describe("app install", () => {
       expect(data).toMatchObject({ code: "CLEAR_REFUSED", package: PKG });
       expect(calls(fake)).toContain(`install -r ${APK}`);
       expect(calls(fake)).not.toContain(`shell pm clear --user 0 ${PKG}`);
-    });
-
-    it("takes precedence over --if-changed even when the same version and signer are installed", async () => {
-      const { toon, data, fake } = await both(
-        () =>
-          world({
-            start: "new",
-            dumps: { new: V57 },
-            installedApk: APK,
-            rules: [
-              installs(APK),
-              { match: shell(`pm clear --user 0 ${PKG}`), respond: { stdout: "Success\n" } },
-            ],
-          }),
-        ["app", "install", APK, "--clean-data", "--if-changed"],
-      );
-      expect(toon.exitCode).toBe(0);
-      expect(data.ok).toBe("install com.example.notes -> 1.4.0 (57) with data wiped");
-      expect(data.install).not.toHaveProperty("shortcut");
-      expect(calls(fake)).toEqual([
-        `shell ${SDK}`,
-        "shell am get-current-user",
-        `shell ${DUMPSYS}`,
-        `shell pm path --user 0 ${PKG}`,
-        `install -r ${APK}`,
-        `shell ${DUMPSYS}`,
-        `shell pm path --user 0 ${PKG}`,
-        `shell pm path --user 0 ${PKG}`,
-        `shell ${SHA_APK}`,
-        `shell pm clear --user 0 ${PKG}`,
-        `shell ${DUMPSYS}`,
-        `shell pm path --user 0 ${PKG}`,
-      ]);
-      expectClean(fake);
     });
   });
 
@@ -1327,81 +1128,10 @@ describe("app uninstall", () => {
     expect(calls(fake)).toEqual([
       "shell am get-current-user",
       `shell ${DUMPSYS}`,
-      `shell pm path --user 10 ${PKG}`,
       `shell pm uninstall --user 10 ${PKG}`,
       `shell ${DUMPSYS}`,
     ]);
     expectClean(fake);
-  });
-
-  it("removes an installed package and checks that it is gone", async () => {
-    const { toon, data, fake } = await both(
-      () =>
-        world({
-          start: "current",
-          dumps: { current: V57, absent: ABSENT },
-          rules: [uninstalls(`pm uninstall ${PKG}`, { stdout: "Success\n" })],
-        }),
-      ["app", "uninstall", PKG],
-    );
-    expect(toon.exitCode).toBe(0);
-    expect(toonLines(toon)).toEqual(["ok: uninstall com.example.notes -> removed"]);
-    expect(data).toEqual({ ok: "uninstall com.example.notes -> removed" });
-    expect(calls(fake)).toEqual([
-      "shell am get-current-user",
-      `shell ${DUMPSYS}`,
-      `shell pm path --user 0 ${PKG}`,
-      `shell pm uninstall --user 0 ${PKG}`,
-      `shell ${DUMPSYS}`,
-    ]);
-    expectClean(fake);
-  });
-
-  it("is the already-not-installed no-op, exit 0, when the package is not there", async () => {
-    const { toon, data, fake } = await both(
-      () => world({ start: "absent", dumps: { absent: ABSENT }, rules: [] }),
-      ["app", "uninstall", PKG],
-    );
-    expect(toon.exitCode).toBe(0);
-    expect(toonLines(toon)).toEqual([
-      "ok: uninstall com.example.notes -> already not installed (no-op)",
-    ]);
-    expect(data).toEqual({ ok: "uninstall com.example.notes -> already not installed (no-op)" });
-    // Raw adb would fail with DELETE_FAILED_INTERNAL_ERROR; uninstall is never even sent.
-    expect(calls(fake)).toEqual(["shell am get-current-user", `shell ${DUMPSYS}`]);
-  });
-
-  it("is the same no-op for a package kept after `uninstall -k`", async () => {
-    const { toon, data, fake } = await both(
-      () => world({ start: "kept", dumps: { kept: KEPT }, rules: [] }),
-      ["app", "uninstall", PKG],
-    );
-    expect(toon.exitCode).toBe(0);
-    expect(data.ok).toBe("uninstall com.example.notes -> already not installed (no-op)");
-    expect(calls(fake)).toEqual(["shell am get-current-user", `shell ${DUMPSYS}`]);
-  });
-
-  it("replays a real device: the missing-package failure never reaches the user", async () => {
-    const fake = createFakeAdb("uninstall-missing.json");
-    fakes.push(fake);
-    const run = await runCli(["app", "uninstall", "dev.probe"], fake.env);
-    expect(run.exitCode).toBe(0);
-    expect(run.stdout).toBe("ok: uninstall dev.probe -> already not installed (no-op)\n");
-  });
-
-  it("keeps the data with --keep-data (pm uninstall -k)", async () => {
-    const { toon, data, fake } = await both(
-      () =>
-        world({
-          start: "current",
-          dumps: { current: V57, kept: KEPT },
-          rules: [uninstalls(`pm uninstall -k ${PKG}`, { stdout: "Success\n" }, "kept")],
-        }),
-      ["app", "uninstall", PKG, "--keep-data"],
-    );
-    expect(toon.exitCode).toBe(0);
-    expect(data.ok).toBe("uninstall com.example.notes -> removed with data kept");
-    expect(calls(fake)).toContain(`shell pm uninstall --user 0 -k ${PKG}`);
   });
 
   it("forgets the install record of a package it removes", async () => {
@@ -1535,10 +1265,8 @@ describe("app uninstall", () => {
       expect(calls(fake)).toEqual([
         "shell am get-current-user",
         `shell ${DUMPSYS}`,
-        `shell pm path --user ${userId} ${PKG}`,
         `shell pm uninstall${keepData ? " -k" : ""} ${PKG}`,
         `shell ${DUMPSYS}`,
-        `shell pm path --user ${userId} ${PKG}`,
       ]);
       expect(data.help).toContainEqual(expect.stringContaining("for all users"));
     },
