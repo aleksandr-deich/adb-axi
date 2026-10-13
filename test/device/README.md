@@ -4,17 +4,19 @@ Nothing here runs in `npm test` or `npm run check`. The device checks run on eve
 
 ## Device checks (`*.test.ts`)
 
-The checks drive adb-axi installed from a packed tarball against one emulator, use the probe app for app and log scenarios, and wait for app and log events with adb-axi's own `wait` commands instead of sleeping. Each expected result is grounded in probe state, Android window focus, kernel process state or database bytes, rather than another adb-axi summary. The original six files remain, with attached-device and foreground-state checks added as file 6:
+The checks drive adb-axi installed from a packed tarball against one emulator, use the probe app for app and log scenarios, and wait for app and log events with adb-axi's own `wait` commands instead of sleeping. Each expected result is grounded in probe state, Android window focus, kernel process state or database bytes, rather than another adb-axi summary. The original six files remain, with lifecycle, observation and device-identity coverage added:
 
-| File              | What it checks                                                                                                                        |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `1-process-death` | `app kill` then `app restore`: the saved counter survives, the volatile one resets, a new process, and no crash since the mark        |
-| `2-app-start`     | `app start` on the app in front is not recreated; `--fresh` is a cold start                                                           |
-| `3-data-db`       | a row still only in `probe.db-wal` comes back from `data db`; the release build gives `APP_NOT_DEBUGGABLE`                            |
-| `4-doctor-ui`     | `doctor ui` reports UiAutomation free and exits 0                                                                                     |
-| `5-logs-crash`    | a Java crash counts once and zero after the next mark; a native crash and an ANR are reported; the ANR report is in the system buffer |
-| `6-device-state`  | the target's serial, AVD name and API match device properties; `app current` matches independent window-focus and kernel-PID queries  |
-| `7-offline`       | runs last and stops the emulator; a command against it then fails with a typed error in under 2 s                                     |
+| File                | What it checks                                                                                                                                  |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `0-app-lifecycle`   | install/reinstall, if-changed/clean-data, stop/clear, uninstall/keep-data and missing packages, with real package/process/private-data evidence |
+| `1-process-death`   | `app kill` then `app restore`: the saved counter survives, the volatile one resets, a new process, and no crash since the mark                  |
+| `2-app-start`       | `app start` on the app in front is not recreated; `--fresh` is a cold start                                                                     |
+| `3-data-db`         | a row still only in `probe.db-wal` comes back from `data db`; the release build gives `APP_NOT_DEBUGGABLE`                                      |
+| `4-doctor-ui`       | `doctor ui` reports UiAutomation free and exits 0                                                                                               |
+| `5-logs-crash`      | a Java crash counts once and zero after the next mark; a native crash and an ANR are reported; the ANR report is in the system buffer           |
+| `6-app-observation` | named log windows across process restarts, filters/mark replacement, wait transitions, package metadata and actual Room/WAL reads               |
+| `6-device-state`    | the target's serial, AVD name and API match device properties; `app current` matches independent window-focus and kernel-PID queries            |
+| `7-offline`         | runs last and stops the emulator; a command against it then fails with a typed error in under 2 s                                               |
 
 Run them against an emulator nobody else is using. The last check shuts it down:
 
