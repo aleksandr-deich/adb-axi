@@ -2,7 +2,6 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { decode } from "@toon-format/toon";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { allCommands, REGISTRY } from "../../src/commands/registry.js";
 import { createFakeAdb, FIXTURES_DIR, type FakeAdb } from "../fake-adb/harness.js";
 import type { Response, Rule } from "../fake-adb/scenario.js";
 import { runCli, type CliRun } from "../helpers/run.js";
@@ -788,37 +787,5 @@ describe("wait app", () => {
     const { toon, data } = await both(["wait", "app", "dev.probe", "--state", "running"], fake);
     expect(toon.exitCode).toBe(1);
     expect(data).toMatchObject({ code: "DEVICE_AMBIGUOUS" });
-  });
-});
-
-describe("help for the shipped app read commands", () => {
-  it("lists the shipped app and wait commands and no unshipped one", async () => {
-    const f = device({});
-    const app = decode((await runCli(["app", "--help"], f.env)).stdout.trimEnd()) as {
-      subcommands: { command: string }[];
-    };
-    expect(app.subcommands.map((s) => s.command)).toEqual(
-      expect.arrayContaining(["adb-axi app current", "adb-axi app list", "adb-axi app info"]),
-    );
-    const wait = decode((await runCli(["wait", "--help"], f.env)).stdout.trimEnd()) as {
-      subcommands: { command: string }[];
-    };
-    expect(wait.subcommands.map((s) => s.command)).toContain("adb-axi wait app");
-    const listed = [...app.subcommands, ...wait.subcommands].map((s) => s.command);
-    const unshipped = allCommands(REGISTRY)
-      .filter((command) => !command.shipped)
-      .map((command) => `adb-axi ${command.path.join(" ")}`);
-    expect(listed.filter((command) => unshipped.includes(command))).toEqual([]);
-    expect(f.calls()).toEqual([]);
-  });
-
-  it("describes each command's usage and flags", async () => {
-    const f = device({});
-    const list = await runCli(["app", "list", "--help"], f.env);
-    expect(list.exitCode).toBe(0);
-    expect(list.stdout).toContain("--grep <re>");
-    const wait = await runCli(["wait", "app", "--help"], f.env);
-    expect(wait.stdout).toContain("--state <foreground|running|stopped> (required)");
-    expect(f.calls()).toEqual([]);
   });
 });

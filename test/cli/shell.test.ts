@@ -482,14 +482,4 @@ describe("shell", () => {
     expect(exitCode).toBe(1);
     expect(decode(stdout.trimEnd())).toMatchObject({ code: "ADB_NOT_FOUND" });
   });
-
-  it("is listed in help with its examples", async () => {
-    const f = withFake();
-    const top = await runCli(["--help"], f.env);
-    expect(top.stdout).toContain("adb-axi shell");
-    const help = await runCli(["shell", "--help"], f.env);
-    expect(help.stdout).toContain("--full");
-    expect(help.stdout).toContain("adb-axi shell -- 'getprop ro.build.version.sdk'");
-    expect(f.calls()).toEqual([]);
-  });
 });

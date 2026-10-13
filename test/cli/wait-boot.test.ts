@@ -3,7 +3,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { decode } from "@toon-format/toon";
 import { afterEach, describe, expect, it } from "vitest";
-import { isShippedPath, REGISTRY } from "../../src/commands/registry.js";
 import { isProcessAlive } from "../../src/core/exec.js";
 import { createFakeAdb, type FakeAdb } from "../fake-adb/harness.js";
 import {
@@ -553,13 +552,6 @@ describe("wait boot", () => {
         last: { state: "unknown" },
       });
     }, 20_000);
-
-    it("uses the 120 s default deadline", async () => {
-      const f = scenario([listing(devices(line(SERIAL, "device"))), shell(BOOTED)]);
-      const help = await runCli(["wait", "boot", "--help"], f.env);
-      expect(help.stdout).toContain('"--timeout <dur>",120s');
-      expect(f.calls()).toEqual([]);
-    });
   });
 
   describe("errors that waiting cannot fix", () => {
@@ -616,15 +608,5 @@ describe("wait boot", () => {
         error: "reading the boot state of emulator-5554 printed output adb-axi cannot read",
       });
     });
-  });
-
-  it("is listed in help, and its help lines name only shipped commands", async () => {
-    const f = scenario([]);
-    const top = await runCli(["--help"], f.env);
-    expect(top.stdout).toContain("adb-axi wait boot");
-    const help = await runCli(["wait", "--help"], f.env);
-    expect(help.stdout).toContain("adb-axi wait boot");
-    expect(isShippedPath(REGISTRY, ["wait", "boot"])).toBe(true);
-    expect(f.calls()).toEqual([]);
   });
 });

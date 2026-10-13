@@ -1291,17 +1291,6 @@ describe("app install", () => {
       expect(run.stdout).toContain("code: VALIDATION_ERROR");
     });
   });
-
-  it("is shipped: help lists it and its flags", async () => {
-    const fake = world({ start: "old", dumps: { old: V56 } });
-    const run = await runCli(["app", "install", "--help"], fake.env);
-    expect(run.exitCode).toBe(0);
-    expect(run.stdout).toContain("--clean-data");
-    expect(run.stdout).toContain("--if-changed");
-    expect(run.stdout).toContain("same versionCode and signer");
-    expect(run.stdout).toContain("debug and release variants");
-    expect(run.stdout).toContain("180s");
-  });
 });
 
 describe("app uninstall", () => {
@@ -1595,12 +1584,5 @@ describe("app uninstall", () => {
     expect(toon.exitCode).toBe(2);
     expect(data).toMatchObject({ code: "VALIDATION_ERROR" });
     expect(calls(fake)).toEqual([]);
-  });
-
-  it("is shipped: help lists it and --keep-data", async () => {
-    const fake = world({ start: "current", dumps: { current: V57 } });
-    const run = await runCli(["app", "uninstall", "--help"], fake.env);
-    expect(run.exitCode).toBe(0);
-    expect(run.stdout).toContain("--keep-data");
   });
 });

@@ -70,6 +70,31 @@ const CASES: Case[] = [
   { args: ["update"], selection: "none" },
 ];
 
+const HELP_CONTRACTS: Record<string, { fragments: string[]; summary?: string }> = {
+  devices: { fragments: ["--all", "--fields <list>"] },
+  "app install": {
+    fragments: [
+      "--clean-data",
+      "--if-changed",
+      "same versionCode and signer",
+      "debug and release variants",
+      "180s",
+    ],
+  },
+  "app uninstall": { fragments: ["--keep-data"] },
+  "app start": { fragments: ["--fresh", "--activity <name>", "--timeout"] },
+  "app clear": {
+    fragments: ["--full"],
+    summary:
+      "Clear the current Android user's app data, verify it is cleared, and report the process stopped. Android also stops the app's running processes for other Android users, leaving their data intact.",
+  },
+  "app list": { fragments: ["--grep <re>"] },
+  "wait app": { fragments: ["--state <foreground|running|stopped> (required)"] },
+  "wait boot": { fragments: ['"--timeout <dur>",120s'] },
+  "data db": { fragments: ["64 MB result limit"] },
+  shell: { fragments: ["--full", "adb-axi shell -- 'getprop ro.build.version.sdk'"] },
+};
+
 const name = (c: Case): string => (c.args.length === 0 ? "(home)" : commandWords(c.args));
 
 /** The command words of a case: `app start`, `logs`, `shell`. */
@@ -185,13 +210,30 @@ function expectErrorShape(run: CliRun, data: Record<string, unknown>): void {
 const isError = (data: Record<string, unknown>): boolean => "error" in data && "code" in data;
 
 describe("conformance sweep", () => {
-  it("covers every shipped command", () => {
+  it("covers every shipped command", async () => {
     const shipped = allCommands(REGISTRY)
       .filter((command) => command.shipped)
       .map((command) => command.path.join(" "));
     const covered = CASES.filter((c) => c.args.length > 0).map((c) => commandWords(c.args));
     expect(covered.sort()).toEqual(shipped.sort());
     expect(REGISTRY.home.shipped).toBe(true);
+    const f = multiDevice();
+    const top = await both(["--help"], f);
+    expect(top.toon.exitCode).toBe(0);
+    expect((top.data.commands as { command: string }[]).map((c) => c.command).sort()).toEqual(
+      ["adb-axi", ...covered.map((command) => `adb-axi ${command}`)].sort(),
+    );
+    for (const group of ["app", "wait", "data", "logs", "doctor"]) {
+      const help = await both([group, "--help"], f);
+      expect(help.toon.exitCode).toBe(0);
+      expect((help.data.subcommands as { command: string }[]).map((c) => c.command).sort()).toEqual(
+        covered
+          .filter((command) => command.startsWith(`${group} `))
+          .map((command) => `adb-axi ${command}`)
+          .sort(),
+      );
+    }
+    expect(f.calls()).toEqual([]);
   });
 
   it("leaves no hidden stub in the registry", () => {
@@ -201,9 +243,8 @@ describe("conformance sweep", () => {
   });
 
   describe.each(CASES)("adb-axi $args", (c) => {
-    it.skipIf(c.selection === "none")(
-      "fails at once with DEVICE_AMBIGUOUS when two devices are online and none is selected",
-      async () => {
+    if (c.selection !== "none")
+      it("fails at once with DEVICE_AMBIGUOUS when two devices are online and none is selected", async () => {
         const f = multiDevice();
         const { toon, data } = await both(c.args, f);
         // Two runs, each well inside the 15 s default deadline: nothing waited on a device.
@@ -243,12 +284,10 @@ describe("conformance sweep", () => {
           ).toBe(true);
         }
         expect(f.unmatched()).toEqual([]);
-      },
-    );
+      });
 
-    it.skipIf(c.args.length === 0 || c.selection === "none")(
-      "returns at once when the target is offline",
-      async () => {
+    if (c.selection !== "none")
+      it("returns at once when the target is offline", async () => {
         const f = multiDevice();
         const args = withDevice(c.args, "emulator-5558");
         const { toon, data } = await both(
@@ -278,12 +317,10 @@ describe("conformance sweep", () => {
           .calls()
           .filter((call) => call.argv[1] === "emulator-5558" && call.argv[2] !== "emu");
         expect(shellCalls).toEqual([]);
-      },
-    );
+      });
 
-    it.skipIf(c.args.length === 0 || c.selection === "none")(
-      "never lets a device call outlive --timeout, and leaves no adb process behind",
-      async () => {
+    if (c.selection !== "none")
+      it("never lets a device call outlive --timeout, and leaves no adb process behind", async () => {
         const f = multiDevice();
         const args = withFlag(withDevice(c.args, "emulator-5554"), "--timeout", "1s");
         const { toon, data } = await both(args, f, true);
@@ -299,24 +336,22 @@ describe("conformance sweep", () => {
           expect(isProcessAlive(call.pid), call.argv.join(" ")).toBe(false);
           if (call.end !== null) expect(call.end - call.start).toBeLessThan(1_000 + MARGIN_MS);
         }
-      },
-    );
+      });
 
-    it.skipIf(c.args.length === 0)(
-      "rejects an unknown flag with exit 2 and the valid flags, never calling adb",
-      async () => {
+    if (c.args.length > 0)
+      it("rejects an unknown flag with exit 2 and the valid flags, never calling adb", async () => {
         const f = multiDevice();
         const { toon, data } = await both(withFlag(c.args, "--bogus"), f);
         expectErrorShape(toon, data);
         expect(data.code).toBe("VALIDATION_ERROR");
+        expect(data.error).toBe(`unknown flag --bogus for \`adb-axi ${name(c)}\``);
         expect(data.valid_flags).toContain("--device <serial|avd>");
+        if (name(c) === "logs") expect(data.valid_flags).toContain("--pkg <pkg>");
         expect(f.calls()).toEqual([]);
-      },
-    );
+      });
 
-    it.skipIf(c.args.length === 0)(
-      "prints its help with flags, defaults and examples",
-      async () => {
+    if (c.args.length > 0)
+      it("prints its help with flags, defaults and examples", async () => {
         const f = multiDevice();
         const { toon, data } = await both([...commandWords(c.args).split(" "), "--help"], f);
         expect(toon.exitCode).toBe(0);
@@ -340,9 +375,13 @@ describe("conformance sweep", () => {
         const examples = data.examples as string[];
         expect(examples.length).toBeGreaterThanOrEqual(2);
         expect(examples.length).toBeLessThanOrEqual(3);
+        const contract = HELP_CONTRACTS[name(c)];
+        for (const fragment of contract?.fragments ?? []) {
+          expect(toon.stdout).toContain(fragment);
+        }
+        if (contract?.summary !== undefined) expect(data.summary).toBe(contract.summary);
         expect(f.calls()).toEqual([]);
-      },
-    );
+      });
   });
 });
 

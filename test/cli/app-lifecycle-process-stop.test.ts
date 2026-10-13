@@ -1,8 +1,5 @@
-import { decode } from "@toon-format/toon";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { allCommands, REGISTRY } from "../../src/commands/registry.js";
 import type { FakeAdb } from "../fake-adb/harness.js";
-import { runCli } from "../helpers/run.js";
 
 import {
   lifecycleDevices,
@@ -149,51 +146,5 @@ describe("lifecycle review regressions", () => {
       twice([CURRENT_USER, PACKAGE, "pm path --user 0 dev.probe", PIDOF, KERNEL_UIDS, FORCE_STOP]),
     );
     expectClean(f);
-  });
-});
-
-describe("help for the shipped app lifecycle commands", () => {
-  it("lists app start, stop and clear, and no unshipped command", async () => {
-    const f = device({});
-    const app = decode((await runCli(["app", "--help"], f.env)).stdout.trimEnd()) as {
-      subcommands: { command: string }[];
-    };
-    const listed = app.subcommands.map((s) => s.command);
-    expect(listed).toEqual(
-      expect.arrayContaining(["adb-axi app start", "adb-axi app stop", "adb-axi app clear"]),
-    );
-    const unshipped = allCommands(REGISTRY)
-      .filter((command) => !command.shipped)
-      .map((command) => `adb-axi ${command.path.join(" ")}`);
-    expect(listed.filter((command) => unshipped.includes(command))).toEqual([]);
-    expect(f.calls()).toEqual([]);
-  });
-
-  it("documents clear's data scope and Android's cross-user process stop", async () => {
-    const f = device({});
-    const { toon, data } = await both(["app", "clear", "--help"], f);
-    expect(toon.exitCode).toBe(0);
-    expect(data.summary).toBe(
-      "Clear the current Android user's app data, verify it is cleared, and report the process stopped. Android also stops the app's running processes for other Android users, leaving their data intact.",
-    );
-    expect(f.calls()).toEqual([]);
-  });
-
-  it("describes the full-output escape for clear errors", async () => {
-    const f = device({});
-    const clear = await runCli(["app", "clear", "--help"], f.env);
-    expect(clear.exitCode).toBe(0);
-    expect(clear.stdout).toContain("--full");
-    expect(f.calls()).toEqual([]);
-  });
-
-  it("describes app start's flags", async () => {
-    const f = device({});
-    const start = await runCli(["app", "start", "--help"], f.env);
-    expect(start.exitCode).toBe(0);
-    expect(start.stdout).toContain("--fresh");
-    expect(start.stdout).toContain("--activity <name>");
-    expect(start.stdout).toContain("--timeout");
-    expect(f.calls()).toEqual([]);
   });
 });

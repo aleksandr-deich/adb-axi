@@ -391,14 +391,4 @@ describe("devices", () => {
     const { stdout } = await runCli(["devices"], f.env);
     expect(stdout.includes("adb-axi doctor")).toBe(isShippedPath(REGISTRY, ["doctor"]));
   });
-
-  it("is listed in help with its flags", async () => {
-    const f = withFake("devices-mixed.json");
-    const top = await runCli(["--help"], f.env);
-    expect(top.stdout).toContain("adb-axi devices");
-    const help = await runCli(["devices", "--help"], f.env);
-    expect(help.stdout).toContain("--all");
-    expect(help.stdout).toContain("--fields <list>");
-    expect(f.calls()).toEqual([]);
-  });
 });

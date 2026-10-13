@@ -890,21 +890,3 @@ describe("data db: row cap and --full", () => {
     expect(file.rows[0]?.v).toBe(long);
   });
 });
-
-describe("data db: registration", () => {
-  it("documents the 64 MB query result limit in command help", async () => {
-    const f = device([]);
-    const run = await runCli(["data", "db", "--help"], f.env);
-    expect(run.exitCode).toBe(0);
-    expect(run.stdout).toContain("64 MB result limit");
-  });
-
-  it("is shipped: listed in `data --help` and in the top-level help", async () => {
-    const f = device([]);
-    const group = await runCli(["data", "--help"], f.env);
-    expect(group.stdout).toContain("adb-axi data db");
-    const top = await runCli(["--help"], f.env);
-    expect(top.stdout).toContain("data");
-    expect(f.calls()).toEqual([]);
-  });
-});

@@ -92,28 +92,10 @@ describe("adb-axi bin", () => {
         "",
       ].join("\n"),
     );
-    expect(f.calls()).toEqual([]);
-  });
-
-  it("rejects the same misplaced flag in JSON with the same keys", async () => {
-    const f = withFake();
-    const toon = await runCli(["-s", "emulator-5554", "logs"], f.env);
     const json = await runCli(["--json", "-s", "emulator-5554", "logs"], f.env);
     expect(json.exitCode).toBe(2);
-    expect(JSON.parse(json.stdout)).toEqual(decode(toon.stdout.trimEnd()));
+    expect(JSON.parse(json.stdout)).toEqual(decode(stdout.trimEnd()));
     expect(Object.keys(JSON.parse(json.stdout) as object)).toEqual(["error", "code", "help"]);
-    expect(f.calls()).toEqual([]);
-  });
-
-  it("exits 2 on an unknown flag and lists that command's valid flags", async () => {
-    const f = withFake();
-    const { stdout, exitCode } = await runCli(["logs", "--bogus"], f.env);
-    expect(exitCode).toBe(2);
-    const error = decode(stdout.trimEnd()) as Record<string, unknown>;
-    expect(error.code).toBe("VALIDATION_ERROR");
-    expect(error.error).toBe("unknown flag --bogus for `adb-axi logs`");
-    expect(error.valid_flags).toContain("--pkg <pkg>");
-    expect(error.valid_flags).toContain("--device <serial|avd>");
     expect(f.calls()).toEqual([]);
   });
 
