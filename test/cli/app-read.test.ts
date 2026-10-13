@@ -159,17 +159,6 @@ function packageDevice(options: { user?: string[]; system?: string[] } = {}): Fa
 }
 
 describe("app current", () => {
-  it("reports the app in front with its activity and pid", async () => {
-    const f = device({ [FOREGROUND]: PROBE_FRONT, [PIDOF]: PROBE_RUNNING });
-    const { toon, data } = await both(["app", "current"], f);
-    expect(toon.exitCode).toBe(0);
-    expect(toon.stdout).toBe(
-      "app:\n  package: dev.probe\n  activity: .MainActivity\n  pid: 8235\n",
-    );
-    expect(data).toEqual({ app: { package: "dev.probe", activity: ".MainActivity", pid: 8235 } });
-    expectClean(f);
-  });
-
   it("reports a launcher in front as the launcher package", async () => {
     const f = device({
       [FOREGROUND]: LAUNCHER_FRONT,

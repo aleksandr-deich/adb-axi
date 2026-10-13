@@ -17,7 +17,7 @@ import { DatabaseSync } from "node:sqlite";
 import { decode } from "@toon-format/toon";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { isProcessAlive } from "../../src/core/exec.js";
-import { createFakeAdb, FIXTURES_DIR, type FakeAdb } from "../fake-adb/harness.js";
+import { createFakeAdb, type FakeAdb } from "../fake-adb/harness.js";
 import { buildZip } from "../helpers/apk-builder.js";
 import type { Response, Rule } from "../fake-adb/scenario.js";
 import { runCli, type CliRun } from "../helpers/run.js";
@@ -28,7 +28,6 @@ vi.setConfig({ testTimeout: 40_000 });
 const SERIAL = "emulator-5554";
 const PKG = "dev.probe";
 const ONE_ONLINE = `List of devices attached\n${SERIAL}          device product:sdk_gphone64_arm64 model:sdk_gphone64_arm64 device:emu64a transport_id:1\n\n`;
-const CAPTURED = join(FIXTURES_DIR, "captured", "35");
 const MARGIN_MS = 1500;
 
 let fake: FakeAdb | undefined;
@@ -285,23 +284,6 @@ describe("data db: listing", () => {
     expect(data).toEqual({ count: "0 databases", databases: [] });
   });
 
-  it("fails with APP_NOT_DEBUGGABLE when run-as refuses the app (the real refusal text, on stderr)", async () => {
-    const f = device([
-      {
-        match: lsCall(),
-        respond: { stderr: "run-as: package not debuggable: dev.probe\n", exit: 1 },
-      },
-    ]);
-    const { toon, data } = await both(f, [PKG]);
-    expect(toon.exitCode).toBe(1);
-    expect(data).toMatchObject({
-      error: "dev.probe is not debuggable, so its private files cannot be read",
-      code: "APP_NOT_DEBUGGABLE",
-      detail: "run-as: package not debuggable: dev.probe",
-    });
-    expect(data.help).toHaveLength(1);
-  });
-
   it("fails with APP_NOT_INSTALLED when run-as does not know the package", async () => {
     const f = device([
       {
@@ -420,20 +402,6 @@ describe("data db: reading", () => {
     const { toon, data } = await both(f, [PKG, "SELECT * FROM bounds"]);
     expect(toon.exitCode).toBe(0);
     expect(data.rows).toEqual([{ id: 1, minX: 2, maxX: 3 }]);
-    expect(f.unmatched()).toEqual([]);
-  });
-
-  it("returns the row that is only in the WAL of a real device capture", async () => {
-    const f = deviceWith({
-      "probe.db": join(CAPTURED, "exec-out-probe-db.bin"),
-      "probe.db-wal": join(CAPTURED, "exec-out-probe-db-wal.bin"),
-    });
-    const { toon, data } = await both(f, [PKG, "SELECT id, text FROM notes ORDER BY id DESC"]);
-    expect(toon.exitCode).toBe(0);
-    expect(toon.stdout).toMatch(
-      /^db: "probe\.db \(with WAL, copied \d\d:\d\d:\d\d\)"\nrows\[1\]\{id,text\}:\n {2}1,probe-1\n$/,
-    );
-    expect(data.rows).toEqual([{ id: 1, text: "probe-1" }]);
     expect(f.unmatched()).toEqual([]);
   });
 

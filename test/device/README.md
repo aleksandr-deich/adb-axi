@@ -1,20 +1,20 @@
 # Real-device tools
 
-Nothing here runs in `npm test` or `npm run check`. The device checks run on every pull request and on pushes to `main`: the full suite on API 30 and 35 emulators, and `0-app-lifecycle.test.ts` plus `1-process-death.test.ts` on API 29 (`.github/workflows/emulator.yml`). Everything here changes the devices it touches, so run it only on emulators reserved for the job, and always name each one by serial.
+Nothing here runs in `npm test` or `npm run check`. The device checks run on every pull request and on pushes to `main`, against API 29, 30 and 35 emulators (`.github/workflows/emulator.yml`). Everything here changes the devices it touches, so run it only on emulators reserved for the job, and always name each one by serial.
 
 ## Device checks (`*.test.ts`)
 
-The checks drive adb-axi installed from a packed tarball against one emulator, use the probe app for app and log scenarios, and wait for app and log events with adb-axi's own `wait` commands instead of sleeping. The numbers follow the v0.1 real-emulator checks; check 6 needs two devices and is a local step (see below):
+The checks drive adb-axi installed from a packed tarball against one emulator, use the probe app for app and log scenarios, and wait for app and log events with adb-axi's own `wait` commands instead of sleeping. Each expected result is grounded in probe state, Android window focus, kernel process state or database bytes, rather than another adb-axi summary. The original six files remain, with attached-device and foreground-state checks added as file 6:
 
-| File              | What it checks                                                                                                                                             |
-| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `0-app-lifecycle` | keep-data uninstall removes code and processes; `app info` reports absent; repeated uninstall is a no-op; reinstall preserves a Room row, in JSON and TOON |
-| `1-process-death` | `app kill` then `app restore`: the saved counter survives, the volatile one resets, a new process, and no crash since the mark                             |
-| `2-app-start`     | `app start` on the app in front is not recreated; `--fresh` is a cold start                                                                                |
-| `3-data-db`       | a row still only in `probe.db-wal` comes back from `data db`; the release build gives `APP_NOT_DEBUGGABLE`                                                 |
-| `4-doctor-ui`     | `doctor ui` reports UiAutomation free and exits 0                                                                                                          |
-| `5-logs-crash`    | a Java crash counts once and zero after the next mark; a native crash and an ANR are reported; the ANR report is in the system buffer                      |
-| `7-offline`       | runs last and stops the emulator; a command against it then fails with a typed error in under 2 s                                                          |
+| File              | What it checks                                                                                                                        |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `1-process-death` | `app kill` then `app restore`: the saved counter survives, the volatile one resets, a new process, and no crash since the mark        |
+| `2-app-start`     | `app start` on the app in front is not recreated; `--fresh` is a cold start                                                           |
+| `3-data-db`       | a row still only in `probe.db-wal` comes back from `data db`; the release build gives `APP_NOT_DEBUGGABLE`                            |
+| `4-doctor-ui`     | `doctor ui` reports UiAutomation free and exits 0                                                                                     |
+| `5-logs-crash`    | a Java crash counts once and zero after the next mark; a native crash and an ANR are reported; the ANR report is in the system buffer |
+| `6-device-state`  | the target's serial, AVD name and API match device properties; `app current` matches independent window-focus and kernel-PID queries  |
+| `7-offline`       | runs last and stops the emulator; a command against it then fails with a typed error in under 2 s                                     |
 
 Run them against an emulator nobody else is using. The last check shuts it down:
 
@@ -22,7 +22,9 @@ Run them against an emulator nobody else is using. The last check shuts it down:
 ANDROID_SERIAL=emulator-5554 npm run test:device
 ```
 
-The setup packs and installs adb-axi into a temporary prefix (set `ADB_AXI_BIN` to use an installed one instead) and uses a fresh `ADB_AXI_HOME`. Before any check runs it waits until the emulator's package and activity services answer steadily, since `sys.boot_completed` alone can come seconds before they do. Every adb-axi call and its output is written to `test-results/device/<check>.txt`; CI uploads that folder as the `device-transcripts-api-<level>` artifact.
+The setup packs and installs adb-axi into a temporary prefix (set `ADB_AXI_BIN` to use an installed one instead) and uses a fresh `ADB_AXI_HOME` for every test. Probe installs clear package data before independent scenarios; log marks scope observations without clearing the device's logs. Before any check runs it waits until the emulator's package and activity services answer steadily, since `sys.boot_completed` alone can come seconds before they do. Every adb-axi call, exit code, duration and output is written to `test-results/device/<check>.txt`. Failed tests also save the last 2,000 logcat lines in `<check>.logcat.txt`; CI uploads that folder as the `device-transcripts-api-<level>` artifact. Temporary CLI state and a locally packed installation are removed at teardown.
+
+Ordinary flows belong in this packed-package suite. Keep deterministic synthetic tests for transport faults, hung commands, deadline expiry, malformed input and branches that cannot be reliably reproduced on an emulator; keep pure parsing, formatting and algorithm tests. Remove a fake-backed case only after equivalent independently grounded device assertions pass, preserving its output-format checks.
 
 ## Local-only checks
 
@@ -43,19 +45,15 @@ android layout --device=emulator-5554 > /dev/null    # works again
 
 ### Two devices
 
-Start the phone and the tablet AVD, then check selection:
+Reserve two disposable emulators first. The automated `6-device-state` assertions work with one or several attached emulators, but do not assert ambiguous selection. To check that locally, use only emulators you own and substitute their serials below; never reuse an occupied emulator or a physical device:
 
 ```
-android emulator start --headless Pixel_10_Pro_XL
-android emulator start --headless medium_tablet
 unset ANDROID_SERIAL
-adb-axi devices                                      # two rows: Pixel_10_Pro_XL phone, medium_tablet tablet
-adb-axi app current                                  # DEVICE_AMBIGUOUS
-adb-axi logs crash                                   # DEVICE_AMBIGUOUS
-adb-axi app current --device Pixel_10_Pro_XL         # the phone's foreground app
-adb-axi app current --device medium_tablet           # the tablet's foreground app
-android emulator stop Pixel_10_Pro_XL
-android emulator stop medium_tablet
+adb-axi devices                                      # both reserved emulators are listed
+adb-axi app current                                  # DEVICE_AMBIGUOUS when both are online
+adb-axi logs crash                                   # DEVICE_AMBIGUOUS when both are online
+adb-axi app current --device <first-serial>           # first emulator's foreground app
+adb-axi app current --device <second-serial>          # second emulator's foreground app
 ```
 
 ## Probe app (`probe-app/`)

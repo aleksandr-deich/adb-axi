@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import type { TestProject } from "vitest/node";
 import { locateAdb } from "../../src/adb/locate.js";
 import { exec } from "../../src/core/exec.js";
@@ -13,7 +13,7 @@ export interface DeviceContext {
   serial: string;
   /** The `adb-axi` executable installed from a packed tarball. */
   bin: string;
-  /** `ADB_AXI_HOME` for this run, so marks never mix with the host's own state. */
+  /** Holds one `ADB_AXI_HOME` per test file, so marks never mix with the host's own state. */
   home: string;
   /** Where each test file writes the transcript of its adb-axi calls. */
   transcripts: string;
@@ -30,7 +30,7 @@ declare module "vitest" {
  * a tarball (so the checks run what ships), a fresh state home and the transcript folder,
  * then waits until the emulator's framework services answer.
  */
-export default async function setup(project: TestProject): Promise<void> {
+export default async function setup(project: TestProject): Promise<() => void> {
   const serial = process.env.ANDROID_SERIAL ?? "";
   if (serial === "") {
     throw new Error(
@@ -43,7 +43,19 @@ export default async function setup(project: TestProject): Promise<void> {
   rmSync(transcripts, { recursive: true, force: true });
   mkdirSync(transcripts, { recursive: true });
   project.provide("device", { serial, bin, home, transcripts });
-  await waitForServices(serial);
+  const cleanup = () => {
+    rmSync(home, { recursive: true, force: true });
+    if (process.env.ADB_AXI_BIN === undefined) {
+      rmSync(resolve(dirname(bin), "../.."), { recursive: true, force: true });
+    }
+  };
+  try {
+    await waitForServices(serial);
+  } catch (error) {
+    cleanup();
+    throw error;
+  }
+  return cleanup;
 }
 
 /** How long the services must keep answering, from one system_server, to count as ready. */

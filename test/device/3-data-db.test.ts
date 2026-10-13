@@ -21,14 +21,27 @@ describe("data db", () => {
       "databases/probe.db-wal:1",
     ]);
 
-    const query = await axi.ok(["data", "db", PKG, "SELECT id, text FROM notes"]);
+    const sql = "SELECT id, text FROM notes ORDER BY id DESC";
+    const query = await axi.ok(["data", "db", PKG, sql]);
     expect(query.rows).toEqual([{ id: 1, text: "probe-1" }]);
+    expect(query.db).toMatch(/^probe\.db \(with WAL, copied \d\d:\d\d:\d\d\)$/);
+    const text = await axi.text(["data", "db", PKG, sql]);
+    expect(text.stdout).toMatch(
+      /^db: "probe\.db \(with WAL, copied \d\d:\d\d:\d\d\)"\nrows\[1\]\{id,text\}:\n {2}1,probe-1\n$/,
+    );
+    expect(text.data.rows).toEqual(query.rows);
   });
 
   test("a release build is APP_NOT_DEBUGGABLE", async () => {
     await axi.ok(["app", "install", RELEASE_APK]);
     const run = await axi.run(["data", "db", PKG]);
     expect(run.exitCode).toBe(1);
-    expect(run.json.code).toBe("APP_NOT_DEBUGGABLE");
+    expect(run.json).toMatchObject({
+      error: "dev.probe is not debuggable, so its private files cannot be read",
+      code: "APP_NOT_DEBUGGABLE",
+      detail: "run-as: package not debuggable: dev.probe",
+    });
+    expect(run.json.help).toHaveLength(1);
+    expect((await axi.text(["data", "db", PKG], 120_000, 1)).data).toEqual(run.json);
   });
 });

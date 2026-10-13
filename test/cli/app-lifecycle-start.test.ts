@@ -183,17 +183,6 @@ describe("app start", () => {
     });
   });
 
-  it("reports an intent delivered to the activity on top as launch unknown, not recreated (12.2)", async () => {
-    const f = liveDevice(AM_START.deliveredToTop, "running");
-    const { toon, data } = await both(["app", "start", "dev.probe"], f);
-    expect(toon.exitCode).toBe(0);
-    expect(data).toEqual({
-      ok: "start dev.probe -> foreground (already on top, intent delivered to it)",
-      app: { activity: ".MainActivity", pid: 8235, launch: "unknown", recreated: false },
-      help: ["Run `adb-axi app start dev.probe --fresh` to kill the process and cold-start"],
-    });
-  });
-
   it("reads API 29 output the same way: a cold start, and LaunchState: UNKNOWN (0) as launch unknown", async () => {
     const cold = liveDevice({ stdoutFile: "synthetic/29/am-start-cold.txt" }, "stopped");
     const first = await both(["app", "start", "dev.probe"], cold);

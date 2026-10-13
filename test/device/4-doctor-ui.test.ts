@@ -10,5 +10,8 @@ describe("doctor ui", () => {
     const run = await axi.run(["doctor", "ui"]);
     expect(run.exitCode).toBe(0);
     expect(run.json).toEqual({ uiautomation: "free" });
+    const text = await axi.text(["doctor", "ui"]);
+    expect(text.stdout).toBe("uiautomation: free\n");
+    expect(text.data).toEqual(run.json);
   });
 });

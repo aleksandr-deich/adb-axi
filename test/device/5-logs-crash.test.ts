@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, test } from "vitest";
+import { beforeEach, describe, expect, test } from "vitest";
 import { Axi, DEBUG_APK, PKG } from "./support.js";
 
 const axi = new Axi(import.meta.filename);
@@ -7,7 +7,7 @@ const axi = new Axi(import.meta.filename);
 const DIED = String.raw`Process dev\.probe \(pid \d+\) has died`;
 
 describe("logs crash", () => {
-  beforeAll(async () => {
+  beforeEach(async () => {
     await axi.ok(["app", "install", DEBUG_APK, "--clean-data"]);
   });
 
