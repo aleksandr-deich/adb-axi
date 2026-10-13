@@ -1,6 +1,6 @@
 # Real-device tools
 
-Nothing here runs in `npm test` or `npm run check`. The device checks run on every pull request and on pushes to `main`, against API 30 and 35 emulators (`.github/workflows/emulator.yml`). Everything here changes the devices it touches, so run it only on emulators reserved for the job, and always name each one by serial.
+Nothing here runs in `npm test` or `npm run check`. The device checks run on every pull request and on pushes to `main`: the full suite on API 30 and 35 emulators, and only `1-process-death.test.ts` on API 29 (`.github/workflows/emulator.yml`). Everything here changes the devices it touches, so run it only on emulators reserved for the job, and always name each one by serial.
 
 ## Device checks (`*.test.ts`)
 
