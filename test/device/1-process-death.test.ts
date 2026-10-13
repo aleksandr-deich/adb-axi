@@ -30,7 +30,7 @@ describe("process death and restore", () => {
     ]);
     const failures = diagnostics
       .filter((result) => result.status === "rejected")
-      .map((result) => result.reason);
+      .map((result: { reason: unknown }) => result.reason);
     if (killed.status === "rejected") {
       if (failures.length === 0) throw killed.reason;
       throw new AggregateError([killed.reason, ...failures], "App kill and diagnostics failed");
