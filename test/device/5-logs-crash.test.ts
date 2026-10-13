@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, test } from "vitest";
 import { Axi, DEBUG_APK, PKG } from "./support.js";
 
 const axi = new Axi(import.meta.filename);
@@ -7,6 +7,28 @@ const axi = new Axi(import.meta.filename);
 const DIED = String.raw`Process dev\.probe \(pid \d+\) has died`;
 
 describe("logs crash", () => {
+  let errorDialogs: string | undefined;
+
+  beforeAll(async () => {
+    const setting = await axi.ok(["shell", "settings get global hide_error_dialogs"]);
+    const value = String(setting.stdout);
+    expect(value).toMatch(/^(null|\d+)$/);
+    errorDialogs = value;
+    await axi.ok(["shell", "settings put global hide_error_dialogs 1"]);
+  });
+
+  afterAll(async () => {
+    if (errorDialogs === undefined) return;
+    await axi.ok([
+      "shell",
+      errorDialogs === "null"
+        ? "settings delete global hide_error_dialogs"
+        : `settings put global hide_error_dialogs ${errorDialogs}`,
+    ]);
+    const restored = await axi.ok(["shell", "settings get global hide_error_dialogs"]);
+    expect(restored.stdout).toBe(errorDialogs);
+  });
+
   beforeEach(async () => {
     await axi.ok(["app", "install", DEBUG_APK, "--clean-data"]);
   });
@@ -44,14 +66,25 @@ describe("logs crash", () => {
   test("an ANR is reported, and its report is in the system buffer", async () => {
     await axi.ok(["app", "start", PKG, "--fresh"]);
     await axi.waitFocused((component) => component === `${PKG}/.MainActivity`);
-    await axi.ok(["shell", "dumpsys window windows"]);
-    await axi.ok(["shell", "dumpsys input"]);
+    const focusDeadline = Date.now() + 30_000;
+    for (;;) {
+      const focus = await axi.ok(["shell", "dumpsys window | grep mCurrentFocus= || true"]);
+      if (String(focus.stdout).includes(`${PKG}/`)) break;
+      expect(Date.now(), String(focus.stdout)).toBeLessThan(focusDeadline);
+    }
+    await axi.ok([
+      "shell",
+      "dumpsys input | grep -E 'Focused|DispatchEnabled|DispatchFrozen|WaitQueue|OutboundQueue'",
+    ]);
     const since = await axi.mark("before-anr");
     await axi.probe("anr");
     await axi.waitLog("event=anr blocking", "before-anr");
     // Input sent while the main thread is blocked times out into the ANR (about 5 to 15 s).
     await axi.ok(["shell", "input keyboard -d 0 keyevent KEYCODE_DPAD_DOWN", "--timeout", "60s"]);
-    await axi.ok(["shell", "dumpsys input"]);
+    await axi.ok([
+      "shell",
+      "dumpsys input | grep -E 'Focused|DispatchEnabled|DispatchFrozen|WaitQueue|OutboundQueue'",
+    ]);
     await axi.waitLog(String.raw`ANR in dev\.probe`, "before-anr", "60s");
 
     const { count, crash } = await axi.crashes("before-anr");

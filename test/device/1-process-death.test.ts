@@ -17,9 +17,12 @@ describe("process death and restore", () => {
     const ps = `rows=$(ps -A -o PID,UID,NAME,STAT) && printf '%s\\n' "$rows" | awk 'NR == 1 || $3 == "${PKG}" || $3 == "[${PKG}]" || index($3, "${PKG}:") == 1 || index($3, "[${PKG}:") == 1'`;
     await axi.ok(["shell", ps]);
     await axi.ok(["shell", `pidof ${PKG}`]);
+    const activity = `dump=$(dumpsys activity processes) && { printf '%s\\n' "$dump" | grep -F '${PKG}' || true; }`;
+    await axi.ok(["shell", activity]);
     const [killed] = await Promise.allSettled([axi.ok(["app", "kill", PKG])]);
     const diagnostics = await Promise.allSettled([
       axi.ok(["shell", ps]),
+      axi.ok(["shell", activity]),
       axi.run(["shell", `pidof ${PKG}`]).then((run) => {
         if (run.exitCode === 0) return;
         expect(run.exitCode, run.stdout + run.stderr).toBe(1);
