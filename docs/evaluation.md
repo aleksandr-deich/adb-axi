@@ -1,25 +1,70 @@
 # Evaluation
 
-How adb-axi has been measured against plain `adb` when a coding agent does the device work. Each study below compares two arms: an agent with adb-axi and its skill, and the same agent with plain `adb`. Studies are listed newest first.
+How adb-axi has been measured in agent workflows and real-device regression checks. The agent studies compare two arms: an agent with adb-axi and its skill, and the same agent with plain `adb`. Scripted device checks test the CLI's behaviour without comparing agents or tools. Studies are listed newest first.
 
 ## How to read this
 
 Two kinds of evidence are kept apart:
 
 - **Realistic task evidence**: an agent does a whole job (fix a reported bug on a device, build an app slice) and independent checks score the result. This is the evidence to use for "does adb-axi help an agent".
-- **Regression signal**: a fixed set of small scripted tasks, run the same way for each release. It shows whether a release moved turns, tokens or time. Its tasks are too small, and its checks too literal, to rank the two arms.
+- **Regression signal**: a fixed set of small scripted tasks, run the same way for each release. It shows whether a release moved correctness, turns, tokens or time. Its tasks are too small, and its checks too literal, to rank the two arms.
 
-Every study so far is small: one app or one probe app, one model per study, and three to five repeats. No study claims statistical significance. A null result is reported as a null result.
+The agent studies so far are small: one app or one probe app, one model per study, and three to five repeats. No study claims statistical significance. A null result is reported as a null result.
 
-| Study                                                            | Kind       | Date       | Version | Agent runs | Verdict                                                                                |
-| ---------------------------------------------------------------- | ---------- | ---------- | ------- | ---------- | -------------------------------------------------------------------------------------- |
-| [Device bug-fix episodes](#device-bug-fix-episodes)              | Realistic  | 2026-10-10 | 0.2.1   | 30         | No reliability or effort difference; three workflow strengths; one side effect to mind |
-| [App-build repeats](#app-build-repeats)                          | Realistic  | 2026-10-09 | 0.2.0   | 8          | No whole-run difference at 5 runs per arm; process death takes fewer turns             |
-| [App-build pilot](#app-build-pilot)                              | Realistic  | 2026-10-08 | 0.1.3   | 2          | No detectable difference at 1 run per arm; found a `data db` bug                       |
-| [Scripted benchmark, second run](#scripted-benchmark-second-run) | Regression | 2026-10-07 | 0.1.3   | 80         | Turn overhead halved; success counts not comparable as first scored                    |
-| [Scripted benchmark, first run](#scripted-benchmark-first-run)   | Regression | 2026-10-05 | 0.1.2   | 80         | Same success and cost; 27% more turns, spent on learning the CLI                       |
+| Study                                                            | Kind       | Date       | Version       | Agent runs | Verdict                                                                                   |
+| ---------------------------------------------------------------- | ---------- | ---------- | ------------- | ---------- | ----------------------------------------------------------------------------------------- |
+| [Packed-CLI emulator coverage](#packed-cli-emulator-coverage)    | Regression | 2026-10-13 | 0.2.1 + fixes | 0          | All 11 checks pass on API 29/30/35 and supplementary API 37.1; exposed a process-name bug |
+| [Device bug-fix episodes](#device-bug-fix-episodes)              | Realistic  | 2026-10-10 | 0.2.1         | 30         | No reliability or effort difference; three workflow strengths; one side effect to mind    |
+| [App-build repeats](#app-build-repeats)                          | Realistic  | 2026-10-09 | 0.2.0         | 8          | No whole-run difference at 5 runs per arm; process death takes fewer turns                |
+| [App-build pilot](#app-build-pilot)                              | Realistic  | 2026-10-08 | 0.1.3         | 2          | No detectable difference at 1 run per arm; found a `data db` bug                          |
+| [Scripted benchmark, second run](#scripted-benchmark-second-run) | Regression | 2026-10-07 | 0.1.3         | 80         | Turn overhead halved; success counts not comparable as first scored                       |
+| [Scripted benchmark, first run](#scripted-benchmark-first-run)   | Regression | 2026-10-05 | 0.1.2         | 80         | Same success and cost; 27% more turns, spent on learning the CLI                          |
 
-Raw transcripts and run records are not published. The numbers here are taken from each study's final report and frozen analysis; where a public pull request or file backs a statement, it is linked.
+Raw agent-study transcripts and run records are not published. Scripted device checks publish CI logs and artifacts. The numbers here are taken from each study's final report and frozen analysis; where a public pull request or file backs a statement, it is linked.
+
+## Packed-CLI emulator coverage
+
+- **Date:** 2026-10-13.
+- **Tested version:** adb-axi 0.2.1 with the process-name fix in [#52](https://github.com/aleksandr-deich/adb-axi/pull/52), at testing commit [`26d058b`](https://github.com/aleksandr-deich/adb-axi/commit/26d058b5006b10679ba21f7a0d17a88486642134).
+- **Design:** the installed executable from `npm pack` drives the existing debug and non-debuggable release probe APKs on disposable emulators. The six existing device files and their assertions remain; a seventh checks device identity and foreground state against independent Android queries. Each test has isolated CLI state, crash scenarios reset probe data, log marks delimit observations, and the final test stops its emulator. This is a correctness regression round, not an adb-axi versus plain-adb comparison.
+- **Agent/model:** no agent in the measured runs; Vitest 5 runs the scripted checks on Node.js 24.
+- **Sample size:** four final device-suite runs, 11 checks each: three x86_64 CI emulators (API 29, 30 and 35) and one supplementary local arm64 emulator (API 37.1). Earlier diagnostic rounds are not pooled into the final pass counts.
+
+### Key numbers
+
+| Emulator        | Checks passed | Vitest wall seconds |
+| --------------- | ------------- | ------------------- |
+| API 29, x86_64  | 11 of 11      | 42.87               |
+| API 30, x86_64  | 11 of 11      | 36.60               |
+| API 35, x86_64  | 11 of 11      | 47.48               |
+| API 37.1, arm64 | 11 of 11      | 110.86              |
+
+The [complete CI matrix](https://github.com/aleksandr-deich/adb-axi/actions/runs/38410094458) passes every job. The [Ubuntu and macOS checks](https://github.com/aleksandr-deich/adb-axi/actions/runs/38410094032) also pass. Locally, `npm run check` passes typechecking, lint and formatting, 1,307 tests with 7 preexisting skips, and 64 benchmark-harness tests. Device wall times include framework readiness; the local run also packs and installs inside setup, while CI does that before the measured Vitest command. Image provisioning and the preceding build are excluded, so the times are not a platform-speed comparison.
+
+**Independently grounded results:**
+
+- Starting the foreground singleTop activity preserves its probe counters and PID; `--fresh` creates a new PID and resets both counters. Kill/restore preserves `saved=3`, resets `volatile` to 0 and produces a new process with no crash.
+- A Room insert produces `probe-1` in the WAL but not the main database file, and `data db` returns that row. The signed non-debuggable release probe returns `APP_NOT_DEBUGGABLE`.
+- One Java crash is counted after its mark and none after the next mark. Native SIGSEGV and ANR reports remain covered; the ANR is independently present in Android's system log buffer.
+- UiAutomation is free with exit 0. The target's serial, AVD name and API match its independently read identity; `app current` matches WindowManager focus and the kernel PID. After emulator shutdown, an explicit-serial command returns a typed unavailable-device error within the unchanged two-second bound.
+
+**Four duplicate fake-backed cases were replaced after real assertions passed:** foreground app payload and formatting by `6-device-state`; already-on-top start by `2-app-start`; the captured WAL row and release database refusal by `3-data-db`. Their JSON/TOON and expected payload checks remain in the device replacements. Pure parsing, formatting and algorithm tests remain, as do synthetic transport faults, hangs, deadline expiry, malformed/ZIP64 input, crash-boundary cases and other branches that these device checks do not replace.
+
+**A product bug exposed by API 29:** before the fix, `app kill` could reject a bracketed kernel process name with `INVALID_OUTPUT` during process exit, even though independent kernel and ActivityManager observations subsequently showed the process gone ([failing run](https://github.com/aleksandr-deich/adb-axi/actions/runs/38376236171)). It was fixed separately in [#52](https://github.com/aleksandr-deich/adb-axi/pull/52), which accepts valid bracketed names without dropping UID filtering or malformed-name rejection. After rebasing onto that fix, the complete API 29 suite passes: kill reports exit, restore produces a new PID, saved state survives, volatile state resets and there is no crash. This testing change adds no shipped implementation changes of its own.
+
+**Two test-environment corrections, without weaker assertions or longer deadlines:** older emulator images expose the AVD name through `ro.kernel.qemu.avd_name`, not the newer boot property. Android 10 can leave a prior crash dialog in front of a resumed activity, and its input dispatcher detects an unfinished key event when a second event waits behind it. The crash file now temporarily suppresses error dialogs, requires actual input-window focus and runs two concurrent keyboard-event producers. It restores and verifies the original setting afterward. Raw Android logs distinguish failure to generate an ANR from failure to parse one.
+
+### Verdict
+
+The packed CLI passes all approved ordinary flows on the complete API 29/30/35 PR matrix, with independent device evidence rather than simulated ADB replies. Extending the matrix exposed a real product issue that the previous API 30/35 coverage had not caught. Four duplicate fake cases could be removed; the remaining synthetic tests still cover distinct failure and edge conditions.
+
+### Limitations
+
+- One final run per API level, one small probe app, emulators only; this is not a reliability estimate or a comparison of agent effort.
+- API 37.1 is supplementary local evidence, not a substitute for CI's API 29/30/35 coverage. One later local startup attempt failed before any assertion; a fresh isolated transport passed the final integrated run.
+- Device listing checks the selected target's real row but does not automate ambiguous selection or physical-device behaviour. Resident UiAutomation-holder repair remains a local-only check.
+- ANR coverage deliberately suppresses error dialogs and uses a synthetic blocking action in a real app; it does not test an app's naturally occurring ANR or dialog interaction.
+- Seven existing tests remain skipped in the non-device suite; none were newly skipped or weakened in this round.
 
 ## Device bug-fix episodes
 
