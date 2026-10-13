@@ -43,11 +43,12 @@ describe("logs crash", () => {
 
   test("an ANR is reported, and its report is in the system buffer", async () => {
     await axi.ok(["app", "start", PKG, "--fresh"]);
+    await axi.waitFocused((component) => component === `${PKG}/.MainActivity`);
     const since = await axi.mark("before-anr");
     await axi.probe("anr");
     await axi.waitLog("event=anr blocking", "before-anr");
     // Input sent while the main thread is blocked times out into the ANR (about 5 to 15 s).
-    await axi.ok(["shell", "input keyevent KEYCODE_DPAD_DOWN", "--timeout", "60s"]);
+    await axi.ok(["shell", "input keyboard -d 0 keyevent KEYCODE_DPAD_DOWN", "--timeout", "60s"]);
     await axi.waitLog(String.raw`ANR in dev\.probe`, "before-anr", "60s");
 
     const { count, crash } = await axi.crashes("before-anr");

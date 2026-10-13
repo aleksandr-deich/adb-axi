@@ -11,9 +11,10 @@ describe("attached device and foreground state", () => {
   test("devices reports the target's real serial, AVD name and API", async () => {
     const facts = await axi.ok([
       "shell",
-      "getprop ro.boot.qemu.avd_name; getprop ro.build.version.sdk",
+      "getprop ro.boot.qemu.avd_name; getprop ro.kernel.qemu.avd_name; getprop ro.build.version.sdk",
     ]);
-    const [avd, api] = String(facts.stdout).split("\n");
+    const [bootAvd, kernelAvd, api] = String(facts.stdout).split("\n");
+    const avd = bootAvd || kernelAvd;
     expect(avd).not.toBe("");
     expect(Number(api)).toBeGreaterThanOrEqual(29);
     const expected = { serial: axi.serial, avd, api: Number(api), state: "device" };
