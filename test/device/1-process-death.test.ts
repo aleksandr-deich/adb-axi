@@ -14,7 +14,13 @@ describe("process death and restore", () => {
     const before = probeState(await axi.waitLog("event=inc saved=3 ", "before-kill"));
     expect(before).toMatchObject({ saved: "3", volatile: "3" });
 
-    const kill = await axi.ok(["app", "kill", PKG]);
+    await axi.ok(["shell", "ps -A -o PID,UID,NAME,STAT"]);
+    await axi.ok(["shell", `pidof ${PKG}`]);
+    const kill = await axi.ok(["app", "kill", PKG]).finally(async () => {
+      await axi.ok(["shell", "ps -A -o PID,UID,NAME,STAT"]);
+      await axi.ok(["shell", `pidof ${PKG}`]);
+      await axi.ok(["logs", "--pkg", PKG, "--since", "before-kill"]);
+    });
     expect(kill.kill).toMatchObject({ pid_before: Number(before.pid), pid_after: null });
     expect((kill.kill as { cached_after_ms: unknown }).cached_after_ms).toEqual(expect.any(Number));
 

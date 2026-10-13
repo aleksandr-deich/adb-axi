@@ -24,6 +24,9 @@ jobs:
       fail-fast: false
       matrix:
         api-level: [30, 35]
+        include:
+          - api-level: 29
+            test-file: test/device/1-process-death.test.ts
     env:
       ANDROID_SERIAL: emulator-5554
     steps:
@@ -52,7 +55,7 @@ jobs:
           disable-animations: true
           disk-size: 6000M
           heap-size: 600M
-          script: npx vitest run --config vitest.device.config.ts
+          script: npx vitest run --config vitest.device.config.ts ${{ matrix.test-file }}
       - name: Upload transcripts
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
