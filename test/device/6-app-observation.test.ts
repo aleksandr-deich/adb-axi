@@ -62,25 +62,6 @@ async function roomFiles(): Promise<string> {
   return String(files.stdout);
 }
 
-async function captureStoppedFocus(): Promise<void> {
-  await axi.ok([
-    "shell",
-    "dumpsys window | grep -E '^WINDOW MANAGER|mCurrentFocus=|mFocusedApp=' || true",
-  ]);
-  await axi.ok([
-    "shell",
-    "dumpsys window displays | grep -E 'Display:|mCurrentFocus=|mFocusedApp=' || true",
-  ]);
-  await axi.ok([
-    "shell",
-    "dumpsys input | grep -A 5 -E 'FocusedApplication|FocusedWindow' || true",
-  ]);
-  await axi.ok([
-    "shell",
-    "dumpsys activity activities | grep -E 'mResumedActivity|topResumedActivity|mFocusedActivity|ResumedActivity|ActivityRecord.*dev[.]probe|TaskRecord.*dev[.]probe' || true",
-  ]);
-}
-
 describe("real observation windows and package state", () => {
   test("a named window filters real probe events across process restarts, not unrelated logs", async () => {
     await axi.mark("observation");
@@ -204,7 +185,6 @@ describe("real observation windows and package state", () => {
     await axi.ok(["app", "stop", PKG]);
     waited(await stopped, "stopped");
     expect(await axi.pidsOf(PKG)).toEqual([]);
-    await captureStoppedFocus();
     await axi.waitFocused((component) => !component.startsWith(`${PKG}/`));
     waited(await parity(["wait", "app", PKG, "--state", "stopped"]), "stopped");
     const foreground = axi.ok(["wait", "app", PKG, "--state", "foreground"]);
@@ -302,7 +282,6 @@ describe("real observation windows and package state", () => {
     });
     await axi.ok(["app", "install", RELEASE_APK, "--clean-data"]);
     expect(await axi.pidsOf(PKG)).toEqual([]);
-    await captureStoppedFocus();
     await axi.waitFocused((component) => !component.startsWith(`${PKG}/`));
     const release = String(
       (await axi.ok(["shell", `dumpsys package ${PKG} | grep -E 'pkgFlags=|flags=|User 0:'`]))

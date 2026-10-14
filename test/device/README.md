@@ -4,7 +4,7 @@ Nothing here runs in `npm test` or `npm run check`. The device checks run on eve
 
 ## Device checks (`*.test.ts`)
 
-The checks drive adb-axi installed from a packed tarball against one emulator, use the probe app for app and log scenarios, and wait for app and log events with adb-axi's own `wait` commands instead of sleeping. Each expected result is grounded in probe state, Android window focus, kernel process state or database bytes, rather than another adb-axi summary. The original six files remain, with lifecycle, observation and device-identity coverage added:
+The checks drive adb-axi installed from a packed tarball against one emulator, use the probe app for app and log scenarios, and wait for app and log events with adb-axi's own `wait` commands instead of sleeping. Each expected result is grounded in probe state, Android window focus, kernel process state or database bytes, rather than another adb-axi summary. Window focus comes from current display contents, not historical last-ANR snapshots included in an unqualified window dump. The original six files remain, with lifecycle, observation and device-identity coverage added:
 
 | File                | What it checks                                                                                                                                  |
 | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |

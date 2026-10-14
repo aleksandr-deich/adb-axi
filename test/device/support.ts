@@ -142,7 +142,7 @@ export class Axi {
   }
 
   async focused(): Promise<string | undefined> {
-    const json = await this.ok(["shell", "dumpsys window | grep mFocusedApp= || true"]);
+    const json = await this.ok(["shell", "dumpsys window displays | grep mFocusedApp= || true"]);
     expect(typeof json.stdout).toBe("string");
     return /mFocusedApp=.*? u\d+ (\S+\/\S+) t\d+/.exec(json.stdout as string)?.[1];
   }
