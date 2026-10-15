@@ -1,5 +1,6 @@
 import { copyFileSync, existsSync, rmSync } from "node:fs";
 import { decode } from "@toon-format/toon";
+import { LAUNCH_CRASH_COMMAND } from "../../src/android/launch-crash.js";
 import { expect } from "vitest";
 import { createFakeAdb, type FakeAdb } from "../fake-adb/harness.js";
 import type { Response, Rule } from "../fake-adb/scenario.js";
@@ -101,6 +102,10 @@ export function lifecycleDevices(track: (fake: FakeAdb) => void) {
           match: shell(`pm path --user ${userId} dev.probe`),
           respond: { stdout: "package:/data/app/probe/base.apk\n" },
         })),
+        {
+          match: shell(LAUNCH_CRASH_COMMAND),
+          respond: { stdoutFile: "captured/29/launch-events-running.txt" },
+        },
         { match: shell(CURRENT_USER), respond: { stdout: "0\n" } },
         { match: shell(RESOLVE), respond: { stdout: "dev.probe/.MainActivity\n" } },
         { match: shell(PROCESSES), respond: PROCESS_RUNNING },
@@ -123,6 +128,10 @@ export function lifecycleDevices(track: (fake: FakeAdb) => void) {
       synthetic: true,
       state: { proc: initially },
       rules: [
+        {
+          match: shell(LAUNCH_CRASH_COMMAND),
+          respond: { stdoutFile: "captured/29/launch-events-running.txt" },
+        },
         { match: ["devices", "-l"], respond: { stdout: ONE_ONLINE } },
         { match: shell(CURRENT_USER), respond: { stdout: "0\n" } },
         { match: shell(RESOLVE), respond: { stdout: "dev.probe/.MainActivity\n" } },

@@ -1,0 +1,105 @@
+{
+  "api": 29,
+  "serial": "emulator-5590",
+  "image": "system-images;android-29;default;arm64-v8a",
+  "captures": [
+    {
+      "file": "launch-events-running.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5590",
+        "shell",
+        "logcat -d -b events -v epoch -s am_crash"
+      ],
+      "exitCode": 0,
+      "stderr": ""
+    },
+    {
+      "file": "launch-process-running.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5590",
+        "shell",
+        "dumpsys activity processes dev.probe"
+      ],
+      "exitCode": 0,
+      "stderr": ""
+    },
+    {
+      "file": "launch-foreground-running.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5590",
+        "shell",
+        "dumpsys activity activities"
+      ],
+      "exitCode": 0,
+      "stderr": ""
+    },
+    {
+      "file": "launch-activity-metadata.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5590",
+        "shell",
+        "cmd package resolve-activity --user 0 -n 'dev.probe/.MainActivity'"
+      ],
+      "exitCode": 0,
+      "stderr": ""
+    },
+    {
+      "file": "launch-am-crashed.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5590",
+        "shell",
+        "am start --user 0 -W -n 'dev.probe/.MainActivity'"
+      ],
+      "exitCode": null,
+      "stderr": "",
+      "kind": "timeout",
+      "boundMs": 4000
+    },
+    {
+      "file": "launch-events-crashed.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5590",
+        "shell",
+        "logcat -d -b events -v epoch -s am_crash"
+      ],
+      "exitCode": 0,
+      "stderr": ""
+    },
+    {
+      "file": "launch-am-running.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5590",
+        "shell",
+        "am start --user 0 -W -n 'dev.probe/.MainActivity'"
+      ],
+      "exitCode": 0,
+      "stderr": ""
+    },
+    {
+      "file": "launch-recents-running.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5590",
+        "shell",
+        "dumpsys activity recents"
+      ],
+      "exitCode": 0,
+      "stderr": ""
+    }
+  ]
+}

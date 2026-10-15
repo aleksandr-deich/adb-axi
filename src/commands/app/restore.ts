@@ -1,9 +1,5 @@
 import type { LaunchType } from "../../android/amstart.js";
-import {
-  declaredActivities,
-  parseActivityFilters,
-  readActivityProcessName,
-} from "../../android/activities.js";
+import { declaredActivities, parseActivityFilters } from "../../android/activities.js";
 import { assertPackageName, type Component } from "../../android/component.js";
 import { findTask, readRecents } from "../../android/recents.js";
 import { AdbAxiError } from "../../core/errors.js";
@@ -17,7 +13,7 @@ import {
   type InstalledPackage,
 } from "./process.js";
 import { readOptions, targetSerial, UNKNOWN } from "./shared.js";
-import { amStart, settle, type Seen } from "./start.js";
+import { launchActivity, type Seen } from "./start.js";
 
 export const appRestore = defineCommand({
   path: ["app", "restore"],
@@ -120,22 +116,16 @@ export async function restoreTask(
   const pidsBefore = (await packageProcesses(context, pkg, userId, readOptions(context))).map(
     (process) => process.pid,
   );
-  const start = await amStart(context, adb, serial, pkg, component.activity, userId, command, () =>
-    declaredActivities(parseActivityFilters(installed.dump), pkg),
-  );
-  const launched = start.activity ?? component;
-  const processName = await readActivityProcessName(
-    adb,
-    serial,
-    launched,
+  const { start, settled, launched, processName } = await launchActivity(
+    context,
+    component,
     userId,
-    readOptions(context),
+    command,
+    () => declaredActivities(parseActivityFilters(installed.dump), pkg),
+    (launched, processName, last) => diedOnStart(context, launched, processName, last),
   );
-  const settled = await settle(context, adb, serial, launched, userId, processName);
   const pid = settled.pid;
-  if (settled.state === "stopped" || pid === UNKNOWN) {
-    throw diedOnStart(context, launched, processName, settled);
-  }
+  if (pid === UNKNOWN) throw diedOnStart(context, launched, processName, settled);
   const inFront = settled.state === "foreground";
   return {
     app: {
@@ -177,7 +167,9 @@ function diedOnStart(
 ): AdbAxiError {
   return new AdbAxiError(
     "APP_DIED_ON_START",
-    `the ${processName} process of ${activity.component} is gone right after its restore`,
+    last.state === "crashed"
+      ? `the ${processName} process of ${activity.component} crashed during its restore`
+      : `the ${processName} process of ${activity.component} is gone right after its restore`,
     {
       fields: {
         last: { state: last.state, pid: last.pid, foreground: last.front?.package ?? UNKNOWN },

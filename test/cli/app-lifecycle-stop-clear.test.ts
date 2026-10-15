@@ -1,4 +1,5 @@
 import { decode } from "@toon-format/toon";
+import { LAUNCH_CRASH_COMMAND } from "../../src/android/launch-crash.js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createFakeAdb, type FakeAdb } from "../fake-adb/harness.js";
 import { runCli } from "../helpers/run.js";
@@ -630,7 +631,7 @@ describe("launched activity process identity", () => {
           "Run `adb-axi app start dev.probe/.IconAlias --fresh` to kill the process and cold-start",
         ],
       });
-      expect(shellCommands(f)).toEqual([
+      expect(shellCommands(f).filter((command) => command !== LAUNCH_CRASH_COMMAND)).toEqual([
         CURRENT_USER,
         PACKAGE,
         `pm path --user ${userId} dev.probe`,

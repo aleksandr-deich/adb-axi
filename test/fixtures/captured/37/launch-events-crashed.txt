@@ -1,0 +1,2 @@
+--------- beginning of events
+         1792075918.203   641  2277 I am_crash: [9849,0,dev.probe,552091206,java.lang.IllegalStateException,probe armed crash on create,MainActivity.kt,57,0]

@@ -20,7 +20,7 @@ export const ERROR_CATALOGUE = {
   HOLDER_PROTECTED: "A live UiAutomation holder was not touched",
   APP_NOT_INSTALLED: "The package is not installed",
   ACTIVITY_NOT_FOUND: "The activity does not exist; existing ones are listed",
-  APP_DIED_ON_START: "The process was gone right after start or restore",
+  APP_DIED_ON_START: "The process crashed during launch or was gone right after start or restore",
   STOP_FAILED: "The process was still present at the deadline after a force-stop or pm clear",
   CLEAR_FAILED: "Files were still in the app data directory after pm clear; they are listed",
   CLEAR_REFUSED: "The package does not run the APK just installed, so its data was not wiped",

@@ -12,6 +12,7 @@ export interface ExecOptions {
   /** Bytes written to the child's stdin, which is then closed. Without it stdin is closed at once. */
   input?: string | Uint8Array;
   maxOutputBytes?: number;
+  signal?: AbortSignal;
   /**
    * Kill the child with SIGKILL when SIGINT or SIGTERM ends adb-axi. Only for a child that
    * adb-axi alone owns and that has no use once adb-axi is gone, such as a query process.
@@ -64,6 +65,12 @@ export function exec(options: ExecOptions): Promise<ExecResult> {
       windowsHide: true,
     });
 
+    const abort = (): void => {
+      child.kill("SIGKILL");
+    };
+    options.signal?.addEventListener("abort", abort, { once: true });
+    if (options.signal?.aborted === true) abort();
+
     const stopKillOnInterrupt = options.killOnInterrupt
       ? onInterrupt(() => {
           child.kill("SIGKILL");
@@ -81,6 +88,7 @@ export function exec(options: ExecOptions): Promise<ExecResult> {
       if (settled) return;
       settled = true;
       stopKillOnInterrupt?.();
+      options.signal?.removeEventListener("abort", abort);
       clearTimeout(deadlineTimer);
       clearTimeout(drainTimer);
       child.stdout.destroy();

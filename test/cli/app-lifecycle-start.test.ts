@@ -1,4 +1,5 @@
 import { decode } from "@toon-format/toon";
+import { LAUNCH_CRASH_COMMAND } from "../../src/android/launch-crash.js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createFakeAdb, type FakeAdb } from "../fake-adb/harness.js";
 import type { Response } from "../fake-adb/scenario.js";
@@ -79,7 +80,7 @@ describe("app start", () => {
       app: { activity: ".MainActivity", pid: 8235, launch: "hot", recreated: false },
       help: ["Run `adb-axi app start dev.probe --fresh` to kill the process and cold-start"],
     });
-    expect(shellCommands(f)).toEqual(
+    expect(shellCommands(f).filter((command) => command !== LAUNCH_CRASH_COMMAND)).toEqual(
       twice([
         CURRENT_USER,
         PACKAGE,
@@ -114,7 +115,7 @@ describe("app start", () => {
       ok: "start dev.probe -> foreground (cold start)",
       app: { activity: ".MainActivity", pid: 8235, launch: "cold", recreated: true, took_ms: 1102 },
     });
-    expect(shellCommands(f)).toEqual(
+    expect(shellCommands(f).filter((command) => command !== LAUNCH_CRASH_COMMAND)).toEqual(
       twice([
         CURRENT_USER,
         PACKAGE,
@@ -337,7 +338,7 @@ describe("app start", () => {
     );
     expect(data).toMatchObject({ code: "WAIT_TIMEOUT" });
     // The timed-out start is never read as a launched app.
-    expect(shellCommands(f)).toEqual(
+    expect(shellCommands(f).filter((command) => command !== LAUNCH_CRASH_COMMAND)).toEqual(
       twice([CURRENT_USER, PACKAGE, "pm path --user 0 dev.probe", RESOLVE, START]),
     );
   });
@@ -658,6 +659,10 @@ describe("lifecycle review regressions", () => {
             currentData: "present",
           },
           rules: [
+            {
+              match: shell(LAUNCH_CRASH_COMMAND),
+              respond: { stdoutFile: "captured/29/launch-events-running.txt" },
+            },
             { match: ["devices", "-l"], respond: { stdout: ONE_ONLINE } },
             { match: shell(CURRENT_USER), respond: { stdout: "10\n" } },
             {
