@@ -6,15 +6,15 @@ Nothing here runs in `npm test` or `npm run check`. The device checks run on eve
 
 The checks drive adb-axi installed from a packed tarball against one emulator, use the probe app for app and log scenarios, and wait for app and log events with adb-axi's own `wait` commands instead of sleeping. The numbers follow the v0.1 real-emulator checks; check 6 needs two devices and is a local step (see below):
 
-| File              | What it checks                                                                                                                        |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| File              | What it checks                                                                                                                                             |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `0-app-lifecycle` | keep-data uninstall removes code and processes; `app info` reports absent; repeated uninstall is a no-op; reinstall preserves a Room row, in JSON and TOON |
-| `1-process-death` | `app kill` then `app restore`: the saved counter survives, the volatile one resets, a new process, and no crash since the mark        |
-| `2-app-start`     | `app start` on the app in front is not recreated; `--fresh` is a cold start                                                           |
-| `3-data-db`       | a row still only in `probe.db-wal` comes back from `data db`; the release build gives `APP_NOT_DEBUGGABLE`                            |
-| `4-doctor-ui`     | `doctor ui` reports UiAutomation free and exits 0                                                                                     |
-| `5-logs-crash`    | a Java crash counts once and zero after the next mark; a native crash and an ANR are reported; the ANR report is in the system buffer |
-| `7-offline`       | runs last and stops the emulator; a command against it then fails with a typed error in under 2 s                                     |
+| `1-process-death` | `app kill` then `app restore`: the saved counter survives, the volatile one resets, a new process, and no crash since the mark                             |
+| `2-app-start`     | `app start` on the app in front is not recreated; `--fresh` is a cold start                                                                                |
+| `3-data-db`       | a row still only in `probe.db-wal` comes back from `data db`; the release build gives `APP_NOT_DEBUGGABLE`                                                 |
+| `4-doctor-ui`     | `doctor ui` reports UiAutomation free and exits 0                                                                                                          |
+| `5-logs-crash`    | a Java crash counts once and zero after the next mark; a native crash and an ANR are reported; the ANR report is in the system buffer                      |
+| `7-offline`       | runs last and stops the emulator; a command against it then fails with a typed error in under 2 s                                                          |
 
 Run them against an emulator nobody else is using. The last check shuts it down:
 
