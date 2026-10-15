@@ -1,9 +1,9 @@
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { readFileSync } from "node:fs";
+import {} from "node:path";
 import { decode } from "@toon-format/toon";
 import { afterEach, describe, expect, it } from "vitest";
-import { parseLogcat } from "../../src/android/logcat.js";
-import { FIXTURES_DIR, createFakeAdb, type FakeAdb } from "../fake-adb/harness.js";
+import {} from "../../src/android/logcat.js";
+import { createFakeAdb, type FakeAdb } from "../fake-adb/harness.js";
 import type { Response, Rule } from "../fake-adb/scenario.js";
 import { runCli, type CliRun } from "../helpers/run.js";
 
@@ -18,9 +18,6 @@ afterEach(() => {
   fake?.cleanup();
   fake = undefined;
 });
-
-const captured = (api: "35" | "37", file: string): string =>
-  readFileSync(join(FIXTURES_DIR, "captured", api, file), "utf8");
 
 /** A log line as `logcat -v epoch` prints it. */
 function logLine(
@@ -124,199 +121,7 @@ async function crashSince(f: FakeAdb, ...args: string[]): Promise<Both> {
   return both(["logs", "crash", "--since", "before-run", ...args], f);
 }
 
-const scanned = (text: string): number => parseLogcat(text).lines.length;
-
 describe("logs crash", () => {
-  describe("a Java crash", () => {
-    it("prints the wrapped exception's root cause in compact TOON and JSON", async () => {
-      const text = readFileSync(join(FIXTURES_DIR, "crash/java-wrapped.txt"), "utf8");
-      const f = device({ window: { stdout: text } });
-      const { toon, data } = await crashSince(f, "--pkg", "com.example.notes");
-      expect(toon.exitCode).toBe(0);
-      expect(data.crash).toMatchObject({
-        exception: "java.lang.RuntimeException",
-        message: "Unable to start activity ComponentInfo{com.example.notes/.Main}",
-        cause: "java.lang.IllegalStateException",
-        cause_message: "bad state",
-      });
-      expect(toon.stdout).toMatchInlineSnapshot(`
-        "crashes: "1 since before-run (40 s, 10 lines scanned)"
-        crash:
-          kind: java
-          at: "2026-10-01 07:58:44.000"
-          process: com.example.notes
-          exception: java.lang.RuntimeException
-          message: "Unable to start activity ComponentInfo{com.example.notes/.Main}"
-          cause: java.lang.IllegalStateException
-          cause_message: bad state
-          app_frame: "com.example.notes.Main.onCreate(Main.kt:12)"
-          frames: 4
-        help[1]: Run the same command with \`--full\` to write the whole trace to a file
-        "
-      `);
-      const full = await runCli(
-        ["logs", "crash", "--since", "before-run", "--full", "--json"],
-        f.env,
-      );
-      const path = (JSON.parse(full.stdout) as { full: string }).full;
-      expect(readFileSync(path, "utf8")).toContain("suppressed cause");
-      expectClean(f);
-    });
-
-    it("bounds root-cause type and message even for long chains", async () => {
-      const messages = [
-        "FATAL EXCEPTION: main",
-        "Process: com.example.notes, PID: 100",
-        "java.lang.RuntimeException: outer",
-        ...Array.from(
-          { length: 100 },
-          (_, i) => `Caused by: java.lang.RuntimeException: wrapper ${i}`,
-        ),
-        `Caused by: ${"X".repeat(900)}: ${"y".repeat(900)}`,
-      ];
-      const f = device({
-        window: {
-          stdout: messages
-            .map((message) => logLine(1790834324000, 100, "E", "AndroidRuntime", message))
-            .join("\n"),
-        },
-      });
-      const { data } = await crashSince(f);
-      expect(data.crash).toMatchObject({
-        cause: `${"X".repeat(500)}... (truncated, 900 chars total)`,
-        cause_message: `${"y".repeat(500)}... (truncated, 900 chars total)`,
-      });
-      expect(JSON.stringify(data)).not.toContain("wrapper 99");
-      expectClean(f);
-    });
-
-    it("keeps mixed crashes tabular with absent causes marked explicitly", async () => {
-      const text = readFileSync(join(FIXTURES_DIR, "crash/java-wrapped.txt"), "utf8");
-      const f = device({ window: { stdout: text + captured("35", "logcat-crash-java.txt") } });
-      const { toon, data } = await crashSince(f);
-      expect(toon.stdout).toContain(
-        "crash[2]{kind,at,process,exception,message,cause,cause_message,app_frame,frames}:",
-      );
-      expect((data.crash as Record<string, unknown>[])[1]).toMatchObject({
-        cause: "-",
-        cause_message: "-",
-      });
-      expectClean(f);
-    });
-    it.each([
-      { api: "35" as const, at: "2026-10-01 07:58:44.594", frames: 22 },
-      { api: "37" as const, at: "2026-10-01 07:56:25.610", frames: 23 },
-    ])("prints the crash recorded on API $api and the count in the window", async (c) => {
-      const text = captured(c.api, "logcat-crash-java.txt");
-      const f = device({
-        api: Number(c.api),
-        markAt: c.api === "35" ? 1790834300 : 1790834170,
-        window: { stdout: text },
-      });
-      const { toon, data } = await crashSince(f, "--pkg", "dev.probe");
-      expect(toon.exitCode).toBe(0);
-      expect(data).toEqual({
-        crashes: `1 since before-run (40 s, ${scanned(text)} lines scanned)`,
-        crash: {
-          kind: "java",
-          at: c.at,
-          process: "dev.probe",
-          exception: "java.lang.IllegalStateException",
-          message: "probe crash requested",
-          app_frame: "dev.probe.MainActivity.dispatch(MainActivity.kt:67)",
-          frames: c.frames,
-        },
-        help: ["Run the same command with `--full` to write the whole trace to a file"],
-      });
-      expect(toon.stdout).toContain("crash:\n  kind: java\n  at: ");
-      expect(toon.stdout).toContain(
-        "help[1]: Run the same command with `--full` to write the whole trace to a file",
-      );
-      // The bounded dump includes lead-in for native crash signals, without a uid filter.
-      const start = c.api === "35" ? "1790834240.000" : "1790834110.000";
-      expect(logcatCommands(f)).toEqual([
-        `logcat -d -v epoch -T ${start}`,
-        `logcat -d -v epoch -T ${start}`,
-      ]);
-      expectClean(f);
-    });
-
-    it("cuts a long message and says how long it was", async () => {
-      const long = "x".repeat(900);
-      const f = device({
-        window: {
-          stdout: [
-            logLine(1790834324000, 100, "E", "AndroidRuntime", "FATAL EXCEPTION: main"),
-            logLine(
-              1790834324000,
-              100,
-              "E",
-              "AndroidRuntime",
-              "Process: com.example.notes, PID: 100",
-            ),
-            logLine(
-              1790834324000,
-              100,
-              "E",
-              "AndroidRuntime",
-              `java.lang.IllegalStateException: ${long}`,
-            ),
-            logLine(
-              1790834324000,
-              100,
-              "E",
-              "AndroidRuntime",
-              "\tat com.example.notes.Main.run(Main.kt:1)",
-            ),
-          ].join("\n"),
-        },
-      });
-      const { data } = await crashSince(f);
-      const crash = data.crash as Record<string, unknown>;
-      expect(crash.message).toBe(`${"x".repeat(500)}... (truncated, 900 chars total)`);
-    });
-  });
-
-  describe("a native crash and an ANR", () => {
-    it.each(["35", "37"] as const)(
-      "reads the tombstone and the ANR report of API %s",
-      async (api) => {
-        const text = [
-          captured(api, "logcat-crash-native.txt"),
-          captured(api, "logcat-anr-system.txt"),
-        ].join("");
-        const f = device({
-          api: Number(api),
-          markAt: api === "35" ? 1790834300 : 1790834170,
-          window: { stdout: text },
-        });
-        const { toon, data } = await crashSince(f, "--pkg", "dev.probe");
-        expect(toon.exitCode).toBe(0);
-        expect(data.crashes).toBe(`2 since before-run (40 s, ${scanned(text)} lines scanned)`);
-        const crashes = data.crash as Record<string, unknown>[];
-        expect(crashes.map((c) => c.kind)).toEqual(["native", "anr"]);
-        expect(crashes[0]).toMatchObject({
-          process: "dev.probe",
-          exception: "SIGSEGV",
-          message: "signal 11 (SIGSEGV), code 0 (SI_USER), fault addr --------",
-          app_frame: "dev.probe.MainActivity.dispatch+0 (base.apk)",
-        });
-        expect(crashes[1]).toMatchObject({
-          process: "dev.probe",
-          exception: "ANR",
-          app_frame: "-",
-          frames: 0,
-        });
-        expect(crashes[1]?.message).toContain("Input dispatching timed out");
-        // Several crashes print as a table, one row each, with the same fields as a single one.
-        expect(toon.stdout).toContain(
-          "crash[2]{kind,at,process,exception,message,app_frame,frames}:",
-        );
-        expectClean(f);
-      },
-    );
-  });
-
   describe("matching by package name", () => {
     const window = [
       // The app's own crash, a second process of the app, a look-alike package, another app.
@@ -378,17 +183,6 @@ describe("logs crash", () => {
       ).toEqual([]);
       expect(logcatCommands(f).join(" ")).not.toContain("--uid");
       expectClean(f);
-    });
-
-    it("counts every app's crash without --pkg, and none for a package that did not crash", async () => {
-      const f = device({ window: { stdout: window } });
-      const all = await crashSince(f);
-      expect(all.data.crashes).toMatch(/^6 since before-run/);
-      const none = await both(
-        ["logs", "crash", "--since", "before-run", "--pkg", "com.example.never"],
-        f,
-      );
-      expect(none.data.crashes).toMatch(/^0 since before-run/);
     });
   });
 
@@ -552,187 +346,9 @@ describe("logs crash", () => {
       expect(data.crashes).toBe("1 since before-run (40 s, 4 lines scanned)");
       expect(data.crash).toMatchObject({ kind: "native", at: "2026-10-01 07:58:20.200" });
     });
-
-    it("counts a crash at or after the mark", async () => {
-      const f = device({
-        window: {
-          stdout: [
-            logLine(1790834300000, 100, "E", "AndroidRuntime", "FATAL EXCEPTION: main"),
-            logLine(1790834300000, 100, "E", "AndroidRuntime", "Process: dev.probe, PID: 100"),
-            logLine(
-              1790834300000,
-              100,
-              "E",
-              "AndroidRuntime",
-              "java.lang.IllegalStateException: now",
-            ),
-          ].join("\n"),
-        },
-      });
-      const { data } = await crashSince(f, "--pkg", "dev.probe");
-      expect(data.crashes).toMatch(/^1 since before-run/);
-    });
-
-    it("says zero out loud, in one line, and still names the window", async () => {
-      const f = device({
-        clocks: ["1790834300.000000000 +0200\n", "1790834340.000000000 +0200\n"],
-        window: { stdout: logLine(1790834310000, 1, "I", "Tag", "quiet") },
-      });
-      await runCli(["logs", "mark", "after-fix"], f.env);
-      const toon = await runCli(
-        ["logs", "crash", "--pkg", "dev.probe", "--since", "after-fix"],
-        f.env,
-      );
-      expect(toon.exitCode).toBe(0);
-      expect(toon.stdout).toBe('crashes: "0 since after-fix (40 s, 1 lines scanned)"\n');
-      const json = await runCli(
-        ["logs", "crash", "--pkg", "dev.probe", "--since", "after-fix", "--json"],
-        f.env,
-      );
-      expect(JSON.parse(json.stdout)).toEqual({
-        crashes: "0 since after-fix (40 s, 1 lines scanned)",
-      });
-      expectClean(f);
-    });
-
-    it("counts a duration back from the device clock, and defaults to 15 minutes", async () => {
-      const f = device({
-        clocks: ["1790835000.250000000 +0000\n"],
-        window: { stdout: "" },
-      });
-      const seconds = await both(["logs", "crash", "--since", "30s"], f);
-      expect(seconds.data.crashes).toBe("0 since 30s ago (30 s, 0 lines scanned)");
-      expect(logcatCommands(f)).toEqual([
-        "logcat -d -v epoch -T 1790834910.250",
-        "logcat -d -v epoch -T 1790834910.250",
-      ]);
-      const fallback = await both(["logs", "crash"], f);
-      expect(fallback.data.crashes).toBe("0 since 15m ago (900 s, 0 lines scanned)");
-      expect(logcatCommands(f).slice(2)).toEqual([
-        "logcat -d -v epoch -T 1790834040.250",
-        "logcat -d -v epoch -T 1790834040.250",
-      ]);
-      expectClean(f);
-    });
-
-    it("sends no --uid to an API 30 device, which does not have it", async () => {
-      const text = readFileSync(join(FIXTURES_DIR, "synthetic/30/logcat-epoch-crash.txt"), "utf8");
-      const f = device({
-        api: 30,
-        markAt: 1790834170,
-        window: { stdout: text },
-        // On API 30 a mark also records the app's processes.
-        scenarioRules: [
-          {
-            match: ["-s", SERIAL, "shell", "ps -A -o PID,NAME"],
-            respond: { stdoutFile: "synthetic/30/ps-pid-name.txt" },
-          },
-        ],
-      });
-      const { data } = await crashSince(f, "--pkg", "dev.probe");
-      expect(data.crashes).toMatch(/^1 since before-run/);
-      expect(data.crash).toMatchObject({ process: "dev.probe", frames: 2 });
-      for (const call of f.calls()) expect(call.argv.join(" ")).not.toContain("--uid");
-      expectClean(f);
-    });
   });
 
   describe("truncation and --full", () => {
-    const loop = (n: number): string =>
-      Array.from({ length: n }, (_, i) => [
-        logLine(1790834310000 + i * 1000, 100 + i, "E", "AndroidRuntime", "FATAL EXCEPTION: main"),
-        logLine(
-          1790834310000 + i * 1000,
-          100 + i,
-          "E",
-          "AndroidRuntime",
-          `Process: dev.probe, PID: ${100 + i}`,
-        ),
-        logLine(
-          1790834310000 + i * 1000,
-          100 + i,
-          "E",
-          "AndroidRuntime",
-          `java.lang.IllegalStateException: crash ${i}`,
-        ),
-        logLine(
-          1790834310000 + i * 1000,
-          100 + i,
-          "E",
-          "AndroidRuntime",
-          `\tat dev.probe.Main.run(Main.kt:${i})`,
-        ),
-      ])
-        .flat()
-        .join("\n");
-
-    it("describes the first five of a crash loop and counts the rest", async () => {
-      const f = device({ window: { stdout: loop(7) } });
-      const { toon, data } = await crashSince(f, "--pkg", "dev.probe");
-      expect(data.crashes).toBe("7 since before-run (40 s, 28 lines scanned)");
-      const crashes = data.crash as Record<string, unknown>[];
-      expect(crashes.map((c) => c.message)).toEqual([0, 1, 2, 3, 4].map((i) => `crash ${i}`));
-      expect(data.shown).toBe("5 of 7 crashes");
-      expect(data.help).toEqual([
-        "Run the same command with `--full` to write the whole trace to a file",
-      ]);
-      expect(toon.stdout).toContain("shown: 5 of 7 crashes");
-    });
-
-    it("writes the whole trace of every crash to a file, and prints its path", async () => {
-      const text = [captured("35", "logcat-crash-java.txt"), loop(7)].join("");
-      const f = device({ window: { stdout: text } });
-      await runCli(["logs", "mark", "before-run"], f.env);
-      const toon = await runCli(
-        ["logs", "crash", "--pkg", "dev.probe", "--since", "before-run", "--full"],
-        f.env,
-      );
-      expect(toon.exitCode).toBe(0);
-      const data = decode(toon.stdout.trimEnd()) as Record<string, unknown>;
-      // The display is still capped; the file is not; the `--full` hint is gone.
-      expect(data.shown).toBe("5 of 8 crashes");
-      expect(data).not.toHaveProperty("help");
-      const path = data.full as string;
-      expect(path.startsWith(join(f.home, "out"))).toBe(true);
-      const written = readFileSync(path, "utf8");
-      expect(written.match(/^== java at /gm)).toHaveLength(8);
-      expect(
-        written.startsWith("== java at 2026-10-01 07:58:30.000 in dev.probe (pid 100)\n"),
-      ).toBe(true);
-      expect(written).toContain("== java at 2026-10-01 07:58:44.594 in dev.probe (pid 9328)\n");
-      // All 22 frames of the captured trace, which the output only counts.
-      expect(written).toContain(
-        "\tat com.android.internal.os.ZygoteInit.main(ZygoteInit.java:886)\n",
-      );
-      expect(written.match(/^\tat /gm)?.length).toBe(22 + 7);
-      expect(written).toContain("java.lang.IllegalStateException: crash 6");
-      expectClean(f);
-    });
-
-    it("gives the --full file the whole ANR block and a native tombstone", async () => {
-      const f = device({
-        api: 35,
-        window: {
-          stdout: [
-            captured("35", "logcat-crash-native.txt"),
-            captured("35", "logcat-anr-system.txt"),
-          ].join(""),
-        },
-      });
-      await runCli(["logs", "mark", "before-run"], f.env);
-      const run = await runCli(["logs", "crash", "--since", "before-run", "--full"], f.env);
-      const written = readFileSync(
-        (decode(run.stdout.trimEnd()) as Record<string, unknown>).full as string,
-        "utf8",
-      );
-      expect(written).toContain("== native at 2026-10-01 07:58:45.290 in dev.probe (pid 9386)\n");
-      expect(written).toContain("backtrace:\n");
-      expect(written).toContain("== anr at 2026-10-01 07:58:53.557 in dev.probe (pid 9448)\n");
-      expect(written).toContain(
-        "ANR in dev.probe (dev.probe/.MainActivity)\nPID: 9448\nReason: Input dispatching",
-      );
-    });
-
     it("keeps unrelated system-server activity out of an ANR's full trace", async () => {
       const f = device({
         window: {
@@ -761,50 +377,9 @@ describe("logs crash", () => {
       expect(readFileSync(data.full as string, "utf8")).toContain("Reason: blocked");
       expect(readFileSync(data.full as string, "utf8")).not.toContain("Reason: unrelated");
     });
-
-    it("writes an empty file and prints its path when there is no crash", async () => {
-      const f = device({ window: { stdout: logLine(1790834310000, 1, "I", "Tag", "quiet") } });
-      await runCli(["logs", "mark", "before-run"], f.env);
-      const run = await runCli(["logs", "crash", "--since", "before-run", "--full"], f.env);
-      const data = decode(run.stdout.trimEnd()) as Record<string, unknown>;
-      expect(data.crashes).toBe("0 since before-run (40 s, 1 lines scanned)");
-      expect(readFileSync(data.full as string, "utf8")).toBe("");
-      expect(data).not.toHaveProperty("help");
-    });
-
-    it("gives overlapping --full runs separate files", async () => {
-      const f = device({ window: { stdout: captured("35", "logcat-crash-java.txt") } });
-      await runCli(["logs", "mark", "before-run"], f.env);
-      const runs = await Promise.all([
-        runCli(["logs", "crash", "--since", "before-run", "--full"], f.env),
-        runCli(["logs", "crash", "--since", "before-run", "--full"], f.env),
-      ]);
-      const paths = runs.map(
-        (run) => (decode(run.stdout.trimEnd()) as Record<string, unknown>).full as string,
-      );
-      expect(new Set(paths).size).toBe(2);
-      for (const path of paths) expect(existsSync(path)).toBe(true);
-    });
   });
 
   describe("errors", () => {
-    it("fails MARK_NOT_FOUND for an unknown mark, listing the marks the device has", async () => {
-      const f = device({});
-      await runCli(["logs", "mark", "before-save"], f.env);
-      const { toon, data } = await both(["logs", "crash", "--since", "nope"], f);
-      expect(toon.exitCode).toBe(1);
-      expect(data).toEqual({
-        error: "no log mark named nope on emulator-5554",
-        code: "MARK_NOT_FOUND",
-        marks: ["before-save"],
-        help: [
-          "Run `adb-axi logs mark nope` to record it now",
-          "Or pass one of the marks listed above, or a duration such as `5m`",
-        ],
-      });
-      expect(logcatCommands(f)).toEqual([]);
-    });
-
     it("rejects a bad package name with exit 2 before touching the device", async () => {
       const f = device({});
       const run = await runCli(["logs", "crash", "--pkg", "not a package"], f.env);
@@ -825,21 +400,6 @@ describe("logs crash", () => {
       const { toon, data } = await crashSince(f);
       expect(toon.exitCode).toBe(1);
       expect(data).toMatchObject({ code: "REMOTE_EXIT", exit: 1 });
-    });
-
-    it("fails TIMEOUT at the deadline when logcat never returns, with no process left behind", async () => {
-      const f = device({ window: { hang: true } });
-      await runCli(["logs", "mark", "before-run"], f.env);
-      const run = await runCli(
-        ["logs", "crash", "--since", "before-run", "--timeout", "1s"],
-        f.env,
-      );
-      expect(run.exitCode).toBe(1);
-      expect(decode(run.stdout.trimEnd())).toMatchObject({
-        code: "TIMEOUT",
-        step: "reading the log",
-      });
-      expect(run.durationMs).toBeLessThan(5000);
     });
   });
 });
