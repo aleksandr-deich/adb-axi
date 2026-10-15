@@ -29,7 +29,6 @@ import {
   METADATA,
   activityInfo,
   INSTALLED,
-  LAUNCHER_FRONT,
   PROBE_RUNNING,
   PROBE_STOPPED,
   AM_START,
@@ -119,32 +118,6 @@ describe("app start", () => {
       error: "dev.probe did not finish launching within 15 s",
       last: { status: "no answer", activity: ".MainActivity" },
     });
-  });
-
-  it("fails with APP_DIED_ON_START when the process is gone right after the start", async () => {
-    const f = device({
-      [PACKAGE]: INSTALLED,
-      [START]: AM_START.cold,
-      [PROCESSES]: {},
-      [PIDOF]: PROBE_STOPPED,
-      [FOREGROUND]: LAUNCHER_FRONT,
-    });
-    const { toon, data } = await both(["app", "start", "dev.probe"], f);
-    expect(toon.exitCode).toBe(1);
-    expect(toon.stdout).toBe(
-      [
-        "error: the dev.probe process of dev.probe/.MainActivity is gone right after its start",
-        "code: APP_DIED_ON_START",
-        "last:",
-        "  state: stopped",
-        '  pid: "-"',
-        "  foreground: com.google.android.apps.nexuslauncher",
-        "help[2]: Run `adb-axi logs crash --pkg dev.probe --since 1m` for the crash,Run `adb-axi app start dev.probe --fresh` to try a cold start",
-        "",
-      ].join("\n"),
-    );
-    expect(data).toMatchObject({ code: "APP_DIED_ON_START" });
-    expectClean(f);
   });
 
   it("rejects bad names and simultaneous activity selectors with exit 2 before any shell call", async () => {

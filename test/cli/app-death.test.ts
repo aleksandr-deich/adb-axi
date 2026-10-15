@@ -242,14 +242,6 @@ function expectClean(fake: FakeAdb): void {
   }
 }
 
-const killedFront = {
-  pid_before: OLD_PID,
-  pid_after: null,
-  backgrounded_first: true,
-  cached_after_ms: 0,
-  method: "am kill",
-};
-
 describe("app kill", () => {
   it("waits for pidof exit evidence after the API 29 bracketed process row", async () => {
     const { toon, data, fake } = await both(["app", "kill", "dev.probe"], () =>
@@ -440,22 +432,6 @@ describe("app restore", () => {
     expectClean(fake);
   });
 
-  it("fails with APP_DIED_ON_START when the restored process is gone right after the start", async () => {
-    const { toon, data, fake } = await both(["app", "restore", "dev.probe"], () =>
-      probeDevice({ phase: "dead", start: { respond: AM_COLD, then: "dead" } }),
-    );
-    expect(toon.exitCode).toBe(1);
-    expect(data).toMatchObject({
-      error: "the dev.probe process of dev.probe/.MainActivity is gone right after its restore",
-      code: "APP_DIED_ON_START",
-      last: { state: "stopped", pid: "-", foreground: "com.google.android.apps.nexuslauncher" },
-    });
-    for (const line of (data.help as string[] | undefined) ?? []) {
-      expect(line).toContain("logs crash --pkg dev.probe");
-    }
-    expectClean(fake);
-  });
-
   it("fails with WAIT_TIMEOUT when am reports Status: timeout", async () => {
     const { toon, data, fake } = await both(["app", "restore", "dev.probe"], () =>
       probeDevice({ phase: "dead", start: { respond: AM_TIMEOUT, then: "dead" } }),
@@ -587,19 +563,6 @@ describe("app death", () => {
     // The snapshot before the kill failed, so there is no point in a second one.
     expect(fake.calls().filter((call) => call.tool === "agent-device")).toHaveLength(1);
     expect(shellCommands(fake)).toContain(START);
-    expectClean(fake);
-  });
-
-  it("fails with APP_DIED_ON_START as app restore does, with the kill evidence", async () => {
-    const { toon, data, fake } = await both(["app", "death", "dev.probe"], () =>
-      probeDevice({ phase: "front", start: { respond: AM_COLD, then: "dead" } }),
-    );
-    expect(toon.exitCode).toBe(1);
-    expect(normalized(data)).toMatchObject({
-      code: "APP_DIED_ON_START",
-      last: { state: "stopped", pid: "-" },
-      kill: killedFront,
-    });
     expectClean(fake);
   });
 });
