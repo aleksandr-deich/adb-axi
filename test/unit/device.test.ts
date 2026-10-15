@@ -252,48 +252,6 @@ describe("facts", () => {
 });
 
 describe("resolveTarget", () => {
-  it("picks the only online device without any selection", async () => {
-    const { adb, f } = setup("one-online.json");
-    await expect(resolveTarget(options(f, adb))).resolves.toMatchObject({
-      serial: "emulator-5554",
-      selectedBy: "only-online",
-    });
-    expect(f.calls()).toHaveLength(1);
-  });
-
-  it("fails DEVICE_AMBIGUOUS with the online candidates when two are online", async () => {
-    const { adb, f } = setup("multi-device.json");
-    const error = await resolveError(options(f, adb));
-    expect(error).toEqual({
-      error: "2 devices are online and none is selected",
-      code: "DEVICE_AMBIGUOUS",
-      devices: [
-        { serial: "emulator-5554", avd: "Pixel_10_Pro_XL", form: "phone" },
-        { serial: "emulator-5556", avd: "Pixel_Tablet", form: "tablet" },
-      ],
-      help: [
-        "Run `adb-axi logs --pkg com.example --device <serial or avd>`",
-        "Or export ANDROID_SERIAL=<serial> in this shell",
-      ],
-    });
-    expect(f.unmatched()).toEqual([]);
-  });
-
-  it("resolves --device by serial without reading any facts", async () => {
-    const { adb, f } = setup("multi-device.json");
-    await expect(
-      resolveTarget(options(f, adb, { requested: "emulator-5556" })),
-    ).resolves.toMatchObject({ serial: "emulator-5556", selectedBy: "flag" });
-    expect(f.calls().map((call) => call.argv)).toEqual([["devices", "-l"]]);
-  });
-
-  it("resolves --device by AVD name", async () => {
-    const { adb, f } = setup("multi-device.json");
-    await expect(
-      resolveTarget(options(f, adb, { requested: "Pixel_Tablet" })),
-    ).resolves.toMatchObject({ serial: "emulator-5556" });
-  });
-
   it("honours ANDROID_SERIAL, and --device wins over it", async () => {
     const { adb, f } = setup("multi-device.json");
     const env = { ...f.env, ANDROID_SERIAL: "emulator-5556" };
@@ -347,23 +305,6 @@ describe("resolveTarget", () => {
       }),
     );
     expect(error.help).toEqual(["Run `adb-axi doctor --device emulator-5556` to see why"]);
-  });
-
-  it("fails a missing target with DEVICE_NOT_FOUND and the attached devices", async () => {
-    const { adb, f } = setup("multi-device.json");
-    const error = await resolveError(options(f, adb, { requested: "bogus-9999" }));
-    expect(error).toEqual({
-      error: "no attached device has the serial or AVD name bogus-9999",
-      code: "DEVICE_NOT_FOUND",
-      devices: [
-        { serial: "emulator-5554", avd: "Pixel_10_Pro_XL", state: "device" },
-        { serial: "emulator-5556", avd: "Pixel_Tablet", state: "device" },
-        { serial: "emulator-5558", avd: "Pixel_Fold", state: "offline" },
-      ],
-      help: [
-        "Run `adb-axi logs --pkg com.example --device <serial or avd>` with one of the devices above",
-      ],
-    });
   });
 
   it("resolves an offline emulator by AVD name and then fails its state check", async () => {

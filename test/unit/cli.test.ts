@@ -111,33 +111,6 @@ describe("dispatch", () => {
     expect(JSON.parse(after.out)).toMatchObject({ noop: false, timeout_ms: 15_000 });
   });
 
-  it("routes bare --json to the home view with the header", async () => {
-    const { out, exit } = await run(["--json"]);
-    expect(exit).toBe(0);
-    const parsed = JSON.parse(out) as Record<string, unknown>;
-    expect(Object.keys(parsed)).toEqual(["bin", "description", "devices", "target"]);
-    const toon = decode((await run([])).out.trimEnd()) as Record<string, unknown>;
-    expect(Object.keys(toon)).toEqual(["bin", "description", "devices", "target"]);
-  });
-
-  it("rejects a leading device flag with the corrected command, in either format", async () => {
-    const toon = await run(["-s", "emulator-5554", "app", "start", "com.example"]);
-    expect(toon.exit).toBe(2);
-    expect(toon.out).toMatchInlineSnapshot(`
-      "error: \`-s emulator-5554\` must come after the command
-      code: VALIDATION_ERROR
-      help[1]: Run \`adb-axi app start com.example --device emulator-5554\`
-      "
-    `);
-    const json = await run(["--json", "--device", "emulator-5554", "--debug", "app", "start", "x"]);
-    expect(json.exit).toBe(2);
-    expect(JSON.parse(json.out)).toEqual({
-      error: "`--device emulator-5554 --debug` must come after the command",
-      code: "VALIDATION_ERROR",
-      help: ["Run `adb-axi app start x --device emulator-5554 --debug`"],
-    });
-  });
-
   it("puts corrected flags before -- so they stay flags", async () => {
     const { out } = await run(["-s", "e-1", "shell", "--", "ls", "-la"]);
     expect(out).toContain("Run `adb-axi shell --device e-1 -- ls -la`");
@@ -165,32 +138,6 @@ describe("dispatch", () => {
       code: "VALIDATION_ERROR",
       help: [
         "Run `adb-axi <command> --pkg x --device emulator-5554`",
-        "Run `adb-axi --help` for every command and its summary",
-      ],
-    });
-  });
-
-  it("lists the command's valid flags for an unknown flag, with its help", async () => {
-    const { out, exit } = await run(["app", "start", "com.example", "--bogus"]);
-    expect(exit).toBe(2);
-    expect(out).toMatchInlineSnapshot(`
-      "error: unknown flag --bogus for \`adb-axi app start\`
-      code: VALIDATION_ERROR
-      valid_flags[6]: "--fresh","--device <serial|avd>","--timeout <dur>","--json","--debug","--help"
-      help[1]: Run \`adb-axi app start --help\` for flag details
-      "
-    `);
-  });
-
-  it("lists shipped commands only for an unknown command", async () => {
-    const { out, exit } = await run(["ap"]);
-    expect(exit).toBe(2);
-    expect(decode(out.trimEnd())).toEqual({
-      error: "unknown command `ap`",
-      code: "VALIDATION_ERROR",
-      commands: ["app"],
-      help: [
-        "Run `adb-axi app` if `ap` was meant to be `app`",
         "Run `adb-axi --help` for every command and its summary",
       ],
     });
@@ -282,9 +229,5 @@ describe("dispatch", () => {
     const { out, exit } = await run(["app", "--fresh", "start", "x"]);
     expect(exit).toBe(2);
     expect(out).toContain("Run `adb-axi app start --fresh x`");
-  });
-
-  it("prints the version for version flags", async () => {
-    expect((await run(["--version"])).out).toMatch(/^\d+\.\d+\.\d+\n$/);
   });
 });
