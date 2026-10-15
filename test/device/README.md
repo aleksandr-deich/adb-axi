@@ -6,17 +6,19 @@ Nothing here runs in `npm test` or `npm run check`. The device checks run on eve
 
 The checks drive adb-axi installed from a packed tarball against one emulator, use the probe app for app and log scenarios, and wait for app and log events with adb-axi's own `wait` commands instead of sleeping. Each expected result is grounded in probe state, Android window focus, kernel process state or database bytes, rather than another adb-axi summary. Window focus comes from current display contents, not historical last-ANR snapshots included in an unqualified window dump. The original six files remain, with lifecycle, observation and device-identity coverage added:
 
-| File                | What it checks                                                                                                                                  |
-| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `0-app-lifecycle`   | install/reinstall, if-changed/clean-data, stop/clear, uninstall/keep-data and missing packages, with real package/process/private-data evidence |
-| `1-process-death`   | `app kill` then `app restore`: the saved counter survives, the volatile one resets, a new process, and no crash since the mark                  |
-| `2-app-start`       | `app start` on the app in front is not recreated; `--fresh` is a cold start                                                                     |
-| `3-data-db`         | a row still only in `probe.db-wal` comes back from `data db`; the release build gives `APP_NOT_DEBUGGABLE`                                      |
-| `4-doctor-ui`       | `doctor ui` reports UiAutomation free and exits 0                                                                                               |
-| `5-logs-crash`      | a Java crash counts once and zero after the next mark; a native crash and an ANR are reported; the ANR report is in the system buffer           |
-| `6-app-observation` | named log windows across process restarts, filters/mark replacement, wait transitions, package metadata and actual Room/WAL reads               |
-| `6-device-state`    | the target's serial, AVD name and API match device properties; `app current` matches independent window-focus and kernel-PID queries            |
-| `7-offline`         | runs last and stops the emulator; a command against it then fails with a typed error in under 2 s                                               |
+| File                    | What it checks                                                                                                                                                                                                              |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `0-app-install`         | upgrade and downgrade, debug/release swaps, the install record, a file that is not an APK and the package manager's own refusals, from the variant APKs                                                                     |
+| `0-app-lifecycle`       | install/reinstall, if-changed/clean-data, stop/clear, uninstall/keep-data and missing packages, with real package/process/private-data evidence                                                                             |
+| `1-process-death`       | `app kill` then `app restore`: the saved counter survives, the volatile one resets, a new process, and no crash since the mark; kill, restore and death with nothing running, no task, a second process and no agent-device |
+| `2-app-crash-on-launch` | a crash in `onCreate` is `APP_DIED_ON_START` for start and restore, with Android's crash dialogs shown and hidden (restored after)                                                                                          |
+| `2-app-start`           | `app start` on the app in front is not recreated; `--fresh` is a cold start; named, nested, `:ui` and alias activities, other apps in front and start refusals                                                              |
+| `3-data-db`             | a row still only in `probe.db-wal` comes back from `data db`; the release build gives `APP_NOT_DEBUGGABLE`                                                                                                                  |
+| `4-doctor-ui`           | `doctor ui` reports UiAutomation free and exits 0                                                                                                                                                                           |
+| `5-logs-crash`          | a Java crash counts once and zero after the next mark; a native crash and an ANR are reported; the ANR report is in the system buffer                                                                                       |
+| `6-app-observation`     | named log windows across process restarts, filters/mark replacement, wait transitions and timeouts, package metadata, absent packages, the launcher in front and actual Room/WAL reads                                      |
+| `6-device-state`        | the target's serial, AVD name and API match device properties; `app current` matches independent window-focus and kernel-PID queries                                                                                        |
+| `7-offline`             | runs last and stops the emulator; a command against it then fails with a typed error in under 2 s                                                                                                                           |
 
 Run them against an emulator nobody else is using. The last check shuts it down:
 
@@ -66,29 +68,39 @@ adb-axi app current --device <second-serial>          # second emulator's foregr
 adb -s <serial> shell am start -n dev.probe/.MainActivity --es probe <action>
 ```
 
-| Action   | Effect                                                                                     |
-| -------- | ------------------------------------------------------------------------------------------ |
-| `inc`    | adds 1 to `saved` (`rememberSaveable`, survives process death) and `volatile` (`remember`) |
-| `state`  | logs the current state                                                                     |
-| `write`  | inserts a row into the Room database `probe.db` (WAL); the row stays in `probe.db-wal`     |
-| `finish` | finishes the activity and leaves the process alive, so the next start is warm              |
-| `crash`  | throws on the main thread (Java crash)                                                     |
-| `native` | sends itself SIGSEGV (native crash with a tombstone)                                       |
-| `anr`    | blocks the main thread for 30 s; input sent meanwhile ends in an ANR                       |
+| Action         | Effect                                                                                                                     |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `inc`          | adds 1 to `saved` (`rememberSaveable`, survives process death) and `volatile` (`remember`)                                 |
+| `state`        | logs the current state                                                                                                     |
+| `write`        | inserts a row into the Room database `probe.db` (WAL); the row stays in `probe.db-wal`                                     |
+| `finish`       | finishes the activity and leaves the process alive, so the next start is warm                                              |
+| `crash`        | throws on the main thread (Java crash)                                                                                     |
+| `native`       | sends itself SIGSEGV (native crash with a tombstone)                                                                       |
+| `anr`          | blocks the main thread for 30 s; input sent meanwhile ends in an ANR                                                       |
+| `armcrash`     | makes the next `MainActivity` create throw, so a start or restore dies on launch                                           |
+| `finishremove` | `finishAndRemoveTask`: the process stays, its task leaves recents                                                          |
+| `crashchain`   | throws a wrapped exception with a cause chain and a long message (`--ei length N`)                                         |
+| `alias`        | enables (`--ez on true`) or disables the second launcher entry `.Alias`; the shell may not                                 |
+| `log`          | logs `--ei count N` lines of `--es text T` (`--es level`, `--es tag`, `--ez numbered`)                                     |
+| `file`         | writes `--es name N` into `files/` or, with `--es where databases`, the databases folder (`--es text T` or `--ei bytes B`) |
+| `sql`          | runs `--es stmt S` on `--es db NAME` (`--ez wal true`), kept open for the life of the process                              |
 
-`MainActivity` is `singleTop`, so an action sent while it is on top reaches `onNewIntent`. Every state change logs one line with tag `ProbeState`, the oracle the checks read from logcat:
+`MainActivity` is `singleTop`, so an action sent while it is on top reaches `onNewIntent`. Other activities: `.UiActivity` runs in the `:ui` process, `.BounceActivity` opens Settings over itself, `.PermActivity` asks for the camera permission, `.PrivateActivity` is not exported and `.Outer$Inner` is a nested class. Every state change logs one line with tag `ProbeState`, the oracle the checks read from logcat:
 
 ```
 ProbeState: event=inc saved=3 volatile=3 rows=0 restored=false pid=4321
 ```
 
-Build both variants (debuggable debug, non-debuggable release signed with the debug key) and refresh the committed fixtures:
+Build both variants (debuggable debug, non-debuggable release signed with the debug key) and the code-free `variants` module, whose builds of `dev.probe` each get one real package-manager answer (`v2`, `othersigner` signed by the test-only key `variants/test-only-other-signer.jks`, `minsdk36`, `flaggedtest`, `needslib`, `riscvonly`), then refresh the committed fixtures:
 
 ```
 cd test/device/probe-app
 ./gradlew clean assembleDebug assembleRelease
 cp app/build/outputs/apk/debug/app-debug.apk ../../fixtures/apk/probe-debug.apk
 cp app/build/outputs/apk/release/app-release.apk ../../fixtures/apk/probe-release.apk
+for v in v2 othersigner minsdk36 flaggedtest needslib riscvonly; do
+  cp variants/build/outputs/apk/$v/debug/variants-$v-debug.apk ../../fixtures/apk/probe-$v.apk
+done
 ```
 
 ## Capture (`capture.ts`)
