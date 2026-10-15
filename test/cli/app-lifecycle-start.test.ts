@@ -80,7 +80,16 @@ describe("app start", () => {
       help: ["Run `adb-axi app start dev.probe --fresh` to kill the process and cold-start"],
     });
     expect(shellCommands(f)).toEqual(
-      twice([CURRENT_USER, PACKAGE, RESOLVE, START, METADATA, PROCESSES, FOREGROUND]),
+      twice([
+        CURRENT_USER,
+        PACKAGE,
+        "pm path --user 0 dev.probe",
+        RESOLVE,
+        START,
+        METADATA,
+        PROCESSES,
+        FOREGROUND,
+      ]),
     );
     expectClean(f);
   });
@@ -109,6 +118,7 @@ describe("app start", () => {
       twice([
         CURRENT_USER,
         PACKAGE,
+        "pm path --user 0 dev.probe",
         RESOLVE,
         FORCE_STOP,
         PIDOF,
@@ -302,7 +312,9 @@ describe("app start", () => {
       error: "dev.probe has no launcher activity",
       activities: [],
     });
-    expect(shellCommands(f)).toEqual(twice([CURRENT_USER, PACKAGE, RESOLVE]));
+    expect(shellCommands(f)).toEqual(
+      twice([CURRENT_USER, PACKAGE, "pm path --user 0 dev.probe", RESOLVE]),
+    );
   });
 
   it("fails with WAIT_TIMEOUT when am reports Status: timeout with exit 0 (S4)", async () => {
@@ -325,7 +337,9 @@ describe("app start", () => {
     );
     expect(data).toMatchObject({ code: "WAIT_TIMEOUT" });
     // The timed-out start is never read as a launched app.
-    expect(shellCommands(f)).toEqual(twice([CURRENT_USER, PACKAGE, RESOLVE, START]));
+    expect(shellCommands(f)).toEqual(
+      twice([CURRENT_USER, PACKAGE, "pm path --user 0 dev.probe", RESOLVE, START]),
+    );
   });
 
   it("fails with WAIT_TIMEOUT when am start does not answer within --timeout", async () => {
@@ -647,6 +661,10 @@ describe("lifecycle review regressions", () => {
             { match: ["devices", "-l"], respond: { stdout: ONE_ONLINE } },
             { match: shell(CURRENT_USER), respond: { stdout: "10\n" } },
             {
+              match: shell("pm path --user 10 dev.probe"),
+              respond: { stdout: "package:/data/app/probe/base.apk\n" },
+            },
+            {
               match: shell(PACKAGE),
               respond: {
                 stdout:
@@ -733,7 +751,14 @@ describe("lifecycle review regressions", () => {
         if (command === "stop") expect(data.ok).toMatch(/pid 8235 gone/);
         if (command === "clear") {
           expect(data.confirmed_by).toEqual(["pm clear", "run-as"]);
-          expect(shellCommands(fake)).toEqual([CURRENT_USER, PACKAGE, clear, PIDOF, files]);
+          expect(shellCommands(fake)).toEqual([
+            CURRENT_USER,
+            PACKAGE,
+            "pm path --user 10 dev.probe",
+            clear,
+            PIDOF,
+            files,
+          ]);
         }
         expectClean(fake);
         fake.cleanup();

@@ -1,6 +1,6 @@
 import type { AdbClient } from "../adb/run.js";
 import { assertPackageName, isPackageName } from "./component.js";
-import { readShell, type ReadOptions } from "./read.js";
+import { invalidOutput, readShell, type ReadOptions } from "./read.js";
 
 /** One line of `pm list packages [-U] [--show-versioncode]`. */
 export interface ListedPackage {
@@ -37,13 +37,10 @@ export function parsePackageList(stdout: string): ListedPackage[] {
   return packages;
 }
 
-/** What `dumpsys package <pkg>` says about one package. */
+/** Package metadata with selected-user installation state. */
 export interface PackageInfo {
   package: string;
-  /**
-   * Installed for the selected Android user. A package uninstalled with its data kept
-   * (`pm uninstall -k`) still has a record, with `installed=false`.
-   */
+  /** Installed for the selected Android user; device reads also verify code availability. */
   installed: boolean;
   versionName: string | null;
   versionCode: number | null;
@@ -133,15 +130,14 @@ export function parsePackageRecords(stdout: string, userId = 0): Map<string, Pac
   return records;
 }
 
-/** One package's record, or `null` when the device has none (never installed). */
+/** One package's raw record, or `null` when the dump has none. */
 export function parseDumpsysPackage(stdout: string, pkg: string, userId = 0): PackageInfo | null {
   return parsePackageRecords(stdout, userId).get(pkg) ?? null;
 }
 
 /**
- * Read one package with `dumpsys package <pkg>`. `null` means no record at all; a record
- * can still say `installed: false` (uninstalled with its data kept), so callers check
- * `installed` before treating the package as present.
+ * Read one package's metadata and verify installed code for the selected user. `null`
+ * means no record; retained data can have a record with `installed: false`.
  */
 export async function readPackage(
   adb: AdbClient,
@@ -150,6 +146,21 @@ export async function readPackage(
   options: ReadOptions,
   userId = 0,
 ): Promise<PackageInfo | null> {
+  return (await readPackageSnapshot(adb, serial, pkg, options, userId)).info;
+}
+
+/**
+ * Retained records on Android 10/11 can still claim installation after code removal,
+ * so a true user flag needs code-path evidence (see test/unit/package-installed.test.ts).
+ * Keep the raw dump for lifecycle activity metadata, separate from verified installation.
+ */
+export async function readPackageSnapshot(
+  adb: AdbClient,
+  serial: string,
+  pkg: string,
+  options: ReadOptions,
+  userId = 0,
+): Promise<{ info: PackageInfo | null; dump: string }> {
   assertPackageName(pkg);
   const result = await readShell(
     adb,
@@ -158,7 +169,28 @@ export async function readPackage(
     `reading package ${pkg}`,
     options,
   );
-  return parseDumpsysPackage(result.stdout, pkg, userId);
+  const info = parseDumpsysPackage(result.stdout, pkg, userId);
+  if (info?.installed === true) {
+    const step = `reading the installed code of ${pkg}`;
+    const paths = await readShell(
+      adb,
+      serial,
+      `pm path --user ${userId} ${pkg}`,
+      step,
+      options,
+      [0, 1],
+    );
+    const lines = paths.stdout.trim() === "" ? [] : paths.stdout.trim().split(/\r?\n/);
+    if (
+      paths.stderr.trim() !== "" ||
+      (paths.exitCode !== 0 && lines.length > 0) ||
+      lines.some((line) => !/^package:\/[^\r\n]+\.apk$/.test(line))
+    ) {
+      throw invalidOutput(step, paths.stdout);
+    }
+    info.installed = lines.length > 0;
+  }
+  return { info, dump: result.stdout };
 }
 
 /**
