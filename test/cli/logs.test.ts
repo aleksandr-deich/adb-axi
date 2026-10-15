@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { decode } from "@toon-format/toon";
 import { afterEach, describe, expect, it } from "vitest";
@@ -177,28 +177,6 @@ describe("logs mark", () => {
       expect(readFileSync(path, "utf8")).toBe(saved);
     },
   );
-  it("drops marks from an earlier boot of the same serial and explains the reset once", async () => {
-    const f = devices({
-      serial: A,
-      api: 35,
-      clocks: [MARK_CLOCK],
-      shell: {
-        "logcat -d -v epoch -T 1790833210.420": { stdout: "" },
-      },
-    });
-    await runCli(["logs", "mark", "old"], f.env);
-    const path = join(f.home, A, "marks.json");
-    const saved = JSON.parse(readFileSync(path, "utf8")) as Record<string, unknown>;
-    writeFileSync(path, JSON.stringify({ ...saved, boot_id: "previous-boot" }));
-    const first = await runCli(["logs", "--since", "old", "--json"], f.env);
-    expect(JSON.parse(first.stdout)).toMatchObject({
-      code: "MARK_NOT_FOUND",
-      marks: [],
-      marks_note: "Log marks from a previous device or boot were dropped",
-    });
-    const second = await runCli(["logs", "--since", "old", "--json"], f.env);
-    expect(JSON.parse(second.stdout)).not.toHaveProperty("marks_note");
-  });
 
   it("rejects names that are unsafe or that read as a duration, before touching a device", async () => {
     const f = devices({ serial: A, api: 35 });

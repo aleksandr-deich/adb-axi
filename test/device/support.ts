@@ -120,9 +120,16 @@ export class Axi {
    * Run one command as a user who has not picked a device: no `--device` and no
    * `ANDROID_SERIAL`. The exit code is the caller's to check.
    */
-  async unselected(args: readonly string[], deadlineMs = 120_000): Promise<AxiRun> {
-    const env = { ...this.env };
-    delete env.ANDROID_SERIAL;
+  async unselected(
+    args: readonly string[],
+    deadlineMs = 120_000,
+    overrides: Record<string, string> = {},
+  ): Promise<AxiRun> {
+    const env = Object.fromEntries(
+      Object.entries({ ...this.env, ...overrides }).filter(
+        ([key]) => key !== "ANDROID_SERIAL" || key in overrides,
+      ),
+    );
     const call = await this.call(withFlags(args, ["--json"]), deadlineMs, env);
     return { ...call, json: JSON.parse(call.stdout) as Record<string, unknown> };
   }

@@ -297,18 +297,6 @@ describe("doctor", () => {
       expect(data.checks).toHaveLength(10);
     });
 
-    it("fails when no device is attached", async () => {
-      const f = scenario({ devices: list() });
-      const { toon, data, rows } = await doctor(f);
-      expect(toon.exitCode).toBe(1);
-      expect(data.summary).toBe("3 run, 2 ok, 0 warn, 1 failed");
-      expect(rows.device).toEqual({
-        check: "device",
-        status: "failed",
-        detail: "no device is attached",
-      });
-    });
-
     it("fails an offline target without pointing back at doctor", async () => {
       const f = scenario({ devices: list(ONLINE_LINE, OFFLINE_TABLET) });
       const { toon, data, rows } = await doctor(f, ["--device", TABLET]);

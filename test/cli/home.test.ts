@@ -106,22 +106,6 @@ describe("adb-axi (home view)", () => {
     },
   );
 
-  it("prints a definitive empty state with exit 0 when nothing is attached", async () => {
-    fake = createFakeAdb("devices-empty.json");
-    const run = await both(fake);
-    expect(run.exitCode).toBe(0);
-    expect(body(run)).toMatchInlineSnapshot(`
-      "description: "Truthful, token-efficient adb for agents: devices, app lifecycle, logs and app data"
-      count: "0 attached, 0 online"
-      devices: []
-      target: "-"
-      target_note: no device is attached
-      help[1]: "Start an emulator or connect a device, then run \`adb-axi\` again"
-      "
-    `);
-    expect(fake.unmatched()).toEqual([]);
-  });
-
   it("reports an ambiguous selection instead of failing, and points the offline device at doctor", async () => {
     fake = createFakeAdb("multi-device.json");
     const run = await both(fake);

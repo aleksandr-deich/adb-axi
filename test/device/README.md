@@ -18,7 +18,8 @@ The checks drive adb-axi installed from a packed tarball against one emulator, u
 | `5-logs-crash`          | a Java crash counts once and zero after the next mark; a native crash and an ANR are reported; the ANR report is in the system buffer                                                                                       |
 | `6-app-observation`     | named log windows across process restarts, filters/mark replacement, wait transitions and timeouts, package metadata, absent packages, the launcher in front and actual Room/WAL reads                                      |
 | `6-device-state`        | the target's serial, AVD name and API match device properties; `app current` matches independent window-focus and kernel-PID queries                                                                                        |
-| `7-offline`             | runs last and stops the emulator; a command against it then fails with a typed error in under 2 s                                                                                                                           |
+| `7-reboot`              | reboots the emulator: `wait boot` times out with the last state, then waits until the services answer; marks from the old boot are dropped once; an unattached serial times out naming it                                   |
+| `8-offline`             | runs last and stops the emulator; a command against it then fails with a typed error in under 2 s; with nothing else attached, `devices`, the home view and `doctor` give a definitive empty state                          |
 
 Run them against an emulator nobody else is using. The last check shuts it down:
 

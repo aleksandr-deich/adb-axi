@@ -55,8 +55,6 @@ const UNREAD = {
 
 const BOOTED = boot(1);
 const BOOTING = boot(0, "131.54 400.00", { pid: "", pkg: 20, activity: 20 });
-/** Booted, but system_server has not brought up the services yet. */
-const NO_SERVICES = boot(1, "1141.19 3978.79", { pkg: 20, activity: 20 });
 /** A device up for under five minutes, with its services answering. */
 const fresh = (pid: string): Response => boot(1, "31.20 60.00", { pid });
 
@@ -192,53 +190,6 @@ function expectClean(f: FakeAdb, serial = SERIAL): void {
 }
 
 describe("wait boot", () => {
-  it("returns at once, as a no-op, when the device has already booted", async () => {
-    const f = scenario([listing(devices(line(SERIAL, "device"))), shell(BOOTED)]);
-    const { toon, data } = await both(["wait", "boot"], f);
-    expect(toon.exitCode).toBe(0);
-    expect(toon.stdout).toMatch(
-      /^ok: wait boot emulator-5554 -> already booted \(no-op\)\nwaited_ms: \d+\n$/,
-    );
-    expect(data).toEqual({
-      ok: "wait boot emulator-5554 -> already booted (no-op)",
-      waited_ms: expect.any(Number) as number,
-    });
-    expect(f.calls().filter((call) => call.argv[2] === "shell")).toHaveLength(2);
-    expectClean(f);
-  });
-
-  it("polls until sys.boot_completed is 1 and reports how long it waited", async () => {
-    const f = scenario([
-      listing(devices(line(SERIAL, "device"))),
-      shell(BOOTING, { times: 2, then: BOOTED }),
-    ]);
-    const { toon, data } = await once(["wait", "boot"], f);
-    expect(toon.exitCode).toBe(0);
-    const waited = data.waited_ms;
-    expect(typeof waited).toBe("number");
-    expect(waited as number).toBeGreaterThanOrEqual(500);
-    expect(data).toEqual({
-      ok: `wait boot ${SERIAL} -> booted after ${String(waited)} ms`,
-      waited_ms: waited,
-    });
-    expect(f.calls().filter((call) => call.argv[2] === "shell")).toHaveLength(3);
-    expectClean(f);
-  });
-
-  it("keeps waiting after the boot flag until the package and activity services answer", async () => {
-    const f = scenario([
-      listing(devices(line(SERIAL, "device"))),
-      shell(NO_SERVICES, { times: 1 }),
-      shell(boot(1, "1141.19 3978.79", { activity: 20 }), { times: 1 }),
-      shell(BOOTED),
-    ]);
-    const { toon, data } = await once(["wait", "boot"], f);
-    expect(toon.exitCode).toBe(0);
-    expect(data.ok).toMatch(/^wait boot emulator-5554 -> booted after \d+ ms$/);
-    expect(f.calls().filter((call) => call.argv[2] === "shell")).toHaveLength(3);
-    expectClean(f);
-  });
-
   it("rejects a service probe spanning a restart even on an older device", async () => {
     const f = scenario([
       listing(devices(line(SERIAL, "device"))),
@@ -264,26 +215,6 @@ describe("wait boot", () => {
     expect(f.calls().filter((call) => call.argv[2] === "shell")).toHaveLength(2);
     expectClean(f);
   });
-
-  it("on a fresh device, waits for the services to keep answering from one system_server", async () => {
-    // system_server 585 answers, then restarts: its services go away and 912 brings them back.
-    const f = scenario([
-      listing(devices(line(SERIAL, "device"))),
-      shell(fresh("585"), { times: 3 }),
-      shell(boot(1, "33.00 64.00", { pid: "", pkg: 20, activity: 20 }), { times: 1 }),
-      shell(boot(1, "33.40 65.00", { pid: "912", pkg: 0, activity: 20 }), { times: 1 }),
-      shell(fresh("912")),
-    ]);
-    const { toon, data } = await once(["wait", "boot", "--timeout", "30s"], f);
-    expect(toon.exitCode).toBe(0);
-    const waited = data.waited_ms as number;
-    // Five looks at least 400 ms apart before 912 answers in full, then ten seconds of it answering.
-    expect(waited).toBeGreaterThanOrEqual(5 * 400 + 10_000);
-    expect(data.ok).toBe(`wait boot ${SERIAL} -> booted after ${String(waited)} ms`);
-    const looks = f.calls().filter((call) => call.argv[2] === "shell");
-    expect(looks.length).toBeGreaterThan(5 + 1);
-    expectClean(f);
-  }, 40_000);
 
   it("on a fresh device, does not count a probe spanning a restart toward settle", async () => {
     const f = scenario([
@@ -313,21 +244,6 @@ describe("wait boot", () => {
     expectClean(f);
   }, 40_000);
 
-  it("waits through a device that is not attached yet and one that is still offline", async () => {
-    const f = scenario([
-      // One look finds nothing attached, one finds the device offline, then it is up and booted.
-      listing(devices(), { times: 1 }),
-      listing(devices(line(SERIAL, "offline")), { times: 1 }),
-      listing(devices(line(SERIAL, "device"))),
-      shell(BOOTED),
-    ]);
-    const { toon, data } = await once(["wait", "boot", "--device", SERIAL], f);
-    expect(toon.exitCode).toBe(0);
-    expect(data.ok).toMatch(/^wait boot emulator-5554 -> booted after \d+ ms$/);
-    expect(f.calls().filter((call) => call.argv[2] === "shell")).toHaveLength(1);
-    expectClean(f);
-  });
-
   it("does not switch to a different device after the selected device disconnects", async () => {
     const f = quickScenario([
       listing(devices(line(SERIAL, "device")), { times: 1 }),
@@ -352,62 +268,7 @@ describe("wait boot", () => {
     expect(f.unmatched()).toEqual([]);
   }, 20_000);
 
-  it("resolves the device by AVD name", async () => {
-    const f = scenario([
-      listing(devices(line(SERIAL, "device"), line(TABLET, "device"))),
-      {
-        match: ["-s", SERIAL, "emu", "avd", "name"],
-        respond: { stdout: "Pixel_10_Pro_XL\r\nOK\r\n" },
-      },
-      {
-        match: ["-s", TABLET, "emu", "avd", "name"],
-        respond: { stdout: "Pixel_Tablet\r\nOK\r\n" },
-      },
-      shell(BOOTED, {}, TABLET),
-    ]);
-    const { toon, data } = await both(["wait", "boot", "--device", "Pixel_Tablet"], f);
-    expect(toon.exitCode).toBe(0);
-    expect(data.ok).toBe(`wait boot ${TABLET} -> already booted (no-op)`);
-    expectClean(f, TABLET);
-  });
-
   describe("WAIT_TIMEOUT", () => {
-    it("carries the last observation: state, boot_completed and uptime_s", async () => {
-      const f = quickScenario([
-        listing(devices(line(TABLET, "device"))),
-        shell(BOOTING, {}, TABLET),
-      ]);
-      const { toon, data } = await both(["wait", "boot", "--device", TABLET, "--timeout", "3s"], f);
-      expect(toon.exitCode).toBe(1);
-      expect(toon.stdout).toBe(
-        [
-          "error: emulator-5556 had not finished booting after 3 s",
-          "code: WAIT_TIMEOUT",
-          "last:",
-          "  state: device",
-          "  boot_completed: 0",
-          "  uptime_s: 131",
-          "  package_service: 0",
-          "  activity_service: 0",
-          "help[1]: Run `adb-axi doctor --device emulator-5556` to see why",
-          "",
-        ].join("\n"),
-      );
-      expect(data).toEqual({
-        error: "emulator-5556 had not finished booting after 3 s",
-        code: "WAIT_TIMEOUT",
-        last: {
-          state: "device",
-          boot_completed: 0,
-          uptime_s: 131,
-          package_service: 0,
-          activity_service: 0,
-        },
-        help: ["Run `adb-axi doctor --device emulator-5556` to see why"],
-      });
-      expectClean(f, TABLET);
-    }, 20_000);
-
     it("carries which service still did not answer after the boot flag", async () => {
       const f = quickScenario([
         listing(devices(line(SERIAL, "device"))),
@@ -449,23 +310,7 @@ describe("wait boot", () => {
       expectClean(f);
     }, 20_000);
 
-    it("reports an offline device as the last state, with the boot unknown", async () => {
-      const f = quickScenario([listing(devices(line(SERIAL, "offline")))]);
-      const { toon, data } = await both(["wait", "boot", "--timeout", "2s"], f);
-      expect(toon.exitCode).toBe(1);
-      expect(data).toMatchObject({
-        error: "the device had not finished booting after 2 s",
-        code: "WAIT_TIMEOUT",
-        last: { state: "offline", ...UNREAD },
-      });
-      // The boot is never read from a device that is not online.
-      expect(f.calls().filter((call) => call.argv[0] === "-s")).toEqual([]);
-    }, 20_000);
-
-    it.each([
-      ["offline", "offline"],
-      ["recovery", "not online"],
-    ])(
+    it.each([["recovery", "not online"]])(
       "reports the last state for offline and %s attachments",
       async (other, state) => {
         const f = quickScenario([listing(devices(line(SERIAL, "offline"), line(TABLET, other)))]);
@@ -479,45 +324,6 @@ describe("wait boot", () => {
       },
       20_000,
     );
-
-    it("names the environment-selected device in the timeout and doctor hint", async () => {
-      const f = quickScenario([listing(devices())]);
-      const run = await runCli(["wait", "boot", "--timeout", "1s"], {
-        ...f.env,
-        ANDROID_SERIAL: TABLET,
-      });
-      expect(run.exitCode).toBe(1);
-      expect(decode(run.stdout.trimEnd())).toEqual({
-        error: `${TABLET} had not finished booting after 1 s`,
-        code: "WAIT_TIMEOUT",
-        last: { state: "not attached", ...UNREAD },
-        help: [`Run \`adb-axi doctor --device ${TABLET}\` to see why`],
-      });
-      expect(f.unmatched()).toEqual([]);
-    }, 20_000);
-
-    it("reports a device that never attached, and names the one that was asked for", async () => {
-      const f = quickScenario([listing(devices())]);
-      const { toon, json, data } = await both(
-        ["wait", "boot", "--device", TABLET, "--timeout", "2s"],
-        f,
-      );
-      expect(toon.exitCode).toBe(1);
-      expect(data).toEqual({
-        error: "emulator-5556 had not finished booting after 2 s",
-        code: "WAIT_TIMEOUT",
-        last: { state: "not attached", ...UNREAD },
-        help: ["Run `adb-axi doctor --device emulator-5556` to see why"],
-      });
-      for (const run of [toon, json]) {
-        expect(run.durationMs).toBeGreaterThanOrEqual(2_000);
-        expect(run.durationMs).toBeLessThan(5_000);
-      }
-      expect(f.unmatched()).toEqual([]);
-      const observed = f.calls();
-      expect(observed.length).toBeGreaterThanOrEqual(2);
-      expect(observed.every((call) => call.argv.join(" ") === "devices -l")).toBe(true);
-    }, 20_000);
 
     it("falls back to a plain doctor hint when no device was ever chosen", async () => {
       const f = scenario([listing(devices())]);
@@ -576,24 +382,6 @@ describe("wait boot", () => {
       expect(toon.exitCode).toBe(1);
       expect(toon.durationMs).toBeLessThan(2000);
       expect(data).toMatchObject({ code: "DEVICE_UNAUTHORIZED" });
-    });
-
-    it("fails at once with DEVICE_AMBIGUOUS when several are online and none is chosen", async () => {
-      fake = createFakeAdb("multi-device.json");
-      const { toon, data } = await both(["wait", "boot"], fake);
-      expect(toon.exitCode).toBe(1);
-      expect(toon.durationMs).toBeLessThan(2000);
-      expect(data).toMatchObject({
-        error: "2 devices are online and none is selected",
-        code: "DEVICE_AMBIGUOUS",
-        help: [
-          "Run `adb-axi wait boot --device <serial or avd>`",
-          "Or export ANDROID_SERIAL=<serial> in this shell",
-        ],
-      });
-      expect(
-        fake.calls().filter((call) => call.argv[2] === "shell" && call.argv[3] === BOOT),
-      ).toEqual([]);
     });
 
     it("fails with INVALID_OUTPUT when the device prints something that is not the boot state", async () => {

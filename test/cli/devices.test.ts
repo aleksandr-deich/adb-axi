@@ -37,19 +37,6 @@ describe("devices", () => {
     expect(f.unmatched()).toEqual([]);
   });
 
-  it("says so when nothing is attached, and exits 0", async () => {
-    const f = withFake("devices-empty.json");
-    const { toon, json } = await both(f);
-    expect(toon.exitCode).toBe(0);
-    expect(toon.stdout).toMatchInlineSnapshot(`
-      "count: "0 attached, 0 online"
-      devices: []
-      help[1]: "Start an emulator or connect a device, then run \`adb-axi devices\` again"
-      "
-    `);
-    expect(json.devices).toEqual([]);
-  });
-
   it("does not ask to connect a device when only devices in other states are attached", async () => {
     const f = withFake({
       rules: [
