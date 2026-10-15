@@ -1,6 +1,6 @@
 # Real-device tools
 
-Nothing here runs in `npm test` or `npm run check`. The device checks run on every pull request and on pushes to `main`: the full suite on API 30 and 35 emulators, and only `1-process-death.test.ts` on API 29 (`.github/workflows/emulator.yml`). Everything here changes the devices it touches, so run it only on emulators reserved for the job, and always name each one by serial.
+Nothing here runs in `npm test` or `npm run check`. The device checks run on every pull request and on pushes to `main`: the full suite on API 30 and 35 emulators, and `0-app-lifecycle.test.ts` plus `1-process-death.test.ts` on API 29 (`.github/workflows/emulator.yml`). Everything here changes the devices it touches, so run it only on emulators reserved for the job, and always name each one by serial.
 
 ## Device checks (`*.test.ts`)
 
@@ -8,6 +8,7 @@ The checks drive adb-axi installed from a packed tarball against one emulator, u
 
 | File              | What it checks                                                                                                                        |
 | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `0-app-lifecycle` | keep-data uninstall removes code and processes; `app info` reports absent; repeated uninstall is a no-op; reinstall preserves a Room row, in JSON and TOON |
 | `1-process-death` | `app kill` then `app restore`: the saved counter survives, the volatile one resets, a new process, and no crash since the mark        |
 | `2-app-start`     | `app start` on the app in front is not recreated; `--fresh` is a cold start                                                           |
 | `3-data-db`       | a row still only in `probe.db-wal` comes back from `data db`; the release build gives `APP_NOT_DEBUGGABLE`                            |

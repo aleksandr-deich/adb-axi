@@ -70,7 +70,7 @@ export async function mainPids(
 
 /**
  * Resolve the current Android user once and require installation for that user. No
- * package record, an absent user record, or an uninstalled record is `APP_NOT_INSTALLED`.
+ * package record, an absent/uninstalled user record, or no installed code is `APP_NOT_INSTALLED`.
  * The returned user ID scopes subsequent mutations and observations even if users switch.
  */
 export async function requireInstalled(

@@ -37,7 +37,7 @@ export function parsePackageList(stdout: string): ListedPackage[] {
   return packages;
 }
 
-/** What `dumpsys package <pkg>` says about one package. */
+/** Package metadata with selected-user installation state. */
 export interface PackageInfo {
   package: string;
   /** Installed for the selected Android user; device reads also verify code availability. */
@@ -130,7 +130,7 @@ export function parsePackageRecords(stdout: string, userId = 0): Map<string, Pac
   return records;
 }
 
-/** One package's record, or `null` when the device has none (never installed). */
+/** One package's raw record, or `null` when the dump has none. */
 export function parseDumpsysPackage(stdout: string, pkg: string, userId = 0): PackageInfo | null {
   return parsePackageRecords(stdout, userId).get(pkg) ?? null;
 }
@@ -149,6 +149,11 @@ export async function readPackage(
   return (await readPackageSnapshot(adb, serial, pkg, options, userId)).info;
 }
 
+/**
+ * Retained records on Android 10/11 can still claim installation after code removal,
+ * so a true user flag needs code-path evidence (see test/unit/package-installed.test.ts).
+ * Keep the raw dump for lifecycle activity metadata, separate from verified installation.
+ */
 export async function readPackageSnapshot(
   adb: AdbClient,
   serial: string,
