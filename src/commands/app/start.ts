@@ -224,13 +224,7 @@ export async function launchActivity(
 ): Promise<{ start: AmStart; launched: Component; processName: string; settled: Seen }> {
   const adb = context.adb();
   const serial = targetSerial(context);
-  const watch = await LaunchWatch.open(
-    adb,
-    serial,
-    component.package,
-    userId,
-    readOptions(context),
-  );
+  const watch = await LaunchWatch.open(adb, serial, userId, readOptions(context));
   const start = await watch.during(
     (signal) =>
       amStart(
