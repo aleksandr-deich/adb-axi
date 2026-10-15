@@ -209,6 +209,10 @@ describe("ordinary installed probe lifecycle", () => {
       const absent = await command(["app", "uninstall", PKG], format);
       noop(absent, format, true);
       expect(absent.ok).toBe(`uninstall ${PKG} -> already not installed (no-op)`);
+      expect((await command(["app", "info", PKG], format)).app).toEqual({
+        package: PKG,
+        installed: false,
+      });
       const installed = await command(["app", "install", DEBUG_APK], format);
       expect(installed.ok).toBe(`install ${PKG} -> 1.0 (1) with data kept`);
       expect(installed.install).toMatchObject({ previous: "not installed", debuggable: true });

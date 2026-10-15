@@ -339,3 +339,56 @@ describe("real observation windows and package state", () => {
     expect(empty.rows).toEqual([]);
   });
 });
+
+describe("reads with nothing of the probe's in front", () => {
+  test("app current names the launcher in front, with its own activity and pid", async () => {
+    await axi.sh("input keyevent KEYCODE_HOME");
+    const component = await axi.waitFocused((value) => !value.startsWith(`${PKG}/`));
+    const [launcher, activity] = component.split("/");
+    const pids = await axi.pidsOf(launcher ?? "");
+    expect(pids).toHaveLength(1);
+    expect(await parity(["app", "current"])).toEqual({
+      app: { package: launcher, activity, pid: pids[0] },
+    });
+  });
+
+  test("app info and app list say plainly what is not installed", async () => {
+    await axi.ok(["app", "uninstall", PKG]);
+    expect(await axi.sh(`pm path ${PKG} || true`)).toBe("");
+    expect(await parity(["app", "info", PKG])).toEqual({
+      app: { package: PKG, installed: false },
+    });
+    const users = (await axi.sh("pm list packages --user 0 -3")).trim();
+    const userCount = users === "" ? 0 : users.split("\n").length;
+    const systemCount =
+      Number((await axi.sh("pm list packages --user 0 | wc -l")).trim()) - userCount;
+    const list = await parity(["app", "list"]);
+    expect(list.count).toBe(
+      `${userCount} user package${userCount === 1 ? "" : "s"} shown, ${systemCount} system packages hidden (use --all)`,
+    );
+    expect(list.packages).toHaveLength(userCount);
+  });
+
+  test("wait app gives up at its deadline with the last state it saw", async () => {
+    await axi.ok(["app", "stop", PKG]);
+    await axi.sh("input keyevent KEYCODE_HOME");
+    const front = (await axi.waitFocused((value) => !value.startsWith(`${PKG}/`))).split("/")[0];
+    const run = await axi.run(["wait", "app", PKG, "--state", "foreground", "--timeout", "2s"]);
+    expect(run.exitCode).toBe(1);
+    expect(run.durationMs).toBeLessThan(2_000 + 1_500);
+    expect(run.json).toEqual({
+      error: `${PKG} did not reach foreground within 2 s`,
+      code: "WAIT_TIMEOUT",
+      last: { state: "stopped", pid: "-", foreground: front },
+      help: [
+        `Run \`adb-axi app info ${PKG} --device ${axi.serial}\` for its pid and foreground state`,
+        `Run \`adb-axi app current --device ${axi.serial}\` to see what is in front`,
+      ],
+    });
+    expect(
+      (await axi.text(["wait", "app", PKG, "--state", "foreground", "--timeout", "2s"], 30_000, 1))
+        .data,
+    ).toEqual(run.json);
+    expect(await axi.pidsOf(PKG)).toEqual([]);
+  });
+});

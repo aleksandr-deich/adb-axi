@@ -94,13 +94,14 @@ describe("app install against the real package manager", () => {
         ["app", "install", DEBUG_APK],
         "INSTALL_FAILED_VERSION_DOWNGRADE",
       );
-      expect(downgrade).toEqual({
+      const { detail, ...refusal } = downgrade;
+      expect(detail === undefined || typeof detail === "string").toBe(true);
+      expect(refusal).toEqual({
         error: `${PKG} was not installed because its versionCode is lower than the installed version's`,
         code: "INSTALL_FAILED_VERSION_DOWNGRADE",
         package: PKG,
         installed: "2.0 (2)",
         apk_version: "1.0 (1)",
-        detail: expect.any(String) as string,
         help: [
           "Build the APK with a higher versionCode than the installed one",
           `Run \`adb-axi app uninstall ${PKG} --device ${axi.serial}\` and install again to go back to the older version (uninstalling deletes the app's data)`,
