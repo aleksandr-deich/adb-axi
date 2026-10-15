@@ -26,7 +26,7 @@ jobs:
         api-level: [30, 35]
         include:
           - api-level: 29
-            test-file: test/device/1-process-death.test.ts
+            test-file: test/device/0-app-lifecycle.test.ts test/device/1-process-death.test.ts
     env:
       ANDROID_SERIAL: emulator-5554
     steps:

@@ -1,5 +1,6 @@
 import { appendFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
+import { decode } from "@toon-format/toon";
 import { expect, inject } from "vitest";
 import { exec } from "../../src/core/exec.js";
 
@@ -43,7 +44,17 @@ export class Axi {
 
   /** Run one command; the exit code is the caller's to check. */
   async run(args: readonly string[], deadlineMs = 120_000): Promise<AxiRun> {
-    const full = [...args, "--device", this.serial, "--json"];
+    const call = await this.call([...args, "--device", this.serial, "--json"], deadlineMs);
+    return { ...call, json: JSON.parse(call.stdout) as Record<string, unknown> };
+  }
+
+  async text(args: readonly string[], deadlineMs = 120_000): Promise<Record<string, unknown>> {
+    const call = await this.call([...args, "--device", this.serial], deadlineMs);
+    expect(call.exitCode, `adb-axi ${call.args.join(" ")}\n${call.stdout}${call.stderr}`).toBe(0);
+    return decode(call.stdout.trimEnd()) as Record<string, unknown>;
+  }
+
+  private async call(full: readonly string[], deadlineMs: number): Promise<Omit<AxiRun, "json">> {
     const result = await exec({ file: this.bin, args: full, env: this.env, deadlineMs });
     const stdout = result.stdout.toString("utf8");
     const stderr = result.stderr.toString("utf8");
@@ -65,7 +76,6 @@ export class Axi {
       durationMs: result.durationMs,
       stdout,
       stderr,
-      json: JSON.parse(stdout) as Record<string, unknown>,
     };
   }
 
