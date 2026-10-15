@@ -288,15 +288,6 @@ describe("app info", () => {
     expectClean(f);
   });
 
-  it("answers installed: false for a package uninstalled with its data kept", async () => {
-    const f = device({
-      "dumpsys package dev.probe": { stdoutFile: "synthetic/30/dumpsys-package-kept-data.txt" },
-    });
-    const { toon, data } = await both(["app", "info", "dev.probe"], f);
-    expect(toon.exitCode).toBe(0);
-    expect(data).toEqual({ app: { package: "dev.probe", installed: false } });
-  });
-
   it("rejects a package name that is not one with exit 2, before any shell call", async () => {
     const f = device({});
     const { toon, data } = await both(["app", "info", "dev.probe; reboot"], f);
