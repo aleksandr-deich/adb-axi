@@ -130,7 +130,7 @@ describe("lifecycle review regressions", () => {
     expect(toon.exitCode).toBe(0);
     expect(data).toEqual({ ok: "stop dev.probe -> already not running (no-op)" });
     expect(shellCommands(f)).toEqual(
-      twice([CURRENT_USER, PACKAGE, PIDOF, KERNEL_UIDS, FORCE_STOP]),
+      twice([CURRENT_USER, PACKAGE, "pm path --user 0 dev.probe", PIDOF, KERNEL_UIDS, FORCE_STOP]),
     );
     expectClean(f);
   });
@@ -146,7 +146,7 @@ describe("lifecycle review regressions", () => {
     expect(toon.exitCode).toBe(0);
     expect(data).toEqual({ ok: "stop dev.probe -> already not running (no-op)" });
     expect(shellCommands(f)).toEqual(
-      twice([CURRENT_USER, PACKAGE, PIDOF, KERNEL_UIDS, FORCE_STOP]),
+      twice([CURRENT_USER, PACKAGE, "pm path --user 0 dev.probe", PIDOF, KERNEL_UIDS, FORCE_STOP]),
     );
     expectClean(f);
   });

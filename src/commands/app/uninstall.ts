@@ -31,8 +31,6 @@ export const appUninstall = defineCommand({
     const adb = context.adb();
     const userId = await readCurrentUser(adb, serial, options);
 
-    // Raw `pm uninstall` fails for a package that is not there; here that is the state
-    // asked for. A record kept by `pm uninstall -k` (`installed=false`) is not installed either.
     const record = await readPackage(adb, serial, pkg, options, userId);
     if (record === null || !record.installed) {
       const warning = forgetInstallRecord(serial, pkg, context.env);

@@ -113,6 +113,7 @@ describe("packages", () => {
   it("reads an installed package and a missing one from the captured output", async () => {
     const { f, adb } = device({
       "dumpsys package dev.probe": { stdoutFile: "captured/35/dumpsys-package-release.txt" },
+      "pm path --user 0 dev.probe": { stdoutFile: "captured/35/pm-path.txt" },
       "dumpsys package dev.probe.missing": {
         stdoutFile: "captured/35/dumpsys-package-absent.txt",
       },
@@ -123,7 +124,11 @@ describe("packages", () => {
       uid: 10213,
     });
     expect(await readPackage(adb, SERIAL, "dev.probe.missing", options())).toBeNull();
-    expectAddressed(f, ["dumpsys package dev.probe", "dumpsys package dev.probe.missing"]);
+    expectAddressed(f, [
+      "dumpsys package dev.probe",
+      "pm path --user 0 dev.probe",
+      "dumpsys package dev.probe.missing",
+    ]);
   });
 
   it("lists third-party packages with versionCode and uid (API 29, synthetic)", async () => {

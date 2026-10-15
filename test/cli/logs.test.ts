@@ -54,6 +54,10 @@ function deviceRules(device: Device): Rule[] {
       match: ["-s", device.serial, "shell", command],
       respond,
     })),
+    {
+      match: ["-s", device.serial, "shell", "pm path --user 0 dev.probe"],
+      respond: { stdout: "package:/data/app/probe/base.apk\n" },
+    },
   ];
 }
 

@@ -106,6 +106,19 @@ export class Axi {
     return time ?? "";
   }
 
+  async pidsOf(name: string): Promise<number[]> {
+    const json = await this.ok([
+      "shell",
+      `ps -A -o PID,NAME | awk '$2 == "${name}" || $2 == "[${name}]" {print}'`,
+    ]);
+    expect(typeof json.stdout).toBe("string");
+    return (json.stdout as string)
+      .split("\n")
+      .map((line) => line.trim().split(/\s+/))
+      .filter((columns) => columns[1] === name || columns[1] === `[${name}]`)
+      .map((columns) => Number(columns[0]));
+  }
+
   /** Count probe crashes since a mark and return the CLI's crash payload, or {} if absent. */
   async crashes(since: string): Promise<{ count: number; crash: Record<string, unknown> }> {
     const json = await this.ok(["logs", "crash", "--pkg", PKG, "--since", since]);

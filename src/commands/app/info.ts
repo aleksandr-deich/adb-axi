@@ -33,8 +33,6 @@ export const appInfo = defineCommand({
     const adb = context.adb();
     const userId = await readCurrentUser(adb, serial, options);
 
-    // Not installed is an answer. A record that says `installed=false` is a package
-    // uninstalled with its data kept, which is not installed either.
     const record = await readPackage(adb, serial, pkg, options, userId);
     if (record === null || !record.installed) {
       return { app: { package: pkg, installed: false } };

@@ -66,6 +66,7 @@ describe("app stop", () => {
     expect(shellCommands(f)).toEqual([
       CURRENT_USER,
       PACKAGE,
+      "pm path --user 0 dev.probe",
       PIDOF,
       KERNEL_UIDS,
       FORCE_STOP,
@@ -100,6 +101,10 @@ describe("app stop", () => {
           respond: { stdout: "  PID   UID\n 5120 10213\n 5187 10213\n" },
         },
         { match: shell(PACKAGE), respond: INSTALLED },
+        {
+          match: shell("pm path --user 0 dev.probe"),
+          respond: { stdout: "package:/data/app/probe/base.apk\n" },
+        },
         { match: shell(FORCE_STOP), respond: {}, set: { proc: "stopped" } },
         {
           match: shell(PIDOF),
@@ -129,7 +134,13 @@ describe("app stop", () => {
     const f = device({ [PACKAGE]: INSTALLED, [PIDOF]: PROBE_STOPPED, [FORCE_STOP]: {} });
     const run = await runCli(["app", "stop", "dev.probe"], f.env);
     expect(run.exitCode).toBe(0);
-    expect(shellCommands(f)).toEqual([CURRENT_USER, PACKAGE, PIDOF, FORCE_STOP]);
+    expect(shellCommands(f)).toEqual([
+      CURRENT_USER,
+      PACKAGE,
+      "pm path --user 0 dev.probe",
+      PIDOF,
+      FORCE_STOP,
+    ]);
   });
 
   it("fails with STOP_FAILED, carrying the pid, when the process outlives the deadline", async () => {
@@ -188,7 +199,9 @@ describe("app clear", () => {
       ok: "clear dev.probe -> data cleared, process stopped",
       confirmed_by: ["pm clear", "run-as"],
     });
-    expect(shellCommands(f)).toEqual(twice([CURRENT_USER, PACKAGE, CLEAR, PIDOF, DATA_FILES]));
+    expect(shellCommands(f)).toEqual(
+      twice([CURRENT_USER, PACKAGE, "pm path --user 0 dev.probe", CLEAR, PIDOF, DATA_FILES]),
+    );
     expectClean(f);
   });
 
@@ -221,7 +234,9 @@ describe("app clear", () => {
       ok: "clear dev.probe -> data cleared, process stopped",
       confirmed_by: ["pm clear"],
     });
-    expect(shellCommands(f)).toEqual(twice([CURRENT_USER, PACKAGE, CLEAR, PIDOF]));
+    expect(shellCommands(f)).toEqual(
+      twice([CURRENT_USER, PACKAGE, "pm path --user 0 dev.probe", CLEAR, PIDOF]),
+    );
     expectClean(f);
   });
 
@@ -272,7 +287,9 @@ describe("app clear", () => {
       ok: "clear dev.probe -> data cleared, process stopped",
       confirmed_by: ["pm clear"],
     });
-    expect(shellCommands(f)).toEqual(twice([CURRENT_USER, PACKAGE, CLEAR, PIDOF, DATA_FILES]));
+    expect(shellCommands(f)).toEqual(
+      twice([CURRENT_USER, PACKAGE, "pm path --user 0 dev.probe", CLEAR, PIDOF, DATA_FILES]),
+    );
     expectClean(f);
   });
 
@@ -616,11 +633,20 @@ describe("launched activity process identity", () => {
       expect(shellCommands(f)).toEqual([
         CURRENT_USER,
         PACKAGE,
+        `pm path --user ${userId} dev.probe`,
         aliasStart,
         aliasMetadata,
         PROCESSES,
         FOREGROUND,
-        ...twice([CURRENT_USER, PACKAGE, aliasStart, targetMetadata, PROCESSES, FOREGROUND]),
+        ...twice([
+          CURRENT_USER,
+          PACKAGE,
+          `pm path --user ${userId} dev.probe`,
+          aliasStart,
+          targetMetadata,
+          PROCESSES,
+          FOREGROUND,
+        ]),
       ]);
       expectClean(f);
     },

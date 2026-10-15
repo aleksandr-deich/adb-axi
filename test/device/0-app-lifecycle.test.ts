@@ -21,14 +21,11 @@ async function seed(): Promise<void> {
   await axi.probe("write");
   const state = probeState(await axi.waitLog("event=write saved=1 volatile=1 rows=1 ", "seed"));
   expect(state).toMatchObject({ saved: "1", volatile: "1", rows: "1" });
+  expect(await axi.pidsOf(PKG)).toEqual([Number(state.pid)]);
 }
 
 async function gone(): Promise<void> {
-  const processes = await axi.ok([
-    "shell",
-    `ps -A -o PID,NAME | awk '$2 == "${PKG}" || $2 == "[${PKG}]" {print}'`,
-  ]);
-  expect(processes.stdout).toBe("");
+  expect(await axi.pidsOf(PKG)).toEqual([]);
   const activity = await axi.ok([
     "shell",
     `dumpsys activity processes | grep -E 'ProcessRecord.*:${PKG}/' || true`,

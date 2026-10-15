@@ -297,8 +297,10 @@ describe("app install", () => {
       `shell ${SDK}`,
       "shell am get-current-user",
       `shell ${DUMPSYS}`,
+      `shell pm path --user 0 ${PKG}`,
       `install -r ${APK}`,
       `shell ${DUMPSYS}`,
+      `shell pm path --user 0 ${PKG}`,
     ]);
     expectClean(fake);
     expect(toon.stderr).toBe("");
@@ -384,6 +386,10 @@ describe("app install", () => {
           { match: shell(SDK), respond: { stdout: "35\n" } },
           { match: shell("am get-current-user"), respond: { stdout: "0\n" } },
           {
+            match: shell("pm path --user 0 dev.probe"),
+            respond: { stdoutFile: "captured/35/pm-path.txt" },
+          },
+          {
             match: shell("dumpsys package dev.probe"),
             when: { pkg: "absent" },
             respond: { stdoutFile: "captured/35/dumpsys-package-absent.txt" },
@@ -459,6 +465,7 @@ describe("app install", () => {
         `shell ${SDK}`,
         "shell am get-current-user",
         `shell ${DUMPSYS}`,
+        `shell pm path --user 0 ${PKG}`,
         `shell ${APK_PATH}`,
         `exec-out ${CAT_APK}`,
       ]);
@@ -846,12 +853,15 @@ describe("app install", () => {
         `shell ${SDK}`,
         "shell am get-current-user",
         `shell ${DUMPSYS}`,
+        `shell pm path --user 10 ${PKG}`,
         `install -r ${APK}`,
         `shell ${DUMPSYS}`,
+        `shell pm path --user 10 ${PKG}`,
         `shell pm path --user 10 ${PKG}`,
         `shell ${SHA_APK}`,
         `shell pm clear --user 10 ${PKG}`,
         `shell ${DUMPSYS}`,
+        `shell pm path --user 10 ${PKG}`,
       ]);
       expectClean(fake);
     });
@@ -864,12 +874,15 @@ describe("app install", () => {
         `shell ${SDK}`,
         "shell am get-current-user",
         `shell ${DUMPSYS}`,
+        `shell pm path --user 0 ${PKG}`,
         `install -r ${APK}`,
         `shell ${DUMPSYS}`,
+        `shell pm path --user 0 ${PKG}`,
         `shell pm path --user 0 ${PKG}`,
         `shell ${SHA_APK}`,
         `shell pm clear --user 0 ${PKG}`,
         `shell ${DUMPSYS}`,
+        `shell pm path --user 0 ${PKG}`,
       ]);
       expectClean(fake);
     });
@@ -978,7 +991,14 @@ describe("app install", () => {
       [
         "has no base APK",
         (): Partial<World> => ({
-          rules: [{ match: shell(`pm path --user 0 ${PKG}`), respond: { stdout: "" } }],
+          rules: [
+            {
+              match: shell(`pm path --user 0 ${PKG}`),
+              respond: { stdout: "package:/data/app/notes/base.apk\n" },
+              times: 2,
+            },
+            { match: shell(`pm path --user 0 ${PKG}`), respond: { stdout: "" } },
+          ],
         }),
       ],
     ])("refuses the wipe when the installed package %s", async (_name, evidence) => {
@@ -1022,12 +1042,15 @@ describe("app install", () => {
         `shell ${SDK}`,
         "shell am get-current-user",
         `shell ${DUMPSYS}`,
+        `shell pm path --user 0 ${PKG}`,
         `install -r ${APK}`,
         `shell ${DUMPSYS}`,
+        `shell pm path --user 0 ${PKG}`,
         `shell pm path --user 0 ${PKG}`,
         `shell ${SHA_APK}`,
         `shell pm clear --user 0 ${PKG}`,
         `shell ${DUMPSYS}`,
+        `shell pm path --user 0 ${PKG}`,
       ]);
       expectClean(fake);
     });
@@ -1315,6 +1338,7 @@ describe("app uninstall", () => {
     expect(calls(fake)).toEqual([
       "shell am get-current-user",
       `shell ${DUMPSYS}`,
+      `shell pm path --user 10 ${PKG}`,
       `shell pm uninstall --user 10 ${PKG}`,
       `shell ${DUMPSYS}`,
     ]);
@@ -1337,6 +1361,7 @@ describe("app uninstall", () => {
     expect(calls(fake)).toEqual([
       "shell am get-current-user",
       `shell ${DUMPSYS}`,
+      `shell pm path --user 0 ${PKG}`,
       `shell pm uninstall --user 0 ${PKG}`,
       `shell ${DUMPSYS}`,
     ]);
@@ -1521,8 +1546,10 @@ describe("app uninstall", () => {
       expect(calls(fake)).toEqual([
         "shell am get-current-user",
         `shell ${DUMPSYS}`,
+        `shell pm path --user ${userId} ${PKG}`,
         `shell pm uninstall${keepData ? " -k" : ""} ${PKG}`,
         `shell ${DUMPSYS}`,
+        `shell pm path --user ${userId} ${PKG}`,
       ]);
       expect(data.help).toContainEqual(expect.stringContaining("for all users"));
     },

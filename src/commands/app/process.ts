@@ -1,5 +1,5 @@
 import type { AdbClient } from "../../adb/run.js";
-import { parseDumpsysPackage, type PackageInfo } from "../../android/packages.js";
+import { readPackageSnapshot, type PackageInfo } from "../../android/packages.js";
 import { pidof } from "../../android/pidof.js";
 import { readCurrentUser } from "../../android/users.js";
 import { readProcesses, type ProcessRecord } from "../../android/processes.js";
@@ -78,14 +78,13 @@ export async function requireInstalled(
   pkg: string,
 ): Promise<InstalledPackage> {
   const userId = await readCurrentUser(context.adb(), targetSerial(context), readOptions(context));
-  const result = await readShell(
+  const { info, dump } = await readPackageSnapshot(
     context.adb(),
     targetSerial(context),
-    `dumpsys package ${pkg}`,
-    `reading package ${pkg}`,
+    pkg,
     readOptions(context),
+    userId,
   );
-  const info = parseDumpsysPackage(result.stdout, pkg, userId);
   if (info === null || !info.installed) {
     throw new AdbAxiError("APP_NOT_INSTALLED", `${pkg} is not installed on this device`, {
       help: [
@@ -99,7 +98,7 @@ export async function requireInstalled(
       ],
     });
   }
-  return { info, dump: result.stdout, userId };
+  return { info, dump, userId };
 }
 
 /** `am force-stop` prints nothing and exits 0 whether or not anything was running. */

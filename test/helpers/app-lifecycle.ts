@@ -28,6 +28,7 @@ export const PROCESS_RUNNING = {
   stdoutFile: "captured/35/dumpsys-activity-processes-probe-front.txt",
 };
 export const PACKAGE = "dumpsys package dev.probe";
+export const CODE_PATH = "pm path --user 0 dev.probe";
 export const FOREGROUND = "dumpsys activity activities";
 export const PIDOF = "pidof dev.probe";
 export const FORCE_STOP = "am force-stop --user 0 dev.probe";
@@ -96,6 +97,10 @@ export function lifecycleDevices(track: (fake: FakeAdb) => void) {
       rules: [
         { match: ["devices", "-l"], respond: { stdout: ONE_ONLINE } },
         ...rules,
+        ...[0, 10].map((userId) => ({
+          match: shell(`pm path --user ${userId} dev.probe`),
+          respond: { stdout: "package:/data/app/probe/base.apk\n" },
+        })),
         { match: shell(CURRENT_USER), respond: { stdout: "0\n" } },
         { match: shell(RESOLVE), respond: { stdout: "dev.probe/.MainActivity\n" } },
         { match: shell(PROCESSES), respond: PROCESS_RUNNING },
@@ -135,6 +140,7 @@ export function lifecycleDevices(track: (fake: FakeAdb) => void) {
           respond: { stdout: "  PID   UID\n" },
         },
         { match: shell(PACKAGE), respond: INSTALLED },
+        { match: shell(CODE_PATH), respond: { stdout: "package:/data/app/probe/base.apk\n" } },
         { match: shell(FORCE_STOP), respond: {}, set: { proc: "stopped" } },
         { match: shell(CLEAR), respond: { stdout: "Success\n" }, set: { proc: "stopped" } },
         { match: shell(DATA_FILES), respond: {} },

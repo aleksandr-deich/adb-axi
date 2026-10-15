@@ -48,6 +48,10 @@ function deviceWithRules(rules: Rule[]): FakeAdb {
     rules: [
       { match: ["devices", "-l"], respond: { stdout: ONE_ONLINE } },
       ...rules,
+      ...[0, 10].map((userId) => ({
+        match: ["-s", SERIAL, "shell", `pm path --user ${userId} dev.probe`],
+        respond: { stdout: "package:/data/app/probe/base.apk\n" },
+      })),
       { match: ["-s", SERIAL, "shell", "am get-current-user"], respond: { stdout: "0\n" } },
     ],
   });
@@ -453,6 +457,7 @@ describe("app info", () => {
     expect(shellCommands(f)).toEqual([
       "am get-current-user",
       "dumpsys package dev.probe",
+      "pm path --user 10 dev.probe",
       PIDOF,
       FOREGROUND,
       "run-as dev.probe --user 10 du -sk .",

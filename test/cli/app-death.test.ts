@@ -15,6 +15,7 @@ const ONE_ONLINE = `List of devices attached\n${SERIAL}          device product:
 
 const CURRENT_USER = "am get-current-user";
 const PACKAGE = "dumpsys package dev.probe";
+const CODE_PATH = "pm path --user 0 dev.probe";
 const PIDOF = "pidof dev.probe";
 const KERNEL_UIDS = "ps -A -o PID,UID,NAME";
 const PROCESSES = "dumpsys activity processes dev.probe";
@@ -132,6 +133,10 @@ function probeDevice(probe: Probe): FakeAdb {
     { match: ["devices", "-l"], respond: { stdout: ONE_ONLINE } },
     { match: shell(CURRENT_USER), respond: { stdout: "0\n" } },
     { match: shell(PACKAGE), respond: probe.package ?? INSTALLED },
+    ...[0, 10].map((userId) => ({
+      match: shell(`pm path --user ${userId} dev.probe`),
+      respond: { stdout: "package:/data/app/probe/base.apk\n" },
+    })),
     { match: shell(RECENTS), respond: probe.recents ?? RECENTS_KEPT },
     { match: shell(METADATA), respond: ACTIVITY_INFO },
     {
@@ -351,7 +356,7 @@ describe("app kill", () => {
       );
       expect(toon.exitCode).toBe(1);
       expect(data).toMatchObject({ code: "INVALID_OUTPUT" });
-      expect(shellCommands(fake)).toEqual([CURRENT_USER, PACKAGE, KERNEL_UIDS]);
+      expect(shellCommands(fake)).toEqual([CURRENT_USER, PACKAGE, CODE_PATH, KERNEL_UIDS]);
       expectClean(fake);
     },
   );
@@ -447,6 +452,7 @@ describe("app kill", () => {
     expect(shellCommands(fake)).toEqual([
       CURRENT_USER,
       PACKAGE,
+      CODE_PATH,
       KERNEL_UIDS,
       PIDOF,
       FOREGROUND,
@@ -472,6 +478,7 @@ describe("app kill", () => {
     expect(shellCommands(fake)).toEqual([
       CURRENT_USER,
       PACKAGE,
+      CODE_PATH,
       KERNEL_UIDS,
       PIDOF,
       FOREGROUND,
@@ -491,7 +498,7 @@ describe("app kill", () => {
     expect(toon.exitCode).toBe(0);
     expect(toon.stdout).toBe("ok: kill dev.probe -> already not running (no-op)\n");
     expect(data).toEqual({ ok: "kill dev.probe -> already not running (no-op)" });
-    expect(shellCommands(fake)).toEqual([CURRENT_USER, PACKAGE, KERNEL_UIDS, PIDOF]);
+    expect(shellCommands(fake)).toEqual([CURRENT_USER, PACKAGE, CODE_PATH, KERNEL_UIDS, PIDOF]);
     expectClean(fake);
   });
 
@@ -710,6 +717,7 @@ describe("app restore", () => {
     expect(shellCommands(fake)).toEqual([
       CURRENT_USER,
       PACKAGE,
+      CODE_PATH,
       RECENTS,
       PROCESSES,
       START,
@@ -764,7 +772,7 @@ describe("app restore", () => {
         "Run `adb-axi app start dev.probe` to start it fresh (its saved state is not restored)",
       ],
     });
-    expect(shellCommands(fake)).toEqual([CURRENT_USER, PACKAGE, RECENTS]);
+    expect(shellCommands(fake)).toEqual([CURRENT_USER, PACKAGE, CODE_PATH, RECENTS]);
     expectClean(fake);
   });
 
