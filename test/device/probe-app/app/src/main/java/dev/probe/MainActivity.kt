@@ -1,6 +1,10 @@
 package dev.probe
 
+import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.database.sqlite.SQLiteDatabase
 import android.os.Bundle
 import android.os.Process
 import android.os.SystemClock
@@ -31,6 +35,7 @@ import kotlinx.coroutines.channels.Channel
  * A probe for adb-axi's real-device checks, driven only by explicit intents:
  *
  *   am start -n dev.probe/.MainActivity --es probe inc|state|write|finish|crash|native|anr
+ *   am start -n dev.probe/.MainActivity --es probe armcrash|finishremove|crashchain|alias|log|file|sql
  *
  * Every state change logs one `ProbeState` line, the oracle the checks read from logcat:
  *
@@ -45,6 +50,12 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         restored = savedInstanceState != null
+        // Armed by `armcrash`: the next create dies, so a start or a restore sees the process go.
+        val prefs = getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        if (prefs.getBoolean(ARMED, false)) {
+            prefs.edit().remove(ARMED).commit()
+            throw IllegalStateException("probe armed crash on create")
+        }
         // A recreated activity gets its original intent back; only a fresh start acts on it.
         if (!restored) dispatch(intent)
         setContent { ProbeScreen() }
@@ -65,6 +76,35 @@ class MainActivity : ComponentActivity() {
                 finish()
             }
             "crash" -> throw IllegalStateException("probe crash requested")
+            "crashchain" -> throw RuntimeException(
+                "probe outer failure",
+                IllegalArgumentException(
+                    "probe middle failure",
+                    IllegalStateException("probe root cause " + "r".repeat(intent.getIntExtra("length", 600))),
+                ),
+            )
+            "armcrash" -> {
+                getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(ARMED, true).commit()
+                Log.i(TAG, "event=armcrash pid=${Process.myPid()}")
+            }
+            // Leaves the process alive with no activity and no task in recents.
+            "finishremove" -> {
+                Log.i(TAG, "event=finishremove pid=${Process.myPid()}")
+                finishAndRemoveTask()
+            }
+            // The shell may not change an app's components on newer Android; the app itself may.
+            "alias" -> {
+                val on = intent.getBooleanExtra("on", true)
+                packageManager.setComponentEnabledSetting(
+                    ComponentName(this, "dev.probe.Alias"),
+                    if (on) PackageManager.COMPONENT_ENABLED_STATE_ENABLED else PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                    PackageManager.DONT_KILL_APP,
+                )
+                Log.i(TAG, "event=alias on=$on pid=${Process.myPid()}")
+            }
+            "log" -> logBurst(intent)
+            "file" -> writeFile(intent)
+            "sql" -> runSql(intent)
             // SIGSEGV to itself: debuggerd writes a native crash tombstone without any NDK code.
             "native" -> Process.sendSignal(Process.myPid(), SIGSEGV)
             // Blocks the main thread; any input sent meanwhile times out into an ANR.
@@ -74,6 +114,60 @@ class MainActivity : ComponentActivity() {
             }
             "inc", "state", "write" -> actions.trySend(action)
             else -> Log.w(TAG, "event=unknown action=$action pid=${Process.myPid()}")
+        }
+    }
+
+    /**
+     * `--ei count N --es text T [--es level v|d|i|w|e] [--es tag ProbeLog] [--ez numbered true]`:
+     * N lines of T, each suffixed ` #i` when numbered, then one `event=log` oracle line.
+     */
+    private fun logBurst(intent: Intent) {
+        val count = intent.getIntExtra("count", 1)
+        val text = intent.getStringExtra("text") ?: "probe line"
+        val tag = intent.getStringExtra("tag") ?: "ProbeLog"
+        val numbered = intent.getBooleanExtra("numbered", false)
+        val priority = when (intent.getStringExtra("level")) {
+            "v" -> Log.VERBOSE
+            "d" -> Log.DEBUG
+            "w" -> Log.WARN
+            "e" -> Log.ERROR
+            else -> Log.INFO
+        }
+        for (i in 1..count) Log.println(priority, tag, if (numbered) "$text #$i" else text)
+        Log.i(TAG, "event=log count=$count pid=${Process.myPid()}")
+    }
+
+    /**
+     * `--es name N [--es where files|databases] (--es text T | --ei bytes B)`: writes one
+     * private file, then logs `event=file`.
+     */
+    private fun writeFile(intent: Intent) {
+        val name = intent.getStringExtra("name") ?: "probe.bin"
+        val file = if (intent.getStringExtra("where") == "databases") getDatabasePath(name) else filesDir.resolve(name)
+        file.parentFile?.mkdirs()
+        val text = intent.getStringExtra("text")
+        if (text != null) file.writeText(text) else file.writeBytes(ByteArray(intent.getIntExtra("bytes", 0)) { 0x5a })
+        Log.i(TAG, "event=file name=$name bytes=${file.length()} pid=${Process.myPid()}")
+    }
+
+    /**
+     * `--es db NAME --es stmt SQL [--ez wal true]`: runs one statement on an app database kept
+     * open for the life of the process, so a WAL database keeps its -wal and -shm files.
+     */
+    private fun runSql(intent: Intent) {
+        val name = intent.getStringExtra("db") ?: "extra.db"
+        val stmt = intent.getStringExtra("stmt") ?: ""
+        try {
+            val db = databases.getOrPut(name) {
+                getDatabasePath(name).parentFile?.mkdirs()
+                SQLiteDatabase.openOrCreateDatabase(getDatabasePath(name), null).also {
+                    if (intent.getBooleanExtra("wal", false)) it.enableWriteAheadLogging()
+                }
+            }
+            db.execSQL(stmt)
+            Log.i(TAG, "event=sql db=$name ok pid=${Process.myPid()}")
+        } catch (error: Exception) {
+            Log.w(TAG, "event=sql db=$name error=${error.message} pid=${Process.myPid()}")
         }
     }
 
@@ -119,6 +213,9 @@ class MainActivity : ComponentActivity() {
     }
 
     private companion object {
+        val databases = mutableMapOf<String, SQLiteDatabase>()
+        const val PREFS = "probe"
+        const val ARMED = "crash_next_create"
         const val TAG = "ProbeState"
         const val EXTRA_PROBE = "probe"
         const val SIGSEGV = 11

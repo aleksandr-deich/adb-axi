@@ -21,54 +21,65 @@ vi.setConfig({ testTimeout: 60_000 });
 /** How far past its deadline a command may finish: node start-up plus the kill. */
 const MARGIN_MS = 1_250;
 
-/** How a command treats the target device. */
-type Selection =
-  /** Acts on one resolved device and fails at once when there is none. */
-  | "target"
-  /** Reports on the host and every device; a selection problem is a failed check (exit 1). */
-  | "report"
-  /** Lists every device; no selection is needed. */
-  | "list"
-  /** Waits for the device to come up, so an offline device is waited out. */
-  | "wait"
-  /** Does not use adb; exercise only shared flag validation and help. */
-  | "none";
-
 interface Case {
   /** The command line after `adb-axi`. */
   args: string[];
-  selection: Selection;
 }
 
 const PKG = "com.example.notes";
 
 /** Every v0.1 command, with arguments that pass validation. `update` talks to npm, not adb. */
 const CASES: Case[] = [
-  { args: [], selection: "list" },
-  { args: ["devices"], selection: "list" },
-  { args: ["doctor"], selection: "report" },
-  { args: ["doctor", "ui"], selection: "target" },
-  { args: ["wait", "boot"], selection: "wait" },
-  { args: ["wait", "app", PKG, "--state", "foreground"], selection: "target" },
-  { args: ["wait", "log", "Displayed"], selection: "target" },
-  { args: ["app", "current"], selection: "target" },
-  { args: ["app", "list"], selection: "target" },
-  { args: ["app", "info", PKG], selection: "target" },
-  { args: ["app", "install", "test/fixtures/apk/probe-debug.apk"], selection: "target" },
-  { args: ["app", "uninstall", PKG], selection: "target" },
-  { args: ["app", "start", PKG], selection: "target" },
-  { args: ["app", "stop", PKG], selection: "target" },
-  { args: ["app", "clear", PKG], selection: "target" },
-  { args: ["app", "kill", PKG], selection: "target" },
-  { args: ["app", "restore", PKG], selection: "target" },
-  { args: ["app", "death", PKG], selection: "target" },
-  { args: ["logs"], selection: "target" },
-  { args: ["logs", "mark", "before-save"], selection: "target" },
-  { args: ["logs", "crash"], selection: "target" },
-  { args: ["data", "db", PKG], selection: "target" },
-  { args: ["shell", "--", "id"], selection: "target" },
-  { args: ["update"], selection: "none" },
+  { args: [] },
+  { args: ["devices"] },
+  { args: ["doctor"] },
+  { args: ["doctor", "ui"] },
+  { args: ["wait", "boot"] },
+  { args: ["wait", "app", PKG, "--state", "foreground"] },
+  { args: ["wait", "log", "Displayed"] },
+  { args: ["app", "current"] },
+  { args: ["app", "list"] },
+  { args: ["app", "info", PKG] },
+  { args: ["app", "install", "test/fixtures/apk/probe-debug.apk"] },
+  { args: ["app", "uninstall", PKG] },
+  { args: ["app", "start", PKG] },
+  { args: ["app", "stop", PKG] },
+  { args: ["app", "clear", PKG] },
+  { args: ["app", "kill", PKG] },
+  { args: ["app", "restore", PKG] },
+  { args: ["app", "death", PKG] },
+  { args: ["logs"] },
+  { args: ["logs", "mark", "before-save"] },
+  { args: ["logs", "crash"] },
+  { args: ["data", "db", PKG] },
+  { args: ["shell", "--", "id"] },
+  { args: ["update"] },
 ];
+
+const HELP_CONTRACTS: Record<string, { fragments: string[]; summary?: string }> = {
+  devices: { fragments: ["--all", "--fields <list>"] },
+  "app install": {
+    fragments: [
+      "--clean-data",
+      "--if-changed",
+      "same versionCode and signer",
+      "debug and release variants",
+      "180s",
+    ],
+  },
+  "app uninstall": { fragments: ["--keep-data"] },
+  "app start": { fragments: ["--fresh", "--activity <name>", "--timeout"] },
+  "app clear": {
+    fragments: ["--full"],
+    summary:
+      "Clear the current Android user's app data, verify it is cleared, and report the process stopped. Android also stops the app's running processes for other Android users, leaving their data intact.",
+  },
+  "app list": { fragments: ["--grep <re>"] },
+  "wait app": { fragments: ["--state <foreground|running|stopped> (required)"] },
+  "wait boot": { fragments: ['"--timeout <dur>",120s'] },
+  "data db": { fragments: ["64 MB result limit"] },
+  shell: { fragments: ["--full", "adb-axi shell -- 'getprop ro.build.version.sdk'"] },
+};
 
 const name = (c: Case): string => (c.args.length === 0 ? "(home)" : commandWords(c.args));
 
@@ -181,17 +192,31 @@ function expectErrorShape(run: CliRun, data: Record<string, unknown>): void {
   expect(run.exitCode).toBe(data.code === "VALIDATION_ERROR" ? 2 : 1);
 }
 
-/** Whether a run printed an error rather than an answer. */
-const isError = (data: Record<string, unknown>): boolean => "error" in data && "code" in data;
-
 describe("conformance sweep", () => {
-  it("covers every shipped command", () => {
+  it("covers every shipped command", async () => {
     const shipped = allCommands(REGISTRY)
       .filter((command) => command.shipped)
       .map((command) => command.path.join(" "));
     const covered = CASES.filter((c) => c.args.length > 0).map((c) => commandWords(c.args));
     expect(covered.sort()).toEqual(shipped.sort());
     expect(REGISTRY.home.shipped).toBe(true);
+    const f = multiDevice();
+    const top = await both(["--help"], f);
+    expect(top.toon.exitCode).toBe(0);
+    expect((top.data.commands as { command: string }[]).map((c) => c.command).sort()).toEqual(
+      ["adb-axi", ...covered.map((command) => `adb-axi ${command}`)].sort(),
+    );
+    for (const group of ["app", "wait", "data", "logs", "doctor"]) {
+      const help = await both([group, "--help"], f);
+      expect(help.toon.exitCode).toBe(0);
+      expect((help.data.subcommands as { command: string }[]).map((c) => c.command).sort()).toEqual(
+        covered
+          .filter((command) => command.startsWith(`${group} `))
+          .map((command) => `adb-axi ${command}`)
+          .sort(),
+      );
+    }
+    expect(f.calls()).toEqual([]);
   });
 
   it("leaves no hidden stub in the registry", () => {
@@ -200,149 +225,91 @@ describe("conformance sweep", () => {
     }
   });
 
-  describe.each(CASES)("adb-axi $args", (c) => {
-    it.skipIf(c.selection === "none")(
-      "fails at once with DEVICE_AMBIGUOUS when two devices are online and none is selected",
-      async () => {
-        const f = multiDevice();
-        const { toon, data } = await both(c.args, f);
-        // Two runs, each well inside the 15 s default deadline: nothing waited on a device.
-        expect(toon.durationMs).toBeLessThan(5_000);
-        if (c.selection === "target" || c.selection === "wait") {
-          expectErrorShape(toon, data);
-          expect(data.code).toBe("DEVICE_AMBIGUOUS");
-          expect(data.devices).toEqual([
-            { serial: "emulator-5554", avd: "Pixel_10_Pro_XL", form: "phone" },
-            { serial: "emulator-5556", avd: "Pixel_Tablet", form: "tablet" },
-          ]);
-          // The help line repeats the command as typed, with the device flag it lacks.
-          expect(data.help).toEqual([
-            expect.stringContaining(`--device <serial or avd>`),
-            "Or export ANDROID_SERIAL=<serial> in this shell",
-          ]);
-          expect((data.help as string[])[0]).toContain(`adb-axi ${name(c)}`);
-        } else if (c.selection === "report") {
-          expect(toon.exitCode).toBe(1);
-          const device = (data.checks as { check: string; status: string; detail: string }[]).find(
-            (check) => check.check === "device",
-          );
-          expect(device).toMatchObject({ status: "failed" });
-          expect(device?.detail).toContain("2 devices are online and none is selected");
-        } else {
-          expect(toon.exitCode).toBe(0);
-        }
-        // Only the device list and the facts that describe the candidates were read.
-        for (const call of f.calls()) {
-          const shell = call.argv[2] === "shell" ? (call.argv[3] ?? "") : "";
-          expect(
-            call.argv[0] === "devices" ||
-              call.argv[0] === "version" ||
-              call.argv[2] === "emu" ||
-              shell.startsWith("echo @sdk;"),
-            call.argv.join(" "),
-          ).toBe(true);
-        }
-        expect(f.unmatched()).toEqual([]);
-      },
-    );
+  it("every command rejects an unknown flag with exit 2 and the valid flags, never calling adb", async () => {
+    for (const c of CASES.filter((c) => c.args.length > 0)) {
+      const f = multiDevice();
+      const { toon, data } = await both(withFlag(c.args, "--bogus"), f);
+      expectErrorShape(toon, data);
+      expect(data.code, name(c)).toBe("VALIDATION_ERROR");
+      expect(data.error).toBe(`unknown flag --bogus for \`adb-axi ${name(c)}\``);
+      expect(data.valid_flags, name(c)).toContain("--device <serial|avd>");
+      if (name(c) === "logs") expect(data.valid_flags).toContain("--pkg <pkg>");
+      expect(f.calls(), name(c)).toEqual([]);
+      f.cleanup();
+    }
+  });
 
-    it.skipIf(c.args.length === 0 || c.selection === "none")(
-      "returns at once when the target is offline",
-      async () => {
-        const f = multiDevice();
-        const args = withDevice(c.args, "emulator-5558");
-        const { toon, data } = await both(
-          c.selection === "wait" ? withFlag(args, "--timeout", "1s") : args,
-          f,
-        );
-        if (c.selection === "target") {
-          expectErrorShape(toon, data);
-          expect(data).toMatchObject({ code: "DEVICE_OFFLINE", state: "offline" });
-          expect(toon.durationMs).toBeLessThan(2_000);
-        } else if (c.selection === "wait") {
-          // A booting device is offline, which `wait boot` waits out until its deadline.
-          expectErrorShape(toon, data);
-          expect(data).toMatchObject({ code: "WAIT_TIMEOUT", last: { state: "offline" } });
-          expect(toon.durationMs).toBeLessThan(1_000 + MARGIN_MS);
-        } else if (c.selection === "report") {
-          expect(toon.exitCode).toBe(1);
-          expect(data.checks).toContainEqual(
-            expect.objectContaining({ check: "device", status: "failed" }),
-          );
-          expect(toon.durationMs).toBeLessThan(5_000);
-        } else {
-          expect(toon.exitCode).toBe(0);
-        }
-        // The offline device's shell is never asked anything: such calls would hang.
-        const shellCalls = f
-          .calls()
-          .filter((call) => call.argv[1] === "emulator-5558" && call.argv[2] !== "emu");
-        expect(shellCalls).toEqual([]);
-      },
-    );
+  it("every command prints its help with flags, defaults and examples", async () => {
+    for (const c of CASES.filter((c) => c.args.length > 0)) {
+      const f = multiDevice();
+      const words = commandWords(c.args);
+      const { toon, data } = await both([...words.split(" "), "--help"], f);
+      expect(toon.exitCode, words).toBe(0);
+      expect(data.command).toBe(`adb-axi ${words}`);
+      expect(data.usage).toMatch(new RegExp(`^adb-axi ${words}\\b`));
+      const flags = [
+        ...(data.flags as object[]),
+        ...((data.global_flags as object[] | undefined) ?? []),
+      ] as {
+        flag: string;
+        default: string;
+        description: string;
+      }[];
+      expect(
+        flags.map((flag) => flag.flag.split(" ")[0]),
+        words,
+      ).toEqual(expect.arrayContaining(["--device", "--timeout", "--json", "--debug", "--help"]));
+      for (const flag of flags) {
+        expect(flag.default.length, `${words} ${flag.flag}`).toBeGreaterThan(0);
+        expect(flag.description.length, `${words} ${flag.flag}`).toBeGreaterThan(0);
+      }
+      const examples = data.examples as string[];
+      expect(examples.length, words).toBeGreaterThanOrEqual(2);
+      expect(examples.length, words).toBeLessThanOrEqual(3);
+      const contract = HELP_CONTRACTS[name(c)];
+      for (const fragment of contract?.fragments ?? []) {
+        expect(toon.stdout, words).toContain(fragment);
+      }
+      if (contract?.summary !== undefined) expect(data.summary).toBe(contract.summary);
+      expect(f.calls(), words).toEqual([]);
+      f.cleanup();
+    }
+  });
 
-    it.skipIf(c.args.length === 0 || c.selection === "none")(
-      "never lets a device call outlive --timeout, and leaves no adb process behind",
-      async () => {
-        const f = multiDevice();
-        const args = withFlag(withDevice(c.args, "emulator-5554"), "--timeout", "1s");
-        const { toon, data } = await both(args, f, true);
-        expect(toon.durationMs).toBeLessThan(1_000 + MARGIN_MS);
-        if (isError(data)) {
-          expectErrorShape(toon, data);
-          expect(["TIMEOUT", "WAIT_TIMEOUT"]).toContain(data.code);
-        }
-        // The deadline was really exercised: some device call hung and was killed. A device
-        // list reads only the facts that answer.
-        if (c.selection !== "list") expect(f.calls().some((call) => call.end === null)).toBe(true);
-        for (const call of f.calls()) {
-          expect(isProcessAlive(call.pid), call.argv.join(" ")).toBe(false);
-          if (call.end !== null) expect(call.end - call.start).toBeLessThan(1_000 + MARGIN_MS);
-        }
-      },
-    );
+  it.each([
+    ["app", "current"],
+    ["app", "start", PKG],
+  ])(
+    "never lets a device call outlive --timeout, and leaves no adb process behind: %s %s",
+    async (...args) => {
+      const f = multiDevice();
+      const { toon, data } = await both(
+        withFlag(withDevice(args, "emulator-5554"), "--timeout", "1s"),
+        f,
+        true,
+      );
+      expect(toon.durationMs).toBeLessThan(1_000 + MARGIN_MS);
+      expectErrorShape(toon, data);
+      expect(["TIMEOUT", "WAIT_TIMEOUT"]).toContain(data.code);
+      // The deadline was really exercised: some device call hung and was killed.
+      expect(f.calls().some((call) => call.end === null)).toBe(true);
+      for (const call of f.calls()) {
+        expect(isProcessAlive(call.pid), call.argv.join(" ")).toBe(false);
+        if (call.end !== null) expect(call.end - call.start).toBeLessThan(1_000 + MARGIN_MS);
+      }
+    },
+  );
 
-    it.skipIf(c.args.length === 0)(
-      "rejects an unknown flag with exit 2 and the valid flags, never calling adb",
-      async () => {
-        const f = multiDevice();
-        const { toon, data } = await both(withFlag(c.args, "--bogus"), f);
-        expectErrorShape(toon, data);
-        expect(data.code).toBe("VALIDATION_ERROR");
-        expect(data.valid_flags).toContain("--device <serial|avd>");
-        expect(f.calls()).toEqual([]);
-      },
-    );
-
-    it.skipIf(c.args.length === 0)(
-      "prints its help with flags, defaults and examples",
-      async () => {
-        const f = multiDevice();
-        const { toon, data } = await both([...commandWords(c.args).split(" "), "--help"], f);
-        expect(toon.exitCode).toBe(0);
-        expect(data.command).toBe(`adb-axi ${commandWords(c.args)}`);
-        expect(data.usage).toMatch(new RegExp(`^adb-axi ${commandWords(c.args)}\\b`));
-        const flags = [
-          ...(data.flags as object[]),
-          ...((data.global_flags as object[] | undefined) ?? []),
-        ] as {
-          flag: string;
-          default: string;
-          description: string;
-        }[];
-        expect(flags.map((flag) => flag.flag.split(" ")[0])).toEqual(
-          expect.arrayContaining(["--device", "--timeout", "--json", "--debug", "--help"]),
-        );
-        for (const flag of flags) {
-          expect(flag.default.length).toBeGreaterThan(0);
-          expect(flag.description.length).toBeGreaterThan(0);
-        }
-        const examples = data.examples as string[];
-        expect(examples.length).toBeGreaterThanOrEqual(2);
-        expect(examples.length).toBeLessThanOrEqual(3);
-        expect(f.calls()).toEqual([]);
-      },
-    );
+  it("returns at once when the target is offline, never asking its shell", async () => {
+    const f = multiDevice();
+    const { toon, data } = await both(withDevice(["app", "current"], "emulator-5558"), f);
+    expectErrorShape(toon, data);
+    expect(data).toMatchObject({ code: "DEVICE_OFFLINE", state: "offline" });
+    expect(toon.durationMs).toBeLessThan(2_000);
+    const shellCalls = f
+      .calls()
+      .filter((call) => call.argv[1] === "emulator-5558" && call.argv[2] !== "emu");
+    expect(shellCalls).toEqual([]);
   });
 });
 

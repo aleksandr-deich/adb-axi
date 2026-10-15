@@ -60,7 +60,7 @@ describe("captured real-device output", () => {
 });
 
 describe("probe app APKs", () => {
-  it.each(["probe-debug.apk", "probe-release.apk"])(
+  it.each(readdirSync(APK_DIR).filter((name) => name.endsWith(".apk")))(
     "commits %s as a zip named in EVIDENCE.md",
     (name) => {
       const path = join(APK_DIR, name);

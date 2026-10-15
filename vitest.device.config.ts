@@ -3,7 +3,7 @@ import { BaseSequencer, type TestSpecification } from "vitest/node";
 
 /**
  * Files run one at a time in name order, because they share one emulator and the last one
- * (`7-offline`) shuts it down.
+ * (`8-offline`) shuts it down.
  */
 class ByName extends BaseSequencer {
   override sort(files: TestSpecification[]): Promise<TestSpecification[]> {

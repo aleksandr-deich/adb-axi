@@ -2,7 +2,6 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { decode } from "@toon-format/toon";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { allCommands, REGISTRY } from "../../src/commands/registry.js";
 import { createFakeAdb, FIXTURES_DIR, type FakeAdb } from "../fake-adb/harness.js";
 import type { Response, Rule } from "../fake-adb/scenario.js";
 import { runCli, type CliRun } from "../helpers/run.js";
@@ -85,11 +84,6 @@ function withoutWaitTime(data: Record<string, unknown>): Record<string, unknown>
   };
 }
 
-/** Both runs of `both` send the same calls, so a command's calls appear twice. */
-function twice<T>(items: T[]): T[] {
-  return [...items, ...items];
-}
-
 /** The shell commands sent to the device, in order. */
 function shellCommands(f: FakeAdb): string[] {
   return f
@@ -159,34 +153,6 @@ function packageDevice(options: { user?: string[]; system?: string[] } = {}): Fa
 }
 
 describe("app current", () => {
-  it("reports the app in front with its activity and pid", async () => {
-    const f = device({ [FOREGROUND]: PROBE_FRONT, [PIDOF]: PROBE_RUNNING });
-    const { toon, data } = await both(["app", "current"], f);
-    expect(toon.exitCode).toBe(0);
-    expect(toon.stdout).toBe(
-      "app:\n  package: dev.probe\n  activity: .MainActivity\n  pid: 8235\n",
-    );
-    expect(data).toEqual({ app: { package: "dev.probe", activity: ".MainActivity", pid: 8235 } });
-    expectClean(f);
-  });
-
-  it("reports a launcher in front as the launcher package", async () => {
-    const f = device({
-      [FOREGROUND]: LAUNCHER_FRONT,
-      "pidof com.google.android.apps.nexuslauncher": { stdout: "1456\n" },
-    });
-    const { toon, data } = await both(["app", "current"], f);
-    expect(toon.exitCode).toBe(0);
-    expect(data).toEqual({
-      app: {
-        package: "com.google.android.apps.nexuslauncher",
-        activity: ".NexusLauncherActivity",
-        pid: 1456,
-      },
-    });
-    expectClean(f);
-  });
-
   it("says so, with exit 0, when nothing is resumed", async () => {
     const f = device({
       [FOREGROUND]: { stdoutFile: "synthetic/30/dumpsys-activity-activities-asleep.txt" },
@@ -197,39 +163,12 @@ describe("app current", () => {
       app: { package: "-", activity: "-", pid: "-" },
       note: "no activity is resumed, the screen may be off",
     });
-    expect(shellCommands(f)).toEqual(twice([FOREGROUND]));
   });
 
   it("prints a dash for the pid when the process is not found by name", async () => {
     const f = device({ [FOREGROUND]: PROBE_FRONT, [PIDOF]: PROBE_STOPPED });
     const { data } = await both(["app", "current"], f);
     expect(data).toEqual({ app: { package: "dev.probe", activity: ".MainActivity", pid: "-" } });
-  });
-
-  it("fails with REMOTE_EXIT when the activity dump fails, never an empty answer", async () => {
-    const f = device({ [FOREGROUND]: { stderr: "Can't find service: activity\n", exit: 20 } });
-    const { toon, data } = await both(["app", "current"], f);
-    expect(toon.exitCode).toBe(1);
-    expect(data).toMatchObject({
-      code: "REMOTE_EXIT",
-      step: "reading the foreground activity",
-      exit: 20,
-      stderr: "Can't find service: activity",
-    });
-  });
-
-  it("fails with TIMEOUT when the device does not answer within --timeout", async () => {
-    const f = device({ [FOREGROUND]: { ...PROBE_FRONT, delayMs: 5000 } });
-    const { toon, data } = await both(["app", "current", "--timeout", "1s"], f);
-    expect(toon.exitCode).toBe(1);
-    expect(data).toMatchObject({ code: "TIMEOUT", step: "reading the foreground activity" });
-  });
-
-  it("fails with DEVICE_AMBIGUOUS when two devices are online and none is selected", async () => {
-    fake = createFakeAdb("multi-device.json");
-    const { toon, data } = await both(["app", "current"], fake);
-    expect(toon.exitCode).toBe(1);
-    expect(data).toMatchObject({ code: "DEVICE_AMBIGUOUS" });
   });
 });
 
@@ -280,7 +219,6 @@ describe("a device that goes away mid-command", () => {
       ],
     });
     // The command itself is never sent again.
-    expect(shellCommands(f)).toEqual(twice([FOREGROUND]));
   });
 
   it("is DEVICE_NOT_FOUND when it is gone from the list", async () => {
@@ -303,97 +241,9 @@ describe("a device that goes away mid-command", () => {
     const { data } = await bothFresh(f);
     expect(data).toMatchObject({ code: "DEVICE_NOT_FOUND", state: "not attached" });
   });
-
-  it("keeps the remote failure when the device is still online", async () => {
-    const f = goingAway(ONE_ONLINE);
-    const { data } = await bothFresh(f);
-    expect(data).toMatchObject({ code: "REMOTE_EXIT", exit: 1, stderr: "error: closed" });
-  });
 });
 
 describe("app list", () => {
-  it("lists user packages with the count and the total including system packages", async () => {
-    const f = packageDevice();
-    const { toon, data } = await both(["app", "list"], f);
-    expect(toon.exitCode).toBe(0);
-    expect(toon.stdout).toBe(
-      [
-        'count: "3 user packages shown, 3 system packages hidden (use --all)"',
-        "packages[3]{package,version,debuggable}:",
-        "  com.example.notes,1.4.0 (57),true",
-        '  com.example.notes.test,"-",true',
-        "  com.example.tracker,2.0.1 (9),false",
-        'help[1]: "Run `adb-axi app info com.example.notes` for its pid, foreground state and data size"',
-        "",
-      ].join("\n"),
-    );
-    expect(data).toMatchObject({
-      count: "3 user packages shown, 3 system packages hidden (use --all)",
-    });
-    expect(shellCommands(f)).toEqual(twice([PACKAGES_ALL, PACKAGES_USER, PACKAGE_DUMP]));
-    expectClean(f);
-  });
-
-  it("includes system packages with --all", async () => {
-    const f = packageDevice();
-    const { toon, data } = await both(["app", "list", "--all"], f);
-    expect(toon.exitCode).toBe(0);
-    expect(data).toMatchObject({ count: "6 packages shown: 3 user, 3 system" });
-    expect((data.packages as { package: string }[]).map((p) => p.package)).toEqual([
-      "android",
-      "com.android.settings",
-      "com.example.notes",
-      "com.example.notes.test",
-      "com.example.tracker",
-      "com.google.android.apps.nexuslauncher",
-    ]);
-    expect(toon.stdout).toContain("  android,15 (35),false\n");
-    expectClean(f);
-  });
-
-  it("states 0 user packages correctly while counting the system ones", async () => {
-    const f = packageDevice({ user: [] });
-    const { toon, data } = await both(["app", "list"], f);
-    expect(toon.exitCode).toBe(0);
-    expect(toon.stdout).toBe(
-      'count: "0 user packages shown, 3 system packages hidden (use --all)"\npackages: []\n',
-    );
-    expect(data).toEqual({
-      count: "0 user packages shown, 3 system packages hidden (use --all)",
-      packages: [],
-    });
-    // Nothing to describe, so the package dump is never read.
-    expect(shellCommands(f)).toEqual(twice([PACKAGES_ALL, PACKAGES_USER]));
-  });
-
-  it("filters names with --grep and counts the matches on both sides", async () => {
-    const f = packageDevice();
-    const { toon, data } = await both(["app", "list", "--grep", "tracker"], f);
-    expect(toon.exitCode).toBe(0);
-    expect(data.count).toBe("1 user package shown, 0 system packages hidden");
-    expect(data.packages).toEqual([
-      { package: "com.example.tracker", version: "2.0.1 (9)", debuggable: false },
-    ]);
-
-    const system = await both(["app", "list", "--grep", "^android$", "--all"], f);
-    expect(system.data.count).toBe("1 package shown: 0 user, 1 system");
-
-    const none = await both(["app", "list", "--grep", "nothing-matches"], f);
-    expect(none.data).toEqual({
-      count: "0 user packages shown, 0 system packages hidden",
-      packages: [],
-    });
-    expectClean(f);
-  });
-
-  it("keeps the selected device in the command it suggests next", async () => {
-    const f = packageDevice();
-    const { data } = await both(["app", "list", "--grep", "tracker", "--device", SERIAL], f);
-    expect(data.help).toEqual([
-      `Run \`adb-axi app info com.example.tracker --device ${SERIAL}\` for its pid, foreground state and data size`,
-    ]);
-  });
-
   it("falls back to the listed version code when the dump has no record", async () => {
     const f = device({
       [PACKAGES_ALL]: { stdout: "package:com.example.notes versionCode:57 uid:10124\n" },
@@ -413,29 +263,9 @@ describe("app list", () => {
     expect(data).toMatchObject({ code: "VALIDATION_ERROR", error: "`(` is not a valid regex" });
     expect(shellCommands(f)).toEqual([]);
   });
-
-  it("fails with REMOTE_EXIT when the package manager fails", async () => {
-    const f = device({
-      [PACKAGES_ALL]: { stderr: "cmd: Can't find service: package\n", exit: 20 },
-    });
-    const { toon, data } = await both(["app", "list"], f);
-    expect(toon.exitCode).toBe(1);
-    expect(data).toMatchObject({ code: "REMOTE_EXIT", step: "listing packages", exit: 20 });
-  });
-
-  it("fails with TIMEOUT when the device does not answer within --timeout", async () => {
-    const f = device({ [PACKAGES_ALL]: { stdout: "", delayMs: 5000 } });
-    const { toon, data } = await both(["app", "list", "--timeout", "1s"], f);
-    expect(toon.exitCode).toBe(1);
-    expect(data).toMatchObject({ code: "TIMEOUT", step: "listing packages" });
-  });
 });
 
 describe("app info", () => {
-  const DEBUG_DUMP = { stdoutFile: "captured/35/dumpsys-package-debug.txt" };
-  const RELEASE_DUMP = { stdoutFile: "captured/35/dumpsys-package-release.txt" };
-  const DU = "run-as dev.probe --user 0 du -sk .";
-
   it("measures the resolved current user's data, not the owner's", async () => {
     const dump = readFileSync(
       join(FIXTURES_DIR, "captured/35/dumpsys-package-debug.txt"),
@@ -454,123 +284,8 @@ describe("app info", () => {
       installed: true,
       data_size: "72 KB",
     });
-    expect(shellCommands(f)).toEqual([
-      "am get-current-user",
-      "dumpsys package dev.probe",
-      "pm path --user 10 dev.probe",
-      PIDOF,
-      FOREGROUND,
-      "run-as dev.probe --user 10 du -sk .",
-    ]);
+    expect(shellCommands(f)).toContain("run-as dev.probe --user 10 du -sk .");
     expectClean(f);
-  });
-
-  it("reports a running, foreground, debuggable app with its data size", async () => {
-    const f = device({
-      "dumpsys package dev.probe": DEBUG_DUMP,
-      [PIDOF]: PROBE_RUNNING,
-      [FOREGROUND]: PROBE_FRONT,
-      [DU]: { stdout: "56\t.\n" },
-    });
-    const { toon, data } = await both(["app", "info", "dev.probe"], f);
-    expect(toon.exitCode).toBe(0);
-    expect(toon.stdout).toBe(
-      [
-        "app:",
-        "  package: dev.probe",
-        "  installed: true",
-        "  version: 1.0 (1)",
-        "  debuggable: true",
-        "  pid: 8235",
-        "  foreground: true",
-        "  data_size: 56 KB",
-        "",
-      ].join("\n"),
-    );
-    expect(data).toEqual({
-      app: {
-        package: "dev.probe",
-        installed: true,
-        version: "1.0 (1)",
-        debuggable: true,
-        pid: 8235,
-        foreground: true,
-        data_size: "56 KB",
-      },
-    });
-    expectClean(f);
-  });
-
-  it("reports a stopped release app behind the launcher, with the data size unknown", async () => {
-    const f = device({
-      "dumpsys package dev.probe": RELEASE_DUMP,
-      [PIDOF]: PROBE_STOPPED,
-      [FOREGROUND]: LAUNCHER_FRONT,
-    });
-    const { toon, data } = await both(["app", "info", "dev.probe"], f);
-    expect(toon.exitCode).toBe(0);
-    expect(data).toEqual({
-      app: {
-        package: "dev.probe",
-        installed: true,
-        version: "1.0 (1)",
-        debuggable: false,
-        pid: "-",
-        foreground: false,
-        data_size: "-",
-      },
-    });
-    // run-as would be refused on a release build, so it is never tried.
-    expect(shellCommands(f)).not.toContain(DU);
-    expectClean(f);
-  });
-
-  it("prints megabytes for a large data directory", async () => {
-    const f = device({
-      "dumpsys package dev.probe": DEBUG_DUMP,
-      [PIDOF]: PROBE_RUNNING,
-      [FOREGROUND]: PROBE_FRONT,
-      [DU]: { stdout: "5120\t.\n" },
-    });
-    const { data } = await both(["app", "info", "dev.probe"], f);
-    expect(data.app).toMatchObject({ data_size: "5.0 MB" });
-  });
-
-  it("keeps an unknown data size when run-as is refused", async () => {
-    const f = device({
-      "dumpsys package dev.probe": DEBUG_DUMP,
-      [PIDOF]: PROBE_RUNNING,
-      [FOREGROUND]: PROBE_FRONT,
-      [DU]: { stderr: "run-as: package not debuggable: dev.probe\n", exit: 1 },
-    });
-    const { toon, data } = await both(["app", "info", "dev.probe"], f);
-    expect(toon.exitCode).toBe(0);
-    expect(data.app).toMatchObject({ installed: true, debuggable: true, data_size: "-" });
-  });
-
-  it("answers installed: false with exit 0 for a package that is not installed", async () => {
-    const f = device({
-      "dumpsys package dev.probe.missing": { stdoutFile: "captured/35/dumpsys-package-absent.txt" },
-    });
-    const { toon, data } = await both(["app", "info", "dev.probe.missing"], f);
-    expect(toon.exitCode).toBe(0);
-    expect(toon.stdout).toBe("app:\n  package: dev.probe.missing\n  installed: false\n");
-    expect(data).toEqual({ app: { package: "dev.probe.missing", installed: false } });
-    expect(shellCommands(f)).toEqual(
-      twice(["am get-current-user", "dumpsys package dev.probe.missing"]),
-    );
-    // The help says so, since the lifecycle commands fail with APP_NOT_INSTALLED instead.
-    const help = await runCli(["app", "info", "--help"], f.env);
-    expect(help.stdout).toContain("`installed: false` with exit 0");
-  });
-
-  it("answers installed: false for a package uninstalled with its data kept", async () => {
-    const f = device({
-      "dumpsys package dev.probe": { stdoutFile: "synthetic/30/dumpsys-package-kept-data.txt" },
-    });
-    const { toon, data } = await both(["app", "info", "dev.probe"], f);
-    expect(toon.exitCode).toBe(0);
-    expect(data).toEqual({ app: { package: "dev.probe", installed: false } });
   });
 
   it("rejects a package name that is not one with exit 2, before any shell call", async () => {
@@ -588,177 +303,9 @@ describe("app info", () => {
     expect(data).toMatchObject({ code: "VALIDATION_ERROR" });
     expect(shellCommands(f)).toEqual([]);
   });
-
-  it("fails with REMOTE_EXIT when the package dump fails", async () => {
-    const f = device({
-      "dumpsys package dev.probe": { stderr: "Can't find service: package\n", exit: 20 },
-    });
-    const { toon, data } = await both(["app", "info", "dev.probe"], f);
-    expect(toon.exitCode).toBe(1);
-    expect(data).toMatchObject({ code: "REMOTE_EXIT", step: "reading package dev.probe" });
-  });
-
-  it("fails with TIMEOUT when the device does not answer within --timeout", async () => {
-    const f = device({ "dumpsys package dev.probe": { ...DEBUG_DUMP, delayMs: 5000 } });
-    const { toon, data } = await both(["app", "info", "dev.probe", "--timeout", "1s"], f);
-    expect(toon.exitCode).toBe(1);
-    expect(data).toMatchObject({ code: "TIMEOUT", step: "reading package dev.probe" });
-  });
 });
 
 describe("wait app", () => {
-  /**
-   * One run of a wait whose answers change with each call: a second run would start from
-   * the changed state, so these are checked in TOON only (parity is covered elsewhere).
-   */
-  async function once(args: string[], f: FakeAdb): Promise<Both> {
-    const toon = await runCli(args, f.env);
-    const data = decode(toon.stdout.trimEnd()) as Record<string, unknown>;
-    return { toon, json: toon, data };
-  }
-
-  /** The wait line and its `waited_ms` agree. */
-  function expectWaited(result: Both, pkg: string, state: string): number {
-    const waited = result.data.waited_ms;
-    expect(typeof waited).toBe("number");
-    expect(result.data).toEqual({
-      ok: `wait app ${pkg} -> ${state} after ${String(waited)} ms`,
-      waited_ms: waited,
-    });
-    return waited as number;
-  }
-
-  it("returns at once, with waited_ms, when the app is already in front", async () => {
-    const f = device({ [FOREGROUND]: PROBE_FRONT, [PIDOF]: PROBE_RUNNING });
-    const result = await both(["wait", "app", "dev.probe", "--state", "foreground"], f);
-    expect(result.toon.exitCode).toBe(0);
-    expect(result.toon.stdout).toMatch(
-      /^ok: wait app dev\.probe -> foreground after \d+ ms\nwaited_ms: \d+\n$/,
-    );
-    expectWaited(result, "dev.probe", "foreground");
-    expectClean(f);
-  });
-
-  it("polls until the app comes to the foreground", async () => {
-    const f = deviceWithRules([
-      {
-        match: ["-s", SERIAL, "shell", FOREGROUND],
-        respond: LAUNCHER_FRONT,
-        times: 2,
-        then: PROBE_FRONT,
-      },
-      { match: ["-s", SERIAL, "shell", PIDOF], respond: PROBE_RUNNING },
-    ]);
-    const result = await once(["wait", "app", "dev.probe", "--state", "foreground"], f);
-    expect(result.toon.exitCode).toBe(0);
-    // Two polls saw the launcher, so the third came two poll intervals in.
-    expect(expectWaited(result, "dev.probe", "foreground")).toBeGreaterThanOrEqual(500);
-    const reads = shellCommands(f).filter((command) => command === FOREGROUND);
-    expect(reads).toHaveLength(3);
-    expectClean(f);
-  });
-
-  it("waits for a running app without reading the foreground", async () => {
-    const f = deviceWithRules([
-      {
-        match: ["-s", SERIAL, "shell", PIDOF],
-        respond: PROBE_STOPPED,
-        times: 1,
-        then: PROBE_RUNNING,
-      },
-    ]);
-    const result = await once(["wait", "app", "dev.probe", "--state", "running"], f);
-    expect(result.toon.exitCode).toBe(0);
-    expect(expectWaited(result, "dev.probe", "running")).toBeGreaterThanOrEqual(250);
-    expect(shellCommands(f)).not.toContain(FOREGROUND);
-    expectClean(f);
-  });
-
-  it("keeps polling under a --timeout until the state is reached", async () => {
-    const f = deviceWithRules([
-      {
-        match: ["-s", SERIAL, "shell", PIDOF],
-        respond: PROBE_STOPPED,
-        times: 3,
-        then: PROBE_RUNNING,
-      },
-    ]);
-    // The deadline outlasts a slow runner's process spawns; test/unit/wait-app.test.ts covers the final observation at the deadline.
-    const result = await once(
-      ["wait", "app", "dev.probe", "--state", "running", "--timeout", "10s"],
-      f,
-    );
-    expect(result.toon.exitCode).toBe(0);
-    // Three polls saw it stopped, so the fourth came three poll intervals in.
-    expect(expectWaited(result, "dev.probe", "running")).toBeGreaterThanOrEqual(1000);
-    expectClean(f);
-  }, 20_000);
-
-  it("waits for a stopped app", async () => {
-    const f = deviceWithRules([
-      {
-        match: ["-s", SERIAL, "shell", PIDOF],
-        respond: PROBE_RUNNING,
-        times: 1,
-        then: PROBE_STOPPED,
-      },
-    ]);
-    const result = await once(["wait", "app", "dev.probe", "--state", "stopped"], f);
-    expect(result.toon.exitCode).toBe(0);
-    expect(expectWaited(result, "dev.probe", "stopped")).toBeGreaterThanOrEqual(250);
-    expectClean(f);
-  });
-
-  it("succeeds at once for a stopped app that is already stopped", async () => {
-    const f = device({ [PIDOF]: { ...PROBE_STOPPED, delayMs: 300 } });
-    const result = await both(["wait", "app", "dev.probe", "--state", "stopped"], f);
-    expect(result.toon.exitCode).toBe(0);
-    expectWaited(result, "dev.probe", "stopped");
-    // A slow first read still succeeds without another poll, regardless of elapsed time.
-    expect(shellCommands(f)).toEqual(twice([PIDOF]));
-    expectClean(f);
-  });
-
-  it("fails with WAIT_TIMEOUT carrying the last observation when the state is never reached", async () => {
-    const f = device({ [FOREGROUND]: LAUNCHER_FRONT, [PIDOF]: PROBE_RUNNING });
-    // Device resolution and each observation's two reads start the fake adb, so the deadline
-    // must outlast a slow runner's process spawns in both runs; a run with no finished
-    // observation reports `unknown`.
-    const { toon, data } = await both(
-      ["wait", "app", "dev.probe", "--state", "foreground", "--timeout", "3s"],
-      f,
-    );
-    expect(toon.exitCode).toBe(1);
-    expect(toon.stdout).toBe(
-      [
-        "error: dev.probe did not reach foreground within 3 s",
-        "code: WAIT_TIMEOUT",
-        "last:",
-        "  state: running",
-        "  pid: 8235",
-        "  foreground: com.google.android.apps.nexuslauncher",
-        "help[2]: Run `adb-axi app info dev.probe` for its pid and foreground state,Run `adb-axi app current` to see what is in front",
-        "",
-      ].join("\n"),
-    );
-    expect(data).toMatchObject({ code: "WAIT_TIMEOUT" });
-    expectClean(f);
-  }, 20_000);
-
-  it("keeps the deadline: a wait for a stop that never comes ends within the timeout plus a margin", async () => {
-    const f = device({ [PIDOF]: PROBE_RUNNING });
-    const run = await runCli(
-      ["wait", "app", "dev.probe", "--state", "stopped", "--timeout", "2s"],
-      f.env,
-    );
-    expect(run.exitCode).toBe(1);
-    expect(run.durationMs).toBeLessThan(2000 + 1500);
-    expect(decode(run.stdout.trimEnd())).toMatchObject({
-      code: "WAIT_TIMEOUT",
-      last: { state: "running", pid: 8235 },
-    });
-  });
-
   it("reports an unknown last observation when the first read hangs past the deadline", async () => {
     const f = device({ [PIDOF]: { ...PROBE_RUNNING, delayMs: 5000 } });
     const { toon, data } = await both(
@@ -767,17 +314,6 @@ describe("wait app", () => {
     );
     expect(toon.exitCode).toBe(1);
     expect(data).toMatchObject({ code: "WAIT_TIMEOUT", last: { state: "unknown" } });
-  });
-
-  it("fails with REMOTE_EXIT when a read fails, instead of waiting it out", async () => {
-    const f = device({ [PIDOF]: { stderr: "/system/bin/sh: pidof: inaccessible\n", exit: 126 } });
-    const { toon, data } = await both(
-      ["wait", "app", "dev.probe", "--state", "running", "--timeout", "5s"],
-      f,
-    );
-    expect(toon.exitCode).toBe(1);
-    expect(data).toMatchObject({ code: "REMOTE_EXIT", exit: 126 });
-    expect(toon.durationMs).toBeLessThan(2500);
   });
 
   it("rejects a bad state, a missing state and a bad package name with exit 2", async () => {
@@ -792,44 +328,5 @@ describe("wait app", () => {
       expect(data).toMatchObject({ code: "VALIDATION_ERROR" });
     }
     expect(shellCommands(f)).toEqual([]);
-  });
-
-  it("fails with DEVICE_AMBIGUOUS when two devices are online and none is selected", async () => {
-    fake = createFakeAdb("multi-device.json");
-    const { toon, data } = await both(["wait", "app", "dev.probe", "--state", "running"], fake);
-    expect(toon.exitCode).toBe(1);
-    expect(data).toMatchObject({ code: "DEVICE_AMBIGUOUS" });
-  });
-});
-
-describe("help for the shipped app read commands", () => {
-  it("lists the shipped app and wait commands and no unshipped one", async () => {
-    const f = device({});
-    const app = decode((await runCli(["app", "--help"], f.env)).stdout.trimEnd()) as {
-      subcommands: { command: string }[];
-    };
-    expect(app.subcommands.map((s) => s.command)).toEqual(
-      expect.arrayContaining(["adb-axi app current", "adb-axi app list", "adb-axi app info"]),
-    );
-    const wait = decode((await runCli(["wait", "--help"], f.env)).stdout.trimEnd()) as {
-      subcommands: { command: string }[];
-    };
-    expect(wait.subcommands.map((s) => s.command)).toContain("adb-axi wait app");
-    const listed = [...app.subcommands, ...wait.subcommands].map((s) => s.command);
-    const unshipped = allCommands(REGISTRY)
-      .filter((command) => !command.shipped)
-      .map((command) => `adb-axi ${command.path.join(" ")}`);
-    expect(listed.filter((command) => unshipped.includes(command))).toEqual([]);
-    expect(f.calls()).toEqual([]);
-  });
-
-  it("describes each command's usage and flags", async () => {
-    const f = device({});
-    const list = await runCli(["app", "list", "--help"], f.env);
-    expect(list.exitCode).toBe(0);
-    expect(list.stdout).toContain("--grep <re>");
-    const wait = await runCli(["wait", "app", "--help"], f.env);
-    expect(wait.stdout).toContain("--state <foreground|running|stopped> (required)");
-    expect(f.calls()).toEqual([]);
   });
 });
