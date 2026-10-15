@@ -3,47 +3,46 @@ mRecentsUid=10190
 mRecentsComponent=ComponentInfo{com.google.android.apps.nexuslauncher/com.android.quickstep.RecentsActivity}
 mFreezeTaskListReordering=false
 mFreezeTaskListReorderingPendingTimeout=false
-mHiddenTasks=[Task{456f22c #21 type=standard A=10229:dev.probe}, Task{1ffcada #19 type=standard A=10229:dev.probe}, Task{806f510 #16 type=standard A=10229:dev.probe}, Task{352849a #12 type=standard A=10229:dev.probe}]
   Recent tasks:
-  * Recent #0: Task{368685d #29 type=standard A=10229:dev.probe}
+  * Recent #0: Task{1351765 #9 type=standard A=10229:dev.probe}
     userId=0 effectiveUid=u0a229 mCallingUid=2000 mUserSetupComplete=true mCallingPackage=com.android.shell mCallingFeatureId=null
     affinity=10229:dev.probe
     intent={flg=0x10000000 xflg=0x5 cmp=dev.probe/.MainActivity}
     mActivityComponent=dev.probe/.MainActivity
     autoRemoveRecents=false isPersistable=true activityType=1
     rootWasReset=false mNeverRelinquishIdentity=true mReuseTask=false mLockTaskAuth=LOCK_TASK_AUTH_PINNABLE
-    Activities=[ActivityRecord{229323316 u0 dev.probe/.MainActivity t29}]
-    mRootProcess=ProcessRecord{4482d59 11129:dev.probe/u0a229}
-    taskId=29 rootTaskId=29
+    Activities=[ActivityRecord{14719068 u0 dev.probe/.MainActivity t9}]
+    mRootProcess=ProcessRecord{187ce1d 7224:dev.probe/u0a229}
+    taskId=9 rootTaskId=9
     hasChildPipActivity=false
     mHasBeenVisible=true
     mResizeMode=RESIZE_MODE_RESIZEABLE_VIA_SDK_VERSION mSupportsPictureInPicture=false isResizeable=true
     isPerceptible=false
-    lastActiveTime=1093505 (inactive for 1s)
+    lastActiveTime=351350 (inactive for 1s)
      isTrimmable=true isForceHidden=false isForceExcludedFromRecents=false
     mSelfMovable=0
     mHandlePackageUpdate=false
-  * Recent #1: Task{95b8b5 #3 type=home I=com.google.android.apps.nexuslauncher/.NexusLauncherActivity}
+  * Recent #1: Task{3e5b97 #3 type=home I=com.google.android.apps.nexuslauncher/.NexusLauncherActivity}
     userId=0 effectiveUid=u0a190 mCallingUid=0 mUserSetupComplete=true mCallingPackage=null mCallingFeatureId=null
     intent={act=android.intent.action.MAIN cat=[android.intent.category.HOME] flg=0x10000100 cmp=com.google.android.apps.nexuslauncher/.NexusLauncherActivity}
     mActivityComponent=com.google.android.apps.nexuslauncher/.NexusLauncherActivity
     autoRemoveRecents=false isPersistable=true activityType=2
     rootWasReset=false mNeverRelinquishIdentity=true mReuseTask=false mLockTaskAuth=LOCK_TASK_AUTH_PINNABLE
-    Activities=[TaskFragment{c0a2e96 mode=multi-window}, ActivityRecord{149204204 u0 com.google.android.apps.nexuslauncher/.NexusLauncherActivity t3}]
-    mRootProcess=ProcessRecord{14cbecd 1422:com.google.android.apps.nexuslauncher/u0a190}
+    Activities=[TaskFragment{ca9123d mode=multi-window}, ActivityRecord{41649138 u0 com.google.android.apps.nexuslauncher/.NexusLauncherActivity t3}]
+    mRootProcess=ProcessRecord{15d14fd 1382:com.google.android.apps.nexuslauncher/u0a190}
     taskId=3 rootTaskId=1
     hasChildPipActivity=false
     mHasBeenVisible=true
     mResizeMode=RESIZE_MODE_RESIZEABLE mSupportsPictureInPicture=false isResizeable=true
     isPerceptible=false
-    lastActiveTime=1093080 (inactive for 1s)
+    lastActiveTime=351120 (inactive for 1s)
      isTrimmable=true isForceHidden=false isForceExcludedFromRecents=false
     mSelfMovable=0
     mHandlePackageUpdate=false
 
   Visible recent tasks (most recent first):
   * RecentTaskInfo #0: 
-    id=29 userId=0 hasTask=true lastActiveTime=1093505
+    id=9 userId=0 hasTask=true lastActiveTime=351350
     baseIntent=Intent { flg=0x10000000 cmp=dev.probe/.MainActivity }
     baseActivity={dev.probe/dev.probe.MainActivity}
     topActivity={dev.probe/dev.probe.MainActivity}

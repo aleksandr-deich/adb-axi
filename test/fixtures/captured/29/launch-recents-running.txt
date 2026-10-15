@@ -4,31 +4,31 @@ mRecentsComponent=ComponentInfo{com.android.launcher3/com.android.quickstep.Rece
 mFreezeTaskListReordering=false
 mFreezeTaskListReorderingPendingTimeout=false
   Recent tasks:
-  * Recent #0: TaskRecord{f8736a5 #26 A=dev.probe U=0 StackId=21 sz=1}
+  * Recent #0: TaskRecord{309c982 #68 A=dev.probe U=0 StackId=1 sz=1}
     userId=0 effectiveUid=u0a116 mCallingUid=2000 mUserSetupComplete=true mCallingPackage=null
     affinity=dev.probe
     intent={flg=0x10000000 cmp=dev.probe/.MainActivity}
     mActivityComponent=dev.probe/.MainActivity
     autoRemoveRecents=false isPersistable=true numFullscreen=1 activityType=1
     rootWasReset=false mNeverRelinquishIdentity=true mReuseTask=false mLockTaskAuth=LOCK_TASK_AUTH_PINNABLE
-    Activities=[ActivityRecord{c628955 u0 dev.probe/.MainActivity t26}]
+    Activities=[ActivityRecord{84bb410 u0 dev.probe/.MainActivity t68}]
     askedCompatMode=false inRecents=true isAvailable=true
-    mRootProcess=ProcessRecord{238f40f 5335:dev.probe/u0a116}
-    stackId=21
-    hasBeenVisible=true mResizeMode=RESIZE_MODE_RESIZEABLE_VIA_SDK_VERSION mSupportsPictureInPicture=false isResizeable=true lastActiveTime=1092452 (inactive for 0s)
-  * Recent #1: TaskRecord{1792a5e #5 I=com.android.launcher3/.Launcher U=0 StackId=0 sz=1}
+    mRootProcess=ProcessRecord{c9e1264 1985:dev.probe/u0a116}
+    stackId=1
+    hasBeenVisible=true mResizeMode=RESIZE_MODE_RESIZEABLE_VIA_SDK_VERSION mSupportsPictureInPicture=false isResizeable=true lastActiveTime=128364 (inactive for 0s)
+  * Recent #1: TaskRecord{a0efbce #2 I=com.android.launcher3/.Launcher U=0 StackId=0 sz=1}
     userId=0 effectiveUid=u0a101 mCallingUid=0 mUserSetupComplete=true mCallingPackage=null
     intent={act=android.intent.action.MAIN cat=[android.intent.category.HOME] flg=0x10000100 cmp=com.android.launcher3/.Launcher}
     mActivityComponent=com.android.launcher3/.Launcher
     autoRemoveRecents=false isPersistable=true numFullscreen=1 activityType=2
     rootWasReset=false mNeverRelinquishIdentity=true mReuseTask=false mLockTaskAuth=LOCK_TASK_AUTH_PINNABLE
-    Activities=[ActivityRecord{d685279 u0 com.android.launcher3/.Launcher t5}]
+    Activities=[ActivityRecord{63dda4f u0 com.android.launcher3/.Launcher t2}]
     askedCompatMode=false inRecents=true isAvailable=true
-    mRootProcess=ProcessRecord{e33de3f 1042:com.android.launcher3/u0a101}
+    mRootProcess=ProcessRecord{86e2aef 681:com.android.launcher3/u0a101}
     stackId=0
-    hasBeenVisible=true mResizeMode=RESIZE_MODE_RESIZEABLE mSupportsPictureInPicture=false isResizeable=true lastActiveTime=1092344 (inactive for 0s)
-  * Recent #2: TaskRecord{d6d9b86 #2 A=com.android.settings.FallbackHome U=0 StackId=-1 sz=0}
-    userId=0 effectiveUid=1000 mCallingUid=0 mUserSetupComplete=false mCallingPackage=null
+    hasBeenVisible=true mResizeMode=RESIZE_MODE_RESIZEABLE mSupportsPictureInPicture=false isResizeable=true lastActiveTime=128331 (inactive for 1s)
+  * Recent #2: TaskRecord{9c870b #1 A=com.android.settings.FallbackHome U=0 StackId=-1 sz=0}
+    userId=0 effectiveUid=1000 mCallingUid=0 mUserSetupComplete=true mCallingPackage=null
     affinity=com.android.settings.FallbackHome
     intent={act=android.intent.action.MAIN cat=[android.intent.category.HOME] flg=0x10800100 cmp=com.android.settings/.FallbackHome}
     mActivityComponent=com.android.settings/.FallbackHome
@@ -37,11 +37,11 @@ mFreezeTaskListReorderingPendingTimeout=false
     Activities=[]
     askedCompatMode=false inRecents=true isAvailable=true
     stackId=-1
-    hasBeenVisible=true mResizeMode=RESIZE_MODE_UNRESIZEABLE mSupportsPictureInPicture=false isResizeable=false lastActiveTime=8676 (inactive for 1084s)
+    hasBeenVisible=true mResizeMode=RESIZE_MODE_UNRESIZEABLE mSupportsPictureInPicture=false isResizeable=false lastActiveTime=5134 (inactive for 124s)
 
   Visible recent tasks (most recent first):
   * RecentTaskInfo #0: 
-    id=26 stackId=21 userId=0 hasTask=true lastActiveTime=1092452
+    id=68 stackId=1 userId=0 hasTask=true lastActiveTime=128364
     baseIntent=Intent { flg=0x10000000 cmp=dev.probe/.MainActivity }
     isExcluded=false activityType=standard windowingMode=standard supportsSplitScreenMultiWindow=true
     taskDescription { colorBackground=#fffafafa colorPrimary=#fff5f5f5 iconRes=false iconBitmap=false }

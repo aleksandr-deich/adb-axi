@@ -15,7 +15,7 @@ ActivityInfo:
     taskAffinity=dev.probe
     uid=10116 flags=0x20c83e46 privateFlags=0xc801100 theme=0x7f0a0007
     requiresSmallestWidthDp=0 compatibleWidthLimitDp=0 largestWidthLimitDp=0
-    sourceDir=/data/app/dev.probe-BWfameaxx6Jl68xLxBixKg==/base.apk
+    sourceDir=/data/app/dev.probe-OJK6feK_0EqI9e19rx-xwg==/base.apk
     seinfo=default:targetSdkVersion=36
     seinfoUser=:complete
     dataDir=/data/user/0/dev.probe

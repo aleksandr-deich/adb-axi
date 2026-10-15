@@ -725,6 +725,7 @@ describe("app restore", () => {
       CODE_PATH,
       RECENTS,
       PROCESSES,
+      PROCESSES,
       START,
       METADATA,
       PROCESSES,

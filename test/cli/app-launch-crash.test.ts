@@ -4,7 +4,6 @@ import { isProcessAlive } from "../../src/core/exec.js";
 import type { FakeAdb } from "../fake-adb/harness.js";
 import {
   FOREGROUND,
-  INSTALLED,
   METADATA,
   PACKAGE,
   PROCESSES,
@@ -26,8 +25,8 @@ const { deviceWithRules } = lifecycleDevices((value) => {
 const RECENTS = "dumpsys activity recents";
 
 const captures = [
-  { api: 29, pid: 4231, crashPid: 4311 },
-  { api: 37, pid: 9754, crashPid: 9849 },
+  { api: 29, pid: 1985, crashPid: 2056 },
+  { api: 37, pid: 7224, crashPid: 7329 },
 ];
 
 function capture(api: number, name: string) {
@@ -36,9 +35,14 @@ function capture(api: number, name: string) {
 
 function device(api: number, crashed: boolean): FakeAdb {
   return deviceWithRules([
-    { match: shell(PACKAGE), respond: INSTALLED },
+    { match: shell(PACKAGE), respond: capture(api, "package") },
     { match: shell(RECENTS), respond: capture(api, "recents-running") },
     { match: shell(METADATA), respond: capture(api, "activity-metadata") },
+    {
+      match: shell(PROCESSES),
+      when: { launched: "yes" },
+      respond: capture(api, "process-crashed"),
+    },
     { match: shell(PROCESSES), respond: capture(api, "process-running") },
     { match: shell(FOREGROUND), respond: capture(api, "foreground-running") },
     {

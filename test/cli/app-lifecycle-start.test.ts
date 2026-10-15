@@ -54,7 +54,7 @@ afterEach(() => {
   fake = undefined;
 });
 
-const { device, liveDevice } = lifecycleDevices((value) => {
+const { device, deviceWithRules, liveDevice } = lifecycleDevices((value) => {
   fake = value;
 });
 
@@ -86,6 +86,7 @@ describe("app start", () => {
         PACKAGE,
         "pm path --user 0 dev.probe",
         RESOLVE,
+        PROCESSES,
         START,
         METADATA,
         PROCESSES,
@@ -123,6 +124,7 @@ describe("app start", () => {
         RESOLVE,
         FORCE_STOP,
         PIDOF,
+        PROCESSES,
         START,
         METADATA,
         PROCESSES,
@@ -339,7 +341,7 @@ describe("app start", () => {
     expect(data).toMatchObject({ code: "WAIT_TIMEOUT" });
     // The timed-out start is never read as a launched app.
     expect(shellCommands(f).filter((command) => command !== LAUNCH_CRASH_COMMAND)).toEqual(
-      twice([CURRENT_USER, PACKAGE, "pm path --user 0 dev.probe", RESOLVE, START]),
+      twice([CURRENT_USER, PACKAGE, "pm path --user 0 dev.probe", RESOLVE, PROCESSES, START]),
     );
   });
 
@@ -861,17 +863,21 @@ describe("app start settle deadlines", () => {
   )(
     "fails when $command expires before any complete observation with timeout=$timeout",
     async ({ command, timeout }) => {
-      const f = device({
-        [PACKAGE]: INSTALLED,
-        [START]: {
-          ...AM_START.cold,
-          ...(timeout === SHORT_TIMEOUT_MS ? { delayMs: SHORT_START_DELAY_MS } : {}),
+      const f = deviceWithRules([
+        { match: shell(PACKAGE), respond: INSTALLED, set: { launched: "no" } },
+        {
+          match: shell(START),
+          respond: {
+            ...AM_START.cold,
+            ...(timeout === SHORT_TIMEOUT_MS ? { delayMs: SHORT_START_DELAY_MS } : {}),
+          },
+          set: { launched: "yes" },
         },
-        [METADATA]: activityInfo(".MainActivity", "dev.probe:ui"),
-        [PROCESSES]: ui,
-        [FOREGROUND]: permission,
-        [command]: { hang: true },
-      });
+        { match: shell(command), when: { launched: "yes" }, respond: { hang: true } },
+        { match: shell(METADATA), respond: activityInfo(".MainActivity", "dev.probe:ui") },
+        { match: shell(PROCESSES), respond: ui },
+        { match: shell(FOREGROUND), respond: permission },
+      ]);
       const { toon, json, data } = await both(
         ["app", "start", "dev.probe/.MainActivity", "--timeout", `${timeout}ms`],
         f,

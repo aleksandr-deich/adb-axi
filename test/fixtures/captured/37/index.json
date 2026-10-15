@@ -1074,7 +1074,7 @@
         "-s",
         "emulator-5592",
         "shell",
-        "logcat -d -b events -v epoch -s am_crash"
+        "logcat -d -b events,crash -v epoch -s am_crash am_proc_start am_proc_died DEBUG:F"
       ],
       "exitCode": 0,
       "stderr": ""
@@ -1134,7 +1134,7 @@
         "-s",
         "emulator-5592",
         "shell",
-        "logcat -d -b events -v epoch -s am_crash"
+        "logcat -d -b events,crash -v epoch -s am_crash am_proc_start am_proc_died DEBUG:F"
       ],
       "exitCode": 0,
       "stderr": ""
@@ -1159,6 +1159,30 @@
         "emulator-5592",
         "shell",
         "dumpsys activity recents"
+      ],
+      "exitCode": 0,
+      "stderr": ""
+    },
+    {
+      "file": "launch-package.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5592",
+        "shell",
+        "dumpsys package dev.probe"
+      ],
+      "exitCode": 0,
+      "stderr": ""
+    },
+    {
+      "file": "launch-process-crashed.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5592",
+        "shell",
+        "dumpsys activity processes dev.probe"
       ],
       "exitCode": 0,
       "stderr": ""

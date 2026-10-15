@@ -1,6 +1,6 @@
 import type { AdbClient } from "../../adb/run.js";
 import { readLaunchCrashes, type LaunchCrash } from "../../android/launch-crash.js";
-import { readProcesses } from "../../android/processes.js";
+import { readProcesses, type ProcessRecord } from "../../android/processes.js";
 import type { ReadOptions } from "../../android/read.js";
 import { AdbAxiError } from "../../core/errors.js";
 import { poll, realClock } from "../../core/poll.js";
@@ -9,11 +9,11 @@ export class LaunchWatch {
   private constructor(
     private readonly adb: AdbClient,
     private readonly serial: string,
-    private readonly pkg: string,
     private readonly userId: number,
     private readonly uid: number | null,
     private readonly options: ReadOptions,
     private readonly baseline: Set<string>,
+    private readonly prelaunch: readonly ProcessRecord[],
   ) {}
 
   static async open(
@@ -24,24 +24,20 @@ export class LaunchWatch {
     uid: number | null,
     options: ReadOptions,
   ): Promise<LaunchWatch> {
-    const baseline = new Set((await readLaunchCrashes(adb, serial, options)).keys);
-    return new LaunchWatch(adb, serial, pkg, userId, uid, options, baseline);
+    const prelaunch = await readProcesses(adb, serial, pkg, options);
+    const baseline = new Set((await readLaunchCrashes(adb, serial, options, prelaunch)).keys);
+    return new LaunchWatch(adb, serial, userId, uid, options, baseline, prelaunch);
   }
 
   async check(options = this.options): Promise<LaunchCrash[]> {
-    const crashes = (await readLaunchCrashes(this.adb, this.serial, options)).crashes.filter(
-      (crash) => crash.userId === this.userId && !this.baseline.has(crash.key),
+    const { crashes } = await readLaunchCrashes(this.adb, this.serial, options, this.prelaunch);
+    return crashes.filter(
+      (crash) =>
+        this.uid !== null &&
+        crash.uid === this.uid &&
+        crash.userId === this.userId &&
+        !this.baseline.has(crash.key),
     );
-    const processes = crashes.some((crash) => crash.uid === null)
-      ? await readProcesses(this.adb, this.serial, this.pkg, options)
-      : [];
-    return crashes.filter((crash) => {
-      const uid =
-        crash.uid ??
-        processes.find((process) => process.pid === crash.pid && process.process === crash.process)
-          ?.uid;
-      return this.uid !== null && uid === this.uid;
-    });
   }
 
   async during<T>(

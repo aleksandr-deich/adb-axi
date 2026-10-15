@@ -4,5 +4,5 @@ Status: ok
 LaunchState: UNKNOWN (0)
 Activity: dev.probe/.MainActivity
 TotalTime: 0
-WaitTime: 3
+WaitTime: 18
 Complete

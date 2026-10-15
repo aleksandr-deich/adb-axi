@@ -1,6 +1,7 @@
 import type { AdbClient } from "../adb/run.js";
 import { parseCrashes } from "./crash.js";
 import { parseLogcat, type LogLine } from "./logcat.js";
+import type { ProcessRecord } from "./processes.js";
 import { invalidOutput, readShell, type ReadOptions } from "./read.js";
 
 export const LAUNCH_CRASH_COMMAND =
@@ -18,7 +19,10 @@ function crashKey(line: LogLine): string {
   return `${line.time}:${line.pid}:${line.tid}:${line.message}`;
 }
 
-export function parseLaunchCrashes(stdout: string): LaunchCrash[] {
+export function parseLaunchCrashes(
+  stdout: string,
+  prelaunch: readonly ProcessRecord[] = [],
+): LaunchCrash[] {
   const { lines } = parseLogcat(stdout);
   const native = parseCrashes(lines).flatMap((crash) => {
     if (crash.kind !== "native" || crash.pid === null) return [];
@@ -47,7 +51,7 @@ export function parseLaunchCrashes(stdout: string): LaunchCrash[] {
     });
     return died ? [{ ...crash, uid }] : [];
   });
-  const starts = new Map<number, { uid: number; process: string }>();
+  const starts = new Map(prelaunch.map(({ pid, uid, process }) => [pid, { uid, process }]));
   const nativeBoundary = new Map<string, number>();
   return lines.flatMap((line): LaunchCrash[] => {
     if (line.level !== "I") return [];
@@ -58,6 +62,11 @@ export function parseLaunchCrashes(stdout: string): LaunchCrash[] {
         if (Math.floor(uid / 100000) === Number(fields[1]))
           starts.set(Number(fields[2]), { uid, process: fields[4] });
       }
+      return [];
+    }
+    if (line.tag === "am_proc_died") {
+      const pid = /^\[\d+,(\d+),/.exec(line.message)?.[1];
+      if (pid !== undefined) starts.delete(Number(pid));
       return [];
     }
     if (line.tag !== "am_crash") return [];
@@ -100,6 +109,7 @@ export async function readLaunchCrashes(
   adb: AdbClient,
   serial: string,
   options: ReadOptions,
+  prelaunch: readonly ProcessRecord[] = [],
 ): Promise<{ keys: string[]; crashes: LaunchCrash[] }> {
   const step = "reading launch crashes";
   const result = await readShell(adb, serial, LAUNCH_CRASH_COMMAND, step, options);
@@ -107,6 +117,6 @@ export async function readLaunchCrashes(
   if (unparsed !== 0) throw invalidOutput(step, result.stdout);
   return {
     keys: lines.filter((line) => line.tag === "am_crash" && line.level === "I").map(crashKey),
-    crashes: parseLaunchCrashes(result.stdout),
+    crashes: parseLaunchCrashes(result.stdout, prelaunch),
   };
 }
