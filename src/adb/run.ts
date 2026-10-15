@@ -24,6 +24,7 @@ export interface AdbCallOptions {
   capMs?: number;
   input?: string | Uint8Array;
   maxOutputBytes?: number;
+  signal?: AbortSignal;
   /** On timeout, keep the partial stdout and stderr in the error's fields. */
   keepPartialOutput?: boolean;
   /**
@@ -94,6 +95,7 @@ export class AdbClient {
       file: this.path,
       args: argv,
       deadlineMs: budget,
+      ...(options.signal === undefined ? {} : { signal: options.signal }),
       ...(this.options.env === undefined ? {} : { env: this.options.env }),
       ...(options.input === undefined ? {} : { input: options.input }),
       ...(options.maxOutputBytes === undefined ? {} : { maxOutputBytes: options.maxOutputBytes }),

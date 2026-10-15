@@ -1,4 +1,5 @@
 import { decode } from "@toon-format/toon";
+import { LAUNCH_CRASH_COMMAND } from "../../src/android/launch-crash.js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createFakeAdb, type FakeAdb } from "../fake-adb/harness.js";
 import type { Response } from "../fake-adb/scenario.js";
@@ -53,7 +54,7 @@ afterEach(() => {
   fake = undefined;
 });
 
-const { device, liveDevice } = lifecycleDevices((value) => {
+const { device, deviceWithRules, liveDevice } = lifecycleDevices((value) => {
   fake = value;
 });
 
@@ -79,12 +80,13 @@ describe("app start", () => {
       app: { activity: ".MainActivity", pid: 8235, launch: "hot", recreated: false },
       help: ["Run `adb-axi app start dev.probe --fresh` to kill the process and cold-start"],
     });
-    expect(shellCommands(f)).toEqual(
+    expect(shellCommands(f).filter((command) => command !== LAUNCH_CRASH_COMMAND)).toEqual(
       twice([
         CURRENT_USER,
         PACKAGE,
         "pm path --user 0 dev.probe",
         RESOLVE,
+        PROCESSES,
         START,
         METADATA,
         PROCESSES,
@@ -114,7 +116,7 @@ describe("app start", () => {
       ok: "start dev.probe -> foreground (cold start)",
       app: { activity: ".MainActivity", pid: 8235, launch: "cold", recreated: true, took_ms: 1102 },
     });
-    expect(shellCommands(f)).toEqual(
+    expect(shellCommands(f).filter((command) => command !== LAUNCH_CRASH_COMMAND)).toEqual(
       twice([
         CURRENT_USER,
         PACKAGE,
@@ -122,6 +124,7 @@ describe("app start", () => {
         RESOLVE,
         FORCE_STOP,
         PIDOF,
+        PROCESSES,
         START,
         METADATA,
         PROCESSES,
@@ -337,8 +340,8 @@ describe("app start", () => {
     );
     expect(data).toMatchObject({ code: "WAIT_TIMEOUT" });
     // The timed-out start is never read as a launched app.
-    expect(shellCommands(f)).toEqual(
-      twice([CURRENT_USER, PACKAGE, "pm path --user 0 dev.probe", RESOLVE, START]),
+    expect(shellCommands(f).filter((command) => command !== LAUNCH_CRASH_COMMAND)).toEqual(
+      twice([CURRENT_USER, PACKAGE, "pm path --user 0 dev.probe", RESOLVE, PROCESSES, START]),
     );
   });
 
@@ -658,6 +661,10 @@ describe("lifecycle review regressions", () => {
             currentData: "present",
           },
           rules: [
+            {
+              match: shell(LAUNCH_CRASH_COMMAND),
+              respond: { stdoutFile: "captured/29/launch-events-running.txt" },
+            },
             { match: ["devices", "-l"], respond: { stdout: ONE_ONLINE } },
             { match: shell(CURRENT_USER), respond: { stdout: "10\n" } },
             {
@@ -856,17 +863,21 @@ describe("app start settle deadlines", () => {
   )(
     "fails when $command expires before any complete observation with timeout=$timeout",
     async ({ command, timeout }) => {
-      const f = device({
-        [PACKAGE]: INSTALLED,
-        [START]: {
-          ...AM_START.cold,
-          ...(timeout === SHORT_TIMEOUT_MS ? { delayMs: SHORT_START_DELAY_MS } : {}),
+      const f = deviceWithRules([
+        { match: shell(PACKAGE), respond: INSTALLED, set: { launched: "no" } },
+        {
+          match: shell(START),
+          respond: {
+            ...AM_START.cold,
+            ...(timeout === SHORT_TIMEOUT_MS ? { delayMs: SHORT_START_DELAY_MS } : {}),
+          },
+          set: { launched: "yes" },
         },
-        [METADATA]: activityInfo(".MainActivity", "dev.probe:ui"),
-        [PROCESSES]: ui,
-        [FOREGROUND]: permission,
-        [command]: { hang: true },
-      });
+        { match: shell(command), when: { launched: "yes" }, respond: { hang: true } },
+        { match: shell(METADATA), respond: activityInfo(".MainActivity", "dev.probe:ui") },
+        { match: shell(PROCESSES), respond: ui },
+        { match: shell(FOREGROUND), respond: permission },
+      ]);
       const { toon, json, data } = await both(
         ["app", "start", "dev.probe/.MainActivity", "--timeout", `${timeout}ms`],
         f,

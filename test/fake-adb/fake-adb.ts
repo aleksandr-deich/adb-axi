@@ -12,8 +12,7 @@
  */
 import {
   appendFileSync,
-  closeSync,
-  openSync,
+  linkSync,
   readFileSync,
   renameSync,
   unlinkSync,
@@ -140,14 +139,12 @@ function writeState(state: EngineState): void {
 function withLock<T>(lockPath: string, body: () => T): T {
   const deadline = Date.now() + 5000;
   const pause = new Int32Array(new SharedArrayBuffer(4));
+  const ownerPath = `${lockPath}.${process.pid}.owner`;
+  writeFileSync(ownerPath, String(process.pid));
   for (;;) {
     try {
-      const fd = openSync(lockPath, "wx");
-      try {
-        writeFileSync(fd, String(process.pid));
-      } finally {
-        closeSync(fd);
-      }
+      linkSync(ownerPath, lockPath);
+      unlinkSync(ownerPath);
       break;
     } catch (error) {
       if (error instanceof Error && "code" in error && error.code !== "EEXIST") throw error;

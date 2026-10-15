@@ -1066,6 +1066,131 @@
       "stderr": "",
       "durationMs": 444,
       "note": "uninstall of an installed package"
+    },
+    {
+      "file": "launch-events-running.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5592",
+        "shell",
+        "logcat -d -b events,crash -v epoch -s am_crash am_proc_start am_proc_died DEBUG:F"
+      ],
+      "exitCode": 0,
+      "stderr": ""
+    },
+    {
+      "file": "launch-process-running.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5592",
+        "shell",
+        "dumpsys activity processes dev.probe"
+      ],
+      "exitCode": 0,
+      "stderr": ""
+    },
+    {
+      "file": "launch-foreground-running.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5592",
+        "shell",
+        "dumpsys activity activities"
+      ],
+      "exitCode": 0,
+      "stderr": ""
+    },
+    {
+      "file": "launch-activity-metadata.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5592",
+        "shell",
+        "cmd package resolve-activity --user 0 -n 'dev.probe/.MainActivity'"
+      ],
+      "exitCode": 0,
+      "stderr": ""
+    },
+    {
+      "file": "launch-am-crashed.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5592",
+        "shell",
+        "am start --user 0 -W -n 'dev.probe/.MainActivity'"
+      ],
+      "exitCode": 0,
+      "stderr": ""
+    },
+    {
+      "file": "launch-events-crashed.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5592",
+        "shell",
+        "logcat -d -b events,crash -v epoch -s am_crash am_proc_start am_proc_died DEBUG:F"
+      ],
+      "exitCode": 0,
+      "stderr": ""
+    },
+    {
+      "file": "launch-am-running.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5592",
+        "shell",
+        "am start --user 0 -W -n 'dev.probe/.MainActivity'"
+      ],
+      "exitCode": 0,
+      "stderr": ""
+    },
+    {
+      "file": "launch-recents-running.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5592",
+        "shell",
+        "dumpsys activity recents"
+      ],
+      "exitCode": 0,
+      "stderr": ""
+    },
+    {
+      "file": "launch-package.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5592",
+        "shell",
+        "dumpsys package dev.probe"
+      ],
+      "exitCode": 0,
+      "stderr": ""
+    },
+    {
+      "file": "launch-process-crashed.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5592",
+        "shell",
+        "dumpsys activity processes dev.probe"
+      ],
+      "exitCode": 0,
+      "stderr": ""
     }
-  ]
+  ],
+  "launchCapture": {
+    "api": 37,
+    "serial": "emulator-5592",
+    "image": "system-images;android-37.1;google_apis_playstore_ps16k;arm64-v8a"
+  }
 }

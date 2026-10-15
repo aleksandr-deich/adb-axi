@@ -1,0 +1,3 @@
+--------- beginning of events
+         1792090885.902   638   668 I am_proc_start: [0,7329,10229,dev.probe,next-top-activity,{dev.probe/dev.probe.MainActivity}]
+         1792090886.200   638  1152 I am_crash: [7329,0,dev.probe,552091206,java.lang.IllegalStateException,probe armed crash on create,MainActivity.kt,57,0]

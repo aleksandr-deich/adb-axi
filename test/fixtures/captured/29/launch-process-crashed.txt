@@ -1,0 +1,15 @@
+ACTIVITY MANAGER RUNNING PROCESSES (dumpsys activity processes)
+  Process LRU list (sorted by oom_adj, 27 total, non-act at 1, non-svc at 1):
+  mPreviousProcessVisibleTime: 0
+  mDeviceIdleWhitelist=[2000, 10055, 10057]
+  mDeviceIdleExceptIdleWhitelist=[2000, 10049, 10055, 10057, 10061, 10065]
+  mDeviceIdleTempWhitelist=[]
+  Mem watch processes:
+
+    com.android.launcher3/u0a101: 250MB, report to com.android.launcher3
+  mMemWatchDumpProcName=null
+  mMemWatchDumpFile=null
+  mMemWatchDumpPid=0
+  mMemWatchDumpUid=0
+  mMemWatchIsUserInitiated=false
+  mForceBackgroundCheck=false

@@ -1,0 +1,29 @@
+priority=0 preferredOrder=0 match=0x0 specificIndex=-1 isDefault=false
+ActivityInfo:
+  name=dev.probe.MainActivity
+  packageName=dev.probe
+  enabled=true exported=true directBootAware=false
+  taskAffinity=dev.probe targetActivity=null persistableMode=PERSIST_ROOT_ONLY
+  launchMode=1 flags=0x200 privateFlags=0x0 theme=0x0
+  screenOrientation=-1 configChanges=0x3 softInputMode=0x0
+  lockTaskLaunchMode=LOCK_TASK_LAUNCH_MODE_DEFAULT
+  resizeMode=RESIZE_MODE_RESIZEABLE_VIA_SDK_VERSION
+  ApplicationInfo:
+    packageName=dev.probe
+    labelRes=0x7f090003 nonLocalizedLabel=null icon=0x7f080000 banner=0x0
+    processName=dev.probe
+    taskAffinity=dev.probe
+    uid=10116 flags=0x20c83e46 privateFlags=0xc801100 theme=0x7f0a0007
+    requiresSmallestWidthDp=0 compatibleWidthLimitDp=0 largestWidthLimitDp=0
+    sourceDir=/data/app/dev.probe-OJK6feK_0EqI9e19rx-xwg==/base.apk
+    seinfo=default:targetSdkVersion=36
+    seinfoUser=:complete
+    dataDir=/data/user/0/dev.probe
+    deviceProtectedDataDir=/data/user_de/0/dev.probe
+    credentialProtectedDataDir=/data/user/0/dev.probe
+    enabled=true minSdkVersion=29 targetSdkVersion=36 versionCode=1 targetSandboxVersion=1
+    supportsRtl=true
+    fullBackupContent=true
+    HiddenApiEnforcementPolicy=2
+    usesNonSdkApi=false
+    allowsPlaybackCapture=true

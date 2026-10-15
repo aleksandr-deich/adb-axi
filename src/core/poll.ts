@@ -1,3 +1,5 @@
+import { setTimeout } from "node:timers/promises";
+
 /** Poll interval bounds for every wait (7.4): never busier than 250 ms, never lazier than 500 ms. */
 export const MIN_INTERVAL_MS = 250;
 export const MAX_INTERVAL_MS = 500;
@@ -6,15 +8,12 @@ export const DEFAULT_INTERVAL_MS = 400;
 /** Time source for polling. Tests inject a fake one; production uses the real clock. */
 export interface Clock {
   now(): number;
-  sleep(ms: number): Promise<void>;
+  sleep(ms: number, signal?: AbortSignal): Promise<void>;
 }
 
 export const realClock: Clock = {
   now: () => performance.now(),
-  sleep: (ms) =>
-    new Promise((resolve) => {
-      setTimeout(resolve, ms);
-    }),
+  sleep: (ms, signal) => setTimeout(ms, undefined, { signal }),
 };
 
 export type Observation<TValue, TLast> =

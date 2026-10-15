@@ -1,6 +1,7 @@
 import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { decode } from "@toon-format/toon";
+import { LAUNCH_CRASH_COMMAND } from "../../src/android/launch-crash.js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createFakeAdb, FIXTURES_DIR, type FakeAdb } from "../fake-adb/harness.js";
 import type { Response, Rule } from "../fake-adb/scenario.js";
@@ -130,6 +131,10 @@ const shell = (command: string): string[] => ["-s", SERIAL, "shell", command];
 function probeDevice(probe: Probe): FakeAdb {
   const rules: Rule[] = [
     ...(probe.rules ?? []),
+    {
+      match: shell(LAUNCH_CRASH_COMMAND),
+      respond: { stdoutFile: "captured/29/launch-events-running.txt" },
+    },
     { match: ["devices", "-l"], respond: { stdout: ONE_ONLINE } },
     { match: shell(CURRENT_USER), respond: { stdout: "0\n" } },
     { match: shell(PACKAGE), respond: probe.package ?? INSTALLED },
@@ -714,11 +719,12 @@ describe("app restore", () => {
       ok: "restore dev.probe -> foreground from recents (new process)",
       app: restoredApp,
     });
-    expect(shellCommands(fake)).toEqual([
+    expect(shellCommands(fake).filter((command) => command !== LAUNCH_CRASH_COMMAND)).toEqual([
       CURRENT_USER,
       PACKAGE,
       CODE_PATH,
       RECENTS,
+      PROCESSES,
       PROCESSES,
       START,
       METADATA,

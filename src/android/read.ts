@@ -7,6 +7,7 @@ import { AdbAxiError } from "../core/errors.js";
 export interface ReadOptions {
   deadline: Deadline;
   capMs?: number;
+  signal?: AbortSignal;
 }
 
 /**
@@ -25,6 +26,7 @@ export async function readShell(
   const result = await runShell(adb, serial, command, {
     deadline: options.deadline,
     step,
+    ...(options.signal === undefined ? {} : { signal: options.signal }),
     ...(options.capMs === undefined ? {} : { capMs: options.capMs }),
   });
   if (!okExits.includes(result.exitCode)) {

@@ -27,6 +27,7 @@ import {
   waitForExit,
 } from "./process.js";
 import { readOptions, targetSerial, UNKNOWN } from "./shared.js";
+import { LaunchWatch } from "./launch-watch.js";
 
 /**
  * How long a started app gets to be seen in front with a live process. `am start -W` has
@@ -73,7 +74,7 @@ export const appStart = defineCommand({
       requested === null ? pkg : `${pkg}/${requested}`,
       ...(fresh ? ["--fresh"] : []),
     ]);
-    const { dump, userId } = await requireInstalled(context, pkg);
+    const { dump, userId, info } = await requireInstalled(context, pkg);
     const filters = parseActivityFilters(dump);
     const activity =
       requested ?? (await resolveLauncherActivity(adb, serial, pkg, userId, readOptions(context)));
@@ -92,20 +93,15 @@ export const appStart = defineCommand({
       }
     }
 
-    const start = await amStart(context, adb, serial, pkg, activity, userId, command, () =>
-      declaredActivities(filters, pkg),
-    );
-    const launched = start.activity ?? { package: pkg, activity, component: `${pkg}/${activity}` };
-    const processName = await readActivityProcessName(
-      adb,
-      serial,
-      launched,
+    const { start, settled } = await launchActivity(
+      context,
+      { package: pkg, activity, component: `${pkg}/${activity}` },
       userId,
-      readOptions(context),
+      info.uid,
+      command,
+      () => declaredActivities(filters, pkg),
+      (launched, processName, last) => diedOnStart(context, launched, processName, last, command),
     );
-    const settled = await settle(context, adb, serial, launched, userId, processName);
-    if (settled.state === "stopped")
-      throw diedOnStart(context, launched, processName, settled, command);
     return report(context, pkg, activity, fresh, start, settled, command);
   },
 });
@@ -159,6 +155,7 @@ export async function amStart(
   userId: number,
   command: string[],
   activities: () => string[],
+  signal?: AbortSignal,
 ): Promise<AmStart> {
   const component = `${pkg}/${activity}`;
   const step = `starting ${component}`;
@@ -169,6 +166,7 @@ export async function amStart(
     const result = await runShell(adb, serial, `am start --user ${userId} -W -n '${component}'`, {
       deadline: context.deadline,
       step,
+      ...(signal === undefined ? {} : { signal }),
     });
     output = `${result.stdout}\n${result.stderr}`;
     exitCode = result.exitCode;
@@ -211,15 +209,72 @@ export async function amStart(
 
 /** One look at the started app: its pid and the activity in front. */
 export interface Seen {
-  state: "foreground" | "running" | "stopped";
+  state: "foreground" | "running" | "stopped" | "crashed";
   pid: number | "-";
   /** The resumed activity, whichever app it belongs to. */
   front: ActivityRecord | null;
 }
 
+export async function launchActivity(
+  context: CommandContext,
+  component: Component,
+  userId: number,
+  uid: number | null,
+  command: string[],
+  activities: () => string[],
+  died: (activity: Component, processName: string, last: Seen) => AdbAxiError,
+): Promise<{ start: AmStart; launched: Component; processName: string; settled: Seen }> {
+  const adb = context.adb();
+  const serial = targetSerial(context);
+  const watch = await LaunchWatch.open(
+    adb,
+    serial,
+    component.package,
+    userId,
+    uid,
+    readOptions(context),
+  );
+  const start = await watch.during(
+    (signal) =>
+      amStart(
+        context,
+        adb,
+        serial,
+        component.package,
+        component.activity,
+        userId,
+        command,
+        activities,
+        signal,
+      ),
+    async (crash, signal) => {
+      const processName = await readActivityProcessName(adb, serial, component, userId, {
+        ...readOptions(context),
+        signal,
+      });
+      return crash.process === processName
+        ? died(component, processName, { state: "crashed", pid: crash.pid, front: null })
+        : null;
+    },
+  );
+  const launched = start.activity ?? component;
+  const processName = await readActivityProcessName(
+    adb,
+    serial,
+    launched,
+    userId,
+    readOptions(context),
+  );
+  const settled = await settle(context, adb, serial, launched, userId, processName, watch);
+  if (settled.state === "stopped" || settled.state === "crashed")
+    throw died(launched, processName, settled);
+  return { start, launched, processName, settled };
+}
+
 /**
- * Observe the app until it is in front, or its process is gone, for at most `SETTLE_MS`
- * of what is left of the deadline. The first observation usually settles it.
+ * Observe for at most `SETTLE_MS` of the remaining deadline. Check crash evidence
+ * before liveness or foreground: a crash dialog can keep a crashed process alive.
+ * The first observation usually settles it.
  */
 export async function settle(
   context: CommandContext,
@@ -228,6 +283,7 @@ export async function settle(
   activity: Component,
   userId: number,
   processName: string,
+  watch: LaunchWatch,
 ): Promise<Seen> {
   const deadline =
     context.deadline.remainingMs() <= SETTLE_MS ? context.deadline : new Deadline(SETTLE_MS);
@@ -239,6 +295,12 @@ export async function settle(
         return { done: true, value: last };
       }
       try {
+        const crash = (await watch.check({ deadline })).find(
+          (entry) => entry.process === processName,
+        );
+        if (crash !== undefined) {
+          return { done: true, value: { state: "crashed", pid: crash.pid, front: null } };
+        }
         const processes = await packageProcesses(context, activity.package, userId, {
           deadline,
         });
@@ -372,7 +434,9 @@ function diedOnStart(
 ): AdbAxiError {
   return new AdbAxiError(
     "APP_DIED_ON_START",
-    `the ${processName} process of ${activity.component} is gone right after its start`,
+    last.state === "crashed"
+      ? `the ${processName} process of ${activity.component} crashed during its start`
+      : `the ${processName} process of ${activity.component} is gone right after its start`,
     {
       fields: {
         last: { state: last.state, pid: last.pid, foreground: last.front?.package ?? UNKNOWN },

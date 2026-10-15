@@ -1,0 +1,108 @@
+Activity Resolver Table:
+  Non-Data Actions:
+      android.intent.action.MAIN:
+        be73d03 dev.probe/.MainActivity filter 3cd1246
+          Action: "android.intent.action.MAIN"
+          Category: "android.intent.category.LAUNCHER"
+        95e1480 dev.probe/.Alias filter 2064c07
+          Action: "android.intent.action.MAIN"
+          Category: "android.intent.category.LAUNCHER"
+
+Receiver Resolver Table:
+  Non-Data Actions:
+      androidx.profileinstaller.action.SAVE_PROFILE:
+        24deab9 dev.probe/androidx.profileinstaller.ProfileInstallReceiver filter 4b80cd2
+          Action: "androidx.profileinstaller.action.SAVE_PROFILE"
+      androidx.profileinstaller.action.INSTALL_PROFILE:
+        24deab9 dev.probe/androidx.profileinstaller.ProfileInstallReceiver filter c42b134
+          Action: "androidx.profileinstaller.action.INSTALL_PROFILE"
+      androidx.profileinstaller.action.SKIP_FILE:
+        24deab9 dev.probe/androidx.profileinstaller.ProfileInstallReceiver filter c9b7b5d
+          Action: "androidx.profileinstaller.action.SKIP_FILE"
+      androidx.profileinstaller.action.BENCHMARK_OPERATION:
+        24deab9 dev.probe/androidx.profileinstaller.ProfileInstallReceiver filter 2b1a1a3
+          Action: "androidx.profileinstaller.action.BENCHMARK_OPERATION"
+
+Permissions:
+  Permission [dev.probe.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION] (f01d1b7):
+    sourcePackage=dev.probe
+    uid=10116 gids=null type=0 prot=signature
+    perm=Permission{cc77efe dev.probe.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION}
+    packageSetting=PackageSetting{791308d dev.probe/10116}
+
+Registered ContentProviders:
+  dev.probe/androidx.startup.InitializationProvider:
+    Provider{16a65f dev.probe/androidx.startup.InitializationProvider}
+
+ContentProvider Authorities:
+  [dev.probe.androidx-startup]:
+    Provider{16a65f dev.probe/androidx.startup.InitializationProvider}
+      applicationInfo=ApplicationInfo{ccff8ac dev.probe}
+
+Key Set Manager:
+  [dev.probe]
+      Signing KeySets: 6
+
+Packages:
+  Package [dev.probe] (791308d):
+    userId=10116
+    pkg=Package{3597975 dev.probe}
+    codePath=/data/app/dev.probe-OJK6feK_0EqI9e19rx-xwg==
+    resourcePath=/data/app/dev.probe-OJK6feK_0EqI9e19rx-xwg==
+    legacyNativeLibraryDir=/data/app/dev.probe-OJK6feK_0EqI9e19rx-xwg==/lib
+    primaryCpuAbi=arm64-v8a
+    secondaryCpuAbi=null
+    versionCode=1 minSdk=29 targetSdk=36
+    versionName=1.0
+    splits=[base]
+    apkSigningVersion=2
+    applicationInfo=ApplicationInfo{ccff8ac dev.probe}
+    flags=[ DEBUGGABLE HAS_CODE ALLOW_CLEAR_USER_DATA ]
+    privateFlags=[ PRIVATE_FLAG_ACTIVITIES_RESIZE_MODE_RESIZEABLE_VIA_SDK_VERSION ALLOW_AUDIO_PLAYBACK_CAPTURE PARTIALLY_DIRECT_BOOT_AWARE ]
+    dataDir=/data/user/0/dev.probe
+    supportsScreens=[small, medium, large, xlarge, resizeable, anyDensity]
+    usesOptionalLibraries:
+      androidx.window.extensions
+      androidx.window.sidecar
+    timeStamp=2026-10-15 21:00:16
+    firstInstallTime=2026-10-15 16:44:31
+    lastUpdateTime=2026-10-15 21:00:16
+    signatures=PackageSignatures{76d4889 version:2, signatures:[9ad7e673], past signatures:[]}
+    installPermissionsFixed=true
+    pkgFlags=[ DEBUGGABLE HAS_CODE ALLOW_CLEAR_USER_DATA ]
+    declared permissions:
+      dev.probe.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION: prot=signature, INSTALLED
+    requested permissions:
+      android.permission.CAMERA
+      dev.probe.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
+    install permissions:
+      dev.probe.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION: granted=true
+    User 0: ceDataInode=123443 installed=true hidden=false suspended=false stopped=false notLaunched=false enabled=0 instant=false virtual=false
+      runtime permissions:
+
+Package Changes:
+  Sequence number=1
+  User 0:
+    seq=0, package=dev.probe
+
+
+Dexopt state:
+  [dev.probe]
+    path: /data/app/dev.probe-OJK6feK_0EqI9e19rx-xwg==/base.apk
+      arm64: [status=run-from-apk] [reason=unknown]
+
+
+Compiler stats:
+  [dev.probe]
+    (No recorded stats)
+
+Active APEX packages:
+
+
+Inactive APEX packages:
+
+
+Factory APEX packages:
+
+
+  APEX session state:
