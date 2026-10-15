@@ -120,6 +120,7 @@ export async function restoreTask(
     context,
     component,
     userId,
+    installed.info.uid,
     command,
     () => declaredActivities(parseActivityFilters(installed.dump), pkg),
     (launched, processName, last) => diedOnStart(context, launched, processName, last),

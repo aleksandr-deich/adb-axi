@@ -74,7 +74,7 @@ export const appStart = defineCommand({
       requested === null ? pkg : `${pkg}/${requested}`,
       ...(fresh ? ["--fresh"] : []),
     ]);
-    const { dump, userId } = await requireInstalled(context, pkg);
+    const { dump, userId, info } = await requireInstalled(context, pkg);
     const filters = parseActivityFilters(dump);
     const activity =
       requested ?? (await resolveLauncherActivity(adb, serial, pkg, userId, readOptions(context)));
@@ -97,6 +97,7 @@ export const appStart = defineCommand({
       context,
       { package: pkg, activity, component: `${pkg}/${activity}` },
       userId,
+      info.uid,
       command,
       () => declaredActivities(filters, pkg),
       (launched, processName, last) => diedOnStart(context, launched, processName, last, command),
@@ -218,13 +219,21 @@ export async function launchActivity(
   context: CommandContext,
   component: Component,
   userId: number,
+  uid: number | null,
   command: string[],
   activities: () => string[],
   died: (activity: Component, processName: string, last: Seen) => AdbAxiError,
 ): Promise<{ start: AmStart; launched: Component; processName: string; settled: Seen }> {
   const adb = context.adb();
   const serial = targetSerial(context);
-  const watch = await LaunchWatch.open(adb, serial, userId, readOptions(context));
+  const watch = await LaunchWatch.open(
+    adb,
+    serial,
+    component.package,
+    userId,
+    uid,
+    readOptions(context),
+  );
   const start = await watch.during(
     (signal) =>
       amStart(

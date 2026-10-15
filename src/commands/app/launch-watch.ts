@@ -1,5 +1,6 @@
 import type { AdbClient } from "../../adb/run.js";
 import { readLaunchCrashes, type LaunchCrash } from "../../android/launch-crash.js";
+import { readProcesses } from "../../android/processes.js";
 import type { ReadOptions } from "../../android/read.js";
 import { AdbAxiError } from "../../core/errors.js";
 import { poll, realClock } from "../../core/poll.js";
@@ -8,7 +9,9 @@ export class LaunchWatch {
   private constructor(
     private readonly adb: AdbClient,
     private readonly serial: string,
+    private readonly pkg: string,
     private readonly userId: number,
+    private readonly uid: number | null,
     private readonly options: ReadOptions,
     private readonly baseline: Set<string>,
   ) {}
@@ -16,19 +19,29 @@ export class LaunchWatch {
   static async open(
     adb: AdbClient,
     serial: string,
+    pkg: string,
     userId: number,
+    uid: number | null,
     options: ReadOptions,
   ): Promise<LaunchWatch> {
-    const baseline = new Set(
-      (await readLaunchCrashes(adb, serial, options)).map((crash) => crash.key),
-    );
-    return new LaunchWatch(adb, serial, userId, options, baseline);
+    const baseline = new Set((await readLaunchCrashes(adb, serial, options)).keys);
+    return new LaunchWatch(adb, serial, pkg, userId, uid, options, baseline);
   }
 
   async check(options = this.options): Promise<LaunchCrash[]> {
-    return (await readLaunchCrashes(this.adb, this.serial, options)).filter(
+    const crashes = (await readLaunchCrashes(this.adb, this.serial, options)).crashes.filter(
       (crash) => crash.userId === this.userId && !this.baseline.has(crash.key),
     );
+    const processes = crashes.some((crash) => crash.uid === null)
+      ? await readProcesses(this.adb, this.serial, this.pkg, options)
+      : [];
+    return crashes.filter((crash) => {
+      const uid =
+        crash.uid ??
+        processes.find((process) => process.pid === crash.pid && process.process === crash.process)
+          ?.uid;
+      return this.uid !== null && uid === this.uid;
+    });
   }
 
   async during<T>(
