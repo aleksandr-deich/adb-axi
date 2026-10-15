@@ -272,8 +272,9 @@ export async function launchActivity(
 }
 
 /**
- * Observe the app until it is in front, or its process is gone, for at most `SETTLE_MS`
- * of what is left of the deadline. The first observation usually settles it.
+ * Observe for at most `SETTLE_MS` of the remaining deadline. Check crash evidence
+ * before liveness or foreground: a crash dialog can keep a crashed process alive.
+ * The first observation usually settles it.
  */
 export async function settle(
   context: CommandContext,

@@ -159,7 +159,7 @@ function noTask(context: CommandContext, pkg: string): AdbAxiError {
   );
 }
 
-/** `APP_DIED_ON_START`: the restored process is gone right after the start. */
+/** `APP_DIED_ON_START`: a crash dialog can keep the restored process alive. */
 function diedOnStart(
   context: CommandContext,
   activity: Component,

@@ -28,7 +28,7 @@ The CLI help test and multi-user scenario in `test/cli/app-lifecycle.test.ts` co
 
 ## Real-device captures (E0)
 
-`captured/` holds raw output of the commands adb-axi reads, recorded by `test/device/capture.ts` on two emulators, so parsers and scenarios start from what devices print. Scenarios replay a capture with `"stdoutFile": "../captured/<api>/<file>"`.
+The API 35 and 37 captures below were recorded by `test/device/capture.ts` on two emulators, so parsers and scenarios start from what devices print. The additional API 29 and 37 `launch-*` files are documented under [Crash-on-launch captures](#crash-on-launch-captures). Scenarios replay a capture with `"stdoutFile": "../captured/<api>/<file>"`.
 
 | Directory | Device                                                                                                                                |
 | --------- | ------------------------------------------------------------------------------------------------------------------------------------- |
@@ -36,7 +36,7 @@ The CLI help test and multi-user scenario in `test/cli/app-lifecycle.test.ts` co
 | `37/`     | AVD `Pixel_10_Pro_XL`, API 37 (`android-37.1` Google Play 16 KB image), phone 1344x2992 at 480 dpi, `emulator-5554`                   |
 | `35/`     | AVD `medium_tablet` (`android emulator create medium_tablet`), API 35 Google Play tablet image, 2560x1600 at 320 dpi, `emulator-5556` |
 
-Each file is one command's stdout, byte for byte. The command's argv, exit code, stderr and duration are in that directory's `index.json`, together with `observations`: the device facts below, as measured. Text captures have host details masked (the host adb key in `getprop`, the home directory, the user name); `index.json` marks each masked file with `"redacted": true`. Regenerate with `npm run capture -- --serial <phone> --serial <tablet>` (see `test/device/README.md`); it rewrites every file.
+Each file is one command's stdout, byte for byte. The command's argv, exit code, stderr and duration are in that directory's `index.json`, together with `observations`: the device facts below, as measured. Text captures have host details masked (the host adb key in `getprop`, the home directory, the user name); `index.json` marks each masked file with `"redacted": true`. Regenerate these captures with `npm run capture -- --serial <phone> --serial <tablet>` (see `test/device/README.md`); it replaces each selected API directory, deleting any additional `launch-*` files and their index metadata without regenerating them. Preserve those separately before recapturing.
 
 The run, per device: facts; the probe absent; the debug build installed; cold start; three `inc` and one `write` delivered to the activity on top; the probe in front; `am kill` in front; HOME; hot start; HOME and a 90 s watch for "cached"; `am kill`; restore; HOME and `am kill` on the previous app; restore; `finish` and a warm start; start errors; logcat dumps; `pm clear`; a Java crash, a native crash and an ANR; the release build; uninstall.
 
