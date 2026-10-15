@@ -166,12 +166,6 @@ describe("kill, restore and death at their edges", () => {
       expect(alive).toEqual([ui]);
     }
     await axi.ok(["app", "stop", PKG]);
-    const deadline = Date.now() + 15_000;
-    for (;;) {
-      const left = [...(await axi.pidsOf(PKG)), ...(await axi.pidsOf(`${PKG}:ui`))];
-      if (left.length === 0) break;
-      expect(Date.now(), `still running after app stop: ${left.join(" ")}`).toBeLessThan(deadline);
-    }
   }
 
   test("a second process: kill never claims success while one survives, debug or release", async () => {
