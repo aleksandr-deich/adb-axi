@@ -1,3 +1,4 @@
+import { LAUNCH_CRASH_COMMAND } from "../../src/android/launch-crash.js";
 import { decode } from "@toon-format/toon";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createFakeAdb, type FakeAdb } from "../fake-adb/harness.js";
@@ -48,7 +49,7 @@ afterEach(() => {
   fake = undefined;
 });
 
-const { device, liveDevice } = lifecycleDevices((value) => {
+const { device, deviceWithRules, liveDevice } = lifecycleDevices((value) => {
   fake = value;
 });
 
@@ -97,7 +98,11 @@ describe("app start", () => {
     );
     expect(data).toMatchObject({ code: "WAIT_TIMEOUT" });
     // The timed-out start is never read as a launched app.
-    expect(shellCommands(f)).not.toContain(PROCESSES);
+    expect(
+      shellCommands(f)
+        .filter((command) => command !== LAUNCH_CRASH_COMMAND)
+        .at(-1),
+    ).toBe(START);
   });
 
   it("fails with WAIT_TIMEOUT when am start does not answer within --timeout", async () => {
@@ -283,6 +288,10 @@ describe("lifecycle review regressions", () => {
               },
             },
             {
+              match: shell(LAUNCH_CRASH_COMMAND),
+              respond: { stdoutFile: "captured/29/launch-events-running.txt" },
+            },
+            {
               match: shell("pm path --user 10 dev.probe"),
               respond: { stdout: "package:/data/app/probe/base.apk\n" },
             },
@@ -459,17 +468,21 @@ describe("app start settle deadlines", () => {
   )(
     "fails when $command expires before any complete observation with timeout=$timeout",
     async ({ command, timeout }) => {
-      const f = device({
-        [PACKAGE]: INSTALLED,
-        [START]: {
-          ...AM_START.cold,
-          ...(timeout === SHORT_TIMEOUT_MS ? { delayMs: SHORT_START_DELAY_MS } : {}),
+      const f = deviceWithRules([
+        { match: shell(PACKAGE), respond: INSTALLED, set: { launched: "no" } },
+        {
+          match: shell(START),
+          respond: {
+            ...AM_START.cold,
+            ...(timeout === SHORT_TIMEOUT_MS ? { delayMs: SHORT_START_DELAY_MS } : {}),
+          },
+          set: { launched: "yes" },
         },
-        [METADATA]: activityInfo(".MainActivity", "dev.probe:ui"),
-        [PROCESSES]: ui,
-        [FOREGROUND]: permission,
-        [command]: { hang: true },
-      });
+        { match: shell(command), when: { launched: "yes" }, respond: { hang: true } },
+        { match: shell(METADATA), respond: activityInfo(".MainActivity", "dev.probe:ui") },
+        { match: shell(PROCESSES), respond: ui },
+        { match: shell(FOREGROUND), respond: permission },
+      ]);
       const { toon, json, data } = await both(
         ["app", "start", "dev.probe/.MainActivity", "--timeout", `${timeout}ms`],
         f,

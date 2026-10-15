@@ -1,3 +1,4 @@
+import { LAUNCH_CRASH_COMMAND } from "../../src/android/launch-crash.js";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { decode } from "@toon-format/toon";
@@ -108,6 +109,10 @@ function probeDevice(probe: Probe): FakeAdb {
       match: shell(`pm path --user ${userId} dev.probe`),
       respond: { stdout: "package:/data/app/probe/base.apk\n" },
     })),
+    {
+      match: shell(LAUNCH_CRASH_COMMAND),
+      respond: { stdoutFile: "captured/29/launch-events-running.txt" },
+    },
     { match: shell(RECENTS), respond: probe.recents ?? RECENTS_KEPT },
     { match: shell(METADATA), respond: ACTIVITY_INFO },
     {
