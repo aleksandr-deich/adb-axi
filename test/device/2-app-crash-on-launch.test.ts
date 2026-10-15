@@ -53,6 +53,14 @@ async function crashedOnCreate(since: string, count: number): Promise<void> {
   expect(Number(report.trim())).toBe(count);
 }
 
+/** The crash buffer names the process that died, `Process: dev.probe, PID: <pid>`. */
+async function crashedPid(since: string, pid: number): Promise<void> {
+  const report = await axi.sh(
+    `logcat -d -b crash -T '${since}' | grep -c 'Process: ${PKG}, PID: ${pid}$' || true`,
+  );
+  expect(Number(report.trim()), `no crash report for pid ${pid}`).toBe(1);
+}
+
 describe("an app that crashes while it launches", () => {
   for (const { dialogs, setting } of modes) {
     test(`start reports APP_DIED_ON_START with crash dialogs ${dialogs}`, async () => {
@@ -67,14 +75,15 @@ describe("an app that crashes while it launches", () => {
           },
         });
         expect(died).toMatchObject({
-          error: `the ${PKG} process of ${PKG}/.MainActivity is gone right after its start`,
-          last: { state: "stopped", pid: "-" },
+          error: `the ${PKG} process of ${PKG}/.MainActivity crashed during its start`,
+          last: { state: "crashed", pid: expect.any(Number) as number },
           help: [
             `Run \`adb-axi logs crash --pkg ${PKG} --since 1m --device ${axi.serial}\` for the crash`,
             `Run \`adb-axi app start ${PKG} --device ${axi.serial} --fresh\` to try a cold start`,
           ],
         });
         await crashedOnCreate(since, 2);
+        await crashedPid(since, (died.last as { pid: number }).pid);
       });
     });
 
@@ -90,13 +99,14 @@ describe("an app that crashes while it launches", () => {
           },
         });
         expect(died).toMatchObject({
-          error: `the ${PKG} process of ${PKG}/.MainActivity is gone right after its restore`,
-          last: { state: "stopped", pid: "-" },
+          error: `the ${PKG} process of ${PKG}/.MainActivity crashed during its restore`,
+          last: { state: "crashed", pid: expect.any(Number) as number },
           help: [
             `Run \`adb-axi logs crash --pkg ${PKG} --since 1m --device ${axi.serial}\` for the crash`,
           ],
         });
         await crashedOnCreate(since, 2);
+        await crashedPid(since, (died.last as { pid: number }).pid);
       });
     });
   }
