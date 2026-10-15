@@ -13,6 +13,8 @@ const SERIAL = "emulator-5554";
  */
 class ScriptedAdb extends AdbClient {
   readonly calls: string[][] = [];
+  /** The command deadline's remaining time when each answer was returned. */
+  readonly answeredWithMs: number[] = [];
   private readonly commandDeadline: Deadline;
   private readonly answers: AdbExit[];
 
@@ -36,6 +38,7 @@ class ScriptedAdb extends AdbClient {
     if (options.deadline.remainingMs() <= 0) {
       throw new AdbAxiError("TIMEOUT", `${options.step} did not finish`);
     }
+    this.answeredWithMs.push(this.commandDeadline.remainingMs());
     return answer;
   }
 }
@@ -78,8 +81,8 @@ describe("wait app", () => {
       ok: `wait app dev.probe -> running after ${String(waited)} ms`,
       waited_ms: waited,
     });
-    expect(waited).toBeGreaterThanOrEqual(timeoutMs - 5);
     // The first read saw it stopped; the second, taken once the command deadline had passed, sees it running.
+    expect(adb.answeredWithMs[1]).toBeLessThanOrEqual(0);
     expect(adb.calls).toEqual([
       ["-s", SERIAL, "shell", "pidof dev.probe"],
       ["-s", SERIAL, "shell", "pidof dev.probe"],

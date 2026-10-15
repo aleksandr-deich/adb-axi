@@ -212,9 +212,15 @@ The samples under `synthetic/29/` and `synthetic/30/` were written from the AOSP
 
 ## Probe app APKs
 
-`apk/` holds the probe app (`test/device/probe-app`, see `test/device/README.md`) built in both variants. Both are package `dev.probe`, versionCode 1, versionName `1.0`, minSdk 29, targetSdk 36, signed with APK Signature Scheme v2 only, by the same debug certificate (SHA-256 `201dd47659cf511c7f2d5278e906d349ba0ed8cb2ce8ddb55caa10fb300133f2`).
+`apk/` holds the probe app (`test/device/probe-app`, see `test/device/README.md`) built in both variants, and the code-free `variants` module's builds of the same package. All are package `dev.probe`, versionCode 1, versionName `1.0`, minSdk 29, targetSdk 36, signed with APK Signature Scheme v2 only, by the same debug certificate (SHA-256 `201dd47659cf511c7f2d5278e906d349ba0ed8cb2ce8ddb55caa10fb300133f2`), unless the table says otherwise. Each variant exists only to get one real package-manager answer.
 
-| File                | Build   | Debuggable | Use                                                             |
-| ------------------- | ------- | ---------- | --------------------------------------------------------------- |
-| `probe-debug.apk`   | debug   | yes        | real-device checks; APK parser tests (package, version, digest) |
-| `probe-release.apk` | release | no         | `APP_NOT_DEBUGGABLE` checks; APK parser tests                   |
+| File                    | Build   | Debuggable | Use                                                                                                                                                                                  |
+| ----------------------- | ------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `probe-debug.apk`       | debug   | yes        | real-device checks; APK parser tests (package, version, digest)                                                                                                                      |
+| `probe-release.apk`     | release | no         | `APP_NOT_DEBUGGABLE` checks; APK parser tests                                                                                                                                        |
+| `probe-v2.apk`          | variant | yes        | versionCode 2, versionName `2.0`: an upgrade over, and a downgrade to, the probe                                                                                                     |
+| `probe-othersigner.apk` | variant | yes        | signed by the test-only key `variants/test-only-other-signer.jks` (SHA-256 `3daf5925bea97425b853e75a1f5f7c309310165dcb89f9249d4ba29bf7419cb2`): `INSTALL_FAILED_UPDATE_INCOMPATIBLE` |
+| `probe-minsdk36.apk`    | variant | yes        | minSdk 36: `INSTALL_FAILED_OLDER_SDK` below API 36                                                                                                                                   |
+| `probe-flaggedtest.apk` | variant | yes        | `android:testOnly`: `INSTALL_FAILED_TEST_ONLY` for `adb install -r`                                                                                                                  |
+| `probe-needslib.apk`    | variant | yes        | requires the absent library `dev.probe.missing`: `INSTALL_FAILED_MISSING_SHARED_LIBRARY`                                                                                             |
+| `probe-riscvonly.apk`   | variant | yes        | native code only in `lib/riscv64/`: `INSTALL_FAILED_NO_MATCHING_ABIS` on x86_64 and arm64                                                                                            |

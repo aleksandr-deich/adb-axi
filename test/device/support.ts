@@ -15,6 +15,17 @@ export const RELEASE_APK = resolve(
   "probe-release.apk",
 );
 
+/** A code-free build of `dev.probe` from `probe-app/variants`, such as `v2` or `othersigner`. */
+export function variantApk(name: string): string {
+  return resolve(import.meta.dirname, "..", "fixtures", "apk", `probe-${name}.apk`);
+}
+
+export interface AdbRun {
+  exitCode: number | null;
+  stdout: string;
+  stderr: string;
+}
+
 export interface AxiRun {
   args: readonly string[];
   exitCode: number | null;
@@ -58,6 +69,11 @@ export class Axi {
       appendFileSync(this.transcript, `# test: ${task.name}\n`);
       onTestFailed(() => this.saveDeviceLog(task.name));
     });
+  }
+
+  /** The `ADB_AXI_HOME` the next call uses. */
+  get stateHome(): string {
+    return this.env.ADB_AXI_HOME ?? "";
   }
 
   freshHome(): string {
@@ -114,6 +130,54 @@ export class Axi {
     );
   }
 
+  /**
+   * Run one command that must fail with exit 1, in JSON and in TOON, and return the JSON
+   * error after checking both formats carry the same fields.
+   */
+  async fails(
+    args: readonly string[],
+    code: string,
+    options: { deadlineMs?: number; varies?: readonly string[] } = {},
+  ): Promise<Record<string, unknown>> {
+    const run = await this.run(args, options.deadlineMs);
+    expect(run.exitCode, `adb-axi ${run.args.join(" ")}\n${run.stdout}${run.stderr}`).toBe(1);
+    expect(run.json.code).toBe(code);
+    const text = await this.text(args, options.deadlineMs, 1);
+    const stable = (data: Record<string, unknown>): Record<string, unknown> =>
+      Object.fromEntries(
+        Object.entries(data).map(([key, value]) => [
+          key,
+          options.varies?.includes(key) === true ? typeof value : value,
+        ]),
+      );
+    expect(stable(text.data)).toEqual(stable(run.json));
+    return run.json;
+  }
+
+  /** One device shell command through adb-axi; its stdout, after checking it exited 0. */
+  async sh(command: string): Promise<string> {
+    const json = await this.ok(["shell", command]);
+    expect(json.exit, command).toBe(0);
+    return String(json.stdout);
+  }
+
+  /**
+   * Plain adb against this device, for what adb-axi must find already done: an install by
+   * another tool, a second transport. Logged to the transcript like adb-axi calls.
+   */
+  async adb(args: readonly string[], deadlineMs = 120_000): Promise<AdbRun> {
+    const full = ["-s", this.serial, ...args];
+    const result = await exec({ file: locateAdb(), args: full, deadlineMs });
+    const stdout = result.stdout.toString("utf8");
+    const stderr = result.stderr.toString("utf8");
+    const exitCode = result.kind === "exited" ? result.exitCode : null;
+    appendFileSync(
+      this.transcript,
+      `$ adb ${full.map(quote).join(" ")}\n# ${result.kind}, exit ${exitCode ?? "-"}, ${result.durationMs} ms\n${stdout}${stderr}\n`,
+    );
+    return { exitCode, stdout, stderr };
+  }
+
   /** Run one command that must succeed, and return its JSON. */
   async ok(args: readonly string[], deadlineMs?: number): Promise<Record<string, unknown>> {
     const run = await this.run(args, deadlineMs);
@@ -121,9 +185,12 @@ export class Axi {
     return run.json;
   }
 
-  /** Send the probe one action through its explicit intent. */
-  async probe(action: string): Promise<void> {
-    const json = await this.ok(["shell", `am start -n ${PKG}/.MainActivity --es probe ${action}`]);
+  /** Send the probe one action through its explicit intent, with optional `am` extras. */
+  async probe(action: string, extras = ""): Promise<void> {
+    const json = await this.ok([
+      "shell",
+      `am start -n ${PKG}/.MainActivity --es probe ${action}${extras === "" ? "" : ` ${extras}`}`,
+    ]);
     expect(json.exit).toBe(0);
   }
 

@@ -30,4 +30,4 @@ plugins {
 }
 
 rootProject.name = "probe-app"
-include(":app")
+include(":app", ":variants")
