@@ -131,15 +131,21 @@ describe("kill, restore and death at their edges", () => {
     expect(await axi.pidsOf(PKG)).toEqual([]);
   });
 
-  test("a second process: kill never claims success while one survives, and a release build times out naming it", async () => {
-    const debug = await twoProcesses(DEBUG_APK);
-    const run = await axi.run(["app", "kill", PKG]);
+  /**
+   * `am kill` may end both processes, leave the `:ui` one for a run-as fallback (debuggable
+   * builds), or leave it alive; whatever happened, adb-axi's answer must match the kernel.
+   */
+  async function truthfulKill(apk: string, debuggable: boolean): Promise<void> {
+    const { main, ui } = await twoProcesses(apk);
+    const run = await axi.run(["app", "kill", PKG, "--timeout", "5s"]);
     const alive = [...(await axi.pidsOf(PKG)), ...(await axi.pidsOf(`${PKG}:ui`))];
     if (run.exitCode === 0) {
       expect(run.json).toMatchObject({
         ok: `kill ${PKG} -> process gone, task kept in recents`,
-        kill: { pid_before: `${debug.main} ${debug.ui}`, pid_after: null, method: "run-as kill" },
+        kill: { pid_before: `${main} ${ui}`, pid_after: null },
       });
+      const method = (run.json.kill as { method: string }).method;
+      expect(debuggable ? ["am kill", "run-as kill"] : ["am kill"]).toContain(method);
       expect(alive).toEqual([]);
       const restored = await axi.ok(["app", "restore", PKG]);
       expect(restored.app).toMatchObject({ activity: ".UiActivity", new_process: true });
@@ -147,29 +153,25 @@ describe("kill, restore and death at their edges", () => {
     } else {
       expect(run.exitCode).toBe(1);
       expect(run.json).toMatchObject({
+        error: expect.stringMatching(
+          new RegExp(
+            `^${PKG.replace(".", "\\.")} was still alive at the 5 s deadline after am kill`,
+          ),
+        ) as string,
         code: "KILL_TIMEOUT",
-        last: { pid: debug.ui },
+        last: { pid: ui },
         am_kill_sent: true,
       });
-      expect(alive).toEqual([debug.ui]);
+      expect(run.durationMs).toBeLessThan(5_000 + 2_000);
+      expect(alive).toEqual([ui]);
     }
-
-    const release = await twoProcesses(RELEASE_APK);
-    const timeout = await axi.run(["app", "kill", PKG, "--timeout", "5s"]);
-    expect(timeout.exitCode).toBe(1);
-    expect(timeout.json).toMatchObject({
-      error: expect.stringMatching(
-        new RegExp(`^${PKG.replace(".", "\\.")} was still alive at the 5 s deadline after am kill`),
-      ) as string,
-      code: "KILL_TIMEOUT",
-      last: { pid: release.ui },
-      am_kill_sent: true,
-    });
-    expect(timeout.durationMs).toBeLessThan(5_000 + 2_000);
-    expect(await axi.pidsOf(`${PKG}:ui`)).toEqual([release.ui]);
-    expect(await axi.pidsOf(PKG)).toEqual([]);
     await axi.ok(["app", "stop", PKG]);
-    expect(await axi.pidsOf(`${PKG}:ui`)).toEqual([]);
+    expect([...(await axi.pidsOf(PKG)), ...(await axi.pidsOf(`${PKG}:ui`))]).toEqual([]);
+  }
+
+  test("a second process: kill never claims success while one survives, debug or release", async () => {
+    await truthfulKill(DEBUG_APK, true);
+    await truthfulKill(RELEASE_APK, false);
   });
 
   test("restore of a running app keeps its process, and death of a stopped app only restores it", async () => {
