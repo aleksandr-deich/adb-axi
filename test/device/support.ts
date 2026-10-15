@@ -84,12 +84,12 @@ export class Axi {
 
   /** Run one command; the exit code is the caller's to check. */
   async run(args: readonly string[], deadlineMs = 120_000): Promise<AxiRun> {
-    const call = await this.call([...args, "--device", this.serial, "--json"], deadlineMs);
+    const call = await this.call(withFlags(args, ["--device", this.serial, "--json"]), deadlineMs);
     return { ...call, json: JSON.parse(call.stdout) as Record<string, unknown> };
   }
 
   async text(args: readonly string[], deadlineMs = 120_000, exitCode = 0): Promise<AxiText> {
-    const call = await this.call([...args, "--device", this.serial], deadlineMs);
+    const call = await this.call(withFlags(args, ["--device", this.serial]), deadlineMs);
     expect(call.exitCode, `adb-axi ${call.args.join(" ")}\n${call.stdout}${call.stderr}`).toBe(
       exitCode,
     );
@@ -99,8 +99,40 @@ export class Axi {
     };
   }
 
-  private async call(full: readonly string[], deadlineMs: number): Promise<Omit<AxiRun, "json">> {
-    const result = await exec({ file: this.bin, args: full, env: this.env, deadlineMs });
+  /** Run one command with some environment variables changed; `undefined` removes one. */
+  async runWithEnv(
+    args: readonly string[],
+    overrides: Record<string, string | undefined>,
+    deadlineMs = 120_000,
+  ): Promise<AxiRun> {
+    const env = Object.fromEntries(
+      Object.entries({ ...this.env, ...overrides }).filter(([, value]) => value !== undefined),
+    );
+    const call = await this.call(
+      withFlags(args, ["--device", this.serial, "--json"]),
+      deadlineMs,
+      env,
+    );
+    return { ...call, json: JSON.parse(call.stdout) as Record<string, unknown> };
+  }
+
+  /**
+   * Run one command as a user who has not picked a device: no `--device` and no
+   * `ANDROID_SERIAL`. The exit code is the caller's to check.
+   */
+  async unselected(args: readonly string[], deadlineMs = 120_000): Promise<AxiRun> {
+    const env = { ...this.env };
+    delete env.ANDROID_SERIAL;
+    const call = await this.call(withFlags(args, ["--json"]), deadlineMs, env);
+    return { ...call, json: JSON.parse(call.stdout) as Record<string, unknown> };
+  }
+
+  private async call(
+    full: readonly string[],
+    deadlineMs: number,
+    env: NodeJS.ProcessEnv = this.env,
+  ): Promise<Omit<AxiRun, "json">> {
+    const result = await exec({ file: this.bin, args: full, env, deadlineMs });
     const stdout = result.stdout.toString("utf8");
     const stderr = result.stderr.toString("utf8");
     const exitCode = result.kind === "exited" ? result.exitCode : null;
@@ -173,7 +205,11 @@ export class Axi {
    * another tool, a second transport. Logged to the transcript like adb-axi calls.
    */
   async adb(args: readonly string[], deadlineMs = 120_000): Promise<AdbRun> {
-    const full = ["-s", this.serial, ...args];
+    return this.adbHost(["-s", this.serial, ...args], deadlineMs);
+  }
+
+  /** Plain adb with no device named, for host commands such as `connect`. */
+  async adbHost(full: readonly string[], deadlineMs = 120_000): Promise<AdbRun> {
     const result = await exec({ file: locateAdb(), args: full, deadlineMs });
     const stdout = result.stdout.toString("utf8");
     const stderr = result.stderr.toString("utf8");
@@ -283,6 +319,14 @@ export function probeState(message: string): Record<string, string> {
       .map((pair) => pair.split("="))
       .filter((pair): pair is [string, string] => pair.length === 2),
   );
+}
+
+/** adb-axi's own flags go before a `--`, after which everything belongs to the remote command. */
+function withFlags(args: readonly string[], flags: readonly string[]): string[] {
+  const split = args.indexOf("--");
+  return split === -1
+    ? [...args, ...flags]
+    : [...args.slice(0, split), ...flags, ...args.slice(split)];
 }
 
 function quote(arg: string): string {

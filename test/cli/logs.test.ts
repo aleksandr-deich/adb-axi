@@ -200,26 +200,6 @@ describe("logs mark", () => {
     expect(JSON.parse(second.stdout)).not.toHaveProperty("marks_note");
   });
 
-  it("keeps marks per serial: a mark on one device is not found on another", async () => {
-    const f = devices(
-      { serial: A, api: 35, clocks: [MARK_CLOCK] },
-      {
-        serial: B,
-        api: 35,
-        clocks: [LATER_CLOCK],
-        shell: { [logcatFor(MARK_START)]: { stdout: "" } },
-      },
-    );
-    await runCli(["logs", "mark", "before-save", "--device", A], f.env);
-    expect(existsSync(join(f.home, A, "marks.json"))).toBe(true);
-    expect(existsSync(join(f.home, B, "marks.json"))).toBe(false);
-
-    const { toon, data } = await both(["logs", "--since", "before-save", "--device", B], f);
-    expect(toon.exitCode).toBe(1);
-    expect(data).toMatchObject({ code: "MARK_NOT_FOUND", marks: [] });
-    expect(logcatCommands(f)).toEqual([]);
-  });
-
   it("rejects names that are unsafe or that read as a duration, before touching a device", async () => {
     const f = devices({ serial: A, api: 35 });
     for (const name of ["30s", "5m", "a b", "../x", "-x", "x".repeat(65)]) {

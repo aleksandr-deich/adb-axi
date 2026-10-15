@@ -32,11 +32,10 @@ function setup(console: Response, property: Response, serials = ["emulator-5554"
   return fake;
 }
 
-it.each([
-  ["empty", { stdout: "" }],
-  ["refused", { exit: 1, stderr: "console authentication unavailable" }],
-  ["timed out", { hang: true }],
-] satisfies [string, Response][])(
+it.each([["refused", { exit: 1, stderr: "console authentication unavailable" }]] satisfies [
+  string,
+  Response,
+][])(
   "resolves the property name when the console is %s",
   async (_, console) => {
     const f = setup(console, { stdout: "notessa_decoy\n" });

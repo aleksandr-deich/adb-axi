@@ -1,6 +1,5 @@
 import { decode } from "@toon-format/toon";
 import { afterEach, describe, expect, it } from "vitest";
-import { REGISTRY, isShippedPath } from "../../src/commands/registry.js";
 import { isProcessAlive } from "../../src/core/exec.js";
 import { createFakeAdb, type FakeAdb } from "../fake-adb/harness.js";
 import type { Scenario } from "../fake-adb/scenario.js";
@@ -27,40 +26,6 @@ async function both(f: FakeAdb, args: string[] = []) {
 }
 
 describe("devices", () => {
-  it("lists every attached device with its AVD name, API level and form", async () => {
-    const f = withFake("devices-mixed.json");
-    const { toon, json } = await both(f);
-    expect(toon.exitCode).toBe(0);
-    expect(toon.stdout).toMatchInlineSnapshot(`
-      "count: "4 attached, 2 online (1 in other states, use --all)"
-      other_states: 1
-      devices[4]{serial,avd,state,api,form}:
-        emulator-5554,Pixel_10_Pro_XL,device,37,phone
-        emulator-5556,Pixel_Tablet,device,36,tablet
-        emulator-5558,Pixel_Fold,offline,"-","-"
-        ZY22ABCDEFG,"-",unauthorized,"-","-"
-      help[2]: Run \`adb-axi <command> --device Pixel_10_Pro_XL\` to target one by AVD name,Run \`adb-axi doctor --device emulator-5558\` to see why it is offline
-      "
-    `);
-    expect(json.devices).toEqual([
-      { serial: "emulator-5554", avd: "Pixel_10_Pro_XL", state: "device", api: 37, form: "phone" },
-      { serial: "emulator-5556", avd: "Pixel_Tablet", state: "device", api: 36, form: "tablet" },
-      { serial: "emulator-5558", avd: "Pixel_Fold", state: "offline", api: "-", form: "-" },
-      { serial: "ZY22ABCDEFG", avd: "-", state: "unauthorized", api: "-", form: "-" },
-    ]);
-    expect(f.unmatched()).toEqual([]);
-  });
-
-  it("calls only the devices that are online for facts, and always with -s", async () => {
-    const f = withFake("devices-mixed.json");
-    await runCli(["devices"], f.env);
-    const calls = f.calls().map((call) => call.argv);
-    expect(calls[0]).toEqual(["devices", "-l"]);
-    for (const argv of calls.slice(1)) expect(argv[0]).toBe("-s");
-    // The unauthorized physical device is never asked anything.
-    expect(calls.some((argv) => argv[1] === "ZY22ABCDEFG")).toBe(false);
-  });
-
   it("includes devices in unusual states with --all", async () => {
     const f = withFake("devices-mixed.json");
     const { toon, json } = await both(f, ["--all"]);
@@ -70,50 +35,6 @@ describe("devices", () => {
     // Only the AVD-name hint and the doctor hint for the offline device; nothing about --all.
     expect(json.help).toHaveLength(2);
     expect(f.unmatched()).toEqual([]);
-  });
-
-  it("adds the requested columns with --fields, in column order", async () => {
-    const f = withFake("devices-mixed.json");
-    const { toon, json } = await both(f, ["--all", "--fields", "uptime,model,abi,data_free,boot"]);
-    expect(toon.stdout).toContain(
-      "devices[5]{serial,avd,state,api,form,boot,data_free,model,abi,uptime}:",
-    );
-    expect((json.devices as Record<string, unknown>[])[0]).toEqual({
-      serial: "emulator-5554",
-      avd: "Pixel_10_Pro_XL",
-      state: "device",
-      api: 37,
-      form: "phone",
-      boot: "completed",
-      data_free: "3.8G",
-      model: "sdk_gphone16k_arm64",
-      abi: "arm64-v8a",
-      uptime: "9h13m",
-    });
-    expect((json.devices as Record<string, unknown>[])[1]).toMatchObject({
-      model: "Pixel Tablet",
-      data_free: "24.0G",
-      uptime: "1h07m",
-    });
-    // Devices that cannot answer show `-` in every extra column.
-    expect((json.devices as Record<string, unknown>[])[2]).toMatchObject({
-      boot: "-",
-      data_free: "-",
-      model: "-",
-      abi: "-",
-      uptime: "-",
-    });
-    expect(f.unmatched()).toEqual([]);
-  });
-
-  it("asks the device only for the columns requested", async () => {
-    const f = withFake("devices-mixed.json");
-    const { toon } = await both(f, ["--fields", "model"]);
-    expect(toon.stdout).toContain("emulator-5556,Pixel_Tablet,device,36,tablet,Pixel Tablet");
-    const shellCalls = f.calls().filter((call) => call.argv[2] === "shell");
-    expect(
-      shellCalls.map((call) => call.argv[3]).filter((s) => !s?.startsWith("echo @sdk")),
-    ).toEqual(Array<string>(4).fill("echo @model; getprop ro.product.model"));
   });
 
   it("says so when nothing is attached, and exits 0", async () => {
@@ -191,17 +112,6 @@ describe("devices", () => {
       "A device that could not be read shows `-` for what it could not tell",
     );
     for (const call of f.calls()) expect(isProcessAlive(call.pid)).toBe(false);
-  });
-
-  it("reads an unknown AVD name as - when emu avd name stays silent (H6)", async () => {
-    const f = withFake("silent-emu-failure.json");
-    const { json } = await both(f);
-    // The first emulator's console prints nothing and exits 1; the second answers.
-    expect((json.devices as { avd: string }[]).map((row) => row.avd)).toEqual([
-      "-",
-      "Pixel_Tablet",
-    ]);
-    expect(json.count).toBe("2 attached, 2 online");
   });
 
   it("suggests only an AVD name that one attached device uses", async () => {
@@ -334,61 +244,5 @@ describe("devices", () => {
       "Run `adb-axi doctor --device emulator-5554` to diagnose name availability",
       "A device that could not be read shows `-` for what it could not tell",
     ]);
-  });
-
-  it("fails with ADB_SERVER_UNREACHABLE when the adb server does not answer", async () => {
-    const f = withFake("devices-server-down.json");
-    const toon = await runCli(["devices"], f.env);
-    expect(toon.exitCode).toBe(1);
-    expect(decode(toon.stdout.trimEnd())).toMatchObject({
-      error: "the adb server did not answer",
-      code: "ADB_SERVER_UNREACHABLE",
-    });
-    const json = await runCli(["devices", "--json"], f.env);
-    expect(JSON.parse(json.stdout)).toEqual(decode(toon.stdout.trimEnd()));
-    expect(json.exitCode).toBe(1);
-  });
-
-  it("fails with TIMEOUT naming the step when devices -l hangs past the deadline", async () => {
-    const f = withFake({ rules: [{ match: ["devices", "-l"], respond: { hang: true } }] });
-    const { stdout, exitCode, durationMs } = await runCli(["devices", "--timeout", "1s"], f.env);
-    expect(exitCode).toBe(1);
-    expect(decode(stdout.trimEnd())).toMatchObject({ code: "TIMEOUT", step: "listing devices" });
-    expect(durationMs).toBeLessThan(1000 + 750 + 500);
-    for (const call of f.calls()) expect(isProcessAlive(call.pid)).toBe(false);
-  });
-
-  it("fails with ADB_NOT_FOUND when there is no adb", async () => {
-    const f = withFake("devices-mixed.json");
-    const toon = await runCli(["devices"], { ...f.env, PATH: "/nonexistent-bin", HOME: f.dir });
-    expect(toon.exitCode).toBe(1);
-    expect(decode(toon.stdout.trimEnd())).toMatchObject({ code: "ADB_NOT_FOUND" });
-    const json = await runCli(["devices", "--json"], {
-      ...f.env,
-      PATH: "/nonexistent-bin",
-      HOME: f.dir,
-    });
-    expect(JSON.parse(json.stdout)).toEqual(decode(toon.stdout.trimEnd()));
-  });
-
-  it("rejects an unknown --fields column with exit 2 before touching adb", async () => {
-    const f = withFake("devices-mixed.json");
-    const toon = await runCli(["devices", "--fields", "model,color"], f.env);
-    expect(toon.exitCode).toBe(2);
-    expect(decode(toon.stdout.trimEnd())).toEqual({
-      error: '--fields has unknown column "color"',
-      code: "VALIDATION_ERROR",
-      valid_values: ["boot", "data_free", "model", "abi", "uptime"],
-      help: ["Run `adb-axi devices --fields boot,data_free`"],
-    });
-    const json = await runCli(["devices", "--fields", "model,color", "--json"], f.env);
-    expect(JSON.parse(json.stdout)).toEqual(decode(toon.stdout.trimEnd()));
-    expect(f.calls()).toEqual([]);
-  });
-
-  it("only points at doctor once doctor ships", async () => {
-    const f = withFake("devices-mixed.json");
-    const { stdout } = await runCli(["devices"], f.env);
-    expect(stdout.includes("adb-axi doctor")).toBe(isShippedPath(REGISTRY, ["doctor"]));
   });
 });

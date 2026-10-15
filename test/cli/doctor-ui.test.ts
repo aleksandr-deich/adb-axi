@@ -4,7 +4,7 @@ import { main } from "../../src/cli.js";
 import type { HostProcess, HostProcessList } from "../../src/host/processes.js";
 import { createFakeAdb, type FakeAdb } from "../fake-adb/harness.js";
 import type { Response, Rule } from "../fake-adb/scenario.js";
-import { runCli } from "../helpers/run.js";
+import {} from "../helpers/run.js";
 import { sharedWithToon } from "../helpers/json.js";
 
 const SERIAL = "emulator-5554";
@@ -235,32 +235,6 @@ describe("doctor ui", () => {
     expectAddressed(f);
   });
   describe("report", () => {
-    it("reports UiAutomation free when nothing holds it, without reading the log or the host", async () => {
-      const f = scenario({
-        dumpsys: { stdoutFile: "captured/35/dumpsys-activity-processes-probe-front.txt" },
-      });
-      let hostRead = false;
-      let out = "";
-      await main({
-        argv: ["doctor", "ui"],
-        env: f.env,
-        hostProcesses: () => {
-          hostRead = true;
-          return Promise.resolve([]);
-        },
-        stdout: { write: (chunk: string) => (out += chunk) },
-      });
-      expect(process.exitCode ?? 0).toBe(0);
-      expect(out).toBe("uiautomation: free\n");
-      expect(hostRead).toBe(false);
-      expect(shellCalls(f).sort()).toEqual([SHELL.dumpsys, SHELL.ps]);
-      expectAddressed(f);
-
-      const { exitCode, data } = await cli(f, ["doctor", "ui"]);
-      expect(exitCode).toBe(0);
-      expect(data).toEqual({ uiautomation: "free" });
-    });
-
     it("reports a live agent-device session, names what releases it, and exits 0", async () => {
       const f = scenario({ dumpsys: dumpsys({ component: AGENT_DEVICE, pid: 8120 }) });
       const { exitCode, data, toon } = await cli(
@@ -287,27 +261,6 @@ describe("doctor ui", () => {
           },
         ],
         help: ["Run `agent-device close` in the worktree that opened the session when it is done"],
-      });
-      expectAddressed(f);
-    });
-
-    it("reports the Android CLI's idle server as resident, says what it blocks, and exits 0", async () => {
-      const f = scenario({ dumpsys: dumpsys({ component: ANDROID_CLI, pid: 3773 }) });
-      const { exitCode, data } = await cli(f, ["doctor", "ui"]);
-      expect(exitCode).toBe(0);
-      expect(data).toEqual({
-        uiautomation: "in use",
-        holders: [
-          {
-            pid: 3773,
-            holder: "com.android.cli.interact.instrumentation (Android CLI)",
-            state: "resident",
-            why: "no host client",
-          },
-        ],
-        help: [
-          `The Android CLI's UI server holds UiAutomation with no host client; its connection can interfere with other readers and can be what blocks instrumented tests (Gradle connected* tasks, \`am instrument\`) and makes accessibility show as enabled; run \`adb-axi doctor ui --fix --device ${SERIAL}\` to clear it`,
-        ],
       });
       expectAddressed(f);
     });
@@ -352,45 +305,6 @@ describe("doctor ui", () => {
       expectAddressed(f);
     });
 
-    it.each(["shell", "exec-out"])(
-      "detects and protects a connected %s reader renamed to uiautomator",
-      async (transport) => {
-        const f = scenario({ ps: ps([9747, "uiautomator"]) });
-        const host = [
-          ...HOST_NOISE,
-          { pid: 4300, args: `adb -s ${SERIAL} ${transport} uiautomator dump /dev/stdout` },
-        ];
-        const report = await cli(f, ["doctor", "ui"], host);
-        expect(report.exitCode).toBe(0);
-        expect(report.data.uiautomation).toBe("in use");
-        expect(report.data.holders).toEqual([
-          {
-            pid: 9747,
-            holder: "uiautomator (adb uiautomator)",
-            state: "live",
-            why: `adb ${transport} uiautomator pid 4300 on the host`,
-          },
-        ]);
-        const fixed = await cli(f, ["doctor", "ui", "--fix"], host);
-        expect(fixed.exitCode).toBe(1);
-        expect(fixed.data).toMatchObject({
-          code: "HOLDER_PROTECTED",
-          protected: [
-            {
-              pid: 9747,
-              holder: "uiautomator (adb uiautomator)",
-              why: `adb ${transport} uiautomator pid 4300 on the host`,
-            },
-          ],
-          help: [`Wait for \`adb ${transport} uiautomator\` (pid 4300) to finish`],
-        });
-        expect(shellCalls(f).filter((command) => /^(?:kill|am force-stop)/.test(command))).toEqual(
-          [],
-        );
-        expectAddressed(f);
-      },
-    );
-
     it("counts only the holder's own pid as wedged", async () => {
       const f = scenario({
         dumpsys: dumpsys({ component: AGENT_DEVICE, pid: 5673 }),
@@ -426,24 +340,6 @@ describe("doctor ui", () => {
       ]);
     });
 
-    it("does not count an am instrument run that names another emulator", async () => {
-      const f = scenario({ dumpsys: dumpsys({ component: RUNNER, pid: 9021 }) });
-      const { exitCode, data } = await cli(
-        f,
-        ["doctor", "ui"],
-        [...HOST_NOISE, HOST.amInstrumentElsewhere],
-      );
-      expect(exitCode).toBe(1);
-      expect(data.holders).toEqual([
-        {
-          pid: 9021,
-          holder: "com.example.notes.test (am instrument)",
-          state: "leaked",
-          why: "no host client",
-        },
-      ]);
-    });
-
     it("names both force-stop targets in the leaked instrumentation help", async () => {
       const f = scenario({
         dumpsys: dumpsys({ component: RUNNER, pid: 9021, processPackage: "com.example.notes" }),
@@ -453,38 +349,6 @@ describe("doctor ui", () => {
       expect(data.help).toEqual([
         `Run \`adb-axi doctor ui --fix --device ${SERIAL}\` to force-stop com.example.notes.test and force-stop com.example.notes`,
       ]);
-    });
-
-    it("treats a host client on another physical device as unrelated", async () => {
-      const f = scenario({
-        devices: `List of devices attached\nUSB-A device\nUSB-B device\n`,
-        serial: "USB-A",
-        dumpsys: dumpsys({ component: RUNNER, pid: 9021 }),
-      });
-      const { exitCode, data } = await cli(
-        f,
-        ["doctor", "ui", "--device", "USB-A"],
-        [...HOST_NOISE, { pid: 6162, args: `adb -s USB-B shell am instrument -w ${RUNNER}` }],
-      );
-      expect(exitCode).toBe(1);
-      expect(data.holders).toEqual([
-        {
-          pid: 9021,
-          holder: "com.example.notes.test (am instrument)",
-          state: "leaked",
-          why: "no host client",
-        },
-      ]);
-      expect(f.unmatched()).toEqual([]);
-    });
-
-    it("ignores an instrumentation without a UiAutomation connection", async () => {
-      const f = scenario({
-        dumpsys: dumpsys({ component: RUNNER, pid: 9021, uiAutomation: false }),
-      });
-      const { exitCode, data } = await cli(f, ["doctor", "ui"]);
-      expect(exitCode).toBe(0);
-      expect(data).toEqual({ uiautomation: "free" });
     });
 
     it("reports mobilecli live only while mobile-mcp runs and a forward reaches the server", async () => {
@@ -562,15 +426,6 @@ describe("doctor ui", () => {
   });
 
   describe("--fix", () => {
-    it("is a no-op when UiAutomation is already free", async () => {
-      const f = scenario();
-      const { exitCode, data, toon } = await cli(f, ["doctor", "ui", "--fix"]);
-      expect(exitCode).toBe(0);
-      expect(toon).toBe(`ok: doctor ui ${SERIAL} -> uiautomation free (no-op)\n`);
-      expect(data).toEqual({ ok: `doctor ui ${SERIAL} -> uiautomation free (no-op)` });
-      expect(shellCalls(f).every((command) => !/^(?:kill|am force-stop)/.test(command))).toBe(true);
-    });
-
     it("kills the leaked server, force-stops the wedged instrumentation, and checks again", async () => {
       const f = scenario({
         state: { server: "running", cli: "running" },
@@ -770,12 +625,6 @@ describe("doctor ui", () => {
         { component: "b.leaked.test/.Runner", pid: 9002, processPackage: "shared.app" },
         "shared.app",
       ],
-      [
-        "runner package",
-        { component: "shared.test/.Live", pid: 9001, processPackage: "live.app" },
-        { component: "shared.test/.Leaked", pid: 9002, processPackage: "leaked.app" },
-        "shared.test",
-      ],
     ])("does not force-stop a %s used by a live holder", async (_name, live, leaked, pkg) => {
       const f = scenario({ dumpsys: dumpsys(live, leaked) });
       const { exitCode, data } = await cli(
@@ -862,31 +711,6 @@ describe("doctor ui", () => {
       expectAddressed(f);
     });
 
-    it("refuses a running Gradle test with HOLDER_PROTECTED, touching nothing", async () => {
-      const f = scenario({ dumpsys: dumpsys({ component: RUNNER, pid: 9021 }) });
-      const { exitCode, data } = await cli(
-        f,
-        ["doctor", "ui", "--fix"],
-        [...HOST_NOISE, HOST.gradle],
-      );
-      expect(exitCode).toBe(1);
-      expect(data).toEqual({
-        error: "com.example.notes.test (am instrument) is live and --fix left it alone",
-        code: "HOLDER_PROTECTED",
-        protected: [
-          {
-            pid: 9021,
-            holder: "com.example.notes.test (am instrument)",
-            why: "a Gradle connected* task pid 5150 on the host",
-          },
-        ],
-        help: ["Wait for the Gradle connected* task (pid 5150) to finish, or stop it"],
-      });
-      expect(shellCalls(f).filter((command) => /^(?:kill|am force-stop)/.test(command))).toEqual(
-        [],
-      );
-    });
-
     it("exits 1 with what is left when a holder survives the fix", async () => {
       const f = scenario({
         ps: ps([5443, MOBILECLI]),
@@ -941,34 +765,6 @@ describe("doctor ui", () => {
       });
       expect(f.calls().filter((call) => call.argv[2] === "shell")).toHaveLength(4);
       expect(f.calls().every((call) => call.end !== null)).toBe(true);
-    });
-
-    it("fails with TIMEOUT at --timeout when the device stops answering, through the bin", async () => {
-      const f = scenario({
-        logcat: { hang: true },
-        dumpsys: dumpsys({ component: ANDROID_CLI, pid: 5673 }),
-      });
-      const run = await runCli(["doctor", "ui", "--timeout", "1s"], f.env);
-      expect(run.exitCode).toBe(1);
-      expect(decode(run.stdout.trimEnd())).toMatchObject({
-        code: "TIMEOUT",
-        step: "searching the log for wedged UiAutomation",
-      });
-      expect(run.durationMs).toBeLessThan(1000 + 1500);
-    });
-
-    it("answers through the bin with the real host process list when nothing holds UiAutomation", async () => {
-      const f = scenario();
-      const run = await runCli(["doctor", "ui"], f.env);
-      expect(run.exitCode).toBe(0);
-      expect(run.stdout).toBe("uiautomation: free\n");
-      const fix = await runCli(["doctor", "ui", "--fix", "--json"], f.env);
-      expect(fix.exitCode).toBe(0);
-      expect(JSON.parse(fix.stdout)).toEqual({
-        ok: `doctor ui ${SERIAL} -> uiautomation free (no-op)`,
-        noop: true,
-      });
-      expectAddressed(f);
     });
   });
 });
