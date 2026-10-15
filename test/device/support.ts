@@ -1,7 +1,7 @@
 import { appendFileSync, mkdirSync, mkdtempSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import { decode } from "@toon-format/toon";
-import { beforeEach, expect, inject } from "vitest";
+import { afterAll, beforeAll, beforeEach, expect, inject } from "vitest";
 import { locateAdb } from "../../src/adb/locate.js";
 import { exec } from "../../src/core/exec.js";
 
@@ -137,11 +137,18 @@ export class Axi {
   async fails(
     args: readonly string[],
     code: string,
-    options: { deadlineMs?: number; varies?: readonly string[] } = {},
+    options: {
+      deadlineMs?: number;
+      varies?: readonly string[];
+      /** Recreate the failing state before each of the two runs. */
+      before?: () => Promise<void>;
+    } = {},
   ): Promise<Record<string, unknown>> {
+    await options.before?.();
     const run = await this.run(args, options.deadlineMs);
     expect(run.exitCode, `adb-axi ${run.args.join(" ")}\n${run.stdout}${run.stderr}`).toBe(1);
     expect(run.json.code).toBe(code);
+    await options.before?.();
     const text = await this.text(args, options.deadlineMs, 1);
     const stable = (data: Record<string, unknown>): Record<string, unknown> =>
       Object.fromEntries(
@@ -243,6 +250,29 @@ export class Axi {
     expect(count, String(json.crashes)).toBeDefined();
     return { count: Number(count), crash: (json.crash ?? {}) as Record<string, unknown> };
   }
+}
+
+/**
+ * Suppress Android's crash and ANR dialogs for one test file, so a dialog never takes the
+ * foreground from the next check, and restore the original setting afterwards.
+ */
+export function hideErrorDialogs(axi: Axi): void {
+  let original: string | undefined;
+  beforeAll(async () => {
+    const value = (await axi.sh("settings get global hide_error_dialogs")).trim();
+    expect(value).toMatch(/^(null|\d+)$/);
+    original = value;
+    await axi.sh("settings put global hide_error_dialogs 1");
+  });
+  afterAll(async () => {
+    if (original === undefined) return;
+    await axi.sh(
+      original === "null"
+        ? "settings delete global hide_error_dialogs"
+        : `settings put global hide_error_dialogs ${original}`,
+    );
+    expect((await axi.sh("settings get global hide_error_dialogs")).trim()).toBe(original);
+  });
 }
 
 /** The probe's oracle line, `event=... saved=N volatile=N rows=N restored=B pid=N`. */

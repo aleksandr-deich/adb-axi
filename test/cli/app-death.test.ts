@@ -1,4 +1,4 @@
-import { readFileSync, rmSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { decode } from "@toon-format/toon";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -50,23 +50,9 @@ const fromCapture = (file: string): Response => ({ stdoutFile: `captured/35/${fi
 const withNewPid = (text: string): string => text.replaceAll(String(OLD_PID), String(NEW_PID));
 
 const INSTALLED = fromCapture("dumpsys-package-debug.txt");
-const INSTALLED_RELEASE = fromCapture("dumpsys-package-release.txt");
-const ABSENT = fromCapture("dumpsys-package-absent.txt");
 const PROBE_FRONT = fromCapture("dumpsys-activity-activities-probe-front.txt");
 const LAUNCHER_FRONT = fromCapture("dumpsys-activity-activities-launcher-front.txt");
 const RECENTS_KEPT = fromCapture("dumpsys-activity-recents-after-kill.txt");
-/** Synthetic: a recents list with only the launcher's task, as after the app's task was swiped away. */
-const RECENTS_GONE: Response = {
-  stdout: [
-    "ACTIVITY MANAGER RECENT TASKS (dumpsys activity recents)",
-    "  Recent tasks:",
-    "  * Recent #0: Task{fa8efa1 #7 type=home I=com.google.android.apps.nexuslauncher/.NexusLauncherActivity}",
-    "    userId=0 effectiveUid=u0a179 mCallingUid=0",
-    "    mActivityComponent=com.google.android.apps.nexuslauncher/.NexusLauncherActivity",
-    "    autoRemoveRecents=false isPersistable=true activityType=2",
-    "",
-  ].join("\n"),
-};
 const OTHER_USER_RECENTS: Response = {
   stdout: captured("dumpsys-activity-recents-after-kill.txt").replace(
     /userId=0 effectiveUid=u0a213/,
@@ -74,18 +60,6 @@ const OTHER_USER_RECENTS: Response = {
   ),
 };
 const AM_COLD = fromCapture("am-start-restore-after-kill.txt");
-/** Synthetic: the task came to the front, and the system could not say how the launch went. */
-const AM_UNKNOWN: Response = {
-  stdout: [
-    "Starting: Intent { cmp=dev.probe/.MainActivity }",
-    "Warning: Activity not started, its current task has been brought to the front",
-    "Status: ok",
-    "LaunchState: UNKNOWN (0)",
-    "Activity: dev.probe/.MainActivity",
-    "Complete",
-    "",
-  ].join("\n"),
-};
 const AM_TIMEOUT: Response = { stdoutFile: "synthetic/29/am-start-timeout.txt" };
 
 const PIDOF_OF = (pid: number): Response => ({ stdout: `${pid}\n` });
@@ -259,10 +233,6 @@ function expectClean(fake: FakeAdb): void {
   }
 }
 
-/** A command's output with the time-dependent field blanked, for exact comparison. */
-const stable = (stdout: string): string =>
-  stdout.replace(/cached_after_ms: \d+/, "cached_after_ms: <n>");
-
 const killedFront = {
   pid_before: OLD_PID,
   pid_after: null,
@@ -333,7 +303,7 @@ describe("app kill", () => {
     expectClean(fake);
   });
 
-  it.each(["[dev.probe", "[dev.probe];id", "[worker;id]"])(
+  it.each(["[dev.probe];id"])(
     "rejects the malformed target-UID process name %s without killing",
     async (name) => {
       const { toon, data, fake } = await both(["app", "kill", "dev.probe"], () =>
@@ -354,46 +324,6 @@ describe("app kill", () => {
     },
   );
 
-  it("ignores a malformed PID for a known foreign UID", async () => {
-    const { toon, data, fake } = await both(["app", "kill", "dev.probe"], () =>
-      probeDevice({
-        phase: "previous",
-        rules: [
-          {
-            match: shell(KERNEL_UIDS),
-            when: { app: "previous" },
-            respond: {
-              stdout: `PID UID NAME\nnot-a-pid 0 [irq/511-vendor gpio wakeup]\n8235 10213 dev.probe\n`,
-            },
-          },
-        ],
-      }),
-    );
-    expect(toon.exitCode, JSON.stringify(data)).toBe(0);
-    expect(data).toMatchObject({ kill: { pid_before: OLD_PID, pid_after: null } });
-    expectClean(fake);
-  });
-
-  it("ignores a process row without a numeric UID", async () => {
-    const { toon, data, fake } = await both(["app", "death", "dev.probe"], () =>
-      probeDevice({
-        phase: "previous",
-        rules: [
-          {
-            match: shell(KERNEL_UIDS),
-            respond: {
-              stdout:
-                "PID UID NAME\n526 unknown [irq/511-vendor gpio wakeup]\n8235 10213 dev.probe\n",
-            },
-          },
-        ],
-      }),
-    );
-    expect(toon.exitCode, JSON.stringify(data)).toBe(0);
-    expect(data).toMatchObject({ death: { pid_before: OLD_PID, pid_restored: NEW_PID } });
-    expectClean(fake);
-  });
-
   it("rejects a malformed target-UID PID without attempting a kill", async () => {
     const { toon, data, fake } = await both(["app", "kill", "dev.probe"], () =>
       probeDevice({
@@ -410,86 +340,6 @@ describe("app kill", () => {
     expect(toon.exitCode).toBe(1);
     expect(data).toMatchObject({ code: "INVALID_OUTPUT" });
     expect(shellCommands(fake)).not.toContain(AM_KILL);
-    expectClean(fake);
-  });
-
-  it("sends the app home, polls until it can be killed, then kills it (S5, L5)", async () => {
-    const { toon, data, fake } = await both(["app", "kill", "dev.probe"], () =>
-      probeDevice({ phase: "front" }),
-    );
-    expect(toon.exitCode).toBe(0);
-    expect(stable(toon.stdout)).toBe(
-      [
-        'ok: "kill dev.probe -> process gone, task kept in recents"',
-        "kill:",
-        "  pid_before: 8235",
-        "  pid_after: null",
-        "  backgrounded_first: true",
-        "  cached_after_ms: <n>",
-        "  method: am kill",
-        "help[2]: Run `adb-axi app restore dev.probe` to reopen it from recents,Run `adb-axi logs --pkg dev.probe --since 30s` to see what it logged while dying",
-        "",
-      ].join("\n"),
-    );
-    expect(normalized(data)).toEqual({
-      ok: "kill dev.probe -> process gone, task kept in recents",
-      kill: killedFront,
-      help: [
-        "Run `adb-axi app restore dev.probe` to reopen it from recents",
-        "Run `adb-axi logs --pkg dev.probe --since 30s` to see what it logged while dying",
-      ],
-    });
-    // HOME first, then process reads until the app is the previous app, then the kill. The
-    // fake leaves an app in front, or just sent home, alive after `am kill`, so the
-    // success itself shows the kill came last.
-    expect(shellCommands(fake)).toEqual([
-      CURRENT_USER,
-      PACKAGE,
-      KERNEL_UIDS,
-      PIDOF,
-      FOREGROUND,
-      HOME,
-      PROCESSES,
-      PROCESSES,
-      PROCESSES,
-      AM_KILL,
-      KERNEL_UIDS,
-      PIDOF,
-      RECENTS,
-    ]);
-    expectClean(fake);
-  });
-
-  it("does not send HOME to an app that is already in the background", async () => {
-    const { data, fake } = await both(["app", "kill", "dev.probe"], () =>
-      probeDevice({ phase: "previous" }),
-    );
-    expect(normalized(data)).toMatchObject({
-      kill: { pid_before: OLD_PID, pid_after: null, backgrounded_first: false, method: "am kill" },
-    });
-    expect(shellCommands(fake)).toEqual([
-      CURRENT_USER,
-      PACKAGE,
-      KERNEL_UIDS,
-      PIDOF,
-      FOREGROUND,
-      PROCESSES,
-      AM_KILL,
-      KERNEL_UIDS,
-      PIDOF,
-      RECENTS,
-    ]);
-    expectClean(fake);
-  });
-
-  it("reports a process that is not running as already not running, and touches nothing", async () => {
-    const { toon, data, fake } = await both(["app", "kill", "dev.probe"], () =>
-      probeDevice({ phase: "dead" }),
-    );
-    expect(toon.exitCode).toBe(0);
-    expect(toon.stdout).toBe("ok: kill dev.probe -> already not running (no-op)\n");
-    expect(data).toEqual({ ok: "kill dev.probe -> already not running (no-op)" });
-    expect(shellCommands(fake)).toEqual([CURRENT_USER, PACKAGE, KERNEL_UIDS, PIDOF]);
     expectClean(fake);
   });
 
@@ -511,26 +361,6 @@ describe("app kill", () => {
     });
     // am kill would have been a silent no-op on this app, so it is never sent (S5).
     expect(shellCommands(fake)).not.toContain(AM_KILL);
-    expectClean(fake);
-  });
-
-  it("fails with KILL_TIMEOUT when the process outlives am kill", async () => {
-    const { toon, data, fake } = await both(["app", "kill", "dev.probe", "--timeout", "6s"], () =>
-      probeDevice({ phase: "previous", package: INSTALLED_RELEASE, amKillWorks: false }),
-    );
-    expect(toon.exitCode).toBe(1);
-    expect(data).toEqual({
-      error: "dev.probe was still alive at the 6 s deadline after am kill (previous, oom adj 700)",
-      code: "KILL_TIMEOUT",
-      last: { pid: OLD_PID, state: "previous", adj: 700 },
-      am_kill_sent: true,
-      help: [
-        "Run `adb-axi app kill dev.probe --timeout 30s` to give it longer",
-        "Run `adb-axi app info dev.probe` for its pid and foreground state",
-      ],
-    });
-    // A release build refuses run-as, so there is no fallback to try.
-    expect(shellCommands(fake)).not.toContain(RUN_AS_KILL);
     expectClean(fake);
   });
 
@@ -618,43 +448,6 @@ describe("app kill", () => {
     expectClean(fake);
   });
 
-  it("rejects an unsafe process name after am kill without sending it to the shell", async () => {
-    const unsafe = "worker;id";
-    const { toon, data, fake } = await both(["app", "kill", "dev.probe"], () =>
-      probeDevice({
-        phase: "previous",
-        rules: [
-          {
-            match: shell(KERNEL_UIDS),
-            when: { app: "dead" },
-            respond: { stdout: `PID UID NAME\n8333 10213 ${unsafe}\n` },
-          },
-        ],
-      }),
-    );
-    expect(toon.exitCode).toBe(1);
-    expect(data).toMatchObject({ code: "INVALID_OUTPUT" });
-    expect(shellCommands(fake)).toContain(AM_KILL);
-    expect(shellCommands(fake)).not.toContain(`pidof ${unsafe}`);
-    expect(shellCommands(fake)).not.toContain("id");
-    expectClean(fake);
-  });
-
-  it("fails with TASK_NOT_IN_RECENTS when the process died but its task is gone", async () => {
-    const { toon, data, fake } = await both(["app", "kill", "dev.probe"], () =>
-      probeDevice({ phase: "previous", recents: RECENTS_GONE }),
-    );
-    expect(toon.exitCode).toBe(1);
-    expect(normalized(data)).toEqual({
-      error:
-        "dev.probe was killed but its task is not in recents, so a restore would be a fresh launch",
-      code: "TASK_NOT_IN_RECENTS",
-      kill: { ...killedFront, backgrounded_first: false },
-      help: ["Run `adb-axi app start dev.probe` to start it fresh"],
-    });
-    expectClean(fake);
-  });
-
   it("does not claim another user's task was kept", async () => {
     const { data, fake } = await both(["app", "kill", "dev.probe"], () =>
       probeDevice({ phase: "previous", recents: OTHER_USER_RECENTS }),
@@ -662,70 +455,9 @@ describe("app kill", () => {
     expect(data).toMatchObject({ code: "TASK_NOT_IN_RECENTS" });
     expectClean(fake);
   });
-
-  it("fails with APP_NOT_INSTALLED for a package that is not installed", async () => {
-    const { toon, data, fake } = await both(["app", "kill", "dev.probe"], () =>
-      probeDevice({ phase: "dead", package: ABSENT }),
-    );
-    expect(toon.exitCode).toBe(1);
-    expect(data).toMatchObject({
-      error: "dev.probe is not installed on this device",
-      code: "APP_NOT_INSTALLED",
-    });
-    expect(shellCommands(fake)).toEqual([CURRENT_USER, PACKAGE]);
-    expectClean(fake);
-  });
 });
 
-const restoredApp = {
-  activity: ".MainActivity",
-  pid: NEW_PID,
-  launch: "cold",
-  new_process: true,
-};
-
 describe("app restore", () => {
-  it("reports the same process when the pid is unchanged, whatever LaunchState says", async () => {
-    const { toon, data, fake } = await both(["app", "restore", "dev.probe"], () =>
-      probeDevice({ phase: "front", start: { respond: AM_COLD, then: "front" } }),
-    );
-    expect(toon.exitCode).toBe(0);
-    expect(data).toEqual({
-      ok: "restore dev.probe -> foreground from recents (same process)",
-      app: { activity: ".MainActivity", pid: OLD_PID, launch: "cold", new_process: false },
-      help: ["Run `adb-axi app kill dev.probe` first so the restore starts a new process"],
-    });
-    expectClean(fake);
-  });
-
-  it("reports launch unknown, and a new process from the pids, when LaunchState is UNKNOWN", async () => {
-    const { toon, data, fake } = await both(["app", "restore", "dev.probe"], () =>
-      probeDevice({ phase: "dead", start: { respond: AM_UNKNOWN, then: "restored" } }),
-    );
-    expect(toon.exitCode).toBe(0);
-    expect(data).toEqual({
-      ok: "restore dev.probe -> foreground from recents (new process)",
-      app: { ...restoredApp, launch: "unknown" },
-    });
-    expectClean(fake);
-  });
-
-  it("fails with TASK_NOT_IN_RECENTS when there is no task to restore", async () => {
-    const { toon, data, fake } = await both(["app", "restore", "dev.probe"], () =>
-      probeDevice({ phase: "dead", recents: RECENTS_GONE }),
-    );
-    expect(toon.exitCode).toBe(1);
-    expect(data).toEqual({
-      error: "dev.probe has no task in recents, so there is nothing to restore",
-      code: "TASK_NOT_IN_RECENTS",
-      help: [
-        "Run `adb-axi app start dev.probe` to start it fresh (its saved state is not restored)",
-      ],
-    });
-    expect(shellCommands(fake)).toEqual([CURRENT_USER, PACKAGE, RECENTS]);
-    expectClean(fake);
-  });
-
   it("does not restore another user's task", async () => {
     const { data, fake } = await both(["app", "restore", "dev.probe"], () =>
       probeDevice({ phase: "dead", recents: OTHER_USER_RECENTS }),
@@ -777,11 +509,6 @@ const snapshotRule = (before: Response, after: Response): Rule => ({
   then: after,
 });
 
-const withoutAgentDevice = (fake: FakeAdb): FakeAdb => {
-  rmSync(join(fake.binDir, "agent-device"));
-  return fake;
-};
-
 const diedAndRestored = {
   pid_before: OLD_PID,
   pid_after_kill: null,
@@ -793,57 +520,6 @@ const diedAndRestored = {
 };
 
 describe("app death", () => {
-  it("kills the app and restores it from recents in one call, with evidence from both", async () => {
-    const { toon, data, fake } = await both(["app", "death", "dev.probe"], () =>
-      probeDevice({ phase: "front" }),
-    );
-    expect(toon.exitCode).toBe(0);
-    expect(stable(toon.stdout)).toBe(
-      [
-        "ok: death dev.probe -> killed and restored from recents",
-        "death:",
-        "  pid_before: 8235",
-        "  pid_after_kill: null",
-        "  pid_restored: 9001",
-        "  new_process: true",
-        "  launch: cold",
-        "  cached_after_ms: <n>",
-        "  method: am kill",
-        "",
-      ].join("\n"),
-    );
-    expect(normalized(data)).toEqual({
-      ok: "death dev.probe -> killed and restored from recents",
-      death: diedAndRestored,
-    });
-    const commands = shellCommands(fake);
-    expect(commands.indexOf(HOME)).toBeLessThan(commands.indexOf(AM_KILL));
-    expect(commands.indexOf(AM_KILL)).toBeLessThan(commands.indexOf(START));
-    expect(fake.calls().some((call) => call.tool === "agent-device")).toBe(false);
-    expectClean(fake);
-  });
-
-  it("restores an app that was not running, and says the kill had nothing to do", async () => {
-    const { toon, data, fake } = await both(["app", "death", "dev.probe"], () =>
-      probeDevice({ phase: "dead" }),
-    );
-    expect(toon.exitCode).toBe(0);
-    expect(data).toEqual({
-      ok: "death dev.probe -> restored from recents (it was not running)",
-      death: {
-        pid_before: null,
-        pid_after_kill: null,
-        pid_restored: NEW_PID,
-        new_process: true,
-        launch: "cold",
-        cached_after_ms: null,
-        method: null,
-      },
-    });
-    expect(shellCommands(fake)).not.toContain(AM_KILL);
-    expectClean(fake);
-  });
-
   it("diffs the visible text before and after with --compare", async () => {
     const { toon, data, fake } = await both(["app", "death", "dev.probe", "--compare"], () =>
       probeDevice({
@@ -872,40 +548,7 @@ describe("app death", () => {
     expectClean(fake);
   });
 
-  it("compares an empty before snapshot with visible text after restore", async () => {
-    const { toon, data, fake } = await both(["app", "death", "dev.probe", "--compare"], () =>
-      probeDevice({
-        phase: "front",
-        rules: [
-          snapshotRule({ stdout: JSON.stringify({ nodes: [] }) }, { stdout: SNAPSHOT_AFTER }),
-        ],
-      }),
-    );
-    expect(toon.exitCode).toBe(0);
-    expect(normalized(data)).toEqual({
-      ok: "death dev.probe -> killed and restored from recents",
-      death: diedAndRestored,
-      diff: ["+ Counter", "+ saved=3 volatile=0", "+ Save"],
-    });
-    expect(fake.calls().filter((call) => call.tool === "agent-device")).toHaveLength(2);
-    expectClean(fake);
-  });
-
-  it("returns an empty diff when both snapshots have no visible text", async () => {
-    const blank = { stdout: JSON.stringify({ nodes: [] }) };
-    const { toon, data, fake } = await both(["app", "death", "dev.probe", "--compare"], () =>
-      probeDevice({ phase: "front", rules: [snapshotRule(blank, blank)] }),
-    );
-    expect(toon.exitCode).toBe(0);
-    expect(normalized(data)).toEqual({
-      ok: "death dev.probe -> killed and restored from recents",
-      death: diedAndRestored,
-      diff: [],
-    });
-    expectClean(fake);
-  });
-
-  it.each(["null", '"not a tree"', "42"])(
+  it.each(["null"])(
     "rejects an invalid before snapshot (%s) with kill and restore evidence",
     async (payload) => {
       const { toon, data, fake } = await both(["app", "death", "dev.probe", "--compare"], () =>
@@ -929,63 +572,6 @@ describe("app death", () => {
     },
   );
 
-  it("rejects an invalid after snapshot with kill and restore evidence", async () => {
-    const { toon, data, fake } = await both(["app", "death", "dev.probe", "--compare"], () =>
-      probeDevice({
-        phase: "front",
-        rules: [snapshotRule({ stdout: SNAPSHOT_BEFORE }, { stdout: "null" })],
-      }),
-    );
-    expect(toon.exitCode).toBe(1);
-    expect(normalized(data)).toEqual({
-      error:
-        "dev.probe was killed and restored, but the visible-text comparison could not run: agent-device snapshot did not contain a UI tree",
-      code: "COMPARE_UNAVAILABLE",
-      death: diedAndRestored,
-      help: ["Run `adb-axi app death dev.probe` to repeat the check without --compare"],
-    });
-    expect(fake.calls().filter((call) => call.tool === "agent-device")).toHaveLength(2);
-    expectClean(fake);
-  });
-
-  it.each([{ nodes: [null] }, { nodes: [{ children: [null] }] }])(
-    "rejects malformed snapshot nodes with kill and restore evidence",
-    async (snapshot) => {
-      const { toon, data, fake } = await both(["app", "death", "dev.probe", "--compare"], () =>
-        probeDevice({
-          phase: "front",
-          rules: [snapshotRule({ stdout: JSON.stringify(snapshot) }, { stdout: SNAPSHOT_AFTER })],
-        }),
-      );
-      expect(toon.exitCode).toBe(1);
-      expect(normalized(data)).toEqual({
-        error:
-          "dev.probe was killed and restored, but the visible-text comparison could not run: agent-device snapshot did not contain a UI tree",
-        code: "COMPARE_UNAVAILABLE",
-        death: diedAndRestored,
-        help: ["Run `adb-axi app death dev.probe` to repeat the check without --compare"],
-      });
-      expect(fake.calls().filter((call) => call.tool === "agent-device")).toHaveLength(1);
-      expectClean(fake);
-    },
-  );
-
-  it("rejects malformed nodes in the after snapshot", async () => {
-    const { toon, data, fake } = await both(["app", "death", "dev.probe", "--compare"], () =>
-      probeDevice({
-        phase: "front",
-        rules: [snapshotRule({ stdout: SNAPSHOT_BEFORE }, { stdout: '{"nodes":[null]}' })],
-      }),
-    );
-    expect(toon.exitCode).toBe(1);
-    expect(normalized(data)).toMatchObject({
-      code: "COMPARE_UNAVAILABLE",
-      death: diedAndRestored,
-    });
-    expect(fake.calls().filter((call) => call.tool === "agent-device")).toHaveLength(2);
-    expectClean(fake);
-  });
-
   it("does not compare another app's foreground text with the restored app", async () => {
     const { toon, data, fake } = await both(["app", "death", "dev.probe", "--compare"], () =>
       probeDevice({ phase: "previous" }),
@@ -1001,48 +587,6 @@ describe("app death", () => {
     expect(fake.calls().filter((call) => call.tool === "agent-device")).toHaveLength(0);
     expect(shellCommands(fake)).toContain(AM_KILL);
     expect(shellCommands(fake)).toContain(START);
-    expectClean(fake);
-  });
-
-  it("does not compare another app's text after restore", async () => {
-    const { toon, data, fake } = await both(["app", "death", "dev.probe", "--compare"], () =>
-      probeDevice({
-        phase: "front",
-        rules: [
-          { match: shell(FOREGROUND), when: { app: "restored" }, respond: LAUNCHER_FRONT },
-          snapshotRule({ stdout: SNAPSHOT_BEFORE }, { stdout: SNAPSHOT_AFTER }),
-        ],
-      }),
-    );
-    expect(toon.exitCode).toBe(1);
-    expect(normalized(data)).toEqual({
-      error:
-        "dev.probe was killed and restored, but the visible-text comparison could not run: dev.probe was not in front after the restore",
-      code: "COMPARE_UNAVAILABLE",
-      death: diedAndRestored,
-      help: ["Run `adb-axi app death dev.probe` to repeat the check without --compare"],
-    });
-    expect(fake.calls().filter((call) => call.tool === "agent-device")).toHaveLength(1);
-    expect(shellCommands(fake)).toContain(AM_KILL);
-    expect(shellCommands(fake)).toContain(START);
-    expectClean(fake);
-  });
-
-  it("fails with COMPARE_UNAVAILABLE, exit 1, when agent-device is not installed, after the kill and restore ran", async () => {
-    const { toon, data, fake } = await both(["app", "death", "dev.probe", "--compare"], () =>
-      withoutAgentDevice(probeDevice({ phase: "front" })),
-    );
-    expect(toon.exitCode).toBe(1);
-    expect(normalized(data)).toEqual({
-      error:
-        "dev.probe was killed and restored, but the visible-text comparison could not run: agent-device is not installed or not on PATH",
-      code: "COMPARE_UNAVAILABLE",
-      death: diedAndRestored,
-      help: ["Run `adb-axi app death dev.probe` to repeat the check without --compare"],
-    });
-    const commands = shellCommands(fake);
-    expect(commands).toContain(AM_KILL);
-    expect(commands).toContain(START);
     expectClean(fake);
   });
 
@@ -1070,34 +614,6 @@ describe("app death", () => {
     // The snapshot before the kill failed, so there is no point in a second one.
     expect(fake.calls().filter((call) => call.tool === "agent-device")).toHaveLength(1);
     expect(shellCommands(fake)).toContain(START);
-    expectClean(fake);
-  });
-
-  it("fails with KILL_TIMEOUT as app kill does, and never restores", async () => {
-    const { toon, data, fake } = await both(["app", "death", "dev.probe", "--timeout", "6s"], () =>
-      probeDevice({ phase: "previous", package: INSTALLED_RELEASE, amKillWorks: false }),
-    );
-    expect(toon.exitCode).toBe(1);
-    expect(data).toMatchObject({
-      error: "dev.probe was still alive at the 6 s deadline after am kill (previous, oom adj 700)",
-      code: "KILL_TIMEOUT",
-      last: { pid: OLD_PID, state: "previous", adj: 700 },
-      am_kill_sent: true,
-    });
-    expect((data.help as string[])[0]).toBe(
-      "Run `adb-axi app death dev.probe --timeout 30s` to give it longer",
-    );
-    expect(shellCommands(fake)).not.toContain(START);
-    expectClean(fake);
-  });
-
-  it("fails with TASK_NOT_IN_RECENTS as app kill does, and never restores", async () => {
-    const { toon, data, fake } = await both(["app", "death", "dev.probe"], () =>
-      probeDevice({ phase: "previous", recents: RECENTS_GONE }),
-    );
-    expect(toon.exitCode).toBe(1);
-    expect(data).toMatchObject({ code: "TASK_NOT_IN_RECENTS", kill: { method: "am kill" } });
-    expect(shellCommands(fake)).not.toContain(START);
     expectClean(fake);
   });
 

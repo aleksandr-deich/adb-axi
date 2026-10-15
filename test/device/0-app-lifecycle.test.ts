@@ -220,7 +220,7 @@ describe("ordinary installed probe lifecycle", () => {
   test("missing-package lifecycle commands fail before creating any process", async () => {
     const missing = `${PKG}.missing`;
     expect((await axi.ok(["shell", `pm path ${missing} || true`])).stdout).toBe("");
-    for (const action of ["start", "stop", "clear", "restore", "death"]) {
+    for (const action of ["start", "stop", "clear", "kill", "restore", "death"]) {
       const json = await axi.run(["app", action, missing]);
       expect(json.exitCode).toBe(1);
       expect(json.json).toMatchObject({

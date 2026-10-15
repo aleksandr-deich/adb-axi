@@ -1,34 +1,14 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, test } from "vitest";
-import { Axi, DEBUG_APK, PKG } from "./support.js";
+import { beforeEach, describe, expect, test } from "vitest";
+import { Axi, DEBUG_APK, PKG, hideErrorDialogs } from "./support.js";
 
 const axi = new Axi(import.meta.filename);
 
 /** ActivityManager logs this once the crashed process is gone, after the crash report. */
 const DIED = String.raw`Process dev\.probe \(pid \d+\) has died`;
 
+hideErrorDialogs(axi);
+
 describe("logs crash", () => {
-  let errorDialogs: string | undefined;
-
-  beforeAll(async () => {
-    const setting = await axi.ok(["shell", "settings get global hide_error_dialogs"]);
-    const value = String(setting.stdout);
-    expect(value).toMatch(/^(null|\d+)$/);
-    errorDialogs = value;
-    await axi.ok(["shell", "settings put global hide_error_dialogs 1"]);
-  });
-
-  afterAll(async () => {
-    if (errorDialogs === undefined) return;
-    await axi.ok([
-      "shell",
-      errorDialogs === "null"
-        ? "settings delete global hide_error_dialogs"
-        : `settings put global hide_error_dialogs ${errorDialogs}`,
-    ]);
-    const restored = await axi.ok(["shell", "settings get global hide_error_dialogs"]);
-    expect(restored.stdout).toBe(errorDialogs);
-  });
-
   beforeEach(async () => {
     await axi.ok(["app", "install", DEBUG_APK, "--clean-data"]);
   });

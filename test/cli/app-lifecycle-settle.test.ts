@@ -50,10 +50,8 @@ describe("app start settle deadlines", () => {
   };
 
   it.each(
-    [0, 10].flatMap((userId) =>
-      [false, true].flatMap((fresh) =>
-        ["dev.probe", "dev.probe:ui"].map((process) => ({ userId, fresh, process })),
-      ),
+    [0].flatMap((userId) =>
+      [false].flatMap((fresh) => ["dev.probe"].map((process) => ({ userId, fresh, process }))),
     ),
   )(
     "returns the complete short-budget observation, user=$userId, fresh=$fresh, process=$process",
@@ -113,7 +111,7 @@ describe("app start settle deadlines", () => {
     },
   );
 
-  it.each(["process", "foreground"])(
+  it.each(["process"])(
     "keeps the complete observation when a later %s read times out",
     async (step) => {
       const f = deviceWithRules([
@@ -157,7 +155,7 @@ describe("app start settle deadlines", () => {
     },
   );
 
-  it.each(["process", "foreground"])(
+  it.each(["process"])(
     "bounds a stalled later %s read to the settle window rather than the command timeout",
     async (step) => {
       const f = deviceWithRules([

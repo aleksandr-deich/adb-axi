@@ -1,5 +1,8 @@
+import { existsSync } from "node:fs";
+import { delimiter, join } from "node:path";
 import { beforeAll, describe, expect, test } from "vitest";
-import { Axi, DEBUG_APK, PKG, probeState } from "./support.js";
+import { sharedWithToon } from "../helpers/json.js";
+import { Axi, DEBUG_APK, PKG, RELEASE_APK, probeState } from "./support.js";
 
 const axi = new Axi(import.meta.filename);
 
@@ -72,5 +75,163 @@ describe("process death and restore", () => {
 
       expect((await axi.crashes("before-kill")).count).toBe(0);
     }
+  });
+});
+
+describe("kill, restore and death at their edges", () => {
+  async function twoProcesses(apk: string): Promise<{ main: number; ui: number }> {
+    await axi.ok(["app", "install", apk, "--clean-data"]);
+    await axi.ok(["app", "start", PKG]);
+    await axi.ok(["app", "start", `${PKG}/.UiActivity`]);
+    const [main] = await axi.pidsOf(PKG);
+    const [ui] = await axi.pidsOf(`${PKG}:ui`);
+    expect(main).toEqual(expect.any(Number));
+    expect(ui).toEqual(expect.any(Number));
+    return { main: main ?? 0, ui: ui ?? 0 };
+  }
+
+  test("nothing running, no task, a task the app removed itself: no-op or TASK_NOT_IN_RECENTS", async () => {
+    await axi.ok(["app", "install", DEBUG_APK, "--clean-data"]);
+    for (const format of ["json", "toon"] as const) {
+      const args = ["app", "kill", PKG];
+      const kill =
+        format === "json" ? sharedWithToon(await axi.ok(args)) : (await axi.text(args)).data;
+      expect(kill).toEqual({ ok: `kill ${PKG} -> already not running (no-op)` });
+    }
+    expect(await axi.pidsOf(PKG)).toEqual([]);
+
+    const restore = await axi.fails(["app", "restore", PKG], "TASK_NOT_IN_RECENTS");
+    expect(restore).toEqual({
+      error: `${PKG} has no task in recents, so there is nothing to restore`,
+      code: "TASK_NOT_IN_RECENTS",
+      help: [
+        `Run \`adb-axi app start ${PKG} --device ${axi.serial}\` to start it fresh (its saved state is not restored)`,
+      ],
+    });
+    expect(await axi.pidsOf(PKG)).toEqual([]);
+
+    const pids: number[] = [];
+    const gone = await axi.fails(["app", "kill", PKG], "TASK_NOT_IN_RECENTS", {
+      varies: ["kill"],
+      before: async () => {
+        await axi.ok(["app", "start", PKG]);
+        await axi.mark("remove");
+        await axi.probe("finishremove");
+        const pid = Number(probeState(await axi.waitLog("event=finishremove ", "remove")).pid);
+        pids.push(pid);
+        await axi.waitFocused((component) => !component.startsWith(`${PKG}/`));
+        expect(await axi.pidsOf(PKG)).toEqual([pid]);
+      },
+    });
+    expect(gone).toMatchObject({
+      error: `${PKG} was killed but its task is not in recents, so a restore would be a fresh launch`,
+      kill: { pid_before: pids[0], pid_after: null, backgrounded_first: false },
+      help: [`Run \`adb-axi app start ${PKG} --device ${axi.serial}\` to start it fresh`],
+    });
+    expect(await axi.pidsOf(PKG)).toEqual([]);
+  });
+
+  test("a second process: kill never claims success while one survives, and a release build times out naming it", async () => {
+    const debug = await twoProcesses(DEBUG_APK);
+    const run = await axi.run(["app", "kill", PKG]);
+    const alive = [...(await axi.pidsOf(PKG)), ...(await axi.pidsOf(`${PKG}:ui`))];
+    if (run.exitCode === 0) {
+      expect(run.json).toMatchObject({
+        ok: `kill ${PKG} -> process gone, task kept in recents`,
+        kill: { pid_before: `${debug.main} ${debug.ui}`, pid_after: null, method: "run-as kill" },
+      });
+      expect(alive).toEqual([]);
+      const restored = await axi.ok(["app", "restore", PKG]);
+      expect(restored.app).toMatchObject({ activity: ".UiActivity", new_process: true });
+      await axi.waitFocused((component) => component === `${PKG}/.UiActivity`);
+    } else {
+      expect(run.exitCode).toBe(1);
+      expect(run.json).toMatchObject({
+        code: "KILL_TIMEOUT",
+        last: { pid: debug.ui },
+        am_kill_sent: true,
+      });
+      expect(alive).toEqual([debug.ui]);
+    }
+
+    const release = await twoProcesses(RELEASE_APK);
+    const timeout = await axi.run(["app", "kill", PKG, "--timeout", "5s"]);
+    expect(timeout.exitCode).toBe(1);
+    expect(timeout.json).toMatchObject({
+      error: expect.stringMatching(
+        new RegExp(`^${PKG.replace(".", "\\.")} was still alive at the 5 s deadline after am kill`),
+      ) as string,
+      code: "KILL_TIMEOUT",
+      last: { pid: release.ui },
+      am_kill_sent: true,
+    });
+    expect(timeout.durationMs).toBeLessThan(5_000 + 2_000);
+    expect(await axi.pidsOf(`${PKG}:ui`)).toEqual([release.ui]);
+    expect(await axi.pidsOf(PKG)).toEqual([]);
+    await axi.ok(["app", "stop", PKG]);
+    expect(await axi.pidsOf(`${PKG}:ui`)).toEqual([]);
+  });
+
+  test("restore of a running app keeps its process, and death of a stopped app only restores it", async () => {
+    await axi.ok(["app", "install", DEBUG_APK, "--clean-data"]);
+    const started = await axi.ok(["app", "start", PKG]);
+    const pid = (started.app as { pid: number }).pid;
+    await axi.sh("input keyevent KEYCODE_HOME");
+    await axi.waitFocused((component) => !component.startsWith(`${PKG}/`));
+    const restore = await axi.ok(["app", "restore", PKG]);
+    expect(["hot", "unknown"]).toContain((restore.app as { launch: string }).launch);
+    expect(sharedWithToon(restore)).toEqual({
+      ok: `restore ${PKG} -> foreground from recents (same process)`,
+      app: {
+        activity: ".MainActivity",
+        pid,
+        launch: expect.any(String) as string,
+        new_process: false,
+      },
+      help: [
+        `Run \`adb-axi app kill ${PKG} --device ${axi.serial}\` first so the restore starts a new process`,
+      ],
+    });
+    await axi.waitFocused((component) => component === `${PKG}/.MainActivity`);
+    expect(await axi.pidsOf(PKG)).toEqual([pid]);
+
+    await axi.ok(["app", "stop", PKG]);
+    const death = (await axi.text(["app", "death", PKG])).data;
+    const [restored] = await axi.pidsOf(PKG);
+    expect(death).toMatchObject({
+      ok: `death ${PKG} -> restored from recents (it was not running)`,
+      death: {
+        pid_before: null,
+        pid_after_kill: null,
+        pid_restored: restored,
+        new_process: true,
+        method: null,
+      },
+    });
+    await axi.waitFocused((component) => component === `${PKG}/.MainActivity`);
+  });
+
+  test("death --compare without agent-device runs the kill and restore, then says the comparison is unavailable", async () => {
+    const path = (process.env.PATH ?? "").split(delimiter);
+    expect(path.filter((dir) => existsSync(join(dir, "agent-device")))).toEqual([]);
+    await axi.ok(["app", "install", DEBUG_APK, "--clean-data"]);
+    const started = await axi.ok(["app", "start", PKG]);
+    const run = await axi.run(["app", "death", PKG, "--compare"]);
+    expect(run.exitCode).toBe(1);
+    const [restored] = await axi.pidsOf(PKG);
+    expect(run.json).toMatchObject({
+      error: `${PKG} was killed and restored, but the visible-text comparison could not run: agent-device is not installed or not on PATH`,
+      code: "COMPARE_UNAVAILABLE",
+      death: {
+        pid_before: (started.app as { pid: number }).pid,
+        pid_after_kill: null,
+        pid_restored: restored,
+        new_process: true,
+      },
+      help: [
+        `Run \`adb-axi app death ${PKG} --device ${axi.serial}\` to repeat the check without --compare`,
+      ],
+    });
+    await axi.waitFocused((component) => component === `${PKG}/.MainActivity`);
   });
 });
