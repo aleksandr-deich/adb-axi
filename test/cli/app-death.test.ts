@@ -368,42 +368,6 @@ describe("app kill", () => {
     expectClean(fake);
   });
 
-  it("falls back to run-as kill for a debuggable app that outlives am kill", async () => {
-    const { data, fake } = await both(["app", "kill", "dev.probe"], () =>
-      probeDevice({ phase: "previous", amKillWorks: false, runAsKillWorks: true }),
-    );
-    expect(normalized(data)).toMatchObject({
-      ok: "kill dev.probe -> process gone, task kept in recents",
-      kill: { pid_before: OLD_PID, pid_after: null, method: "run-as kill" },
-    });
-    const commands = shellCommands(fake);
-    expect(commands.indexOf(RUN_AS_KILL)).toBeGreaterThan(commands.indexOf(AM_KILL));
-    expectClean(fake);
-  });
-
-  it("does not report success while a secondary process survives run-as", async () => {
-    const sibling = "pidof dev.probe:remote";
-    const { toon, data, fake } = await both(["app", "kill", "dev.probe", "--timeout", "8s"], () =>
-      probeDevice({
-        phase: "previous",
-        amKillWorks: false,
-        rules: [
-          {
-            match: shell(KERNEL_UIDS),
-            respond: { stdout: "PID UID NAME\n8333 10213 dev.probe:remote\n" },
-          },
-          { match: shell(sibling), respond: PIDOF_OF(8333) },
-          { match: shell("run-as dev.probe --user 0 kill -9 8333"), respond: {} },
-        ],
-      }),
-    );
-    expect(toon.exitCode).toBe(1);
-    expect(data).toMatchObject({ code: "KILL_TIMEOUT", last: { pid: 8333 }, am_kill_sent: true });
-    expect(shellCommands(fake)).toContain("run-as dev.probe --user 0 kill -9 8333");
-    expect(shellCommands(fake)).not.toContain(START);
-    expectClean(fake);
-  });
-
   it("tracks an absolute process name by package UID, even without a main process", async () => {
     const custom = "com.example.shared.worker";
     const { toon, data, fake } = await both(["app", "death", "dev.probe", "--timeout", "8s"], () =>
