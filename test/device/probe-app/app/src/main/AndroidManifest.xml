@@ -20,7 +20,7 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <!-- Disabled until a check enables it with pm enable, giving a second launcher entry. -->
+        <!-- Disabled until the probe's `alias` action enables it, giving a second launcher entry. -->
         <activity-alias
             android:name=".Alias"
             android:enabled="false"

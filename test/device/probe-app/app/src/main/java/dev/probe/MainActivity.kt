@@ -1,7 +1,9 @@
 package dev.probe
 
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.database.sqlite.SQLiteDatabase
 import android.os.Bundle
 import android.os.Process
@@ -33,7 +35,7 @@ import kotlinx.coroutines.channels.Channel
  * A probe for adb-axi's real-device checks, driven only by explicit intents:
  *
  *   am start -n dev.probe/.MainActivity --es probe inc|state|write|finish|crash|native|anr
- *   am start -n dev.probe/.MainActivity --es probe armcrash|finishremove|crashchain|log|file|sql
+ *   am start -n dev.probe/.MainActivity --es probe armcrash|finishremove|crashchain|alias|log|file|sql
  *
  * Every state change logs one `ProbeState` line, the oracle the checks read from logcat:
  *
@@ -89,6 +91,16 @@ class MainActivity : ComponentActivity() {
             "finishremove" -> {
                 Log.i(TAG, "event=finishremove pid=${Process.myPid()}")
                 finishAndRemoveTask()
+            }
+            // The shell may not change an app's components on newer Android; the app itself may.
+            "alias" -> {
+                val on = intent.getBooleanExtra("on", true)
+                packageManager.setComponentEnabledSetting(
+                    ComponentName(this, "dev.probe.Alias"),
+                    if (on) PackageManager.COMPONENT_ENABLED_STATE_ENABLED else PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                    PackageManager.DONT_KILL_APP,
+                )
+                Log.i(TAG, "event=alias on=$on pid=${Process.myPid()}")
             }
             "log" -> logBurst(intent)
             "file" -> writeFile(intent)
