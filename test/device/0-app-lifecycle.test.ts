@@ -204,7 +204,7 @@ describe("ordinary installed probe lifecycle", () => {
       const removed = await command(["app", "uninstall", PKG, "--keep-data"], format);
       noop(removed, format, false);
       expect(removed.ok).toBe(`uninstall ${PKG} -> removed with data kept`);
-      expect((await axi.ok(["shell", `pm path ${PKG} || true`])).stdout).toBe("");
+      expect((await axi.ok(["shell", `pm path --user 0 ${PKG} || true`])).stdout).toBe("");
       await gone();
       const absent = await command(["app", "uninstall", PKG], format);
       noop(absent, format, true);

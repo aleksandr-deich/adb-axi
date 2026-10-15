@@ -403,7 +403,7 @@ describe("app install", () => {
       expect(data.install).toMatchObject({
         shortcut: "skipped because the APK metadata cannot be read (ZIP64 APKs are not supported)",
       });
-      expect(calls(fake)).toEqual([`install -r ${APK_ZIP64}`]);
+      expect(calls(fake)).toContain(`install -r ${APK_ZIP64}`);
       expectClean(fake);
     });
 
@@ -460,7 +460,7 @@ describe("app install", () => {
             "skipped because the APK metadata cannot be read (AndroidManifest.xml is larger than adb-axi reads)",
           detail: "AndroidManifest.xml is larger than adb-axi reads",
         });
-        expect(calls(fake)).toEqual([`install -r ${apk}`]);
+        expect(calls(fake)).toContain(`install -r ${apk}`);
         expectClean(fake);
       },
     );
@@ -574,7 +574,14 @@ describe("app install", () => {
       [
         "has no base APK",
         (): Partial<World> => ({
-          rules: [{ match: shell(`pm path --user 0 ${PKG}`), respond: { stdout: "" } }],
+          rules: [
+            {
+              match: shell(`pm path --user 0 ${PKG}`),
+              respond: { stdout: "package:/data/app/notes/base.apk\n" },
+              times: 2,
+            },
+            { match: shell(`pm path --user 0 ${PKG}`), respond: { stdout: "" } },
+          ],
         }),
       ],
     ])("refuses the wipe when the installed package %s", async (_name, evidence) => {

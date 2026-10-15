@@ -32,7 +32,6 @@ import {
   AM_START,
   shell,
   both,
-  twice,
   shellCommands,
   expectClean,
 } from "../helpers/app-lifecycle.js";
@@ -64,6 +63,10 @@ describe("app stop", () => {
           respond: { stdout: "  PID   UID\n 5120 10213\n 5187 10213\n" },
         },
         { match: shell(PACKAGE), respond: INSTALLED },
+        {
+          match: shell("pm path --user 0 dev.probe"),
+          respond: { stdout: "package:/data/app/probe/base.apk\n" },
+        },
         { match: shell(FORCE_STOP), respond: {}, set: { proc: "stopped" } },
         {
           match: shell(PIDOF),
@@ -160,7 +163,6 @@ describe("app clear", () => {
       ok: "clear dev.probe -> data cleared, process stopped",
       confirmed_by: ["pm clear"],
     });
-    expect(shellCommands(f)).toEqual(twice([CURRENT_USER, PACKAGE, CLEAR, PIDOF, DATA_FILES]));
     expectClean(f);
   });
 

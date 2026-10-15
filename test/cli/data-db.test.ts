@@ -211,8 +211,6 @@ describe("data db: listing", () => {
   });
 });
 
-describe("data db: choosing the database", () => {});
-
 describe("data db: reading", () => {
   it("reads an R-Tree table from the app database", async () => {
     const db = makeDb(
@@ -430,5 +428,3 @@ describe("data db: deadlines", () => {
     },
   );
 });
-
-describe("data db: row cap and --full", () => {});

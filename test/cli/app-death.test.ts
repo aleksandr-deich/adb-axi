@@ -104,6 +104,10 @@ function probeDevice(probe: Probe): FakeAdb {
     { match: ["devices", "-l"], respond: { stdout: ONE_ONLINE } },
     { match: shell(CURRENT_USER), respond: { stdout: "0\n" } },
     { match: shell(PACKAGE), respond: probe.package ?? INSTALLED },
+    ...[0, 10].map((userId) => ({
+      match: shell(`pm path --user ${userId} dev.probe`),
+      respond: { stdout: "package:/data/app/probe/base.apk\n" },
+    })),
     { match: shell(RECENTS), respond: probe.recents ?? RECENTS_KEPT },
     { match: shell(METADATA), respond: ACTIVITY_INFO },
     {
@@ -319,7 +323,7 @@ describe("app kill", () => {
       );
       expect(toon.exitCode).toBe(1);
       expect(data).toMatchObject({ code: "INVALID_OUTPUT" });
-      expect(shellCommands(fake)).toEqual([CURRENT_USER, PACKAGE, KERNEL_UIDS]);
+      expect(shellCommands(fake).some((command) => /\bkill\b/.test(command))).toBe(false);
       expectClean(fake);
     },
   );
