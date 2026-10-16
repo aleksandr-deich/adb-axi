@@ -91,6 +91,33 @@ describe("shell on a real device shell", () => {
     expect(written(failed.json.stderr_full)).toHaveLength(70);
   });
 
+  test("a command that prints past the 16 MiB collection limit is stopped and reported, never shown as a success", async () => {
+    const limit = 16 * 1024 * 1024;
+    const marker = "/data/local/tmp/adb-axi-overflow-done";
+    await axi.adb(["shell", `rm -f ${marker}`]);
+    const command = `head -c ${4 * limit} /dev/zero | tr \\\\0 x; touch ${marker}`;
+    const run = await axi.run(["shell", command]);
+    expect(run.exitCode).toBe(1);
+    expect(run.json).toEqual({
+      error: "running the command exceeded the 16 MiB host output limit and was stopped",
+      code: "INVALID_OUTPUT",
+      step: "running the command",
+      limit_bytes: limit,
+      help: [
+        "Redirect the output to a file on the device, for example `> /data/local/tmp/out.txt`, and read only the part you need",
+        `Run \`adb-axi shell --device ${axi.serial} --full -- '${command}'\` to write the complete output to a file`,
+      ],
+    });
+    expect(run.durationMs).toBeLessThan(10_000);
+
+    // The device command never finished: once none of it runs, its marker is still missing.
+    const deadline = Date.now() + 10_000;
+    const running = async (): Promise<boolean> =>
+      (await axi.adb(["shell", "ps -A -o ARGS"])).stdout.includes(`touch ${marker}`);
+    while (await running()) expect(Date.now()).toBeLessThan(deadline);
+    expect((await axi.adb(["shell", `ls ${marker}`])).exitCode).not.toBe(0);
+  });
+
   test("a command past its deadline is killed with its partial output, and the default deadline is 15 s", async () => {
     const run = await axi.run([
       "shell",

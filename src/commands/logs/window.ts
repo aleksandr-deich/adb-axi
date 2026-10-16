@@ -48,6 +48,13 @@ export function logcatCommand(startMs: number, uid?: number): string {
   return uid === undefined ? base : `${base} --uid ${uid}`;
 }
 
+/**
+ * The most text one log window may be. An emulator's default 2 MiB buffers hold about five
+ * times that in compressed lines, near 40 MB of text across main, system and crash. A larger
+ * window needs a later start, which logcat applies on the device.
+ */
+const MAX_WINDOW_BYTES = 64 * 1024 * 1024;
+
 // crash_dump writes the tombstone within seconds of the fatal signal; older signals are outside the window.
 const CRASH_LEAD_IN_MS = 60_000;
 
@@ -62,7 +69,13 @@ export async function readWindowLines(
 ): Promise<LogLine[]> {
   const step = "reading the log";
   const command = logcatCommand(window.startMs - (includeLeadIn ? CRASH_LEAD_IN_MS : 0), uid);
-  const result = await readShell(adb, serial, command, step, options);
+  const result = await readShell(adb, serial, command, step, {
+    ...options,
+    maxOutputBytes: MAX_WINDOW_BYTES,
+    limitHelp: [
+      "Read a shorter window: a later mark (`adb-axi logs mark <name>`) or a shorter `--since` such as `--since 1m`",
+    ],
+  });
   const parsed = parseLogcat(result.stdout);
   // Text that is no log line at all is never passed off as an empty log.
   if (parsed.lines.length === 0 && parsed.unparsed > 0) throw invalidOutput(step, result.stdout);

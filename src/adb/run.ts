@@ -1,6 +1,6 @@
 import type { Deadline } from "../core/deadline.js";
 import { AdbAxiError } from "../core/errors.js";
-import { exec } from "../core/exec.js";
+import { DEFAULT_MAX_OUTPUT_BYTES, exec } from "../core/exec.js";
 import { runHint, shellWords } from "../core/output.js";
 import { MAX_INTERVAL_MS, realClock } from "../core/poll.js";
 import { ONLINE, parseDeviceList } from "../device/list.js";
@@ -23,7 +23,12 @@ export interface AdbCallOptions {
   /** A tighter cap for this one call, below what is left of the command deadline. */
   capMs?: number;
   input?: string | Uint8Array;
+  /** The most output kept; `DEFAULT_MAX_OUTPUT_BYTES` unless the call needs another limit. */
   maxOutputBytes?: number;
+  /** What to do instead, as the help of the `INVALID_OUTPUT` error when the output passes the limit. */
+  limitHelp?: readonly string[];
+  /** Takes the output as it arrives, past `maxOutputBytes` too (see `ExecOptions.sink`). */
+  sink?: (stream: "stdout" | "stderr", chunk: Buffer) => void;
   signal?: AbortSignal;
   /** On timeout, keep the partial stdout and stderr in the error's fields. */
   keepPartialOutput?: boolean;
@@ -99,6 +104,7 @@ export class AdbClient {
       ...(this.options.env === undefined ? {} : { env: this.options.env }),
       ...(options.input === undefined ? {} : { input: options.input }),
       ...(options.maxOutputBytes === undefined ? {} : { maxOutputBytes: options.maxOutputBytes }),
+      ...(options.sink === undefined ? {} : { sink: options.sink }),
     });
 
     if (result.kind === "spawn-error") {
@@ -126,9 +132,15 @@ export class AdbClient {
 
     if (result.kind === "output-limit") {
       this.debug(`  output exceeded the collection limit after ${result.durationMs} ms`);
-      throw new AdbAxiError("INVALID_OUTPUT", `${options.step} exceeded the host output limit`, {
-        fields: { step: options.step, limit_bytes: options.maxOutputBytes },
-      });
+      const limit = options.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES;
+      throw new AdbAxiError(
+        "INVALID_OUTPUT",
+        `${options.step} exceeded the ${formatBytes(limit)} host output limit and was stopped`,
+        {
+          fields: { step: options.step, limit_bytes: limit },
+          help: options.limitHelp ?? [],
+        },
+      );
     }
 
     const exitCode = result.exitCode ?? 128 + signalNumber(result.signal);
@@ -250,6 +262,11 @@ function timeoutError(
 function formatDuration(ms: number): string {
   if (ms < 1000) return `${ms} ms`;
   return ms % 1000 === 0 ? `${ms / 1000} s` : `${(ms / 1000).toFixed(1)} s`;
+}
+
+function formatBytes(bytes: number): string {
+  const mib = bytes / (1024 * 1024);
+  return Number.isInteger(mib) ? `${mib} MiB` : `${bytes} bytes`;
 }
 
 function signalNumber(signal: NodeJS.Signals | null): number {

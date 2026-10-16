@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
-import { linkSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { closeSync, fsyncSync, linkSync, mkdirSync, openSync, rmSync, writeSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { adbAxiHome, isErrno } from "./state.js";
 
 /** Default caps for `logs` and `shell` output. */
@@ -108,28 +108,92 @@ function cutToBytes(line: string, maxBytes: number): string {
 
 /**
  * Write complete output for `--full` to `<ADB_AXI_HOME>/out/<stem>.txt` and return the
- * absolute path. A name that is taken gets a `-2`, `-3`, ... suffix. Each file is written
- * in full under a private temporary name and then linked to its final name, which fails
- * rather than replaces when the name is taken: concurrent runs never share a path, and no
- * path ever holds partial output.
+ * absolute path (see `FullOutputFile`).
  */
 export function writeFullOutput(stem: string, content: string): string {
-  const dir = join(adbAxiHome(), "out");
-  const safeStem = stem.replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^[.-]+/, "") || "output";
-  mkdirSync(dir, { recursive: true });
-  const tmp = join(dir, `.full-${process.pid}-${randomBytes(6).toString("hex")}.tmp`);
+  const file = new FullOutputFile(stem);
   try {
-    writeFileSync(tmp, content, { flag: "wx", flush: true });
-    for (let n = 1; ; n++) {
-      const path = join(dir, `${safeStem}${n === 1 ? "" : `-${n}`}.txt`);
-      try {
-        linkSync(tmp, path);
-        return path;
-      } catch (error) {
-        if (!isErrno(error, "EEXIST")) throw error;
-      }
-    }
+    file.write(content);
+    return file.keep();
   } finally {
-    rmSync(tmp, { force: true });
+    file.discard();
+  }
+}
+
+/**
+ * Complete output for `--full`, written as it arrives to a private temporary file and kept
+ * as `<ADB_AXI_HOME>/out/<stem>.txt`; a name that is taken gets a `-2`, `-3`, ... suffix.
+ * `keep` links the finished file to its final name, which fails rather than replaces when
+ * the name is taken: concurrent runs never share a path, and no path ever holds partial
+ * output.
+ */
+export class FullOutputFile {
+  private readonly stem: string;
+  private tmp: string | undefined;
+  private fd: number | undefined;
+  /** The first write failure; `keep` throws it. */
+  private failure: Error | undefined;
+
+  constructor(stem: string) {
+    this.stem = stem.replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^[.-]+/, "") || "output";
+  }
+
+  /** Append to the file. Never throws: a failure stops the writing and `keep` throws it. */
+  write(chunk: string | Uint8Array): void {
+    if (this.failure !== undefined) return;
+    try {
+      const fd = this.open();
+      const bytes = typeof chunk === "string" ? Buffer.from(chunk, "utf8") : chunk;
+      for (let offset = 0; offset < bytes.length;) {
+        offset += writeSync(fd, bytes, offset);
+      }
+    } catch (error) {
+      this.failure = error instanceof Error ? error : new Error(String(error));
+    }
+  }
+
+  /** Flush the file to disk and give it its final name, which is returned. */
+  keep(): string {
+    if (this.failure !== undefined) throw this.failure;
+    const fd = this.open();
+    fsyncSync(fd);
+    this.close();
+    const tmp = this.tmp ?? "";
+    try {
+      for (let n = 1; ; n++) {
+        const path = join(dirname(tmp), `${this.stem}${n === 1 ? "" : `-${n}`}.txt`);
+        try {
+          linkSync(tmp, path);
+          return path;
+        } catch (error) {
+          if (!isErrno(error, "EEXIST")) throw error;
+        }
+      }
+    } finally {
+      this.discard();
+    }
+  }
+
+  /** Remove the temporary file; a kept file stays under its final name. */
+  discard(): void {
+    this.close();
+    if (this.tmp !== undefined) rmSync(this.tmp, { force: true });
+    this.tmp = undefined;
+  }
+
+  private open(): number {
+    if (this.fd !== undefined) return this.fd;
+    const dir = join(adbAxiHome(), "out");
+    mkdirSync(dir, { recursive: true });
+    const tmp = join(dir, `.full-${process.pid}-${randomBytes(6).toString("hex")}.tmp`);
+    this.fd = openSync(tmp, "wx");
+    this.tmp = tmp;
+    return this.fd;
+  }
+
+  private close(): void {
+    if (this.fd === undefined) return;
+    closeSync(this.fd);
+    this.fd = undefined;
   }
 }

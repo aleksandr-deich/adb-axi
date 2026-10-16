@@ -1,6 +1,13 @@
 import { spawn } from "node:child_process";
 import { onInterrupt } from "./interrupt.js";
 
+/**
+ * The most stdout and stderr together that a call keeps unless it names its own limit. The
+ * device reads adb-axi parses print far less (a whole `dumpsys package packages` is under 1 MB
+ * on an emulator); past it a runaway command is stopped before it fills host memory.
+ */
+export const DEFAULT_MAX_OUTPUT_BYTES = 16 * 1024 * 1024;
+
 export interface ExecOptions {
   /** The executable. Always spawned directly with an argument array, never through a shell. */
   file: string;
@@ -11,7 +18,17 @@ export interface ExecOptions {
   cwd?: string;
   /** Bytes written to the child's stdin, which is then closed. Without it stdin is closed at once. */
   input?: string | Uint8Array;
+  /**
+   * The most stdout and stderr together kept in memory, `DEFAULT_MAX_OUTPUT_BYTES` when unset.
+   * Past it the child is killed and the result is `output-limit` with nothing kept, unless
+   * a `sink` takes the output.
+   */
   maxOutputBytes?: number;
+  /**
+   * Receives every chunk of output as it arrives. The child then runs on past
+   * `maxOutputBytes`, which only bounds the copy kept in memory: its first bytes. Must not throw.
+   */
+  sink?: (stream: "stdout" | "stderr", chunk: Buffer) => void;
   signal?: AbortSignal;
   /**
    * Kill the child with SIGKILL when SIGINT or SIGTERM ends adb-axi. Only for a child that
@@ -55,6 +72,7 @@ export function exec(options: ExecOptions): Promise<ExecResult> {
     let timedOut = false;
     let outputExceeded = false;
     let outputBytes = 0;
+    const maxOutputBytes = options.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES;
     let drainTimer: NodeJS.Timeout | undefined;
 
     const child = spawn(options.file, [...options.args], {
@@ -104,12 +122,16 @@ export function exec(options: ExecOptions): Promise<ExecResult> {
       Math.max(0, options.deadlineMs),
     );
 
-    const collect = (chunks: Buffer[], chunk: Buffer): void => {
+    const collect = (stream: "stdout" | "stderr", chunks: Buffer[], chunk: Buffer): void => {
       if (settled || outputExceeded) return;
-      if (
-        options.maxOutputBytes !== undefined &&
-        outputBytes + chunk.length > options.maxOutputBytes
-      ) {
+      options.sink?.(stream, chunk);
+      if (outputBytes + chunk.length > maxOutputBytes) {
+        if (options.sink !== undefined) {
+          const room = maxOutputBytes - outputBytes;
+          if (room > 0) chunks.push(chunk.subarray(0, room));
+          outputBytes = maxOutputBytes;
+          return;
+        }
         outputExceeded = true;
         stdout.length = 0;
         stderr.length = 0;
@@ -120,10 +142,10 @@ export function exec(options: ExecOptions): Promise<ExecResult> {
       chunks.push(chunk);
     };
     child.stdout.on("data", (chunk: Buffer) => {
-      collect(stdout, chunk);
+      collect("stdout", stdout, chunk);
     });
     child.stderr.on("data", (chunk: Buffer) => {
-      collect(stderr, chunk);
+      collect("stderr", stderr, chunk);
     });
     child.stdin.on("error", () => {
       // The child may exit without reading its input; that is not a failure of the call.

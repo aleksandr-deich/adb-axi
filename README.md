@@ -186,7 +186,7 @@ Only when you need a single database's schema, query it directly: `adb-axi data 
 - **Rows:** the first 50 are printed, with `shown: 50 of N rows` when more exist. Cells over 500 characters are cut. `--full` writes all rows with uncut cells to a file, only when something was cut. Results larger than 64 MB fail even with `--full`.
 - **Errors:** `APP_NOT_DEBUGGABLE` (`run-as` refused, as for release builds), `DB_NOT_FOUND` (names the databases that exist), `INVALID_OUTPUT`, `SQL_ERROR` (SQLite's message) and `NODE_TOO_OLD` (Node.js older than 24.12).
 
-`shell -- '<cmd>'` runs one command string in the device shell through `shell_v2`, so the remote exit code is real. adb-axi's own flags, such as `--device`, go before `--`: everything after it runs on the device. A non-zero exit is exit 1 with `code: REMOTE_EXIT`, the remote `exit` and its `stderr`.
+`shell -- '<cmd>'` runs one command string in the device shell through `shell_v2`, so the remote exit code is real. adb-axi's own flags, such as `--device`, go before `--`: everything after it runs on the device. A non-zero exit is exit 1 with `code: REMOTE_EXIT`, the remote `exit` and its `stderr`. adb-axi keeps at most 16 MiB of a command's output: a command that prints more is stopped and fails with `INVALID_OUTPUT` and `limit_bytes`, never a success. Redirect such output to a file on the device, or use `--full`, which writes each stream to its file as it arrives, however large.
 
 Device settings such as dark mode and display density have no command of their own; `shell` changes them. Read the original values first:
 
