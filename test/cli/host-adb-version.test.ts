@@ -11,14 +11,17 @@ afterEach(() => {
 // An actual old platform-tools build is unavailable in device CI. Simulate its
 // documented version protocol, not the interrupted-shell bug itself. The approved
 // host-floor contract requires refusal before any device call, and a failing doctor check.
-function oldClient(): FakeAdb {
+function oldClient(
+  stdout = "Android Debug Bridge version 1.0.41\nVersion 34.0.5-10900879\n",
+): FakeAdb {
   fake = createFakeAdb({
     synthetic: true,
-    source: "Host-floor contract: Platform-Tools 35.0.0 fixes shell disconnect return codes",
+    source:
+      "Host-floor contract: Platform-Tools 35.0.0 fixes shell disconnect return codes; legacy 25.0.3 output: https://github.com/awake558/adb-win/blob/master/SDK_Platform-Tools_for_Mac/readme.md",
     rules: [
       {
         match: ["version"],
-        respond: { stdout: "Android Debug Bridge version 1.0.41\nVersion 34.0.5-10900879\n" },
+        respond: { stdout },
       },
       {
         match: ["devices", "-l"],
@@ -31,16 +34,22 @@ function oldClient(): FakeAdb {
 
 describe("host adb client floor (simulated old client)", () => {
   it("refuses a device command with found and required versions before touching the device", async () => {
-    const f = oldClient();
-    const result = await runCli(["app", "list", "--device", "emulator-5554", "--json"], f.env);
-    expect(result.exitCode).toBe(1);
-    const data = JSON.parse(result.stdout) as Record<string, unknown>;
-    expect(data).toMatchObject({ code: "HOST_ADB_TOO_OLD", found: "34.0.5", required: "35.0.0" });
-    expect(data.error).toContain("34.0.5");
-    expect(data.error).toContain("35.0.0");
-    expect(String(data.help)).toContain("Update Android SDK Platform-Tools");
-    expect(f.calls().filter((call) => call.argv[0] === "-s")).toEqual([]);
-    expect(f.unmatched()).toEqual([]);
+    for (const [stdout, found] of [
+      ["Android Debug Bridge version 1.0.41\nVersion 34.0.5-10900879\n", "34.0.5"],
+      ["Android Debug Bridge version 1.0.36\nRevision 0e9850346394-android\n", "unknown-legacy"],
+    ] as const) {
+      const f = oldClient(stdout);
+      const result = await runCli(["app", "list", "--device", "emulator-5554", "--json"], f.env);
+      expect(result.exitCode).toBe(1);
+      const data = JSON.parse(result.stdout) as Record<string, unknown>;
+      expect(data).toMatchObject({ code: "HOST_ADB_TOO_OLD", found, required: "35.0.0" });
+      expect(data.error).toContain(found);
+      expect(data.error).toContain("35.0.0");
+      expect(String(data.help)).toContain("Update Android SDK Platform-Tools");
+      expect(f.calls().filter((call) => call.argv[0] === "-s")).toEqual([]);
+      expect(f.unmatched()).toEqual([]);
+      f.cleanup();
+    }
   });
 
   it("reports the old adb client as a failing doctor check with the update fix", async () => {

@@ -8,13 +8,17 @@ export const MIN_HOST_ADB_VERSION = "35.0.0";
 
 /** Platform-tools build, not the `Android Debug Bridge version 1.0.41` protocol line. */
 export function parseAdbVersion(stdout: string): string | undefined {
-  return /^Version (\d+(?:\.\d+)*)/m.exec(stdout)?.[1];
+  return (
+    /^Version (\d+(?:\.\d+){2,})/m.exec(stdout)?.[1] ??
+    (/^Android Debug Bridge version /m.test(stdout) ? "unknown-legacy" : undefined)
+  );
 }
 
 export function hostAdbVersionError(version: string | undefined): AdbAxiError | undefined {
   if (
     version === undefined ||
-    Number(version.split(".")[0]) >= Number(MIN_HOST_ADB_VERSION.split(".")[0])
+    (version !== "unknown-legacy" &&
+      Number(version.split(".")[0]) >= Number(MIN_HOST_ADB_VERSION.split(".")[0]))
   )
     return undefined;
   return new AdbAxiError(
