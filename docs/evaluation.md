@@ -223,7 +223,7 @@ When a new study finishes:
 
 1. Add a section at the top of the studies, above the previous newest one, using the same fields in the same order: **Date**, **Tested version**, **Design**, **Agent/model**, **Sample size**, then **Key numbers**, **Verdict** and **Limitations**.
 2. Add a row at the top of the table under [How to read this](#how-to-read-this), and say whether the study is realistic task evidence or a regression signal.
-3. Refresh the summary in the [README](../README.md) between the `<!-- evaluation:start -->` and `<!-- evaluation:end -->` markers. Keep it to 3-5 lines that lead with the newest realistic evidence and link here.
+3. Refresh the summary in the [README](../README.md) between the `<!-- evaluation:start -->` and `<!-- evaluation:end -->` markers. Keep it to the adb-axi versus plain-adb table plus one sentence, with no version numbers, and link here.
 4. Take every number from the study's final report or analysis file, and report what was tested: the version, the behaviour and the verdict as they were at the time. When a weakness has since been fixed, say so and link the change; do not rewrite the result.
 5. State null results and unfavourable results plainly, and keep the limitations.
 6. Keep the page self-contained. Link only to public sources; leave transcripts, local paths and other private evidence out.

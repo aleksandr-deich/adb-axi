@@ -1,50 +1,41 @@
 # adb-axi
 
-Truthful, token-efficient adb for agents. adb-axi wraps Android's `adb` with compact [TOON](https://github.com/toon-format/toon) output, a deadline on every device call, exit codes that mean what they say, and structured errors that name the next step. It follows the [AXI](https://github.com/kunchenguid/axi) (Agent eXperience Interface) conventions.
+adb-axi is a command-line wrapper around Android's `adb`, built for AI coding agents. It answers questions about Android devices and apps in short, structured output and says what to do next.
 
-It covers the device-state side of Android work: devices and their health, the app lifecycle including process-death checks, run-scoped logs and crashes, and app databases. Screen reading and UI driving are out of scope; use `android layout` for shared screen reads and a UI tool such as agent-device for input.
+What it adds over plain `adb`:
 
-A UI-automation holder left connected can leave accessibility showing as enabled and block instrumented tests. Before handing the device back or running instrumented tests, finish active UI commands, then run `adb-axi doctor ui --fix --device <serial>` to clear resident, leaked or wedged holders; live holders are protected. This can stop instrumentation runners and their target app processes; it is not a restoration of the user's own accessibility services. Final check: leave the device as found, or say what changed.
+- **Short output:** compact [TOON](https://github.com/toon-format/toon), or JSON with `--json`, so agents spend fewer tokens.
+- **No hangs:** every command has a time limit, so a stuck device cannot block the agent.
+- **Honest results:** a command succeeds only when the requested state is actually true, and every error names the next step.
 
-Physical phones are supported for the core commands: devices, doctor, the app lifecycle, logs and crashes, app data and shell. Anything that needs the emulator console reports itself as unavailable on a phone: a phone has no AVD name (`avd` is `-` in `devices`, so select it by serial), and `doctor` reports `console_token` as `no console on a physical device`.
+Use it to check which devices are attached and healthy; install, start, stop and kill apps, including testing that an app survives process death; read the logs and crashes of one test run; and query a debuggable app's database. It does not read the screen or tap and type: use `android layout` or a UI tool such as agent-device for that.
+
+Screen-reading tools can leave a helper connected that keeps Android reporting accessibility as enabled and blocks instrumented tests. Before handing a device back or running instrumented tests, run `adb-axi doctor ui --fix --device <serial>`. It removes stale helpers, which can stop a running instrumentation and its app, and leaves helpers still in use alone.
+
+adb-axi follows the [AXI](https://github.com/kunchenguid/axi) (Agent eXperience Interface) conventions for agent-facing command-line tools.
 
 ## Install
 
-Requirements: Node 24.12 or newer, and Android SDK Platform-Tools 35.0.0 or newer. Devices must run Android 10 (API 29) or newer.
-
-Platform-Tools 35.0.0 [fixed shell exit codes on device disconnect](https://developer.android.com/tools/releases/platform-tools#3500_february_2024). The floor checks the adb client adb-axi runs, not the shared server or the device API. An older client, including adb-identifying output without a parsable `Version x.y.z` line, fails device calls with `HOST_ADB_TOO_OLD` and fails the `doctor` adb check. Unreadable or non-adb output is still allowed and `doctor` warns. Update platform-tools yourself; adb-axi never updates it or replaces the shared server.
+Requirements: Node 24.12 or newer, and Android SDK Platform-Tools 35.0.0 or newer. Devices must run Android 10 (API 29) or newer; emulators and physical phones are both supported.
 
 ```sh
 npm install --global adb-axi
 adb-axi --version
 ```
 
-To build and install it from this repository instead:
-
-```sh
-git clone https://github.com/aleksandr-deich/adb-axi.git
-cd adb-axi
-npm ci
-npm pack                                   # builds, then writes adb-axi-<version>.tgz
-npm install --global ./adb-axi-*.tgz
-adb-axi --version
-```
-
-adb is found on `PATH`, then in `$ANDROID_HOME/platform-tools`, `$ANDROID_SDK_ROOT/platform-tools` and `~/Library/Android/sdk/platform-tools`. When none has it, every command fails with `ADB_NOT_FOUND` and lists the places it searched.
+adb is found on `PATH`, then in `$ANDROID_HOME`, `$ANDROID_SDK_ROOT` or `~/Library/Android/sdk`. An older adb client fails with `HOST_ADB_TOO_OLD`; adb-axi never updates platform-tools itself.
 
 ## Agent skill
-
-The repository ships an agent skill at [`skills/adb-axi/SKILL.md`](skills/adb-axi/SKILL.md). Install it with [`npx skills`](https://github.com/vercel-labs/skills):
 
 ```sh
 npx skills add aleksandr-deich/adb-axi --skill adb-axi -g
 ```
 
-`-g` installs the skill for all projects; drop it to install for the current project only. With the skill, adb-axi needs no global install: run `npx -y adb-axi <command>`, or `adb-axi <command>` when adb-axi is already installed on PATH. The skill explains how agents can avoid unnecessary help and verification calls; command and flag details stay in live CLI help. The requirements above still apply.
+The [skill](skills/adb-axi/SKILL.md) tells agents when to use adb-axi; command details come from the live CLI help. `-g` installs it for all projects. With the skill, agents can run `npx -y adb-axi <command>` without a global install.
 
 ## Start here
 
-Run `adb-axi` with no command for the live state, not a manual: the attached devices, the device a command would target, what is in its foreground, and its recent crashes.
+`adb-axi` with no command shows live state: the attached devices, the device a command would target, its foreground app and its recent crashes.
 
 ```
 $ adb-axi
@@ -59,154 +50,59 @@ crashes: "0 in the last 15m (no log mark yet)"
 help[1]: Run `adb-axi logs --pkg dev.probe --since 1m` for recent app logs
 ```
 
-Crashes are counted since the target's latest mark from its current boot, or in the last 15 minutes when there is no usable mark. The window includes the mark's age by the host clock (`latest mark t1, set 3 d ago`), so an old mark from the same boot is visible even when the device clock is off. `adb-axi --device <serial|avd>` shows one device's foreground and crashes when several are online. With no device attached it says so (`count: "0 attached, 0 online"`, `target: "-"`) and exits 0. When target selection is refused (see [The device model](#the-device-model)), it lists the devices, shows `target: "-"` with the reason and retry hint, omits foreground and crashes, and does not fail. A device read that fails shows `-` for that field, and the first help line points at `doctor` for that device.
+`adb-axi --help` lists every command; `adb-axi <command> --help` gives its arguments, flags, defaults and examples. Flags go after the command: `adb-axi app start com.example.notes --device emulator-5554`. adb-axi picks a device on its own only when exactly one emulator is online; otherwise pass `--device <serial|avd>` or set `ANDROID_SERIAL`.
 
-`adb-axi --help` lists every command; `adb-axi <command> --help` gives its arguments, its flags with their defaults, and examples. Family help such as `adb-axi app --help` shows compact usages with each subcommand's own flags, generated from the same command specs, and global flags once. Flags follow the complete command: `adb-axi app start com.example.notes --device emulator-5554`.
+## Output and exit codes
 
-## The device model
+- **Output:** TOON on stdout, or the same data as JSON with `--json`. A mutation leads with `ok: <verb> <target> -> <resulting state>` and says `(no-op)` when the state was already true. Next steps come as `help` lines that name real commands. `--debug` prints every adb call on stderr.
+- **Exit codes:** 0 when the requested state is true, including no-ops and reads that find nothing; 1 when it is not; 2 for a usage error.
+- **Errors:** one shape: `error`, a stable `code`, the fields that explain it, then `help`.
+- **Deadlines:** every command has one deadline shared by all its device calls; `--help` shows each command's default and `--timeout` overrides it.
+- **Long output:** `logs`, `shell` and `data db` print a bounded view and say how much of it was shown; `--full` writes the complete output to a file.
 
-Several emulators at once is the normal case, so adb-axi never guesses which device you meant. The target is, first match wins:
-
-1. `--device <serial|avd>` (alias `-s`), as a serial such as `emulator-5556` or an AVD name such as `Pixel_Tablet`;
-2. the `ANDROID_SERIAL` environment variable;
-3. the only online device, but only if it is an emulator.
-
-A lone online physical device is never auto-selected. Pass `--device <serial>` (or set `ANDROID_SERIAL`) explicitly, for read-only commands as well as commands that change device state. Without a selector, `DEVICE_SELECTION_REQUIRED` reports the physical device's serial and the exact `--device <serial>` flag to pass.
-
-Commands that require a target fail selection before acting on it. The [home view](#start-here) and [`doctor`](#devices-and-health) report selection problems instead; `devices` lists attached devices without selecting a target. For example:
-
-```
-$ adb-axi logs --pkg com.example.notes
-error: 2 devices are online and none is selected
-code: DEVICE_AMBIGUOUS
-devices[2]{serial,avd,form}:
-  emulator-5554,Pixel_10_Pro_XL,phone
-  emulator-5556,Pixel_Tablet,tablet
-help[2]: Run `adb-axi logs --pkg com.example.notes --device <serial or avd>`,Or export ANDROID_SERIAL=<serial> in this shell
-```
-
-With several devices, run `adb-axi devices`, then pass `--device <serial>` on each command for the intended device. If AVD names show `-`, run `adb-axi doctor --device <serial>` to diagnose; a physical phone has no AVD name.
-
-The target's state is checked from `adb devices -l` before anything else is sent to it, so nothing can block on adb's `- waiting for device -`: an offline device is `DEVICE_OFFLINE`, an unauthorized one `DEVICE_UNAUTHORIZED`, and a serial or AVD name that is not attached `DEVICE_NOT_FOUND`, all immediately. An AVD name used by two emulators is `DEVICE_AMBIGUOUS`, including when two unavailable emulators match only by their last-known names; the error lists their serials so you can pick one. An unavailable emulator may not tell its AVD name; it then shows the name adb-axi last saw on its serial as `<avd> (last known)`, and selecting it by that name reports its unavailable state (`DEVICE_OFFLINE` or `DEVICE_UNAUTHORIZED`). An online emulator whose console cannot be read is never identified by a cached name. A device that goes away while a command runs on it (adb says `error: closed`) is `DEVICE_OFFLINE` or `DEVICE_NOT_FOUND` from what `adb devices` says right after; the command is never sent again. Every device call names the device explicitly (`adb -s <serial> ...`) with an argument list, never a host shell string; host reads such as the client-version check do not use a serial.
-
-Flags go after the command. `adb-axi -s emulator-5554 logs` exits 2 and prints the corrected command, `adb-axi logs --device emulator-5554`, without touching adb. The home view is the exception: `adb-axi --device emulator-5554` (or `-s`, `--timeout`, `--debug`) works without a command.
-
-State that adb-axi keeps (log marks, install records, cached AVD names) lives per device serial under `~/.adb-axi/<serial>/`. Serial numbers can be reused; log marks are checked against the current boot (see [Logs and crashes](#logs-and-crashes)). `--full` output files go to `~/.adb-axi/out/`. Set `ADB_AXI_HOME` to use another directory.
-
-## Output, errors and deadlines
-
-- **Output.** TOON on stdout; `--json` prints the same results as JSON on every command (`adb-axi --json` is the home view). A mutation leads with `ok: <verb> <target> -> <resulting state>`, and one that found the state already true says `(no-op)`; its JSON also carries `"noop": true` or `false`. Lists print a count, and an empty result says 0. Next steps come as `help[N]` lines built from the actual target, and only ever name commands and flags this build ships; device-scoped suggestions keep the `--device` you passed. Text of several lines, such as `shell` output, prints in TOON as a list with one line per row and in JSON as one string. Progress goes to stderr; `--debug` also prints every adb argv there.
-- **Exit codes.** 0 when the requested state is true, including "already" no-ops and reads that find nothing; 1 when it is not; 2 for a usage error (unknown flag or value, missing argument, a flag before the command), which lists the valid flags.
-- **Errors.** One shape on stdout: `error` (one sentence naming the target), a stable `code`, any structured fields that explain it (`last`, `devices`, `exit`, `stderr`, `detail`), then `help`. Raw adb text never becomes the message; it may appear in `detail`.
-- **Deadlines.** Every command has one deadline that all its device calls share, and a call that passes it is killed: 15 s by default, 180 s for `app install`, 120 s for `wait boot` and 30 s for `app death`. `--timeout <dur>` overrides it (`500ms`, `30s`, `5m`). A step that runs out of time is `TIMEOUT` and names the step; on a device step its help points at `doctor` first, because a hung device does not answer a longer deadline either. A wait that runs out is `WAIT_TIMEOUT` with the last observation. The deadline running out while adb-axi asks the adb server for its devices is also `TIMEOUT`, never `ADB_SERVER_UNREACHABLE`, which is kept for a server that refuses or does not answer within 15 s.
-- **Collection limits.** Separate from display truncation, adb output collection defaults to 16 MiB of stdout and stderr combined per call. Exceeding a collection limit stops the host adb client and fails with `INVALID_OUTPUT`, including `step` and `limit_bytes`. Log windows and database operations have their own limits described below; `shell --full` streams to disk instead.
-- **Truncation.** `logs` and `shell` print at most 50 lines or 4 kB, and `data db` at most 50 rows, saying how many were shown out of how many; long single fields are cut with their full length. `--full` writes the complete text to a file and prints its path; `logs` and `data db` write one only when something was cut.
+adb-axi keeps log marks, install records and cached AVD names under `~/.adb-axi/`; set `ADB_AXI_HOME` to use another directory.
 
 ## Commands
 
-| Command                                                      | What it answers                                                                |
-| ------------------------------------------------------------ | ------------------------------------------------------------------------------ |
-| `adb-axi`                                                    | Devices, the resolved target, its foreground app and recent crashes            |
-| `devices [--all] [--fields <list>]`                          | Every attached device with its AVD name, state, API level and form             |
-| `doctor`                                                     | Host, adb server and target checks for things that break a run                 |
-| `doctor ui [--fix]`                                          | What holds UiAutomation, and clearing resident, leaked or wedged holders       |
-| `wait boot`                                                  | Waits until the device is online, booted, and able to install and launch apps  |
-| `wait app <pkg> --state <foreground\|running\|stopped>`      | Waits until an app reaches a state                                             |
-| `wait log <regex> [--since <mark\|dur>]`                     | Waits until a log line matches                                                 |
-| `app current`                                                | The foreground app: package, activity and pid                                  |
-| `app list [--all] [--grep <re>]`                             | Installed packages with a count                                                |
-| `app info <pkg>`                                             | One package: installed, version, debuggable, pid, foreground, data size        |
-| `app install <apk> [--clean-data] [--if-changed]`            | Installs and waits until the new version is live, keeping app data by default  |
-| `app uninstall <pkg> [--keep-data]`                          | Uninstalls a package; scope and exceptions are described under [Apps](#apps)   |
-| `app start <pkg>[/<activity>] [--fresh] [--activity <name>]` | Starts an app and reports what is in front and how it launched                 |
-| `app stop <pkg>`                                             | Force-stops an app and verifies its process is gone                            |
-| `app clear <pkg> [--full]`                                   | Clears the app's data and verifies it                                          |
-| `app kill <pkg>`                                             | Kills the process the way the system does, keeping its task in recents         |
-| `app restore <pkg>`                                          | Reopens the app's task from recents so its saved state is restored             |
-| `app death <pkg> [--compare]`                                | `app kill` then `app restore` in one call, with the evidence of both           |
-| `logs mark [<name>]`                                         | Records the device clock under a name, to scope later reads                    |
-| `logs [--since] [--pkg] [--level] [--grep] [--full]`         | One bounded log dump for a window, with level counts and repeats collapsed     |
-| `logs crash [--pkg <pkg>] [--since <mark\|dur>] [--full]`    | Java crashes, ANRs and native crashes in a window                              |
-| `data db <pkg> [<sql>] [--db <name>] [--full]`               | An app's databases, or one read-only query on a copy that includes the WAL     |
-| `shell -- <cmd>`                                             | One device shell command with its real exit code                               |
-| `update [--check]`                                           | Upgrades adb-axi from npm, or compares against the latest version with --check |
+| Command                                                   | What it answers                                                                |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `adb-axi`                                                 | Devices, the resolved target, its foreground app and recent crashes            |
+| `devices [--all] [--fields <list>]`                       | Every attached device with its AVD name, state, API level and form             |
+| `doctor`                                                  | Host, adb server and target checks for things that break a run                 |
+| `doctor ui [--fix]`                                       | What holds UiAutomation, and clearing resident, leaked or wedged holders       |
+| `wait boot`                                               | Waits until the device is online, booted, and able to install and launch apps  |
+| `wait app <pkg> --state <foreground\|running\|stopped>`   | Waits until an app reaches a state                                             |
+| `wait log <regex> [--since <mark\|dur>]`                  | Waits until a log line matches                                                 |
+| `app current`                                             | The foreground app: package, activity and pid                                  |
+| `app list [--all] [--grep <re>]`                          | Installed packages with a count                                                |
+| `app info <pkg>`                                          | One package: installed, version, debuggable, pid, foreground, data size        |
+| `app install <apk> [--clean-data] [--if-changed]`         | Installs and waits until the new version is live, keeping app data by default  |
+| `app uninstall <pkg> [--keep-data]`                       | Uninstalls a package for the current Android user                              |
+| `app start <pkg> [--fresh] [--activity <name>]`           | Starts an app and reports what is in front and how it launched                 |
+| `app stop <pkg>`                                          | Force-stops an app and verifies its process is gone                            |
+| `app clear <pkg> [--full]`                                | Clears the app's data and verifies it                                          |
+| `app kill <pkg>`                                          | Kills the process the way the system does, keeping its task in recents         |
+| `app restore <pkg>`                                       | Reopens the app's task from recents so its saved state is restored             |
+| `app death <pkg> [--compare]`                             | `app kill` then `app restore` in one call, with the evidence of both           |
+| `logs mark [<name>]`                                      | Records the device clock under a name, to scope later reads                    |
+| `logs [--since] [--pkg] [--level] [--grep] [--full]`      | One bounded log dump for a window, with level counts and repeats collapsed     |
+| `logs crash [--pkg <pkg>] [--since <mark\|dur>] [--full]` | Java crashes, ANRs and native crashes in a window                              |
+| `data db <pkg> [<sql>] [--db <name>] [--full]`            | An app's databases, or one read-only query on a copy that includes the WAL     |
+| `shell -- <cmd>`                                          | One device shell command with its real exit code                               |
+| `update [--check]`                                        | Upgrades adb-axi from npm, or compares against the latest version with --check |
 
-`--version` (or `-v`, `-V`) prints the bare version without loading the command tree.
+Device settings such as dark mode and display density have no command of their own; change them with `shell`.
 
-### Devices and health
+## Example: does an app survive process death?
 
-`devices` lists every attached device as `serial, avd, state, api, form`. `avd` comes from the emulator console, falling back to the device property `ro.boot.qemu.avd_name` when the console gives no name, only for emulators (`-` for physical devices or an unreadable online emulator; unavailable emulators can show a cached name marked `(last known)`), and `form` is `phone` or `tablet` by the smallest screen width (600 dp and up is a tablet). Duplicate AVD names are refused as ambiguous; `devices` and the `DEVICE_NOT_FOUND` error explain missing names and point at `doctor`. Devices in unusual states (recovery, sideload) are counted and shown with `--all`. `--fields` adds columns from `boot`, `data_free`, `model`, `abi` and `uptime`.
+Android kills background apps to free memory, and a well-built app restores its screen when the user returns. Testing that takes four adb-axi commands with no sleeps between them, and each one shows proof of what happened:
 
-`doctor [--device <serial|avd>]` reports on adb, the server, device selection, boot, the device clock (a warning when it is more than a minute from the host's, since log times and marks use it), free space on `/data`, animation scales, the default keyboard, running instrumentations and the emulator console token. When selection fails, the report keeps its host and server checks, marks the `device` check as `failed` with a retry hint, and omits target-dependent checks. Each check is `ok`, `warn` or `failed` with a one-line detail; the command exits 1 if any check fails and 0 if there are only warnings. It reports problems but does not fix them; when an instrumentation holds UiAutomation, its help points at `doctor ui`. A recognized persistent UI server is a warning when resident or live; a wedged or leaked server is a failure.
+1. `logs mark` records the start of the test, so the crash check at the end covers only this run.
+2. `app kill` sends the app to the background if it is in front, then kills its process the way Android does. `pid_after: null` proves the process is gone.
+3. `app restore` reopens the app from the recent-apps list. `launch: cold` and a new `pid` prove it really restarted.
+4. `logs crash` confirms nothing crashed since the mark.
 
-`doctor ui [--fix]` lists what holds the device's single UiAutomation connection: instrumentations started with one (agent-device's snapshot instrumentation, `am instrument` and Gradle `connected*` runs) and known `app_process` servers (mobilecli's `DeviceServer`, `uiautomator`). Each holder is `live` when a host process of its tool may still use it (including `adb shell uiautomator` and `adb exec-out uiautomator` readers that may target this device; for mobilecli, only through an `adb forward` to this device), `wedged` when its own pid logged `Cannot call disconnect() while connecting`, `resident` for the Android CLI's UI server holding UiAutomation with no matching host client, and `leaked` otherwise. A resident connection can interfere with other readers and can be what blocks instrumented tests and makes accessibility show as enabled. If the host process list or the adb forwards cannot be read, the affected holders count as `live`. The report exits 0 when UiAutomation is free or held only by live or resident holders, and 1 when a holder is leaked or wedged. `--fix` clears resident servers as well as leaked and wedged holders: it kills `app_process` servers and force-stops instrumentation runner packages and packages hosting their running target processes for the current Android user, resolved once before clearing (which also stops those packages' other app processes for that user). It never force-stops a package also used by a live holder; a holder blocked that way remains, with a help line saying why. After checking again, it exits 0 when UiAutomation is free, exits 1 with remaining non-live holders (including resident ones that could not be cleared), or fails with `HOLDER_PROTECTED`, naming what would release the live holders, when only live holders remain.
-
-`wait boot` waits for the device to come online, `sys.boot_completed` to become `1`, and the package and activity services to answer a call, so an install or a launch run right after it works. `sys.boot_completed` alone is not enough: on a fresh emulator those services can be missing for seconds after it, while `system_server` starts or restarts. On a device up for less than 5 minutes, the services must also keep answering from the same `system_server` for 10 s, and a restart inside that time starts it again; a device up for longer returns as soon as one look finds everything ready. A device that is not attached yet or offline is waited out rather than an error. Once it selects a device, it keeps waiting for that same device even if another comes online. On `WAIT_TIMEOUT`, `last` holds `state`, `boot_completed`, `uptime_s`, `package_service` and `activity_service` (`1` answered, `0` did not); unknown readings are `-`. A wait that runs out while every reading is ready but the 10 s are not up says so in its error.
-
-### Apps
-
-`app current`, `app list` and `app info` read without changing anything. `app list` shows user packages and counts the hidden system ones (`--all` includes them, `--grep` filters by name); `app info` resolves the current Android user once, checks installation for that user, and reads that user's data size; a package not installed for that user answers `installed: false` with exit 0. `wait app <pkg> --state <foreground|running|stopped>` polls until the state is true and prints `waited_ms`.
-
-For `app info`, install/uninstall verification and lifecycle commands, a package is installed only when its selected-user record says installed and the package manager reports APK code paths for that user. Retained data alone does not count: after `--keep-data` uninstall, `app info` reports `installed: false` even on Android 10/11, where the retained record can still say `installed=true`.
-
-`app install <apk>` uses `adb install -r` to keep existing app data. Without `--clean-data`, its success line says `with data kept` when a package record exists (including an uninstalled record with retained data), or `(fresh install)` when none exists. When APK metadata is readable, it resolves the current Android user once for package checks, then waits for the package manager to report the APK's versionCode installed for that user, and prints whether the installed app is `debuggable`. When a build of the same version replaces another, `changed` says what the version does not: `debuggable: true -> false`, or a signer that differs from the last install adb-axi recorded. `--clean-data` installs, clears only the resolved current Android user's data, and verifies that user's installed version again, even with `--if-changed`; the platform process-stopping side effect described under **Clear** below also applies. Before clearing, it checks on the device that the package's installed base APK has the same SHA-256 as the local APK; if not, it leaves the data alone and exits with `CLEAR_REFUSED`. If the APK metadata cannot be read, or the manifest could name more than one package (a repeated `package` attribute, or one with two different string values), `--clean-data` refuses the install because the package to wipe is unknown; otherwise an unreadable APK can still be installed, and the output says its version was not verified.
-
-Without a requested wipe, `--if-changed` skips only when the installed versionCode and the target device's signer evidence match the APK. Unreadable, unsupported, oversized or timed-out signer evidence skips the shortcut, not the ordinary install. Signing-block reads use v2/v3 certificate digests without SDK build tools; they do not verify cryptographic authenticity. Verified installs save per-device history in `last-install.json`, not proof of the current installed signer. A record-write failure is a warning, not an install failure.
-
-`app uninstall <pkg>` removes a non-system package only for the resolved current Android user and checks that it is no longer installed for that user. `--keep-data` preserves that user's data directory (`pm uninstall --user <id> -k`). System packages retain the unscoped `pm uninstall` command (with `-k` for `--keep-data`): uninstalling a system app's update is platform behaviour that reverts it to the factory version for all users, rather than removing the system app. An absent package for the resolved user, including one with retained data, is an exit-0 no-op. A package still installed afterwards is `UNINSTALL_FAILED`, including a system app reverted to its factory version. Install-record cleanup failures are warnings.
-
-The lifecycle commands require the package to be installed for the current Android user, selected once at the start of the command. Start and stop leave other users' copies alone.
-
-`app start` and `app restore` monitor new crash evidence during launch and the post-launch observation. A detected fatal crash attributed to the selected user's package UID and the launched activity's process fails with `APP_DIED_ON_START` (exit 1), even if a crash dialog keeps the PID alive or `am start -W` remains blocked with dialogs hidden. Earlier crash records do not fail a new launch. Crash evidence reports `last.state: crashed`, the crashed PID and `last.foreground: -`; a process that is simply gone reports `last.state: stopped`.
-
-- **Start:** selects the first enabled launcher activity of the package, or takes an explicit one as `com.example.notes/.MainActivity` or `--activity .MainActivity` (not both). `--fresh` force-stops first. The output tells a recreated activity from an existing instance brought forward; an absent or unknown launch state stays `unknown`. Start checks the launched activity's own process, including a secondary UI process. Any resumed activity of the package counts as foreground; `app.activity` names that activity while `app.pid` is the launched activity's process. Post-launch observation lasts at most two seconds within the deadline; when it expires without a detected crash, the last complete observation is returned, which can show a live app with something else in front.
-- **Stop:** force-stops and verifies the main process exited. "Already not running" is an exit-0 no-op when no main pid exists, but the force-stop is still sent to end secondary processes.
-- **Clear:** clears only the current Android user's app data. Android also stops the app's running processes for other users, leaving their data intact. `confirmed_by` names the verification used: the `pm clear` acknowledgement, plus a file check through `run-as` when the app is debuggable and that check succeeds. Remaining files fail verification; `--full` lists all of them rather than the first ten. Retrying with `--full` clears again.
-- **Kill:** simulates Android reclaiming a backgrounded app. An app in front is sent home first (HOME), then its oom adj is polled until `am kill` can act on it (adj 500 or higher; `am kill` silently does nothing to an app in front), then `am kill` runs and `pidof` verifies every process under the package's UID is gone. `cached_after_ms` is the wait for a killable oom adj; the app need not reach the `cached` state, which some releases never report. A debuggable app that outlives `am kill` is killed through `run-as`. The task must still be in recents (`TASK_NOT_IN_RECENTS` otherwise). A process that is not running is an exit-0 no-op. UID-based checks can include other packages sharing the UID, and do not cover isolated services with a different UID.
-- **Restore:** starts the root activity of the app's task in recents with `am start -W -n` and nothing else: no launcher category, flags or `monkey`, which all start a fresh task. `launch` is the system's own launch state, or `unknown`; `new_process` comes from comparing pids before and after. A process that is still running is brought forward as it is (`new_process: false`).
-- **Death:** `kill` then `restore` under one 30 s deadline, with the pids and launch evidence of both. `--compare` uses `agent-device snapshot --json` to diff the visible text, only when the app is in front before the kill and after the restore. If it is not in front at either point, agent-device is unavailable, or a snapshot fails or is not a valid UI tree, the kill and restore still run, and `COMPARE_UNAVAILABLE` carries their evidence.
-
-### Logs and crashes
-
-`logs mark [name]` stores the device's own clock under a name, per device, so `logs`, `logs crash` and `wait log` can cover exactly one run without host and device clock skew shifting the window. Without a name it uses `mark-<HHMMSS>` from device time. Take marks one at a time per device: simultaneous `logs mark` calls can lose one. `--since` takes a mark name or a duration back from now. When the device's boot ID can be read, marks are bound to it: a new boot or an emulator reusing the serial drops earlier marks with a one-time `marks_note` (also on errors). Older marks without a boot ID are dropped too. When the boot ID cannot be read, existing marks are kept but not used: the home view falls back to its no-mark window (with a notice if marks were stored), and named windows or new marks return `MARK_UNVERIFIED`. Retry marking once the boot ID is readable, or use a duration such as `--since 5m`.
-
-`logs` prints one bounded dump (every logcat call is `-d`, so it never streams): level counts (`counts.matched` is 0 if nothing matches), repeated lines collapsed, and the last 50 rows or 4 kB. When the table differs from the matched lines, `shown` says how: `rows` (how many of the rows are on screen, and how many of the oldest were left out), `lines` (how many lines matched, and how many were folded into repeated rows) and `cut` (messages cut at 500 characters, or a row cut at 4 kB). `--full` writes every matching line uncollapsed, with its own timestamp, to a file and prints the path when rows were omitted, repeats folded, or content cut; otherwise it says `not written: nothing was cut`. A dump that contains a crash points at `logs crash` for the same window. Log-window reads for `logs`, `logs crash` and `wait log` have a 64 MiB collection limit, even with `--full`. A very spammy device can exceed it, which fails with `INVALID_OUTPUT`; read a shorter window with a later mark or a shorter `--since`. Without `--since` the dump starts 15 minutes back. When the device's first log line in the window, from any app, is more than two seconds after the window start, `logs` notes that earlier lines may have been dropped by the device log buffer; the device may also simply have been quiet. With `--pkg` the note still dates the whole buffer: a quiet app alone does not raise it, but an app's older lines may be missing when the device buffer is shallow (about a minute of history on a busy phone).
-
-`--pkg` follows the app with `logcat --uid` on API 31 and newer. On API 29 and 30, which have no `--uid`, it uses a pid list: the app's current pids, those recorded when the window's mark was taken, and those ActivityManager names in "Start proc" lines inside the window; it can miss a process that starts and dies between two reads. Both forms drop lines that other processes log about the app, such as ActivityManager's "has died" lines and ANR reports, which is why `logs crash` matches by name instead.
-
-`wait log <regex>` polls until a log line matches; without `--since` it counts only lines logged after the wait began. It ignores adbd's echoes of shell commands as match evidence.
-
-`logs crash` counts Java crashes, ANRs and native crashes in the window (default 15 minutes) and says `crashes: 0 since <window>` when there are none. Each crash prints its kind, time, process, exception, message, first app frame and frame count; one prints as a block, several as a table, at most 5 with `shown: N of M crashes`. For wrapped Java exceptions, `cause` and `cause_message` add the last direct `Caused by:` type and message, excluding suppressed branches; the existing `exception` and `message` still describe the outer exception. Only the deepest cause is shown, with fields cut at 500 characters and their total length reported, so even long chains stay compact. Cause fields are omitted when no displayed crash has a cause; in a mixed table, rows without one show `-`. `--full` writes every crash's whole trace, including all causes and suppressed exceptions, to a file. `--pkg` matches the process name in the report (the package or `<pkg>:<name>`), not uid or pid. An ANR has no stack in logcat, so it shows `app_frame: -` and `frames: 0`. Crashes that start before the window are not counted, even when their reports continue into it. Native crashes use the fatal signal's time when it is available.
-
-### App data and shell
-
-Only when you need a single database's schema, query it directly: `adb-axi data db com.example.notes 'SELECT name, sql FROM sqlite_master WHERE type = "table"'`. With several databases, the CLI names them and asks for `--db`.
-
-`data db <pkg>` resolves the current Android user once and lists that user's debuggable app databases (`name`, `size`, `wal`); database and WAL copying use the same resolved user. `data db <pkg> "<sql>" [--db <name>]` runs one read-only statement (`SELECT`, `WITH`, `VALUES`, `EXPLAIN` or `PRAGMA`) on a host copy and prints the rows; the sole database is selected automatically, and `--db` is required when the app has several databases. SQLite's `-wal`, `-shm` and `-journal` companions and Room's `.lck` lock files do not count as databases for listing or selection.
-
-- **Copy:** the database and its `-wal` file are copied with `run-as` and read with the SQLite built into Node.js, so rows still only in the WAL are included. The files are copied one at a time while the app runs, so a write made during the copy can be missed. The copied bytes are checked, because `exec-out` exits 0 even when it prints an error instead of the file.
-- **Read-only:** write statements, `ATTACH`, `VACUUM INTO`, multiple statements and sqlite3 dot-commands are refused before any device call. The query runs in its own Node.js process on a read-only connection: a `WITH` or `PRAGMA` that attempts a write is refused, as are `ATTACH` and pragmas that do more than report. That SQLite has no host-file functions or modules (`readfile`, `fsdir`, `zipfile`); FTS and R-Tree tables still read. Queries cannot reach any pre-existing host file. SQLite's own scratch files stay inside adb-axi's private per-query directory, which is removed afterwards. SIGINT or SIGTERM also removes it and kills the query process, which ends itself shortly after the deadline in any case. Very large queries are bounded by the deadline, not by a memory cap.
-- **Rows:** the first 50 are printed, with `shown: 50 of N rows` when more exist. Cells over 500 characters are cut. `--full` writes all rows with uncut cells to a file, only when something was cut. Results larger than 64 MB fail even with `--full`.
-- **Errors:** `APP_NOT_DEBUGGABLE` (`run-as` refused, as for release builds), `DB_NOT_FOUND` (names the databases that exist), `INVALID_OUTPUT`, `SQL_ERROR` (SQLite's message) and `NODE_TOO_OLD` (Node.js older than 24.12).
-
-`shell -- '<cmd>'` runs one command string in the device shell through `shell_v2`, preserving the remote exit code. Reliable disconnect exit codes also require the [host-client requirements](#install). adb-axi's own flags, such as `--device`, go before `--`: everything after it runs on the device. A non-zero exit is exit 1 with `code: REMOTE_EXIT`, the remote `exit` and its `stderr`. Without `--full`, the [default collection limit](#output-errors-and-deadlines) applies, so excessive output is an error, never a truncated success. Redirect such output to a file on the device, or use `--full`, which writes each stream to its file as it arrives without a collection-size ceiling; the command deadline and available disk space still apply.
-
-Device settings such as dark mode and display density have no command of their own; `shell` changes them. Read the original values first:
-
-```sh
-adb-axi shell --device emulator-5554 -- 'cmd uimode night && wm density'
-```
-
-`cmd uimode night` prints `Night mode: yes` or `no`, and `wm density` prints the physical density and any override. When testing a change, install an EXIT trap in a subshell before mutating settings, verify the result, and restore the values you read even if the check fails. Do not assume the defaults (`night no` and `density reset`) were the original values; propagate both verification and cleanup failures.
-
-## Short device-check recipes
-
-- Crashes: run `adb-axi logs mark before-repro --device emulator-5554`, reproduce the problem through the UI, then run `adb-axi logs crash --since before-repro --pkg com.example.notes --device emulator-5554`.
-- Process death: put the app and state to test in front through the UI, run `adb-axi app death com.example.notes --device emulator-5554`, then read `death.pid_restored` and `death.new_process` for the restored process. Check the restored UI state separately; a new pid alone does not prove state preservation.
-
-## Walkthrough: does an app survive process death?
-
-The manual check: put some state on screen, send the app to the background, let the system kill its process, reopen it from recents, and see whether the state came back. With adb-axi it takes no sleeps, and every step proves its own outcome. The UI steps can use any UI tool, for example agent-device.
+Use any UI tool to put some state on screen before step 2 and to check it came back after step 3.
 
 ```
 $ adb-axi logs mark before-kill
@@ -238,19 +134,24 @@ $ adb-axi logs crash --pkg dev.probe --since before-kill
 crashes: "0 since before-kill (13 s, 0 lines scanned)"
 ```
 
-The death is proven by the pid, the restore by `launch: cold` and a new pid, and the crash window covers exactly this run. `app death dev.probe --compare` does the kill, the restore and a before-and-after comparison of the visible text in one call when agent-device is installed.
-
-These transcripts are real adb-axi output, recorded against the scripted fake adb the tests use, so they show the shape of the data rather than one particular device.
+`app death dev.probe` runs steps 2 and 3 in one command.
 
 ## Evaluation
 
 <!-- evaluation:start -->
 
-adb-axi has been measured against plain `adb` with coding agents doing the device work. Designs, numbers and limits are in [docs/evaluation.md](docs/evaluation.md).
+Coding agents did the same device work with adb-axi and with plain `adb`. Details and limits: [docs/evaluation.md](docs/evaluation.md).
 
-- **Device bug-fix episodes** (0.2.1, 30 runs): no reliability or effort difference; both arms fixed every bug. adb-axi shortened upgrade-crash diagnosis, did process-death checks in one command and read stored data in every run. In 14 of 15 runs the separate `android layout` screen reader left a helper connected that shows accessibility as enabled; `doctor ui --fix` clears it.
-- **App builds** (0.1.3 and 0.2.0, 10 runs): no whole-run difference; process death took a median of 2 turns against 4.
-- **Scripted 8-task benchmark** (0.1.2 and 0.1.3, 160 runs): a regression signal, not a ranking. Tokens and cost level with plain `adb`; 13% more turns in 0.1.3, down from 27%.
+| Measure                                        | adb-axi  | plain adb |
+| ---------------------------------------------- | -------- | --------- |
+| Device bugs fixed (5 bugs, 30 agent runs)      | 15 of 15 | 15 of 15  |
+| Upgrade-crash diagnosis, device-work responses | 6        | 9         |
+| Process-death check in app builds, turns       | 2        | 4         |
+| Bug-fix runs that read the app's database      | 15 of 15 | 5 of 15   |
+| Responses spent on skills and help             | 3        | 1         |
+| Input tokens per bug fix                       | 857k     | 879k      |
+
+Counts are medians unless they say "of". Overall reliability and effort were the same; adb-axi saved steps on crashes, process death and app data, spent more on reading help, and cost about 25% more in app builds.
 
 <!-- evaluation:end -->
 
@@ -258,10 +159,11 @@ adb-axi has been measured against plain `adb` with coding agents doing the devic
 
 ```sh
 npm ci
-npm run check   # build, typecheck, lint, format check, tests
+npm run check   # build, typecheck, lint, format check, tests; no device needed
+npm pack && npm install --global ./adb-axi-*.tgz   # install a local build
 ```
 
-`npm run check` runs the built CLI against a scripted fake adb in `test/fake-adb`, so no device or emulator is needed; `test/fixtures/EVIDENCE.md` maps the recorded evidence cases to their scenarios and tests. The separate real-emulator suite runs in CI; see [real-device checks](test/device/README.md) for local usage and coverage.
+`npm run check` drives the built CLI against a scripted fake adb; the real-emulator suite runs in CI (see [real-device checks](test/device/README.md)), and [`test/fixtures/EVIDENCE.md`](test/fixtures/EVIDENCE.md) maps recorded Android evidence to tests. Read [docs/testing.md](docs/testing.md) before changing code or tests.
 
 ## License
 
