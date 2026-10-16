@@ -64,7 +64,7 @@ describe("exec", () => {
     expect(isProcessAlive(result.pid ?? 0)).toBe(false);
   });
 
-  it("leaves unlimited collection unchanged when no limit is requested", async () => {
+  it("collects output below the default limit when no limit is requested", async () => {
     const result = await exec({
       file: node,
       args: ["-e", "process.stdout.write(Buffer.alloc(2048))"],
