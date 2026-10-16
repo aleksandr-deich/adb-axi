@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.2.2](https://github.com/aleksandr-deich/adb-axi/compare/v0.2.1...v0.2.2) (2026-10-16)
+
+
+### Bug Fixes
+
+* **adb:** require Platform-Tools 35.0.0 for device calls ([#57](https://github.com/aleksandr-deich/adb-axi/issues/57)) ([45b9428](https://github.com/aleksandr-deich/adb-axi/commit/45b94287d909f721cad2ab8ba12a89aa8ef973a4))
+* **android:** detect keep-data uninstalls on Android 10 and 11 ([#53](https://github.com/aleksandr-deich/adb-axi/issues/53)) ([5c8db35](https://github.com/aleksandr-deich/adb-axi/commit/5c8db35bc27e60fa61fa789b407f3a7d8247a1c8))
+* bound adb output collection and stream shell --full to disk ([#56](https://github.com/aleksandr-deich/adb-axi/issues/56)) ([5d159da](https://github.com/aleksandr-deich/adb-axi/commit/5d159daf92eaefd686315fbdbef02b3db38feea4))
+* **commands:** protect live exec-out uiautomator readers ([#48](https://github.com/aleksandr-deich/adb-axi/issues/48)) ([722283d](https://github.com/aleksandr-deich/adb-axi/commit/722283db728c053f08e7616aa0117ea6feb3ebe3))
+* detect crashes during app start and restore ([#54](https://github.com/aleksandr-deich/adb-axi/issues/54)) ([dafa96c](https://github.com/aleksandr-deich/adb-axi/commit/dafa96c945ae03c7eb6ac4574ddf2c34e75b3a9d))
+* **device:** fall back to emulator properties for AVD names ([#45](https://github.com/aleksandr-deich/adb-axi/issues/45)) ([b69c098](https://github.com/aleksandr-deich/adb-axi/commit/b69c098338b70cbd6f70049006838c8a4a614996))
+* **device:** require explicit selection for physical devices ([#50](https://github.com/aleksandr-deich/adb-axi/issues/50)) ([d66f67e](https://github.com/aleksandr-deich/adb-axi/commit/d66f67ed823a9cd15e40b8f919faacd38a757f63))
+* handle API 29 bracketed process names in app kill ([#52](https://github.com/aleksandr-deich/adb-axi/issues/52)) ([ec470e2](https://github.com/aleksandr-deich/adb-axi/commit/ec470e29a56a63225334bd49908d17df6ca17a9b))
+
 ## [0.2.1](https://github.com/aleksandr-deich/adb-axi/compare/v0.2.0...v0.2.1) (2026-10-10)
 
 
