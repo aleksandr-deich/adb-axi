@@ -52,7 +52,7 @@ export function locateAdb(env: NodeJS.ProcessEnv = process.env, home: string = h
   throw new AdbAxiError("ADB_NOT_FOUND", "adb was not found", {
     fields: { searched },
     help: [
-      "Install the Android SDK platform-tools, or set ANDROID_HOME to the SDK directory, then run the command again",
+      "Install Android SDK platform-tools 35.0.0 or newer for reliable shell disconnect exit codes, or set ANDROID_HOME to that SDK directory, then run the command again",
     ],
   });
 }

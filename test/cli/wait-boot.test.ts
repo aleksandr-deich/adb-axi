@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { decode } from "@toon-format/toon";
@@ -133,6 +133,12 @@ answer() {
   exit 0
 }
 ${branches.join("\n")}
+# Unscripted client discovery uses the supported capture; host/index.json records provenance.
+${
+  rules.some((rule) => rule.match[0] === "version")
+    ? ""
+    : `if [ "$#" -eq 1 ] && [ "$1" = version ]; then printf '%s' ${q(readFileSync(new URL("../fixtures/captured/host/adb-version.txt", import.meta.url), "utf8"))}; exit 0; fi`
+}
 printf '${UNMATCHED_PREFIX} adb %s\\n' "$*" >&2
 log '["${UNMATCHED_PREFIX}"]'
 printf '{"event":"end","pid":%s,"at":0,"rule":null,"exit":${String(UNMATCHED_EXIT)},"unmatched":true}\\n' $$ >> "$FAKE_ADB_LOG"

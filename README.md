@@ -10,7 +10,9 @@ Physical phones are supported for the core commands: devices, doctor, the app li
 
 ## Install
 
-Requirements: Node 24.12 or newer, and the Android SDK platform-tools. Devices must run Android 10 (API 29) or newer.
+Requirements: Node 24.12 or newer, and Android SDK Platform-Tools 35.0.0 or newer. Devices must run Android 10 (API 29) or newer.
+
+Platform-Tools 35.0.0 [fixed shell exit codes on device disconnect](https://developer.android.com/tools/releases/platform-tools#3500_february_2024). The floor checks the adb client adb-axi runs, not the shared server or the device API. An older client fails device calls with `HOST_ADB_TOO_OLD`; an unknown version is allowed and `doctor` warns. Update platform-tools yourself; adb-axi never updates it or replaces the shared server.
 
 ```sh
 npm install --global adb-axi

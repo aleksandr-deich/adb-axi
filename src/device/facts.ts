@@ -178,6 +178,7 @@ export async function avdName(
     });
     name = result.exitCode === 0 ? parseAvdName(result.stdout.toString("utf8")) : null;
   } catch (error) {
+    if (error instanceof AdbAxiError && error.code === "HOST_ADB_TOO_OLD") throw error;
     if (error instanceof AdbAxiError && error.code === "TIMEOUT") consoleTimeout = error;
   }
   if (name === null) {
@@ -189,7 +190,11 @@ export async function avdName(
       });
       if (result.exitCode === 0) name = parseAvdName(result.stdout);
     } catch (error) {
-      if (error instanceof AdbAxiError && error.code === "TIMEOUT") throw error;
+      if (
+        error instanceof AdbAxiError &&
+        (error.code === "TIMEOUT" || error.code === "HOST_ADB_TOO_OLD")
+      )
+        throw error;
     }
   }
   if (name === null && consoleTimeout !== undefined) throw consoleTimeout;
