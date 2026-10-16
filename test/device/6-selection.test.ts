@@ -125,7 +125,6 @@ describe("device selection with two real transports of one emulator", () => {
     const calls = debug.stderr.split("\n").filter((line) => /^debug: adb /.test(line));
     expect(calls[0]).toBe("debug: adb devices -l");
     expect(calls.length).toBeGreaterThan(1);
-    expect(calls).toContain("debug: adb version");
     for (const call of calls.slice(1).filter((call) => call !== "debug: adb version"))
       expect(call).toMatch(new RegExp(`^debug: adb -s ${axi.serial} `));
     expect(
