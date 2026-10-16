@@ -2,6 +2,8 @@ import { realpathSync } from "node:fs";
 import { homedir } from "node:os";
 import { findSdkTool } from "../../adb/locate.js";
 import { AdbClient } from "../../adb/run.js";
+import { hostAdbVersionError } from "../../adb/version.js";
+export { parseAdbVersion } from "../../adb/version.js";
 import { AdbAxiError } from "../../core/errors.js";
 import { ONLINE, parseDeviceList, type AttachedDevice } from "../../device/list.js";
 import { resolveTarget, type Target } from "../../device/resolve.js";
@@ -18,11 +20,6 @@ export function homeDir(env: NodeJS.ProcessEnv): string {
 export function serverPort(env: NodeJS.ProcessEnv): string {
   const port = env.ANDROID_ADB_SERVER_PORT;
   return port !== undefined && /^\d+$/.test(port) ? port : "5037";
-}
-
-/** `37.0.0` from the `Version 37.0.0-14910828` line of `adb version`. */
-export function parseAdbVersion(stdout: string): string | undefined {
-  return /^Version (\d+(?:\.\d+)*)/m.exec(stdout)?.[1];
 }
 
 /** Whether two paths are the same file, following symlinks (Homebrew links its adb). */
@@ -49,10 +46,11 @@ export async function checkAdb(context: CommandContext): Promise<CheckResult> {
   }
   return settle("adb", async () => {
     const reads = { deadline: context.deadline, capMs: CHECK_CAP_MS };
-    const answer = await adb.host(["version"], { ...reads, step: "reading the adb version" });
-    const version = parseAdbVersion(answer.stdout.toString("utf8"));
+    const version = await adb.version({ ...reads, step: "reading the adb version" });
     const where = tildePath(adb.path, home);
     if (version === undefined) return warn("adb", `version unknown at ${where}`);
+    const tooOld = hostAdbVersionError(version);
+    if (tooOld !== undefined) return failed("adb", `${tooOld.message} (${where})`, tooOld.help);
 
     // Two adb versions on one machine restart each other's server and drop its devices.
     const other = findSdkTool("adb", { ...context.env, PATH: "" }, home).path;
@@ -73,15 +71,11 @@ export async function checkAdb(context: CommandContext): Promise<CheckResult> {
 /** The version of another adb, or `undefined` when it does not answer (it cannot clash then). */
 async function versionOf(path: string, context: CommandContext): Promise<string | undefined> {
   try {
-    const answer = await new AdbClient(path, { env: context.env, debug: context.debug }).host(
-      ["version"],
-      {
-        deadline: context.deadline,
-        capMs: CHECK_CAP_MS,
-        step: "reading the version of another adb",
-      },
-    );
-    return parseAdbVersion(answer.stdout.toString("utf8"));
+    return await new AdbClient(path, { env: context.env, debug: context.debug }).version({
+      deadline: context.deadline,
+      capMs: CHECK_CAP_MS,
+      step: "reading the version of another adb",
+    });
   } catch (error) {
     if (error instanceof AdbAxiError) return undefined;
     throw error;

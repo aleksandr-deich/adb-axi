@@ -192,8 +192,8 @@ describe("parseAdbVersion", () => {
     expect(parseAdbVersion(captured("host/adb-version.txt"))).toBe("37.0.0");
   });
 
-  it("is unknown without a Version line", () => {
-    expect(parseAdbVersion("Android Debug Bridge version 1.0.41\n")).toBeUndefined();
+  it("classifies identifiable adb without a Version line as unknown-legacy", () => {
+    expect(parseAdbVersion("Android Debug Bridge version 1.0.41\n")).toBe("unknown-legacy");
   });
 });
 

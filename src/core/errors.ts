@@ -8,6 +8,8 @@ import { AxiError } from "axi-sdk-js";
 export const ERROR_CATALOGUE = {
   VALIDATION_ERROR: "Unknown flag or value, missing argument, or a flag before the command",
   ADB_NOT_FOUND: "No adb executable in any searched location",
+  HOST_ADB_TOO_OLD:
+    "The adb client predates reliable shell disconnect exit codes; update platform-tools",
   ADB_SERVER_UNREACHABLE: "The adb server did not answer within the deadline",
   DEVICE_AMBIGUOUS: "Several devices match and none was selected",
   DEVICE_SELECTION_REQUIRED: "A physical device requires explicit selection",

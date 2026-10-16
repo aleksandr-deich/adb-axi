@@ -264,7 +264,8 @@ async function factsOrUnknown(
 ): Promise<DeviceFacts> {
   try {
     return await readFacts(options.adb, device, { deadline: options.deadline, env: options.env });
-  } catch {
+  } catch (error) {
+    if (error instanceof AdbAxiError && error.code === "HOST_ADB_TOO_OLD") throw error;
     // Candidates for an ambiguity error are best effort; the error is about selection.
     return {
       serial: device.serial,

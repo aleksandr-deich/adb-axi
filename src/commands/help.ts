@@ -20,6 +20,7 @@ export function topLevelHelp(registry: Registry): Output {
       flagRow(flag.name === "--timeout" ? { ...flag, default: "per command" } : flag),
     ),
     help: [
+      "Requires Android SDK Platform-Tools 35.0.0 or newer for reliable shell disconnect exit codes; adb-axi never updates it",
       "Only a lone online emulator is auto-selected; physical devices require --device <serial> or ANDROID_SERIAL",
       "Flags go after the command, for example `adb-axi app start <pkg> --device <serial|avd>`",
       runHint(["<command>", "--help"], "for its arguments, flags and examples"),

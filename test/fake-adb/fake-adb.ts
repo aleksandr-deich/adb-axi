@@ -57,15 +57,6 @@ function log(entry: LogEntry): void {
   appendFileSync(logPath, `${JSON.stringify(entry)}\n`);
 }
 
-log({
-  event: "start",
-  pid: process.pid,
-  tool,
-  argv,
-  androidSerial: env.ANDROID_SERIAL ?? null,
-  at: Date.now(),
-});
-
 let scenario: Scenario;
 try {
   scenario = JSON.parse(readFileSync(scenarioPath, "utf8")) as Scenario;
@@ -76,6 +67,30 @@ try {
   log({ event: "end", pid: process.pid, at: Date.now(), rule: null, exit: BAD_SCENARIO_EXIT });
   process.exit(BAD_SCENARIO_EXIT);
 }
+
+// Client-floor discovery is not a scenario operation. Only unscripted version reads
+// use the supported host capture (provenance: fixtures/captured/host/index.json),
+// without changing existing call assertions. Explicit version rules always win.
+if (
+  tool === "adb" &&
+  argv.length === 1 &&
+  argv[0] === "version" &&
+  !scenario.rules.some((rule) => (rule.tool ?? "adb") === tool && matchArgv(rule.match, argv))
+) {
+  process.stdout.write(
+    readFileSync(new URL("../fixtures/captured/host/adb-version.txt", import.meta.url), "utf8"),
+  );
+  process.exit(0);
+}
+
+log({
+  event: "start",
+  pid: process.pid,
+  tool,
+  argv,
+  androidSerial: env.ANDROID_SERIAL ?? null,
+  at: Date.now(),
+});
 
 function matchArg(matcher: ArgMatcher, arg: string): boolean {
   if (typeof matcher === "string") return matcher === arg;

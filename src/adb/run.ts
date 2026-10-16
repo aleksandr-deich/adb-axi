@@ -10,6 +10,7 @@ import {
   classifyShellFailure,
   isTransportClosed,
 } from "./variants.js";
+import { hostAdbVersionError, parseAdbVersion } from "./version.js";
 
 /** Looks at `adb devices` after a device's connection closed: the server notices within a second. */
 const LOST_LOOKS = 3;
@@ -63,6 +64,7 @@ export interface AdbClientOptions {
 export class AdbClient {
   readonly path: string;
   private readonly options: AdbClientOptions;
+  private versionRead: Promise<string | undefined> | undefined;
 
   constructor(path: string, options: AdbClientOptions = {}) {
     this.path = path;
@@ -74,9 +76,29 @@ export class AdbClient {
     return this.call([...args], undefined, options);
   }
 
+  /** Read the selected client once, without contacting or replacing the shared server. */
+  version(options: AdbCallOptions): Promise<string | undefined> {
+    return (this.versionRead ??= this.host(["version"], {
+      deadline: options.deadline,
+      capMs: Math.min(options.capMs ?? 5_000, 5_000),
+      step: "reading the adb client version",
+    }).then((answer) =>
+      answer.exitCode === 0 ? parseAdbVersion(answer.stdout.toString("utf8")) : undefined,
+    ));
+  }
+
   /** A call on one device: always `adb -s <serial> <args>`. */
-  device(serial: string, args: readonly string[], options: AdbCallOptions): Promise<AdbExit> {
+  async device(serial: string, args: readonly string[], options: AdbCallOptions): Promise<AdbExit> {
     if (serial === "") throw new TypeError("A device call needs a serial");
+    let version: string | undefined;
+    try {
+      version = await this.version(options);
+    } catch (error) {
+      // An unidentifiable client is not grounds for refusal; doctor diagnoses the read.
+      if (!(error instanceof AdbAxiError)) throw error;
+    }
+    const tooOld = hostAdbVersionError(version);
+    if (tooOld !== undefined) throw tooOld;
     return this.call(["-s", serial, ...args], serial, options);
   }
 

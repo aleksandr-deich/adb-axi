@@ -13,6 +13,8 @@ export interface ShellResult {
  * every device adb-axi supports (it needs API 24; adb-axi's floor is 29), which keeps
  * stdout and stderr apart and returns the remote exit code as adb's own (S2). adb-axi
  * never passes `-x`, which would fall back to the legacy protocol that always exits 0.
+ * Host-client policy lives in version.ts: older shell readers can report exit 0 when
+ * the transport closes before the remote exit packet arrives, even with shell_v2.
  *
  * On a deadline, the TIMEOUT error keeps the partial output.
  */

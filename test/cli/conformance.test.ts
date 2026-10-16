@@ -129,7 +129,10 @@ function multiDevice(): FakeAdb {
       // Anything else on a device never answers, like adb on a wedged device.
       { match: [{ re: "-s" }, { re: "emulator-.*" }, { rest: true }], respond: { hang: true } },
       // Host-level reads doctor makes.
-      { match: ["version"], respond: { stdout: "Android Debug Bridge version 1.0.41\n" } },
+      {
+        match: ["version"],
+        respond: { stdout: "Android Debug Bridge version 1.0.41\nVersion 37.0.0-14910828\n" },
+      },
       { match: [{ rest: true }], respond: { hang: true } },
     ],
   });
