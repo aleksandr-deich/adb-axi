@@ -95,7 +95,8 @@ describe("shell on a real device shell", () => {
     const limit = 16 * 1024 * 1024;
     const marker = "/data/local/tmp/adb-axi-overflow-done";
     await axi.adb(["shell", `rm -f ${marker}`]);
-    const command = `head -c ${4 * limit} /dev/zero | tr \\\\0 x; touch ${marker}`;
+    // Raw bytes reach the cap without benchmarking older Android versions' slow `tr`.
+    const command = `head -c ${4 * limit} /dev/zero; touch ${marker}`;
     const run = await axi.run(["shell", command]);
     expect(run.exitCode).toBe(1);
     expect(run.json).toEqual({
