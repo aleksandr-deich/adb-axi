@@ -6,7 +6,9 @@ import { AdbAxiError } from "../core/errors.js";
  */
 export const MIN_HOST_ADB_VERSION = "35.0.0";
 
-/** Platform-tools build, not the `Android Debug Bridge version 1.0.41` protocol line. */
+/** Platform-tools build, or `unknown-legacy` for identifiable adb without a parsable build.
+ * The `Android Debug Bridge version` line identifies adb, not its platform-tools build.
+ */
 export function parseAdbVersion(stdout: string): string | undefined {
   return (
     /^Version (\d+(?:\.\d+){2,})/m.exec(stdout)?.[1] ??

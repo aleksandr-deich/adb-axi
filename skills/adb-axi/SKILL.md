@@ -16,7 +16,7 @@ For device configuration such as dark mode or display density, run the setting c
 
 ## Current guidance lives in the CLI
 
-Command and flag details come from the live CLI, not this installed file. Run commands as `npx -y adb-axi <command>`, or as `adb-axi <command>` when adb-axi is already installed on PATH; either needs Node.js 24.12 or newer and Android SDK Platform-Tools 35.0.0 or newer. The adb client floor ensures reliable shell disconnect exit codes; update platform-tools yourself if `HOST_ADB_TOO_OLD` is reported, since adb-axi never updates it. No preliminary availability probe is needed.
+Command and flag details come from the live CLI, not this installed file. Run commands as `npx -y adb-axi <command>`, or as `adb-axi <command>` when adb-axi is already installed on PATH; either needs Node.js 24.12 or newer. For platform-tools requirements and `HOST_ADB_TOO_OLD` recovery, see the [README install guidance](https://github.com/aleksandr-deich/adb-axi#install). No preliminary availability probe is needed.
 
 Output is short and the first line is the verdict. Do not pipe it through `tail` or `head`.
 
