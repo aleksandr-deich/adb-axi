@@ -1,5 +1,7 @@
 # Real-device tools
 
+The testing policy for adb-axi is in [`docs/testing.md`](../../docs/testing.md).
+
 Nothing here runs in `npm test` or `npm run check`. The device checks run on every pull request and on pushes to `main`, against API 29, 30 and 35 emulators (`.github/workflows/emulator.yml`). Everything here changes the devices it touches, so run it only on emulators reserved for the job, and always name each one by serial.
 
 ## Device checks (`*.test.ts`)
