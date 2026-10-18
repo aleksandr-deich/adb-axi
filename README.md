@@ -136,22 +136,7 @@ crashes: "0 since before-kill (13 s, 0 lines scanned)"
 
 `app death dev.probe` runs steps 2 and 3 in one command.
 
-## Evaluation
-
 <!-- evaluation:start -->
-
-Coding agents did the same device work with adb-axi and with plain `adb`. Details and limits: [docs/evaluation.md](docs/evaluation.md).
-
-| Study, agent and model                                                                        | Measure                                   | adb-axi  | plain adb |
-| --------------------------------------------------------------------------------------------- | ----------------------------------------- | -------- | --------- |
-| [Device bug-fix episodes](docs/evaluation.md#device-bug-fix-episodes), Codex CLI, gpt-6.1-sol | Bugs fixed (5 bugs, 30 agent runs)        | 15 of 15 | 15 of 15  |
-| [Device bug-fix episodes](docs/evaluation.md#device-bug-fix-episodes), Codex CLI, gpt-6.1-sol | Responses with device work                | 10       | 9         |
-| [Device bug-fix episodes](docs/evaluation.md#device-bug-fix-episodes), Codex CLI, gpt-6.1-sol | Responses spent on skills and help        | 3        | 1         |
-| [Device bug-fix episodes](docs/evaluation.md#device-bug-fix-episodes), Codex CLI, gpt-6.1-sol | Runs leaving `accessibility_enabled` at 1 | 14 of 15 | 0 of 15   |
-| [App-build repeats](docs/evaluation.md#app-build-repeats), Claude Code, Claude Sonnet 5.5     | Process-death check, turns (exploratory)  | 2        | 4         |
-
-Counts are medians unless they say "of". The bug-fix study found no reliability or effort difference, and its rule fixed in advance gave "plain adb better, on safety only": runners in the adb-axi arm used the recommended `android layout` screen reader, which left a helper connected that keeps accessibility reported as enabled, and nothing put it back (`doctor ui --fix` now clears it). The app-build study found no whole-run difference, and adb-axi cost about 25% more. A later calibration with matched guidance (Codex CLI, gpt-6.1-sol) stopped at its registered gate before any adb-axi run: 7 of 8 plain-adb runs were correct and safe, but only 2 of 4 tasks qualified against the 3 required, so it is neither a null nor an equivalence result. These small studies have not established a reliability or effort benefit for adb-axi.
-
 <!-- evaluation:end -->
 
 ## Development
