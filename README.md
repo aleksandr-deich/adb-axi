@@ -136,23 +136,7 @@ crashes: "0 since before-kill (13 s, 0 lines scanned)"
 
 `app death dev.probe` runs steps 2 and 3 in one command.
 
-## Evaluation
-
 <!-- evaluation:start -->
-
-Coding agents did the same device work with adb-axi and with plain `adb`. Details and limits: [docs/evaluation.md](docs/evaluation.md).
-
-| Measure                                        | adb-axi  | plain adb |
-| ---------------------------------------------- | -------- | --------- |
-| Device bugs fixed (5 bugs, 30 agent runs)      | 15 of 15 | 15 of 15  |
-| Upgrade-crash diagnosis, device-work responses | 6        | 9         |
-| Process-death check in app builds, turns       | 2        | 4         |
-| Bug-fix runs that read the app's database      | 15 of 15 | 5 of 15   |
-| Responses spent on skills and help             | 3        | 1         |
-| Input tokens per bug fix                       | 857k     | 879k      |
-
-Counts are medians unless they say "of". Overall reliability and effort were the same; adb-axi saved steps on crashes, process death and app data, spent more on reading help, and cost about 25% more in app builds.
-
 <!-- evaluation:end -->
 
 ## Development
