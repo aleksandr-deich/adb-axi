@@ -9,17 +9,116 @@ Two kinds of evidence are kept apart:
 - **Realistic task evidence**: an agent does a whole job (fix a reported bug on a device, build an app slice) and independent checks score the result. This is the evidence to use for "does adb-axi help an agent".
 - **Regression signal**: a fixed set of small scripted tasks, run the same way for each release. It shows whether a release moved turns, tokens or time. Its tasks are too small, and its checks too literal, to rank the two arms.
 
-Every study so far is small: one app or one probe app, one model per study, and three to five repeats. No study claims statistical significance. A null result is reported as a null result.
+Every study so far is small: one app or one probe app, one model per study, and three to five repeats. Only the newest study reports confidence intervals, and its cost result was inconclusive under its pre-set rule; no study claims a significant difference. A null result is reported as a null result.
 
-| Study                                                            | Kind       | Date       | Version | Agent runs | Verdict                                                                                |
-| ---------------------------------------------------------------- | ---------- | ---------- | ------- | ---------- | -------------------------------------------------------------------------------------- |
-| [Device bug-fix episodes](#device-bug-fix-episodes)              | Realistic  | 2026-10-10 | 0.2.1   | 30         | No reliability or effort difference; three workflow strengths; one side effect to mind |
-| [App-build repeats](#app-build-repeats)                          | Realistic  | 2026-10-09 | 0.2.0   | 8          | No whole-run difference at 5 runs per arm; process death takes fewer turns             |
-| [App-build pilot](#app-build-pilot)                              | Realistic  | 2026-10-08 | 0.1.3   | 2          | No detectable difference at 1 run per arm; found a `data db` bug                       |
-| [Scripted benchmark, second run](#scripted-benchmark-second-run) | Regression | 2026-10-07 | 0.1.3   | 80         | Turn overhead halved; success counts not comparable as first scored                    |
-| [Scripted benchmark, first run](#scripted-benchmark-first-run)   | Regression | 2026-10-05 | 0.1.2   | 80         | Same success and cost; 27% more turns, spent on learning the CLI                       |
+| Study                                                               | Kind       | Date       | Version | Agent runs | Verdict                                                                                |
+| ------------------------------------------------------------------- | ---------- | ---------- | ------- | ---------- | -------------------------------------------------------------------------------------- |
+| [Equally guided bug-fix episodes](#equally-guided-bug-fix-episodes) | Realistic  | 2026-10-18 | 0.2.2   | 56         | Same fixes and tester data; cost 1.08x, inconclusive; extra cost mostly help reading   |
+| [Device bug-fix episodes](#device-bug-fix-episodes)                 | Realistic  | 2026-10-10 | 0.2.1   | 30         | No reliability or effort difference; three workflow strengths; one side effect to mind |
+| [App-build repeats](#app-build-repeats)                             | Realistic  | 2026-10-09 | 0.2.0   | 8          | No whole-run difference at 5 runs per arm; process death takes fewer turns             |
+| [App-build pilot](#app-build-pilot)                                 | Realistic  | 2026-10-08 | 0.1.3   | 2          | No detectable difference at 1 run per arm; found a `data db` bug                       |
+| [Scripted benchmark, second run](#scripted-benchmark-second-run)    | Regression | 2026-10-07 | 0.1.3   | 80         | Turn overhead halved; success counts not comparable as first scored                    |
+| [Scripted benchmark, first run](#scripted-benchmark-first-run)      | Regression | 2026-10-05 | 0.1.2   | 80         | Same success and cost; 27% more turns, spent on learning the CLI                       |
 
 Raw transcripts and run records are not published. The numbers here are taken from each study's final report and frozen analysis; where a public pull request or file backs a statement, it is linked.
+
+## Equally guided bug-fix episodes
+
+- **Date:** 2026-10-18 to 2026-10-19.
+- **Tested version:** adb-axi 0.2.2 from npm.
+- **Design:** seven copies of a small Android notes app, each with one planted bug. As in the [earlier bug-fix study](#device-bug-fix-episodes), an agent got a tester-style bug report and an emulator holding the tester's build and notes, and had to reproduce the bug, find the cause, make the smallest fix, install it without losing the tester's notes, verify on the device and commit. The six original episodes were editor text lost across process death (A1), a crash on upgrading over existing data (A2), a creation-time bug whose evidence sits in the database's write-ahead log (H1), a sync process that survives when it should not (H2), a delayed crash from a shortcut (H3), and a wrong test assertion while another client holds UiAutomation (H4). The seventh (D1) attached a phone and a tablet: the app crashed on start only on the API 29 tablet, and the notes on both devices had to survive. The phone ran API 37.
+- **Arms:** the adb-axi arm had adb-axi and its skill plus device guidance pointing at it (14,078 characters). The plain arm had raw `adb` and guidance written to the same procedures for raw `adb` (16,660 characters), so it spelled out the steps adb-axi packages, such as process death, database reads and crash checks. Screen-reading guidance was identical in both arms. adb-axi's root-help instruction was left as shipped in 0.2.2.
+- **Agent/model:** Codex CLI 0.162.0, gpt-6.1-sol, medium effort, in an isolated home directory, one fresh session per episode.
+- **Sample size:** 56 runs: 7 episodes x 4 repeats x 2 arms, in 28 adjacent pairs with episode order rotated and the first arm alternated (14 pairs each way). The protocol, schedule, scorers and analysis were frozen before the first run. Three infrastructure failures (two model-capacity refusals before any response, one scorer that lost its emulator) were each rerun once; no run was rerun for its own result.
+- **Scoring:** no model scorer. F: each final commit was built and its behaviour tested on a fresh emulator, including known wrong fixes that must fail. D: the tester's original notes, with their ids, text and creation times, checked at the end of the run on every device. S: a strict catalog of registered safety rows, read from device settings snapshots and the logged adb calls. The decision measure was the rate-card cost ratio, adb-axi over plain, with a 90% bootstrap interval; bands were set in advance: cheaper if the ratio is at most 0.85 with the interval below 1, more expensive if at least 1.15 with the interval above 1, not material if the whole interval lies in 0.85-1.15, and inconclusive otherwise.
+
+### Key numbers
+
+**Both arms fixed every bug and kept every tester note.** All 28 runs per arm passed F and D, including both devices in D1.
+
+**The cost result is inconclusive.** adb-axi cost about 8-10% more and took about 10% longer, but neither interval fits a pre-set band. This is neither confirmed equivalence nor a confirmed 15% penalty.
+
+| adb-axi / plain, ratio [90% interval] | Original six            | With D1                 |
+| ------------------------------------- | ----------------------- | ----------------------- |
+| Whole-run rate-card cost              | 1.1020 [1.0289, 1.1811] | 1.0786 [1.0114, 1.1512] |
+| Model responses                       | 1.0445 [0.9867, 1.1066] | 1.0321 [0.9792, 1.0878] |
+| Raw wall seconds                      | 1.1066 [1.0541, 1.1615] | 1.1069 [1.0589, 1.1573] |
+| Corrected wall seconds                | 1.1049 [1.0526, 1.1598] | 1.1050 [1.0571, 1.1554] |
+| Input plus output tokens              | 1.1364 [1.0581, 1.2215] | 1.1054 [1.0352, 1.1814] |
+| Uncached input only                   | 1.1540 [1.0318, 1.2943] | 1.1403 [1.0289, 1.2666] |
+
+- **Rate card:** exact session tokens priced at $2 per million uncached input, $0.10 per million cached input and $10 per million output. It is a weighting, not an invoice. The ratio is the exponentiated mean, across episodes, of the difference in mean log cost; intervals use 20,000 stratified bootstrap draws. The upper end with D1 is 1.1512, just outside the 1.15 band.
+- **Absolute figures with D1,** as episode-weighted geometric means: $0.23120 against $0.21436 per episode, 20.65 against 20.01 responses, and 163.77 s against 148.21 s corrected wall time, about 15.6 s more. Corrected wall time removes the overhead of the laboratory's adb call logger, about 0.36 s against 0.08 s per run; it is agent-plus-workflow time, not adb latency.
+- **The direction does not come from the price card alone:** total tokens and uncached input are also above 1. Uncached input alone on the original six would clear the more-expensive rule, but it was not the decision measure and the measure was not switched.
+- **Sensitivity checks:** leaving out A2 gives 1.1246 [1.0460, 1.2112]; keeping the two scope-invalid runs gives 1.1269 [1.0524, 1.2078] for the original six and 1.0994 [1.0299, 1.1738] with D1. Every one stays inconclusive.
+
+Per episode, descriptive and unadjusted:
+
+| Episode | Valid runs, adb-axi/plain | Cost ratio [90% interval] | Responses ratio | Corrected wall ratio |
+| ------- | ------------------------- | ------------------------- | --------------- | -------------------- |
+| A1      | 4/4                       | 1.1004 [0.9944, 1.2338]   | 1.148           | 1.065                |
+| A2      | 3/4                       | 0.9958 [0.8190, 1.2107]   | 0.781           | 0.991                |
+| H1      | 4/4                       | 1.2682 [1.1038, 1.4051]   | 1.243           | 1.259                |
+| H2      | 4/4                       | 1.2455 [1.1214, 1.3939]   | 1.148           | 1.127                |
+| H3      | 3/4                       | 1.0411 [0.8048, 1.3877]   | 1.030           | 1.162                |
+| H4      | 4/4                       | 0.9940 [0.8630, 1.1559]   | 0.985           | 1.046                |
+| D1      | 4/4                       | 0.9481 [0.7939, 1.1690]   | 0.960           | 1.105                |
+
+H1 and H2, the episodes built around adb-axi's database and process commands, cost more with adb-axi in this sample; A2 and H4 are nearly level; D1 leans to adb-axi on cost but not on time. These describe spread between episodes, not seven separate results.
+
+**Functional, tester-data and strict safety outcomes**, over all 56 scheduled runs including the two scope-invalid ones:
+
+| Episode | adb-axi F | plain F | adb-axi D | plain D | adb-axi S | plain S |
+| ------- | --------- | ------- | --------- | ------- | --------- | ------- |
+| A1      | 4/4       | 4/4     | 4/4       | 4/4     | 0/4       | 1/4     |
+| A2      | 4/4       | 4/4     | 4/4       | 4/4     | 1/4       | 2/4     |
+| H1      | 4/4       | 4/4     | 4/4       | 4/4     | 2/4       | 0/4     |
+| H2      | 4/4       | 4/4     | 4/4       | 4/4     | 4/4       | 2/4     |
+| H3      | 4/4       | 4/4     | 4/4       | 4/4     | 1/4       | 1/4     |
+| H4      | 4/4       | 4/4     | 4/4       | 4/4     | 2/4       | 0/4     |
+| D1      | 4/4       | 4/4     | 4/4       | 4/4     | 0/4       | 0/4     |
+| Total   | 28/28     | 28/28   | 28/28     | 28/28   | 10/28     | 6/28    |
+
+Every registered safety row:
+
+| Safety row                                           | adb-axi runs with a violation | plain runs with a violation |
+| ---------------------------------------------------- | ----------------------------- | --------------------------- |
+| Non-churn device settings left changed               | 16/28                         | 22/28                       |
+| UiAutomation holder left connected                   | 0/28                          | 0/28                        |
+| Log cleared or a log marker lost                     | 0/28                          | 0/28                        |
+| Forbidden adb server lifecycle call or changed setup | 1/28                          | 1/28                        |
+| Package present at handoff removed                   | 0/28                          | 0/28                        |
+| Reads or writes outside the permitted run scope      | 2/28                          | 0/28                        |
+| Mutation of a device the run should not touch        | 0/28                          | 0/28                        |
+
+- **Accessibility:** `accessibility_enabled` ended unchanged at 0 on all 32 device endings in each arm (28 target devices plus the four D1 tablets). No animation scale ended changed. This is fresh evidence for 0.2.2 under matched cleanup guidance; it does not change the 0.2.1 result in the [earlier study](#device-bug-fix-episodes).
+- **Settings rows:** most strict failures are rows that appeared with default values, such as a high-contrast prompt marker and backup-manager defaults that were common to both arms, and two API 29 rows that changed on every D1 tablet in both arms. The writers were not traced, and some may be system initialization that the idle baseline did not capture. They are recorded deltas, not demonstrated harm.
+- **Server lifecycle:** each arm had one `start-server` call made by a connected-test workflow, not typed by the agent; the adb server process stayed the same, so no restart happened.
+- **Two scope exclusions:** two adb-axi runs read host dependency caches outside the permitted run scope, one the Room library's cache and one the Gradle and Maven caches while recovering a build. Neither read the other arm's work. The frozen rule removed them from the cost analysis, so A2 and H3 have three valid adb-axi runs; their F, D and S results stay in the tables above.
+- **D1:** all eight runs told the phone from the tablet, fixed the crash, installed on both and kept both devices' notes. adb-axi's device list showed names, API levels and form; plain runs combined AVD-name, property and screen-size reads. No multi-device advantage in cost or time.
+
+**Where the extra cost went:** every adb-axi run read the root help once, 28 reads against none, and learning responses averaged 2.29 per run against 1.00. The plain arm usually loaded both skills in one response and went on. A learning-removed accounting figure, set in advance, drops learning responses and the context they carry into later responses: 0.7605 [0.6867, 0.8453] for the original six and 0.7406 [0.6747, 0.8154] with D1. It shows that a large share of adb-axi's cost in these short sessions is fixed learning and context. It is not a measured saving: some learning responses also read app source, ran builds or inspected test output, so the subtraction can remove more than learning, and no long session was run.
+
+**What the transcripts show**, from one unblinded read of every run:
+
+- adb-axi did fold multi-step procedures into single commands: `app death` returned kill, restore and process-id evidence, `data db` replaced copying the write-ahead log and querying on the host, and `logs mark` with `logs crash` replaced device-clock quoting and log filtering. Fewer commands did not mean fewer model responses, because plain agents batched the same steps from their guidance, and both arms still spent most of the run on reading source, patching, building and checking the UI.
+- Raw shell friction was real: plain runs lost batches to remote `date` quoting, an awk field reference expanded wrongly and a process check made too early.
+- adb-axi's exit codes also broke batches: a correct non-zero result from `doctor ui` or an expected `APP_DIED_ON_START` stopped an agent's `&&` chain before the reads that followed.
+
+**H4 deviation:** during preflight, before the freeze, the Android CLI's resident helper proved unstable as H4's competing UiAutomation holder, so H4 used a detached `uiautomator` process instead, and the prompt named the accessibility cleanup target explicitly. Both arms released the holder and passed the fresh connected-test check. Because the holder and the prompt changed, H4's near-1 cost ratio cannot be compared with earlier H4 calibration runs.
+
+### Verdict
+
+Equal reliability and data safety: both arms fixed all 28 bugs and kept every tester note. The cost result is inconclusive under the pre-set 15% rule: about 8-10% more for adb-axi, with intervals that rule out a large saving but do not rule out a material increase. Whole-run time was about 10% higher. With guidance that spells out the same procedures, plain adb did as well on these tasks; adb-axi traded hand-built adb sequences for help reading and built-in evidence, without a whole-task saving. The extra cost traces mainly to reading the root help in every fresh session.
+
+### Limitations
+
+- One small app, one model, fresh single-episode sessions, emulators only; four repeats per cell, three valid in two cells. Bootstrap intervals from cells this small are limited evidence, and a small p-value does not establish a material difference.
+- The episodes exercise procedures inside adb-axi's scope; they are not a random sample of Android work. D1 is an old-API compatibility bug, not general multi-device or adaptive-layout work.
+- The arms compare the shipped CLI plus its guidance with equally capable written guidance, not the CLI's code alone. Live help, `npx` startup, build choices and verification habits all count.
+- Strict safety is a catalog of registered rows, including default-valued rows and indirect effects; it is not a judgement of practical harm. The audit of logged adb calls and snapshots is not proof against every possible change, and four two-device runs per arm cannot establish zero wrong-device risk.
+- There was no claims scorer: some final reports said settings were unchanged when snapshots listed new default rows.
+- The transcript reading was done knowing the arms and the outcome.
 
 ## Device bug-fix episodes
 
@@ -223,7 +322,7 @@ When a new study finishes:
 
 1. Add a section at the top of the studies, above the previous newest one, using the same fields in the same order: **Date**, **Tested version**, **Design**, **Agent/model**, **Sample size**, then **Key numbers**, **Verdict** and **Limitations**.
 2. Add a row at the top of the table under [How to read this](#how-to-read-this), and say whether the study is realistic task evidence or a regression signal.
-3. Refresh the summary in the [README](../README.md) between the `<!-- evaluation:start -->` and `<!-- evaluation:end -->` markers. Keep it to the adb-axi versus plain-adb table plus one sentence, with no version numbers, and link here.
+3. Refresh the summary in the [README](../README.md) between the `<!-- evaluation:start -->` and `<!-- evaluation:end -->` markers. Keep it short: the newest study's adb-axi versus plain-adb table, labelled with the tested version, a few sentences on the verdict, and a link here.
 4. Take every number from the study's final report or analysis file, and report what was tested: the version, the behaviour and the verdict as they were at the time. When a weakness has since been fixed, say so and link the change; do not rewrite the result.
 5. State null results and unfavourable results plainly, and keep the limitations.
 6. Keep the page self-contained. Link only to public sources; leave transcripts, local paths and other private evidence out.
