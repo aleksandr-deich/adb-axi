@@ -136,7 +136,29 @@ crashes: "0 since before-kill (13 s, 0 lines scanned)"
 
 `app death dev.probe` runs steps 2 and 3 in one command.
 
+## Evaluation
+
 <!-- evaluation:start -->
+
+adb-axi 0.2.2 was tested against plain `adb` with guidance that spells out the same procedures, using Codex CLI 0.162.0 with gpt-6.1-sol at medium effort. Seven Android bug-fix episodes on a small notes app, one of them with a phone and a tablet attached, ran four times per arm. Independent checks tested each final commit on a fresh emulator and checked the tester's existing notes.
+
+| Outcome, 28 runs per arm                                  | adb-axi 0.2.2 | plain adb |
+| --------------------------------------------------------- | ------------- | --------- |
+| Bugs fixed                                                | 28 of 28      | 28 of 28  |
+| Tester notes kept, on both devices in the two-device task | 28 of 28      | 28 of 28  |
+| Strict safety pass                                        | 10 of 28      | 6 of 28   |
+| Runs ending with device settings rows changed             | 16 of 28      | 22 of 28  |
+| Accessibility left enabled or UiAutomation left connected | 0             | 0         |
+| Logs cleared or existing packages removed                 | 0             | 0         |
+| Indirect adb `start-server` calls; actual restarts        | 1; 0          | 1; 0      |
+| Runs reading files outside the permitted scope            | 2             | 0         |
+| Wrong-device changes in the two-device task               | 0 of 4        | 0 of 4    |
+| Learning responses per run, mean                          | 2.29          | 1.00      |
+| Responses per run, geometric mean of valid runs           | 20.65         | 20.01     |
+| Wall time per run, geometric mean of valid runs           | 163.77 s      | 148.21 s  |
+
+Rate-card cost was 1.102x plain [90% interval 1.029-1.181] on the six single-device episodes and 1.079x [1.011-1.1512] with the two-device episode. Both results are inconclusive under the 15% rule set in advance: not equivalence and not a confirmed penalty. The cost figures leave out the two out-of-scope runs; including them does not change the result. The extra cost traces mainly to every run reading the root help. Most settings failures are rows that appeared with default values, not demonstrated harm. These are small, one-app, one-model emulator results; see [docs/evaluation.md](docs/evaluation.md) for the method, per-episode results, older studies and limits.
+
 <!-- evaluation:end -->
 
 ## Development
