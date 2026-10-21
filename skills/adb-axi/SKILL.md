@@ -27,7 +27,7 @@ Output is short and the first line is the verdict. Do not pipe it through `tail`
 
 ## Select the device
 
-Before choosing a target, run `npx -y adb-axi --help` for authoritative device-selection rules and flags.
+Target a known device with `--device <serial|avd>` after the command, or set `ANDROID_SERIAL=<serial>`. Only a lone online emulator is auto-selected; physical devices and multiple online devices require explicit selection. Consult the relevant command's `--help` when you need flag details.
 
 ## App-build loop
 
