@@ -13,9 +13,11 @@ async function uptime(): Promise<number> {
 // Runs just before the offline check: it reboots the emulator and waits for it again.
 describe("a real reboot", () => {
   test("wait boot: a no-op when long up, a timeout with the last state while rebooting, then a wait until the services answer; old marks are dropped once", async () => {
+    // The wait itself can cross the fresh-boot threshold, so sample its precondition first.
+    const uptimeBefore = await uptime();
     const before = await axi.run(["wait", "boot"]);
     expect(before.exitCode).toBe(0);
-    if ((await uptime()) >= FRESH_UPTIME_S) {
+    if (uptimeBefore >= FRESH_UPTIME_S) {
       expect(before.json).toMatchObject({
         ok: `wait boot ${axi.serial} -> already booted (no-op)`,
         noop: true,
