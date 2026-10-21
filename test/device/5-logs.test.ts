@@ -175,21 +175,35 @@ describe("logs on real device logs", () => {
     const recent = await axi.ok(["logs", "--pkg", PKG, "--since", "2m"]);
     expect(String(recent.window)).toMatch(/^2m ago -> now \(120 s\), \d+ lines scanned$/);
 
-    await axi.sh("logcat -c");
-    const cleared = (await deviceTime()).slice(11);
-    await burst("after clear", 1);
-    const now = (await deviceTime()).slice(11);
-    const late = await axi.ok(["logs", "--since", "10m"]);
+    // A window before boot predates the buffer without requiring logcat -c to succeed.
+    await burst("late buffer", 1);
+    const uptime = Number((await axi.sh("cat /proc/uptime")).trim().split(/\s+/)[0]);
+    expect(Number.isFinite(uptime) && uptime > 0).toBe(true);
+    const oldestTime = async (): Promise<string> => {
+      const raw = await axi.sh("logcat -d -v time -m 1");
+      const match = /^\d\d-\d\d (\d\d:\d\d:\d\d\.\d{3})\s/m.exec(raw);
+      expect(match, raw).not.toBeNull();
+      return match?.[1] ?? "";
+    };
+    const before = await oldestTime();
+    const late = await axi.ok(["logs", "--since", `${Math.ceil(uptime) + 60}s`]);
+    const after = await oldestTime();
     const first =
-      /^first log line in this window is at (\d\d:\d\d:\d\d)\.\d{3}, after the window start; the device log buffer may have dropped earlier lines$/.exec(
+      /^first log line in this window is at (\d\d:\d\d:\d\d\.\d{3}), after the window start; the device log buffer may have dropped earlier lines$/.exec(
         String(late.note),
       );
     expect(first, String(late.note)).not.toBeNull();
     const seconds = (time: string): number =>
       time.split(":").reduce((total, part) => total * 60 + Number(part), 0);
-    const firstAt = seconds(first?.[1] ?? "");
-    expect(firstAt).toBeGreaterThanOrEqual(seconds(cleared) - 60);
-    expect(firstAt).toBeLessThanOrEqual(seconds(now));
+    const beforeAt = seconds(before);
+    // Unwrap midnight relative to the first raw read, including pruning between reads.
+    const atOrAfter = (time: string): number => {
+      const at = seconds(time);
+      return at < beforeAt ? at + 24 * 60 * 60 : at;
+    };
+    const firstAt = atOrAfter(first?.[1] ?? "");
+    expect(firstAt).toBeGreaterThanOrEqual(beforeAt);
+    expect(firstAt).toBeLessThanOrEqual(atOrAfter(after));
   });
 
   test("APP_NOT_INSTALLED for a package the device does not have", async () => {
