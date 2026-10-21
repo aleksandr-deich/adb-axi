@@ -11,6 +11,7 @@ import { formatVersion, readOptions, targetSerial, UNKNOWN } from "./shared.js";
 
 export const appInfo = defineCommand({
   path: ["app", "info"],
+  help: ["Reports package facts for the current Android user"],
   summary: "One package's facts: installed, version, debuggable, pid, foreground, data size",
   positionals: [
     {

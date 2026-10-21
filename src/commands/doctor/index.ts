@@ -4,7 +4,7 @@ import { doctorUi } from "./ui.js";
 
 export const doctor = defineGroup({
   name: "doctor",
-  summary: "Health checks for the host, the adb server and the target device",
+  summary: doctorReport.summary,
   defaultCommand: doctorReport,
   subcommands: [doctorUi],
 });

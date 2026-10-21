@@ -45,6 +45,10 @@ export interface CommandSpec {
   /** Command-specific flags; the global flags are added automatically. */
   flags: readonly FlagSpec[];
   examples: readonly string[];
+  /** Focused reference details shown only in this command's help. */
+  help?: readonly string[];
+  /** Accepted globals that are irrelevant to this command's help; parsing is unchanged. */
+  hiddenGlobalFlags?: readonly string[];
   defaultTimeoutMs: number;
   device: DeviceUse;
   /**

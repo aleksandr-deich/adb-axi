@@ -24,13 +24,17 @@ const MAX_INSTALLED_APK_BYTES = 64 * 1024 * 1024;
 
 export const appInstall = defineCommand({
   path: ["app", "install"],
+  help: [
+    "When APK metadata is readable, version checks and --clean-data target the current Android user; installation can update code shared by other users",
+  ],
   summary: "Install an APK, keeping app data, and wait until the new version is live",
   positionals: [{ name: "apk", description: "Path to the APK on this machine", required: true }],
   flags: [
     {
       name: "--clean-data",
       type: "boolean",
-      description: "Wipe the app's data as part of the install; takes precedence over --if-changed",
+      description:
+        "Wipe app data only after the installed base APK matches the local APK by SHA-256; takes precedence over --if-changed",
     },
     {
       name: "--if-changed",

@@ -28,6 +28,9 @@ const PER_DEVICE_CODES = new Set([
 
 export const devices = defineCommand({
   path: ["devices"],
+  help: [
+    "form uses the smallest screen width: tablet at 600dp or more, phone below that; unknown when screen dimensions or density cannot be read",
+  ],
   summary: "Every attached device with its AVD name, state, API level and form",
   device: "none",
   shipped: true,

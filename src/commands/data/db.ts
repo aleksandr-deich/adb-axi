@@ -27,6 +27,10 @@ const WAL_MAGICS = [0x377f0682, 0x377f0683];
 
 export const dataDb = defineCommand({
   path: ["data", "db"],
+  help: [
+    "Writes are refused. ATTACH, VACUUM INTO, multiple statements and sqlite3 dot-commands are rejected before copying app data",
+    "Queries run on a read-only local copy with host-file access blocked; temporary database copies are removed afterward",
+  ],
   summary:
     "List an app's databases, or run one read-only query on a copy that includes the WAL. " +
     "The copy is taken file by file while the app runs, so a write made during it can be missed",

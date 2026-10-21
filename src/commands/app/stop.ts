@@ -15,6 +15,7 @@ import { readOptions, targetSerial } from "./shared.js";
 
 export const appStop = defineCommand({
   path: ["app", "stop"],
+  help: ["Force-stops the app for the current Android user"],
   summary: "Force-stop an app and verify its process is gone",
   positionals: [
     { name: "pkg", description: "Package name, for example com.example.notes", required: true },

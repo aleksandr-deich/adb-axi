@@ -43,6 +43,10 @@ const ACTIVITY_NAME = /^\.?[A-Za-z_$][\w$]*(\.[A-Za-z_$][\w$]*)*$/;
 
 export const appStart = defineCommand({
   path: ["app", "start"],
+  help: [
+    "Starts the app for the current Android user",
+    "Post-launch observation is bounded to 2s or the remaining deadline, whichever is shorter; a live app may be reported with another app in front",
+  ],
   summary: "Start an app, then report what is in the foreground and how it launched",
   positionals: [
     {
