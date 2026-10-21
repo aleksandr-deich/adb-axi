@@ -258,10 +258,18 @@ describe("conformance sweep", () => {
         default: string;
         description: string;
       }[];
-      expect(
-        flags.map((flag) => flag.flag.split(" ")[0]),
-        words,
-      ).toEqual(expect.arrayContaining(["--device", "--timeout", "--json", "--debug", "--help"]));
+      const flagNames = flags.map((flag) => flag.flag.split(" ")[0]);
+      if (words === "update") {
+        expect(flagNames, words).toEqual(
+          expect.arrayContaining(["--json", "--debug", "--help", "--check", "--dry-run"]),
+        );
+        expect(flagNames, words).not.toContain("--device");
+        expect(flagNames, words).not.toContain("--timeout");
+      } else {
+        expect(flagNames, words).toEqual(
+          expect.arrayContaining(["--device", "--timeout", "--json", "--debug", "--help"]),
+        );
+      }
       for (const flag of flags) {
         expect(flag.default.length, `${words} ${flag.flag}`).toBeGreaterThan(0);
         expect(flag.description.length, `${words} ${flag.flag}`).toBeGreaterThan(0);

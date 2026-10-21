@@ -16,6 +16,9 @@ import { PID_LIST_BELOW_API } from "./scope.js";
 
 export const logsMark = defineCommand({
   path: ["logs", "mark"],
+  help: [
+    "Marks belong to one device boot; a different boot ID, including a reused emulator serial, drops previous marks",
+  ],
   summary: "Record the device clock under a name, to scope later logs and crash reads",
   positionals: [
     {

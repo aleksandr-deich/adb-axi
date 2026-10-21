@@ -43,7 +43,11 @@ export function commandHelp(spec: CommandSpec): Output {
           })),
         }
       : {}),
-    flags: [...spec.flags, ...GLOBAL_FLAGS, HELP_FLAG].map((flag) =>
+    flags: [
+      ...spec.flags,
+      ...GLOBAL_FLAGS.filter((flag) => !spec.hiddenGlobalFlags?.includes(flag.name)),
+      HELP_FLAG,
+    ].map((flag) =>
       flagRow(
         flag.name === "--timeout"
           ? { ...flag, default: formatDuration(spec.defaultTimeoutMs) }
@@ -51,6 +55,7 @@ export function commandHelp(spec: CommandSpec): Output {
       ),
     ),
     examples: [...spec.examples],
+    ...(spec.help === undefined ? {} : { help: [...spec.help] }),
   };
 }
 
@@ -79,6 +84,7 @@ export function groupHelp(group: GroupSpec): Output {
       flagRow(flag.name === "--timeout" ? { ...flag, default: "per command" } : flag),
     ),
     help: [
+      ...(defaultCommand?.help ?? []),
       ...(example === undefined
         ? []
         : [

@@ -11,6 +11,7 @@ export const update = defineCommand({
   path: ["update"],
   summary: "Upgrade adb-axi to the latest published version",
   device: "none",
+  hiddenGlobalFlags: ["--device", "--timeout"],
   shipped: true,
   flags: [
     {

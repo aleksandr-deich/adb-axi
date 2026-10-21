@@ -23,6 +23,10 @@ const SETTLE_MS = 5_000;
 
 export const doctorUi = defineCommand({
   path: ["doctor", "ui"],
+  help: [
+    "live: a host client may still use the holder, or liveness could not be verified; --fix leaves it alone",
+    "resident: Android CLI UI server with no matching host client; wedged: logged a stuck connection; leaked: any other non-live holder",
+  ],
   summary:
     "Find on-device UiAutomation holders and classify them as live, resident, leaked or wedged",
   flags: [

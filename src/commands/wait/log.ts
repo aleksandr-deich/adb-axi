@@ -18,6 +18,7 @@ import {
 
 export const waitLog = defineCommand({
   path: ["wait", "log"],
+  help: ["adbd service-request echoes of shell commands do not count as log matches"],
   summary: "Wait until a log line after the window start matches a regex",
   positionals: [
     { name: "regex", description: "Regex matched against log messages", required: true },
