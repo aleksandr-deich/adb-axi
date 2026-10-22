@@ -1,6 +1,8 @@
 # Opens and updates the release PR from the conventional-commit titles on main, and
-# tags the release and creates its GitHub release when that PR merges. It never
-# publishes to npm: the maintainer runs `npm publish` by hand with 2FA.
+# tags the release and creates its GitHub release when that PR merges. The publish job
+# then publishes that tag to npm through trusted publishing (OIDC): no npm token is
+# stored, and npm adds provenance itself. npm's trusted publisher is bound to this
+# repository and this workflow filename, so renaming the file breaks publishing.
 name: release-please
 
 on:
@@ -18,9 +20,34 @@ concurrency:
 jobs:
   release-please:
     runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
     steps:
       - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5
+        id: release
         with:
           token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+
+  publish:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.release-please.outputs.tag_name }}
+      # Trusted publishing needs npm 11.5.1 or later, which Node 24.5 and later ship.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+      - run: npm ci
+      - run: npm run check
+      - run: npm publish --access public
