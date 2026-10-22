@@ -304,26 +304,23 @@ describe("app kill", () => {
     expectClean(fake);
   });
 
-  it.each([""])(
-    "rejects the missing target-UID process name %s without killing",
-    async (name) => {
-      const { toon, data, fake } = await both(["app", "kill", "dev.probe"], () =>
-        probeDevice({
-          phase: "previous",
-          rules: [
-            {
-              match: shell(KERNEL_UIDS),
-              respond: { stdout: `PID UID NAME\n8235 10213 ${name}\n` },
-            },
-          ],
-        }),
-      );
-      expect(toon.exitCode).toBe(1);
-      expect(data).toMatchObject({ code: "INVALID_OUTPUT" });
-      expect(shellCommands(fake).some((command) => /\bkill\b/.test(command))).toBe(false);
-      expectClean(fake);
-    },
-  );
+  it.each([""])("rejects the missing target-UID process name %s without killing", async (name) => {
+    const { toon, data, fake } = await both(["app", "kill", "dev.probe"], () =>
+      probeDevice({
+        phase: "previous",
+        rules: [
+          {
+            match: shell(KERNEL_UIDS),
+            respond: { stdout: `PID UID NAME\n8235 10213 ${name}\n` },
+          },
+        ],
+      }),
+    );
+    expect(toon.exitCode).toBe(1);
+    expect(data).toMatchObject({ code: "INVALID_OUTPUT" });
+    expect(shellCommands(fake).some((command) => /\bkill\b/.test(command))).toBe(false);
+    expectClean(fake);
+  });
 
   it("rejects a malformed target-UID PID without attempting a kill", async () => {
     const { toon, data, fake } = await both(["app", "kill", "dev.probe"], () =>
