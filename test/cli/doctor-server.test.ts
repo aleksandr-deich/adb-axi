@@ -93,8 +93,10 @@ test("doctor-reports-socket-not-ignored-port", async () => {
     expect(server?.detail).toBe(
       `tcp:localhost:${a} (ADB_SERVER_SOCKET overrides ignored ANDROID_ADB_SERVER_PORT=${b})`,
     );
-    expect(server?.detail).not.toContain(`tcp:${b}`);
-    expect(server?.detail).not.toContain("5037");
+    const selectedPort = Number(server?.detail.split(" ", 1)[0]?.split(":").at(-1));
+    expect(selectedPort).toBe(a);
+    expect(selectedPort).not.toBe(b);
+    expect(selectedPort).not.toBe(5037);
     const baseline = await run(adb, ["-L", `tcp:${b}`, "server-status"], { env, timeout: 5_000 });
     expect(baseline.stdout).toContain('trace_level: "jdwp"');
   } finally {
