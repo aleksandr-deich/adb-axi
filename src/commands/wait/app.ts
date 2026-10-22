@@ -1,7 +1,6 @@
 import { identityOf } from "../../android/app-processes.js";
 import { assertPackageName } from "../../android/component.js";
 import { readPackageSnapshot } from "../../android/packages.js";
-import { readCurrentUser } from "../../android/users.js";
 import { Deadline } from "../../core/deadline.js";
 import { AdbAxiError } from "../../core/errors.js";
 import { okLine, runHint } from "../../core/output.js";
@@ -37,7 +36,7 @@ export const waitApp = defineCommand({
     const serial = context.device.serial;
     const options = context.device.reads;
     const adb = context.device.adb;
-    const userId = await readCurrentUser(adb, serial, options);
+    const userId = await context.device.user();
     const { info, dump } = await readPackageSnapshot(adb, serial, pkg, options, userId);
     // Read once: a package installed during the wait is not waited for.
     if (info === null || !info.installed) {

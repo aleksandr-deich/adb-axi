@@ -1,7 +1,6 @@
 import type { AdbClient } from "../../adb/run.js";
 import { identityOf, runningProcesses, type AppIdentity } from "../../android/app-processes.js";
 import { readPackageSnapshot, type PackageInfo } from "../../android/packages.js";
-import { readCurrentUser } from "../../android/users.js";
 import { readShell, type ReadOptions } from "../../android/read.js";
 import { AdbAxiError } from "../../core/errors.js";
 import { commandLine, runHint } from "../../core/output.js";
@@ -32,11 +31,7 @@ export async function requireInstalled(
   context: DeviceContext,
   pkg: string,
 ): Promise<InstalledPackage> {
-  const userId = await readCurrentUser(
-    context.device.adb,
-    context.device.serial,
-    context.device.reads,
-  );
+  const userId = await context.device.user();
   const { info, dump } = await readPackageSnapshot(
     context.device.adb,
     context.device.serial,

@@ -76,7 +76,6 @@ export const logsDump = defineCommand({
     const serial = context.device.serial;
     const options = context.device.reads;
     const adb = context.device.adb;
-    const device = context.device.target.device;
 
     const now = await readDeviceClock(adb, serial, options);
     const facts = await refreshMarks(context);
@@ -90,7 +89,7 @@ export const logsDump = defineCommand({
     const scope =
       pkg === undefined
         ? undefined
-        : await resolveScope(adb, device, pkg, window, { ...options, env: context.env }, facts);
+        : await resolveScope(context.device, pkg, window, { ...options, env: context.env }, facts);
     const scanned = await readWindowLines(
       adb,
       serial,

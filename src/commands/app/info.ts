@@ -2,7 +2,6 @@ import { identityOf, mainProcess, runningProcesses } from "../../android/app-pro
 import { readForeground } from "../../android/foreground.js";
 import { assertPackageName } from "../../android/component.js";
 import { readPackageSnapshot } from "../../android/packages.js";
-import { readCurrentUser } from "../../android/users.js";
 import { readShell } from "../../android/read.js";
 import { AdbAxiError } from "../../core/errors.js";
 import { defineCommand } from "../define.js";
@@ -32,7 +31,7 @@ export const appInfo = defineCommand({
     const serial = context.device.serial;
     const options = context.device.reads;
     const adb = context.device.adb;
-    const userId = await readCurrentUser(adb, serial, options);
+    const userId = await context.device.user();
 
     const { info: record, dump } = await readPackageSnapshot(adb, serial, pkg, options, userId);
     if (record === null || !record.installed) {

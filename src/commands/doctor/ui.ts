@@ -6,7 +6,6 @@ import {
   type Forward,
 } from "../../android/holders.js";
 import { runShell } from "../../adb/shell.js";
-import { readCurrentUser } from "../../android/users.js";
 import { AdbAxiError } from "../../core/errors.js";
 import { listDevices } from "../../device/list.js";
 import { avdName } from "../../device/facts.js";
@@ -193,7 +192,7 @@ async function fix(context: DeviceContext): Promise<Output> {
     return { ok: okLine("doctor ui", serial, noop("uiautomation free")) };
   }
 
-  const userId = await readCurrentUser(context.device.adb, serial, context.device.reads);
+  const userId = await context.device.user();
   const livePackages = new Set(before.filter(isLive).flatMap(holderPackages));
   const blocked = before.filter(
     (holder) => !isLive(holder) && holderPackages(holder).some((pkg) => livePackages.has(pkg)),

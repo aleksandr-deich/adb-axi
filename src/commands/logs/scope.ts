@@ -1,13 +1,11 @@
-import type { AdbClient } from "../../adb/run.js";
+import type { DeviceSession } from "../../device/session.js";
 import { identityOf, runningProcesses } from "../../android/app-processes.js";
 import type { LogLine } from "../../android/logcat.js";
 import { readPackageSnapshot } from "../../android/packages.js";
 import { invalidOutput, type ReadOptions } from "../../android/read.js";
-import { readCurrentUser } from "../../android/users.js";
 import { AdbAxiError } from "../../core/errors.js";
 import { runHint } from "../../core/output.js";
 import { readShellFacts, type DeviceFacts } from "../../device/facts.js";
-import type { AttachedDevice } from "../../device/list.js";
 import type { LogWindow } from "./window.js";
 
 /**
@@ -22,8 +20,7 @@ export type Scope =
   | { kind: "pids"; pkg: string; uid: number; current: number[]; marked: number[] };
 
 export async function resolveScope(
-  adb: AdbClient,
-  device: AttachedDevice,
+  session: DeviceSession,
   pkg: string,
   window: LogWindow,
   options: ReadOptions & { env: NodeJS.ProcessEnv },
@@ -33,8 +30,8 @@ export async function resolveScope(
    */
   known: DeviceFacts | undefined,
 ): Promise<Scope> {
-  const serial = device.serial;
-  const userId = await readCurrentUser(adb, serial, options);
+  const { adb, serial, target } = session;
+  const userId = await session.user();
   const { info: record, dump } = await readPackageSnapshot(adb, serial, pkg, options, userId);
   if (record === null || !record.installed) {
     throw new AdbAxiError("APP_NOT_INSTALLED", `${pkg} is not installed on ${serial}`, {
@@ -42,7 +39,9 @@ export async function resolveScope(
     });
   }
   const facts =
-    known !== undefined && known.api !== null ? known : await readShellFacts(adb, device, options);
+    known !== undefined && known.api !== null
+      ? known
+      : await readShellFacts(adb, target.device, options);
   if (facts.api === null) throw invalidOutput("reading the Android version", "");
   const app = identityOf(record, dump);
   if (facts.api >= PID_LIST_BELOW_API) return { kind: "uid", pkg, uid: app.uid };

@@ -1,7 +1,6 @@
 import { identityOf, mainProcess, runningProcesses } from "../../android/app-processes.js";
 import { readForeground } from "../../android/foreground.js";
 import { readPackageSnapshot } from "../../android/packages.js";
-import { readCurrentUser } from "../../android/users.js";
 import { defineCommand } from "../define.js";
 import { UNKNOWN } from "./shared.js";
 
@@ -14,7 +13,7 @@ export const appCurrent = defineCommand({
     const serial = context.device.serial;
     const options = context.device.reads;
     const adb = context.device.adb;
-    const userId = await readCurrentUser(adb, serial, options);
+    const userId = await context.device.user();
 
     // A launcher in front is an answer like any other app.
     const resumed = await readForeground(adb, serial, { ...options, userId });

@@ -6,7 +6,6 @@ import type { AdbClient } from "../../adb/run.js";
 import { assertPackageName } from "../../android/component.js";
 import { readPackage, type PackageInfo } from "../../android/packages.js";
 import { parsePmFailure } from "../../android/pm-result.js";
-import { readCurrentUser } from "../../android/users.js";
 import { invalidOutput, readShell, type ReadOptions } from "../../android/read.js";
 import { formatDuration } from "../../core/args.js";
 import { Deadline } from "../../core/deadline.js";
@@ -92,7 +91,7 @@ async function runInstall(context: DeviceContext): Promise<Output> {
   }
   // Taken before the install, so the wipe below is tied to the very bytes adb installs.
   const digest = read.ok && clean ? await fileDigest(apkPath) : null;
-  const userId = read.ok ? await readCurrentUser(adb, serial, options) : 0;
+  const userId = read.ok ? await context.device.user() : 0;
   const before = read.ok
     ? await readPackage(adb, serial, read.info.package, options, userId)
     : null;

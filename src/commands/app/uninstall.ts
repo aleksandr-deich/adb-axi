@@ -1,6 +1,5 @@
 import { assertPackageName } from "../../android/component.js";
 import { readPackage } from "../../android/packages.js";
-import { readCurrentUser } from "../../android/users.js";
 import { parsePmFailure } from "../../android/pm-result.js";
 import { runShell } from "../../adb/shell.js";
 import { AdbAxiError } from "../../core/errors.js";
@@ -28,7 +27,7 @@ export const appUninstall = defineCommand({
     const serial = context.device.serial;
     const options = context.device.reads;
     const adb = context.device.adb;
-    const userId = await readCurrentUser(adb, serial, options);
+    const userId = await context.device.user();
 
     const record = await readPackage(adb, serial, pkg, options, userId);
     if (record === null || !record.installed) {

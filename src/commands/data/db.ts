@@ -3,7 +3,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execOut } from "../../adb/execout.js";
 import { assertPackageName } from "../../android/component.js";
-import { readCurrentUser } from "../../android/users.js";
 import { AdbAxiError } from "../../core/errors.js";
 import { onInterrupt } from "../../core/interrupt.js";
 import { render, runHint, shellWords, type Output } from "../../core/output.js";
@@ -82,21 +81,13 @@ export const dataDb = defineCommand({
           },
         );
       }
-      const userId = await readCurrentUser(
-        context.device.adb,
-        context.device.serial,
-        context.device.reads,
-      );
+      const userId = await context.device.user();
       return listing(context, pkg, await listDatabases(context, pkg, userId));
     }
 
     assertReadOnlySql(sql);
     assertQueryRuntime();
-    const userId = await readCurrentUser(
-      context.device.adb,
-      context.device.serial,
-      context.device.reads,
-    );
+    const userId = await context.device.user();
     const databases = await listDatabases(context, pkg, userId);
     const database = pick(context, pkg, databases, requested);
     return query(context, { pkg, database, sql, full, userId });
