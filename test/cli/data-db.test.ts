@@ -407,7 +407,9 @@ describe("data db: host files", () => {
 });
 
 describe("data db: deadlines", () => {
-  const TIMEOUT_MS = 1000;
+  // The command deadline includes device discovery, the current-user read and listing.
+  // Leave room for those Node-based fakes under load so only the copy hangs past it.
+  const TIMEOUT_MS = 10_000;
 
   it.each([["the copy", "copying databases/app.db of dev.probe", catCall("app.db")]])(
     "kills a hung adb call during %s at --timeout and names the step",
@@ -418,11 +420,17 @@ describe("data db: deadlines", () => {
           : { match: ["-s", SERIAL, "shell", "unused"], respond: {} },
         { match: call, respond: { hang: true } satisfies Response },
       ]);
-      const run = await runCli(["data", "db", PKG, "SELECT 1", "--timeout", "1s"], f.env);
+      const run = await runCli(
+        ["data", "db", PKG, "SELECT 1", "--timeout", `${TIMEOUT_MS / 1000}s`],
+        f.env,
+      );
       expect(run.exitCode).toBe(1);
       expect(errorOf(run)).toMatchObject({ code: "TIMEOUT", step });
       expect(run.durationMs).toBeLessThan(TIMEOUT_MS + 5_000 + MARGIN_MS);
-      for (const hung of f.calls().filter((c) => c.end === null)) {
+      const hungCalls = f.calls().filter((c) => c.end === null);
+      expect(hungCalls).toHaveLength(1);
+      expect(hungCalls[0]?.argv).toEqual(call);
+      for (const hung of hungCalls) {
         expect(isProcessAlive(hung.pid)).toBe(false);
       }
     },
