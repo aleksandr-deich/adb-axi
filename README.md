@@ -52,6 +52,8 @@ help[1]: Run `adb-axi logs --pkg dev.probe --since 1m` for recent app logs
 
 `adb-axi --help` lists every command; `adb-axi <command> --help` gives its arguments, flags, defaults and examples. Flags go after the command: `adb-axi app start com.example.notes --device emulator-5554`. adb-axi picks a device on its own only when exactly one emulator is online; otherwise pass `--device <serial|avd>` or set `ANDROID_SERIAL`.
 
+adb-axi inherits adb's server selection: `ADB_SERVER_SOCKET` takes priority over `ANDROID_ADB_SERVER_ADDRESS` and `ANDROID_ADB_SERVER_PORT`; without a socket setting, the default is the local server on port 5037. `doctor` reports the selected endpoint and notes contradictory address or port settings ignored because of `ADB_SERVER_SOCKET`. Server recovery hints use the selected endpoint too. These settings select the server, independently of `--device` or `ANDROID_SERIAL`.
+
 ## Output and exit codes
 
 - **Output:** TOON on stdout, or the same data as JSON with `--json`. A mutation leads with `ok: <verb> <target> -> <resulting state>` and says `(no-op)` when the state was already true. Next steps come as `help` lines that name real commands. `--debug` prints every adb call on stderr.
@@ -169,7 +171,7 @@ npm run check   # build, typecheck, lint, format check, tests; no device needed
 npm pack && npm install --global ./adb-axi-*.tgz   # install a local build
 ```
 
-`npm run check` drives the built CLI against a scripted fake adb; the real-emulator suite runs in CI (see [real-device checks](test/device/README.md)), and [`test/fixtures/EVIDENCE.md`](test/fixtures/EVIDENCE.md) maps recorded Android evidence to tests. Read [docs/testing.md](docs/testing.md) before changing code or tests.
+`npm run check` includes scripted fake-adb CLI checks and a real-adb server-selection regression, so it requires the supported platform-tools version even without a device. The regression starts and stops its own isolated servers with device discovery disabled. The real-emulator suite runs in CI (see [real-device checks](test/device/README.md)), and [`test/fixtures/EVIDENCE.md`](test/fixtures/EVIDENCE.md) maps recorded Android evidence to tests. Read [docs/testing.md](docs/testing.md) before changing code or tests.
 
 ## License
 
