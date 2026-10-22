@@ -46,7 +46,7 @@ export const appStart = defineCommand({
   path: ["app", "start"],
   help: [
     "Starts the app for the current Android user",
-    "Post-launch observation is bounded to 2s or the remaining deadline, whichever is shorter; a live app may be reported with another app in front",
+    "Post-launch re-observation stops after 2s or the remaining deadline, whichever is shorter; the first observation may use the remaining --timeout on a slow device; a live app may be reported with another app in front",
   ],
   summary: "Start an app, then report what is in the foreground and how it launched",
   positionals: [
