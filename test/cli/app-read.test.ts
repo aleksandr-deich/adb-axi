@@ -17,6 +17,8 @@ const FOREGROUND = "dumpsys activity activities";
 const PIDOF = "pidof dev.probe";
 const PROCESS_TABLE = "ps -A -o PID,UID,NAME";
 const NO_PROCESSES = { stdout: "  PID   UID NAME\n" };
+const PACKAGE = "dumpsys package dev.probe";
+const INSTALLED = { stdoutFile: "captured/35/dumpsys-package-debug.txt" };
 const PACKAGES_ALL = "pm list packages --show-versioncode -U";
 const PACKAGES_USER = "pm list packages --show-versioncode -U -3";
 const PACKAGE_DUMP = "dumpsys package packages";
@@ -168,7 +170,12 @@ describe("app current", () => {
   });
 
   it("prints a dash for the pid when the process is not found by name", async () => {
-    const f = device({ [FOREGROUND]: PROBE_FRONT, [PIDOF]: PROBE_STOPPED });
+    const f = device({
+      [FOREGROUND]: PROBE_FRONT,
+      [PACKAGE]: INSTALLED,
+      [PROCESS_TABLE]: NO_PROCESSES,
+      [PIDOF]: PROBE_STOPPED,
+    });
     const { data } = await both(["app", "current"], f);
     expect(data).toEqual({ app: { package: "dev.probe", activity: ".MainActivity", pid: "-" } });
   });
@@ -189,6 +196,7 @@ describe("a device that goes away mid-command", () => {
           times: 1,
           then: { stdout: after },
         },
+        { match: ["-s", SERIAL, "shell", "am get-current-user"], respond: { stdout: "0\n" } },
         { match: ["-s", SERIAL, "shell", FOREGROUND], respond: command },
       ],
     });

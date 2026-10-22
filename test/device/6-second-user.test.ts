@@ -101,6 +101,16 @@ describe("a second Android user in front, with the probe running only for user 0
     expect(await pidsUnder(current, `${PKG}:ui`)).toEqual([]);
 
     expect((await axi.ok(["app", "info", PKG])).app).toMatchObject({ installed: true, pid: "-" });
+
+    const resumed = await resumedOf(n);
+    expect(resumed).toBeDefined();
+    const front = resumed ?? "";
+    const frontPids = await pidsUnder(uidOf(n, await appIdOf(front)), front);
+    expect(frontPids).toHaveLength(1);
+    expect((await axi.ok(["app", "current"])).app).toMatchObject({
+      package: front,
+      pid: frontPids[0],
+    });
   });
 });
 
