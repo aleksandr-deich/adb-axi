@@ -15,6 +15,7 @@ import { MAX_INTERVAL_MS, poll } from "../../core/poll.js";
 import { isErrno } from "../../core/state.js";
 import { defineCommand } from "../define.js";
 import type { DeviceContext } from "../types.js";
+import type { DeviceSession } from "../../device/session.js";
 import { installFailureError } from "./install-errors.js";
 import { readInstallRecord, writeInstallRecord, type InstallRecord } from "./install-record.js";
 import { formatVersion, UNKNOWN } from "./shared.js";
@@ -103,7 +104,7 @@ async function runInstall(context: DeviceContext): Promise<Output> {
 
   let shortcut: string | undefined;
   if (ifChanged && !clean) {
-    const decision = await decideShortcut(read, previous, adb, serial, api, options);
+    const decision = await decideShortcut(read, previous, context.device, api);
     if (decision.kind === "unchanged" && read.ok) {
       return {
         ok: okLine(
@@ -215,11 +216,10 @@ type Shortcut =
 async function decideShortcut(
   read: ApkRead,
   previous: PackageInfo | null,
-  adb: AdbClient,
-  serial: string,
+  device: DeviceSession,
   api: number | null,
-  options: ReadOptions,
 ): Promise<Shortcut> {
+  const { adb, serial, reads: options } = device;
   if (!read.ok)
     return { kind: "skipped", reason: `the APK metadata cannot be read (${read.reason})` };
   const info = read.info;
@@ -237,7 +237,13 @@ async function decideShortcut(
     capMs: Math.min(30_000, options.deadline.remainingMs() / 2, options.capMs ?? Infinity),
   };
   try {
-    const path = await installedApkPath(adb, serial, `pm path ${info.package}`, evidenceOptions);
+    const userId = await device.user();
+    const path = await installedApkPath(
+      adb,
+      serial,
+      `pm path --user ${userId} ${info.package}`,
+      evidenceOptions,
+    );
     if (path === undefined) {
       return { kind: "skipped", reason: "the installed APK path cannot be established" };
     }

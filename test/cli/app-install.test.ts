@@ -31,7 +31,7 @@ const PKG = "com.example.notes";
 const ONE_ONLINE = `List of devices attached\n${SERIAL}          device product:sdk_gphone64_arm64 model:sdk_gphone64_arm64 device:emu64a transport_id:1\n\n`;
 const DUMPSYS = `dumpsys package ${PKG}`;
 const FACTS = { re: "^echo @sdk; .*" };
-const APK_PATH = `pm path ${PKG}`;
+const APK_PATH = `pm path --user 0 ${PKG}`;
 const CAT_APK = "cat /data/app/notes/base.apk";
 const SHA_APK = "sha256sum /data/app/notes/base.apk";
 const INSTALL_OK = { stdout: "Performing Streamed Install\nSuccess\n" };
@@ -165,7 +165,6 @@ function world(options: World): FakeAdb {
         match: shell(FACTS),
         respond: { ...options.api, stdout: `@sdk\n${options.api?.stdout ?? "35\n"}` },
       },
-      { match: shell(APK_PATH), respond: { stdout: "package:/data/app/notes/base.apk\n" } },
       {
         match: shell(`pm path --user ${options.userId ?? 0} ${PKG}`),
         respond: { stdout: "package:/data/app/notes/base.apk\n" },
@@ -384,7 +383,15 @@ describe("app install", () => {
             start: "current",
             dumps: { current: V57, new: V57 },
             installedApk: APK,
-            rules: [{ match: shell(APK_PATH), respond: response }, installs(APK)],
+            rules: [
+              {
+                match: shell(APK_PATH),
+                respond: { stdout: "package:/data/app/notes/base.apk\n" },
+                times: 1,
+              },
+              { match: shell(APK_PATH), respond: response, times: 1 },
+              installs(APK),
+            ],
           }),
         ["app", "install", APK, "--if-changed"],
       );
