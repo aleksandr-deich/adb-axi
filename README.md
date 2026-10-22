@@ -76,7 +76,7 @@ adb-axi keeps log marks, install records and cached AVD names under `~/.adb-axi/
 | `wait app <pkg> --state <foreground\|running\|stopped>`   | Waits until an app reaches a state                                             |
 | `wait log <regex> [--since <mark\|dur>]`                  | Waits until a log line matches                                                 |
 | `app current`                                             | The foreground app: package, activity and pid                                  |
-| `app list [--all] [--grep <re>]`                          | Installed packages with a count                                                |
+| `app list [--all] [--grep <re>]`                          | Packages installed for the current Android user, with a count                  |
 | `app info <pkg>`                                          | One package: installed, version, debuggable, pid, foreground, data size        |
 | `app install <apk> [--clean-data] [--if-changed]`         | Installs and waits until the new version is live, keeping app data by default  |
 | `app uninstall <pkg> [--keep-data]`                       | Uninstalls a package for the current Android user                              |
@@ -92,6 +92,8 @@ adb-axi keeps log marks, install records and cached AVD names under `~/.adb-axi/
 | `data db <pkg> [<sql>] [--db <name>] [--full]`            | An app's databases, or one read-only query on a copy that includes the WAL     |
 | `shell -- <cmd>`                                          | One device shell command with its real exit code                               |
 | `update [--check]`                                        | Upgrades adb-axi from npm, or compares against the latest version with --check |
+
+`app install --if-changed` checks the current Android user's installed APK and skips installation when its versionCode and signing certificates match the host APK. If that evidence cannot be read, it explains why and installs normally. `--clean-data` disables this shortcut.
 
 Device settings such as dark mode and display density have no command of their own; change them with `shell`.
 

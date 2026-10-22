@@ -11,7 +11,7 @@ export interface DeviceSession {
   readonly serial: string;
   readonly adb: AdbClient;
   readonly reads: ReadOptions;
-  // A command keeps the user it started with even if the device switches users.
+  // Keep the first successfully resolved user even if the device later switches users.
   user(): Promise<number>;
   facts(): Promise<DeviceFacts>;
   // Mutations can change the package record within one command.

@@ -68,8 +68,7 @@ export function marksPath(serial: string, env: NodeJS.ProcessEnv): string {
 
 /**
  * Refresh the boot identity before any mark is stored or used, after validating input.
- * Returns the facts it read, or `undefined` when the device did not answer, so the command
- * never reads them twice.
+ * Uses the device session's facts, returning `undefined` when the device did not answer.
  */
 export async function refreshMarks(context: DeviceContext): Promise<DeviceFacts | undefined> {
   let facts: DeviceFacts | undefined;
