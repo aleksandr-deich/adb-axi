@@ -272,10 +272,11 @@ export async function launchActivity(
 }
 
 /**
- * Observe for at most `SETTLE_MS` of the remaining deadline. Check crash evidence
- * before liveness or foreground: a crash dialog can keep a crashed process alive.
- * The first observation usually settles it, so it takes the command's own deadline: a slow
- * device then fails against `--timeout`, not against the settle window.
+ * The first observation uses the command's deadline so a slow device fails against
+ * `--timeout`, not the settle window. Further observations stop at `SETTLE_MS` from
+ * settle entry or the command deadline, whichever comes first, returning the last result.
+ * Check crash evidence before liveness or foreground: a crash dialog can keep a
+ * crashed process alive.
  */
 export async function settle(
   context: CommandContext,
