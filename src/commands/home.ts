@@ -1,12 +1,11 @@
-import type { AdbClient } from "../adb/run.js";
 import { formatSpan, readDeviceClock } from "../android/clock.js";
 import { parseCrashes } from "../android/crash.js";
 import { readForeground } from "../android/foreground.js";
-import type { ReadOptions } from "../android/read.js";
 import { AdbAxiError } from "../core/errors.js";
 import { runHint, type Output } from "../core/output.js";
 import { listDevices, ONLINE } from "../device/list.js";
 import { resolveTarget } from "../device/resolve.js";
+import { openSession, type DeviceSession } from "../device/session.js";
 import { UNKNOWN } from "./app/shared.js";
 import { defineCommand } from "./define.js";
 import { deviceRow, readRow, type Row } from "./devices.js";
@@ -63,7 +62,8 @@ async function runHome(context: CommandContext): Promise<Output> {
       const bootId = row?.facts.bootId ?? null;
       context.marksVerified = bootId !== null;
       const marksNote = bindMarks(target.serial, context.env, bootId);
-      return { target, state: await readTargetState(adb, target.serial, context), marksNote };
+      const device = openSession(target, adb, context.deadline, context.env, row?.facts);
+      return { target, state: await readTargetState(device, context), marksNote };
     },
     (error: unknown) => {
       if (!(error instanceof AdbAxiError) || !SELECTION_CODES.has(error.code)) throw error;
@@ -141,11 +141,10 @@ interface TargetState {
  * 15 minutes (OQ-10). Reads that fail are left unknown, never an error.
  */
 async function readTargetState(
-  adb: AdbClient,
-  serial: string,
+  device: DeviceSession,
   context: CommandContext,
 ): Promise<TargetState> {
-  const options: ReadOptions = { deadline: context.deadline };
+  const { adb, serial, reads: options } = device;
   let degraded = false;
   const settle = async <T>(read: () => Promise<T>): Promise<T | undefined> => {
     try {

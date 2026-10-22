@@ -65,7 +65,14 @@ async function runInstall(context: DeviceContext): Promise<Output> {
   const adb = context.device.adb;
 
   let read = readApk(apkPath);
-  const api = read.ok ? await readApi(adb, serial, options) : null;
+  let api: number | null = null;
+  if (read.ok) {
+    try {
+      api = (await context.device.facts()).api;
+    } catch (error) {
+      if (!(error instanceof AdbAxiError && error.code === "REMOTE_EXIT")) throw error;
+    }
+  }
   if (read.ok) {
     read =
       api === null
@@ -337,27 +344,6 @@ async function confirmInstalledFile(
   const installed = /^([0-9a-f]{64})\s/.exec(result.stdout)?.[1];
   if (installed === undefined) throw invalidOutput(step, result.stdout);
   if (installed !== digest) throw refuse(`the APK it runs is not ${apkName}`);
-}
-
-async function readApi(
-  adb: AdbClient,
-  serial: string,
-  options: ReadOptions,
-): Promise<number | null> {
-  try {
-    const result = await readShell(
-      adb,
-      serial,
-      "getprop ro.build.version.sdk",
-      "reading the device API level",
-      options,
-    );
-    const value = result.stdout.trim();
-    return /^[1-9]\d*$/.test(value) && Number.isSafeInteger(Number(value)) ? Number(value) : null;
-  } catch (error) {
-    if (error instanceof AdbAxiError && error.code === "REMOTE_EXIT") return null;
-    throw error;
-  }
 }
 
 async function runAdbInstall(

@@ -2,7 +2,6 @@ import { processTable } from "../../android/app-processes.js";
 import { formatDeviceTime, readDeviceClock } from "../../android/clock.js";
 import { invalidOutput } from "../../android/read.js";
 import { okLine } from "../../core/output.js";
-import { readShellFacts } from "../../device/facts.js";
 import { defineCommand } from "../define.js";
 import { assertMarkName, assertMarkVerified, bindTargetMarks, writeMark } from "./marks.js";
 import { PID_LIST_BELOW_API } from "./scope.js";
@@ -29,15 +28,11 @@ export const logsMark = defineCommand({
     const serial = context.device.serial;
     const options = context.device.reads;
     const adb = context.device.adb;
-    const device = context.device.target.device;
 
     // On API 29 and 30 `logs --pkg` is a pid list, so the mark keeps the app processes
     // that are running now. They are read before the clock, so the window starts after them.
     // The same facts carry the boot ID the marks are bound to.
-    const facts = await readShellFacts(adb, device, {
-      deadline: context.deadline,
-      env: context.env,
-    });
+    const facts = await context.device.facts();
     if (facts.api === null) throw invalidOutput("reading the Android version", "");
     const processes =
       facts.api < PID_LIST_BELOW_API ? await processTable(adb, serial, options) : [];

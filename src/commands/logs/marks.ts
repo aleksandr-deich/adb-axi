@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { readShellFacts, type DeviceFacts } from "../../device/facts.js";
+import type { DeviceFacts } from "../../device/facts.js";
 import type { DeviceContext } from "../types.js";
 import { parseDuration } from "../../core/args.js";
 import { AdbAxiError } from "../../core/errors.js";
@@ -72,13 +72,9 @@ export function marksPath(serial: string, env: NodeJS.ProcessEnv): string {
  * never reads them twice.
  */
 export async function refreshMarks(context: DeviceContext): Promise<DeviceFacts | undefined> {
-  const target = context.device.target;
   let facts: DeviceFacts | undefined;
   try {
-    facts = await readShellFacts(context.device.adb, target.device, {
-      deadline: context.deadline,
-      env: context.env,
-    });
+    facts = await context.device.facts();
   } catch (error) {
     if (!(error instanceof AdbAxiError)) throw error;
   }

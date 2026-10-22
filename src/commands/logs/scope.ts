@@ -2,10 +2,9 @@ import type { DeviceSession } from "../../device/session.js";
 import { identityOf, runningProcesses } from "../../android/app-processes.js";
 import type { LogLine } from "../../android/logcat.js";
 import { readPackageSnapshot } from "../../android/packages.js";
-import { invalidOutput, type ReadOptions } from "../../android/read.js";
+import { invalidOutput } from "../../android/read.js";
 import { AdbAxiError } from "../../core/errors.js";
 import { runHint } from "../../core/output.js";
-import { readShellFacts, type DeviceFacts } from "../../device/facts.js";
 import type { LogWindow } from "./window.js";
 
 /**
@@ -23,14 +22,8 @@ export async function resolveScope(
   session: DeviceSession,
   pkg: string,
   window: LogWindow,
-  options: ReadOptions & { env: NodeJS.ProcessEnv },
-  /**
-   * The device's facts when the command already read them; read here otherwise, and
-   * read again when the earlier read had no Android version.
-   */
-  known: DeviceFacts | undefined,
 ): Promise<Scope> {
-  const { adb, serial, target } = session;
+  const { adb, serial, reads: options } = session;
   const userId = await session.user();
   const { info: record, dump } = await readPackageSnapshot(adb, serial, pkg, options, userId);
   if (record === null || !record.installed) {
@@ -38,10 +31,7 @@ export async function resolveScope(
       help: [runHint(["app", "list"], "to see the installed packages")],
     });
   }
-  const facts =
-    known !== undefined && known.api !== null
-      ? known
-      : await readShellFacts(adb, target.device, options);
+  const facts = await session.facts();
   if (facts.api === null) throw invalidOutput("reading the Android version", "");
   const app = identityOf(record, dump);
   if (facts.api >= PID_LIST_BELOW_API) return { kind: "uid", pkg, uid: app.uid };
