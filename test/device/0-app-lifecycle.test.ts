@@ -240,6 +240,26 @@ describe("ordinary installed probe lifecycle", () => {
       expect(await axi.pidsOf(missing)).toEqual([]);
       expect((await axi.ok(["shell", `pm path ${missing} || true`])).stdout).toBe("");
     }
+
+    // No install happens during a wait, so waiting for a missing package to run fails at once.
+    const running = await axi.run([
+      "wait",
+      "app",
+      missing,
+      "--state",
+      "running",
+      "--timeout",
+      "60s",
+    ]);
+    expect(running.exitCode).toBe(1);
+    expect(running.json).toMatchObject({
+      code: "APP_NOT_INSTALLED",
+      error: `${missing} is not installed on this device`,
+    });
+    const stopped = await axi.ok(["wait", "app", missing, "--state", "stopped"]);
+    expect(stopped.ok).toBe(`wait app ${missing} -> stopped after 0 ms`);
+    expect(stopped.note).toBe(`${missing} is not installed for Android user 0`);
+    expect(await axi.pidsOf(missing)).toEqual([]);
   });
 
   test("clear release data is confirmed by package manager without claiming run-as evidence", async () => {

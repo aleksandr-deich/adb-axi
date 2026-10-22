@@ -25,7 +25,6 @@ const PACKAGE_DUMP = "dumpsys package packages";
 
 const PROBE_FRONT = { stdoutFile: "captured/35/dumpsys-activity-activities-probe-front.txt" };
 const LAUNCHER_FRONT = { stdoutFile: "captured/35/dumpsys-activity-activities-launcher-front.txt" };
-const PROBE_RUNNING = { stdoutFile: "captured/35/pidof-running.txt" };
 const PROBE_STOPPED = { stdoutFile: "captured/35/pidof-not-running.txt", exit: 1 };
 
 let fake: FakeAdb | undefined;
@@ -318,7 +317,10 @@ describe("app info", () => {
 
 describe("wait app", () => {
   it("reports an unknown last observation when the first read hangs past the deadline", async () => {
-    const f = device({ [PIDOF]: { ...PROBE_RUNNING, delayMs: 5000 } });
+    const f = device({
+      [PACKAGE]: INSTALLED,
+      [PROCESS_TABLE]: { ...NO_PROCESSES, delayMs: 5000 },
+    });
     const { toon, data } = await both(
       ["wait", "app", "dev.probe", "--state", "running", "--timeout", "1s"],
       f,

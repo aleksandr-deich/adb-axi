@@ -196,6 +196,14 @@ describe("real observation windows and package state", () => {
       `${PKG}/.MainActivity`,
     );
     expect(await axi.pidsOf(PKG)).toHaveLength(1);
+
+    // With only the :ui process alive the app is running, but its main process has no pid.
+    await axi.ok(["app", "stop", PKG]);
+    await axi.sh(`am start -W -n ${PKG}/.UiActivity`);
+    expect((await axi.sh(`pidof ${PKG} || true`)).trim()).toBe("");
+    expect((await axi.sh(`pidof ${PKG}:ui || true`)).trim()).not.toBe("");
+    waited(await parity(["wait", "app", PKG, "--state", "running"]), "running");
+    expect((await axi.ok(["app", "info", PKG])).app).toMatchObject({ pid: "-" });
   });
 
   test("app list and info reflect independent installation, window, kernel and private-size facts", async () => {

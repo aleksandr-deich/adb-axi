@@ -102,6 +102,16 @@ describe("a second Android user in front, with the probe running only for user 0
 
     expect((await axi.ok(["app", "info", PKG])).app).toMatchObject({ installed: true, pid: "-" });
 
+    const running = await axi.run(["wait", "app", PKG, "--state", "running", "--timeout", "3s"]);
+    expect(running.exitCode).toBe(1);
+    expect(running.json).toMatchObject({
+      code: "WAIT_TIMEOUT",
+      last: { state: "stopped", pid: "-" },
+    });
+    expect((await axi.ok(["wait", "app", PKG, "--state", "stopped"])).ok).toMatch(
+      new RegExp(`^wait app ${PKG} -> stopped after \\d+ ms$`),
+    );
+
     const resumed = await resumedOf(n);
     expect(resumed).toBeDefined();
     const front = resumed ?? "";

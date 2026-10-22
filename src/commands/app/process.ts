@@ -40,20 +40,23 @@ export async function requireInstalled(
     readOptions(context),
     userId,
   );
-  if (info === null || !info.installed) {
-    throw new AdbAxiError("APP_NOT_INSTALLED", `${pkg} is not installed on this device`, {
-      help: [
-        runHint(
-          lifecycleCommand(context, ["app", "list", "--grep", pkg.split(".").at(-1) ?? pkg]),
-          "to find the package",
-        ),
-        ...(appInstall.shipped
-          ? [runHint(lifecycleCommand(context, ["app", "install", "<apk>"]), "to install it")]
-          : []),
-      ],
-    });
-  }
+  if (info === null || !info.installed) throw notInstalled(context, pkg);
   return { info, dump, userId, app: identityOf(info, dump) };
+}
+
+/** `APP_NOT_INSTALLED`, with hints to find the package or install it. */
+export function notInstalled(context: CommandContext, pkg: string): AdbAxiError {
+  return new AdbAxiError("APP_NOT_INSTALLED", `${pkg} is not installed on this device`, {
+    help: [
+      runHint(
+        lifecycleCommand(context, ["app", "list", "--grep", pkg.split(".").at(-1) ?? pkg]),
+        "to find the package",
+      ),
+      ...(appInstall.shipped
+        ? [runHint(lifecycleCommand(context, ["app", "install", "<apk>"]), "to install it")]
+        : []),
+    ],
+  });
 }
 
 /** `am force-stop` prints nothing and exits 0 whether or not anything was running. */

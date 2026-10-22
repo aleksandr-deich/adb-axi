@@ -1,6 +1,6 @@
 import type { AdbClient } from "../../adb/run.js";
+import { mainProcess, runningProcesses, type AppIdentity } from "../../android/app-processes.js";
 import { readForeground } from "../../android/foreground.js";
-import { pidof } from "../../android/pidof.js";
 import type { ReadOptions } from "../../android/read.js";
 import { UNKNOWN } from "./shared.js";
 
@@ -16,23 +16,26 @@ export interface AppObservation {
 }
 
 /**
- * Observe one app. The pid comes from `pidof` on its main process; the foreground package
- * from the resumed activity, read only when `withForeground` is set (it is the costlier read).
- * Without it a running app is reported as `running`, never as `foreground`.
+ * Observe one app for one Android user. It is running while any of its processes runs;
+ * the pid is its main process's, `-` when only another process runs. The foreground package
+ * comes from the resumed activity, read only when `withForeground` is set (it is the costlier
+ * read). Without it a running app is reported as `running`, never as `foreground`.
  */
 export async function observeApp(
   adb: AdbClient,
   serial: string,
-  pkg: string,
+  app: AppIdentity,
+  userId: number,
   withForeground: boolean,
   options: ReadOptions,
 ): Promise<AppObservation> {
-  const pids = await pidof(adb, serial, pkg, options);
-  const pid = pids[0] ?? UNKNOWN;
+  const processes = await runningProcesses(adb, serial, app, options);
+  const pid = mainProcess(app, processes)?.pid ?? UNKNOWN;
+  const running = processes.length > 0;
   if (!withForeground) {
-    return { state: pids.length > 0 ? "running" : "stopped", pid };
+    return { state: running ? "running" : "stopped", pid };
   }
-  const resumed = (await readForeground(adb, serial, options))?.package ?? UNKNOWN;
-  const state = resumed === pkg ? "foreground" : pids.length > 0 ? "running" : "stopped";
+  const resumed = (await readForeground(adb, serial, { ...options, userId }))?.package ?? UNKNOWN;
+  const state = resumed === app.pkg ? "foreground" : running ? "running" : "stopped";
   return { state, pid, foreground: resumed };
 }
