@@ -47,33 +47,63 @@ export function parsePidof(stdout: string): number[] | null {
   return pids.every((pid) => Number.isInteger(pid) && pid > 0) ? pids : null;
 }
 
+interface PsRow {
+  line: string;
+  pid: string;
+  uid: string;
+  name: string | undefined;
+}
+
+function psRows(stdout: string): PsRow[] {
+  const lines = stdout.trim().split(/\r?\n/);
+  if (lines.shift()?.trim().replace(/\s+/g, " ") !== "PID UID NAME") {
+    throw invalidOutput(PS_STEP, stdout);
+  }
+  return lines.flatMap((line) => {
+    // NAME is the rest of the row: kernel threads can carry spaces.
+    const row = /^\s*(\S+)\s+(\S+)(?:\s+(.+?))?\s*$/.exec(line);
+    if (row?.[1] === undefined || row[2] === undefined) return [];
+    return [
+      {
+        line,
+        pid: row[1],
+        uid: row[2],
+        name: row[3] === undefined ? undefined : unbracket(row[3]),
+      },
+    ];
+  });
+}
+
 /**
  * The app's rows of `ps -A -o PID,UID,NAME`, pids by process name in row order. The main
  * name is always there, even without a row, so `pidof` still checks it. Rows of other uids,
  * including unreadable ones, cannot name this app and are skipped.
  */
 export function psCandidates(stdout: string, app: AppIdentity): Map<string, Set<number>> {
-  const lines = stdout.trim().split(/\r?\n/);
-  if (lines.shift()?.trim().replace(/\s+/g, " ") !== "PID UID NAME") {
-    throw invalidOutput(PS_STEP, stdout);
-  }
   const names = new Map<string, Set<number>>();
-  for (const line of lines) {
-    // NAME is the rest of the row: kernel threads can carry spaces.
-    const row = /^\s*(\S+)\s+(\S+)(?:\s+(.+?))?\s*$/.exec(line);
-    const rowUid = row?.[2];
-    if (rowUid === undefined || !/^\d+$/.test(rowUid) || Number(rowUid) !== app.uid) continue;
-    const pid = Number(row?.[1]);
-    const name = row?.[3] === undefined ? undefined : unbracket(row[3]);
-    if (!Number.isSafeInteger(pid) || pid <= 0 || !name || !PROCESS_NAME.test(name)) {
-      throw invalidOutput(PS_STEP, line);
+  for (const row of psRows(stdout)) {
+    if (!/^\d+$/.test(row.uid) || Number(row.uid) !== app.uid) continue;
+    const pid = Number(row.pid);
+    if (!Number.isSafeInteger(pid) || pid <= 0 || !row.name || !PROCESS_NAME.test(row.name)) {
+      throw invalidOutput(PS_STEP, row.line);
     }
-    const known = names.get(name) ?? new Set<number>();
+    const known = names.get(row.name) ?? new Set<number>();
     known.add(pid);
-    names.set(name, known);
+    names.set(row.name, known);
   }
   if (!names.has(app.pkg)) names.set(app.pkg, new Set());
   return names;
+}
+
+/** Every row of `ps -A -o PID,UID,NAME` with a readable pid, uid and name. */
+export function parseProcessTable(stdout: string): ProcessRow[] {
+  return psRows(stdout).flatMap((row) => {
+    const pid = Number(row.pid);
+    const uid = Number(row.uid);
+    return /^\d+$/.test(row.pid) && /^\d+$/.test(row.uid) && row.name !== undefined && pid > 0
+      ? [{ pid, uid, name: row.name }]
+      : [];
+  });
 }
 
 /** The candidates `pidof` confirmed: a pid counts only when both reads list it. */
@@ -109,6 +139,16 @@ export async function runningProcesses(
     running.set(name, await readPidof(adb, serial, name, options));
   }
   return confirmRunning(candidates, running);
+}
+
+/** Every process on the device, without `pidof`: a mark only records which pids existed. */
+export async function processTable(
+  adb: AdbClient,
+  serial: string,
+  options: ReadOptions,
+): Promise<ProcessRow[]> {
+  const table = await readShell(adb, serial, PS_COMMAND, PS_STEP, options);
+  return parseProcessTable(table.stdout);
 }
 
 async function readPidof(

@@ -1,6 +1,6 @@
+import { processTable } from "../../android/app-processes.js";
 import { formatDeviceTime, readDeviceClock } from "../../android/clock.js";
 import { invalidOutput } from "../../android/read.js";
-import { readProcessNames } from "../../android/ps.js";
 import { okLine } from "../../core/output.js";
 import { readShellFacts } from "../../device/facts.js";
 import { readOptions, targetSerial } from "../app/shared.js";
@@ -48,9 +48,7 @@ export const logsMark = defineCommand({
     });
     if (facts.api === null) throw invalidOutput("reading the Android version", "");
     const processes =
-      facts.api < PID_LIST_BELOW_API
-        ? appProcesses(await readProcessNames(adb, serial, options))
-        : [];
+      facts.api < PID_LIST_BELOW_API ? appProcesses(await processTable(adb, serial, options)) : [];
 
     const now = await readDeviceClock(adb, serial, options);
     bindTargetMarks(context, facts.bootId);

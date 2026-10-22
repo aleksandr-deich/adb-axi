@@ -2,7 +2,6 @@ import { join } from "node:path";
 import { readShellFacts, type DeviceFacts } from "../../device/facts.js";
 import type { CommandContext } from "../types.js";
 import { isPackageName } from "../../android/component.js";
-import type { ProcessName } from "../../android/ps.js";
 import { parseDuration } from "../../core/args.js";
 import { AdbAxiError } from "../../core/errors.js";
 import { runHint } from "../../core/output.js";
@@ -16,14 +15,21 @@ export interface Mark {
   utcOffsetMinutes: number | null;
   /**
    * The app processes running when the mark was taken. Only recorded on API 29 and 30,
-   * where `logs --pkg` falls back to a pid list.
+   * where `logs --pkg` falls back to a pid list. Marks taken before the uid was recorded
+   * have none, so they cannot name an app's processes.
    */
-  processes: ProcessName[];
+  processes: MarkedProcess[];
   /**
    * The host's clock when the mark was taken, so its age can be told even when the device
    * clock is off. Absent for marks taken before it was recorded.
    */
   hostEpochMs?: number;
+}
+
+export interface MarkedProcess {
+  pid: number;
+  name: string;
+  uid?: number;
 }
 
 /** Marks by name, in the on-disk form of `marks.json`. */
@@ -35,7 +41,7 @@ interface MarksFile {
 interface StoredMark {
   epoch_ms: number;
   utc_offset_minutes: number | null;
-  processes?: ProcessName[];
+  processes?: MarkedProcess[];
   host_epoch_ms?: number;
 }
 
@@ -206,22 +212,26 @@ function isStoredMark(value: unknown): value is StoredMark {
     typeof mark.epoch_ms === "number" &&
     (mark.utc_offset_minutes === null || typeof mark.utc_offset_minutes === "number") &&
     (mark.processes === undefined ||
-      (Array.isArray(mark.processes) && mark.processes.every(isProcessName))) &&
+      (Array.isArray(mark.processes) && mark.processes.every(isMarkedProcess))) &&
     (mark.host_epoch_ms === undefined || typeof mark.host_epoch_ms === "number")
   );
 }
 
-function isProcessName(value: unknown): value is ProcessName {
+function isMarkedProcess(value: unknown): value is MarkedProcess {
   if (typeof value !== "object" || value === null) return false;
-  const entry = value as Partial<Record<keyof ProcessName, unknown>>;
-  return typeof entry.pid === "number" && typeof entry.name === "string";
+  const entry = value as Partial<Record<keyof MarkedProcess, unknown>>;
+  return (
+    typeof entry.pid === "number" &&
+    typeof entry.name === "string" &&
+    (entry.uid === undefined || typeof entry.uid === "number")
+  );
 }
 
 /**
  * The processes worth keeping in a mark: apps, which are named after a dotted package
  * name. System processes (`init`, `[kworker/0:1]`, `/system/bin/...`) are never an app's pids.
  */
-export function appProcesses(processes: readonly ProcessName[]): ProcessName[] {
+export function appProcesses<T extends { name: string }>(processes: readonly T[]): T[] {
   return processes.filter((process) => {
     const base = process.name.split(":")[0] ?? "";
     return base.includes(".") && isPackageName(base);

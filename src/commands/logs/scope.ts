@@ -2,7 +2,6 @@ import type { AdbClient } from "../../adb/run.js";
 import { identityOf, runningProcesses } from "../../android/app-processes.js";
 import type { LogLine } from "../../android/logcat.js";
 import { readPackageSnapshot } from "../../android/packages.js";
-import { belongsTo } from "../../android/ps.js";
 import { invalidOutput, type ReadOptions } from "../../android/read.js";
 import { readCurrentUser } from "../../android/users.js";
 import { AdbAxiError } from "../../core/errors.js";
@@ -48,7 +47,7 @@ export async function resolveScope(
   const app = identityOf(record, dump);
   if (facts.api >= PID_LIST_BELOW_API) return { kind: "uid", pkg, uid: app.uid };
   const marked = (window.mark?.processes ?? [])
-    .filter((process) => belongsTo(process, pkg))
+    .filter((process) => process.uid === app.uid)
     .map((process) => process.pid);
   const current = (await runningProcesses(adb, serial, app, options)).map(({ pid }) => pid);
   return { kind: "pids", pkg, uid: app.uid, current, marked };
