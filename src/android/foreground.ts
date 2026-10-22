@@ -38,7 +38,7 @@ export function parseForeground(stdout: string, userId?: number): ActivityRecord
 export async function readForeground(
   adb: AdbClient,
   serial: string,
-  options: ReadOptions & { userId?: number },
+  options: ReadOptions & { userId: number },
 ): Promise<ActivityRecord | null> {
   const result = await readShell(
     adb,

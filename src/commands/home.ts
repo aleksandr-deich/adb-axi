@@ -159,7 +159,7 @@ async function readTargetState(
   };
 
   const [resumed, counted] = await Promise.all([
-    settle(() => readForeground(adb, serial, options)),
+    settle(async () => readForeground(adb, serial, { ...options, userId: await device.user() })),
     settle(async () => {
       const now = await readDeviceClock(adb, serial, options);
       const marksVerified = context.marksVerified === true;
