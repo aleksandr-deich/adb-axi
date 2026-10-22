@@ -94,20 +94,33 @@ export async function appPids(context: CommandContext, app: AppIdentity): Promis
  * and `pm clear` end them all. A read cut off by the deadline ends the wait; the last full
  * observation is the evidence.
  */
-export async function waitForExit(context: CommandContext, app: AppIdentity): Promise<ExitWait> {
+export async function waitForExit(
+  context: CommandContext,
+  app: AppIdentity,
+  before: readonly number[],
+  repeatStep: () => Promise<void>,
+): Promise<ExitWait> {
+  const original = new Set(before);
   let last: number[] | null = null;
   const result = await poll({
     timeoutMs: context.deadline.remainingMs(),
     check: async () => {
       try {
         last = await appPids(context, app);
+        const confirmingExit = last.length === 0;
+        if (confirmingExit) last = await appPids(context, app);
+        if (last.length === 0) return { done: true, value: null };
+        if (confirmingExit || last.some((pid) => !original.has(pid))) {
+          // Android 11 can resume the activity below a killed :ui and start a new main process mid force-stop.
+          await repeatStep();
+        }
       } catch (error) {
         if (error instanceof AdbAxiError && error.code === "TIMEOUT") {
           return { done: false, last };
         }
         throw error;
       }
-      return last.length === 0 ? { done: true, value: null } : { done: false, last };
+      return { done: false, last };
     },
   });
   return result.ok ? { gone: true } : { gone: false, last };

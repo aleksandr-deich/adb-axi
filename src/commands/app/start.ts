@@ -19,6 +19,7 @@ import { logsCrash } from "../logs/crash.js";
 import { defineCommand } from "../define.js";
 import type { CommandContext } from "../types.js";
 import {
+  appPids,
   formatDuration,
   forceStop,
   lifecycleCommand,
@@ -87,8 +88,10 @@ export const appStart = defineCommand({
     }
 
     if (fresh) {
-      await forceStop(adb, serial, pkg, userId, readOptions(context));
-      const exit = await waitForExit(context, app);
+      const before = await appPids(context, app);
+      const stop = () => forceStop(adb, serial, pkg, userId, readOptions(context));
+      await stop();
+      const exit = await waitForExit(context, app, before, stop);
       if (!exit.gone) {
         throw stopFailed(context, pkg, exit.last, context.timeoutMs, {
           command,

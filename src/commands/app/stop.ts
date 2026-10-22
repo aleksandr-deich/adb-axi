@@ -37,17 +37,17 @@ export const appStop = defineCommand({
     const { userId, app } = await requireInstalled(context, pkg);
     const before = await appPids(context, app);
     const started = realClock.now();
-    await forceStop(adb, serial, pkg, userId, readOptions(context));
-    if (before.length === 0) {
-      return { ok: okLine("stop", pkg, noop("already not running")) };
-    }
-
-    const exit = await waitForExit(context, app);
+    const stop = () => forceStop(adb, serial, pkg, userId, readOptions(context));
+    await stop();
+    const exit = await waitForExit(context, app, before, stop);
     if (!exit.gone) {
       throw stopFailed(context, pkg, exit.last, context.timeoutMs, {
         command: lifecycleCommand(context, ["app", "stop", pkg]),
         step: "am force-stop",
       });
+    }
+    if (before.length === 0) {
+      return { ok: okLine("stop", pkg, noop("already not running")) };
     }
     const tookMs = Math.round(realClock.now() - started);
     return {
