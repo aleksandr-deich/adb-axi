@@ -5,9 +5,8 @@ import { importanceForAdj, type Importance } from "./processes.js";
 import { invalidOutput, readShell, type ReadOptions } from "./read.js";
 
 /**
- * Processes are matched by this exact uid. A uid also covers other packages that share it,
- * and isolated services run under their own uid, so neither is attributed to the app
- * correctly.
+ * Processes are matched by this exact uid, including other packages that share it.
+ * Isolated services run under their own uid and are excluded.
  */
 export interface AppIdentity {
   pkg: string;
@@ -22,7 +21,6 @@ export function identityOf(info: PackageInfo, dump: string): AppIdentity {
 
 export interface RunningProcess {
   pid: number;
-  /** Process name: the package for the main process, `<pkg>:<name>` for others. */
   name: string;
 }
 
@@ -200,7 +198,6 @@ export function amKillCanKill(adj: number): boolean {
 /** One process record from `dumpsys activity processes <pkg>`. */
 export interface ProcessRecord {
   pid: number;
-  /** Process name: the package for the main process, `<pkg>:<name>` for others. */
   process: string;
   uid: number;
   /** The oom adj the system last applied (`set=`), the value `am kill` compares. */
@@ -216,7 +213,7 @@ export interface ProcessRecord {
  * Parse the `*APP*` and `*PERS*` records under "All known processes" (AOSP
  * `ActivityManagerService.dumpProcessesLocked` and `ProcessRecord.dump`). The oom line is
  * `oom: max=...` up to API 30 and `oom adj: max=...` from API 31. Records without a pid
- * are not running and are left out.
+ * are left out.
  */
 export function parseProcesses(stdout: string): ProcessRecord[] {
   const records: ProcessRecord[] = [];

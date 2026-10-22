@@ -13,9 +13,9 @@ export interface Mark {
   /** The device's UTC offset in minutes, or `null` when it printed none. */
   utcOffsetMinutes: number | null;
   /**
-   * The app processes running when the mark was taken. Only recorded on API 29 and 30,
-   * where `logs --pkg` falls back to a pid list. Marks taken before the uid was recorded
-   * have none, so they cannot name an app's processes.
+   * The device-wide process table when the mark was taken, without liveness confirmation.
+   * Only recorded on API 29 and 30, where `logs --pkg` falls back to a pid list. Legacy
+   * entries without a uid remain readable but contribute nothing to app scoping.
    */
   processes: MarkedProcess[];
   /**

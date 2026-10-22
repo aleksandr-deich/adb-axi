@@ -64,9 +64,11 @@ export function scopePids(scope: Scope & { kind: "pids" }, lines: readonly LogLi
 
 /**
  * `Start proc <pid>:<process>/<uid> for <reason>` is what ActivityManager logs when it
- * starts a process (AOSP `ProcessList.startProcessLocked`, API 29 and 30). An app's uid is
- * printed in user form, `u<user>a<app id - 10000>` (`UserHandle.formatUid`), so `u10a116` is
- * uid 1010116; a uid below 10000 prints as the number.
+ * starts a process (AOSP `ProcessList.startProcessLocked`, API 29 and 30).
+ * `UserHandle.formatUid` uses `u<user>a<app id - 10000>` for app ids and
+ * `u<user>s<app id>` for secondary-user system ids: `u10a116` is uid 1010116 and
+ * `u10s1000` is uid 1001000. Primary-user system uids print as decimal numbers.
+ * Isolated `u<user>i<id>` entries cannot belong to the app's exact uid and are ignored.
  */
 const START_PROC = /^Start proc (\d+):[^/\s]+\/(?:u(\d+)([as])(\d+)|(\d+)) for /;
 
