@@ -80,13 +80,17 @@ beforeAll(async () => {
 afterAll(async () => {
   if (user === undefined) return;
   const n = user;
+  const api = Number((await axi.sh("getprop ro.build.version.sdk")).trim());
   await axi.sh("am switch-user 0");
-  await until(
-    "user 0 in front again",
-    async () => (await axi.sh("am get-current-user")).trim() === "0",
+  // `am get-current-user` names the switch's target at once, but from API 34 `pm remove-user`
+  // refuses the user the switch has not yet moved away from: "Current user cannot be removed".
+  // API 29 has no users section and prints the same state in the processes dump.
+  const dump = api >= 30 ? "dumpsys activity users" : "dumpsys activity processes";
+  await until("the switch back to user 0", async () =>
+    /^\s*mCurrentUserId:0$/m.test(await raw(dump)),
   );
-  // Removing a user that is still running failed on API 35.
-  await axi.sh(`am stop-user -w ${n}`);
+  // The stop's broadcasts queue behind the rest of the switch's, which took past 15 s locally.
+  expect((await axi.ok(["shell", `am stop-user -w ${n}`, "--timeout", "60s"])).exit).toBe(0);
   expect(await axi.sh(`pm remove-user ${n}`)).toContain("Success: removed user");
 }, 300_000);
 
