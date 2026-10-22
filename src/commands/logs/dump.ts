@@ -87,7 +87,7 @@ export const logsDump = defineCommand({
       context.env,
       since ?? DEFAULT_SINCE,
       now,
-      context.marksVerified,
+      context.marksVerified === true,
     );
     const scope =
       pkg === undefined

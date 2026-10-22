@@ -26,7 +26,7 @@ export function resolveWindow(
   env: NodeJS.ProcessEnv,
   since: string,
   now: DeviceTime,
-  marksVerified = true,
+  marksVerified: boolean,
 ): LogWindow {
   const duration = parseDuration(since);
   if (duration !== undefined) {

@@ -163,8 +163,9 @@ async function readTargetState(
     settle(() => readForeground(adb, serial, options)),
     settle(async () => {
       const now = await readDeviceClock(adb, serial, options);
-      const mark = context.marksVerified === false ? undefined : latestMark(serial, context.env);
-      const window = resolveWindow(serial, context.env, mark ?? DEFAULT_SINCE, now);
+      const marksVerified = context.marksVerified === true;
+      const mark = marksVerified ? latestMark(serial, context.env) : undefined;
+      const window = resolveWindow(serial, context.env, mark ?? DEFAULT_SINCE, now, marksVerified);
       const lines = await readWindowLines(adb, serial, window, options, undefined, true);
       const count = parseCrashes(lines).filter((crash) => crash.epochMs >= window.startMs).length;
       // The age is by the host's clock, so a stale mark shows even when the device clock is off.
