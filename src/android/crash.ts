@@ -1,5 +1,4 @@
 import type { LogLine } from "./logcat.js";
-import { belongsTo } from "./ps.js";
 
 export type CrashKind = "java" | "anr" | "native";
 
@@ -152,9 +151,14 @@ export function parseCrashes(lines: readonly LogLine[]): Crash[] {
     .map((entry) => entry.crash);
 }
 
+/** Whether a process belongs to a package: the main process or a `<pkg>:<name>` one. */
+export function belongsTo(process: { name: string }, pkg: string): boolean {
+  return process.name === pkg || process.name.startsWith(`${pkg}:`);
+}
+
 /** Whether the crash happened in a process of the package: by name, never by uid or pid. */
 export function crashBelongsTo(crash: Crash, pkg: string): boolean {
-  return belongsTo({ pid: crash.pid ?? 0, name: crash.process }, pkg);
+  return belongsTo({ name: crash.process }, pkg);
 }
 
 interface Block {

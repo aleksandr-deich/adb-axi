@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { parseLogcat } from "../../src/android/logcat.js";
-import { belongsTo, parsePs } from "../../src/android/ps.js";
+import { belongsTo } from "../../src/android/crash.js";
 import { appProcesses, assertMarkName } from "../../src/commands/logs/marks.js";
 import { startedPids } from "../../src/commands/logs/scope.js";
 import { logcatCommand } from "../../src/commands/logs/window.js";
@@ -13,28 +13,25 @@ import { FIXTURES_DIR } from "../fake-adb/harness.js";
 const synthetic30 = (name: string): string =>
   readFileSync(join(FIXTURES_DIR, "synthetic", "30", name), "utf8");
 
-describe("parsePs", () => {
-  it("reads pid and name rows after the PID NAME header", () => {
-    const processes = parsePs(synthetic30("ps-pid-name.txt"));
-    expect(processes).toHaveLength(7);
-    expect(processes?.[0]).toEqual({ pid: 1, name: "init" });
-    expect(processes?.[5]).toEqual({ pid: 6050, name: "dev.probe:remote" });
-  });
-
-  it("does not take output without the header for a process list", () => {
-    expect(parsePs("")).toBeNull();
-    expect(parsePs("ps: bad -o 'NAME'\n")).toBeNull();
-  });
-
+describe("process names", () => {
   it("matches a package's main process and its colon processes, nothing longer", () => {
-    expect(belongsTo({ pid: 1, name: "dev.probe" }, "dev.probe")).toBe(true);
-    expect(belongsTo({ pid: 1, name: "dev.probe:remote" }, "dev.probe")).toBe(true);
-    expect(belongsTo({ pid: 1, name: "dev.probe.test" }, "dev.probe")).toBe(false);
-    expect(belongsTo({ pid: 1, name: "dev.probe2" }, "dev.probe")).toBe(false);
+    expect(belongsTo({ name: "dev.probe" }, "dev.probe")).toBe(true);
+    expect(belongsTo({ name: "dev.probe:remote" }, "dev.probe")).toBe(true);
+    expect(belongsTo({ name: "dev.probe.test" }, "dev.probe")).toBe(false);
+    expect(belongsTo({ name: "dev.probe2" }, "dev.probe")).toBe(false);
   });
 
   it("keeps only package-named processes for a mark", () => {
-    expect(appProcesses(parsePs(synthetic30("ps-pid-name.txt")) ?? [])).toEqual([
+    const processes = [
+      { pid: 1, name: "init" },
+      { pid: 517, name: "system_server" },
+      { pid: 612, name: "[kworker/0:1]" },
+      { pid: 4400, name: "com.other.app" },
+      { pid: 6044, name: "dev.probe" },
+      { pid: 6050, name: "dev.probe:remote" },
+      { pid: 6101, name: "/system/bin/sh" },
+    ];
+    expect(appProcesses(processes)).toEqual([
       { pid: 4400, name: "com.other.app" },
       { pid: 6044, name: "dev.probe" },
       { pid: 6050, name: "dev.probe:remote" },

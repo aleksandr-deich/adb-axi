@@ -2,7 +2,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { readDeviceClock } from "../../src/android/clock.js";
 import {} from "../../src/android/foreground.js";
-import { pidof } from "../../src/android/pidof.js";
+import { runningProcesses } from "../../src/android/app-processes.js";
 import {} from "../../src/android/recents.js";
 import { AdbClient } from "../../src/adb/run.js";
 import { Deadline } from "../../src/core/deadline.js";
@@ -45,10 +45,16 @@ async function failure(promise: Promise<unknown>): Promise<Record<string, unknow
   throw new Error("expected the read to fail");
 }
 
+const PS = "ps -A -o PID,UID,NAME";
+const PS_HEADER = { stdout: "  PID   UID NAME\n" };
+
+const running = (adb: AdbClient, pkg: string) =>
+  runningProcesses(adb, SERIAL, { pkg, uid: 10213 }, options());
+
 describe("pidof", () => {
   it("never reads an inconsistent answer as not running", async () => {
-    const { adb } = device({ "pidof dev.probe": { stdout: "", exit: 0 } });
-    expect(await failure(pidof(adb, SERIAL, "dev.probe", options()))).toMatchObject({
+    const { adb } = device({ [PS]: PS_HEADER, "pidof dev.probe": { stdout: "", exit: 0 } });
+    expect(await failure(running(adb, "dev.probe"))).toMatchObject({
       code: "INVALID_OUTPUT",
       step: "reading the pid of dev.probe",
     });
@@ -56,9 +62,10 @@ describe("pidof", () => {
 
   it("reports a failed pidof as REMOTE_EXIT with its stderr", async () => {
     const { adb } = device({
+      [PS]: PS_HEADER,
       "pidof dev.probe": { stderr: "/system/bin/sh: pidof: inaccessible\n", exit: 126 },
     });
-    expect(await failure(pidof(adb, SERIAL, "dev.probe", options()))).toEqual({
+    expect(await failure(running(adb, "dev.probe"))).toEqual({
       error: "reading the pid of dev.probe failed: `pidof dev.probe` exited 126",
       code: "REMOTE_EXIT",
       step: "reading the pid of dev.probe",
@@ -69,7 +76,7 @@ describe("pidof", () => {
 
   it("refuses a package name that the device shell would read as syntax, before any call", async () => {
     const { f, adb } = device({});
-    expect(await failure(pidof(adb, SERIAL, "dev.probe; reboot", options()))).toMatchObject({
+    expect(await failure(running(adb, "dev.probe; reboot"))).toMatchObject({
       code: "VALIDATION_ERROR",
     });
     expect(f.calls()).toEqual([]);
