@@ -274,7 +274,8 @@ export async function launchActivity(
 /**
  * Observe for at most `SETTLE_MS` of the remaining deadline. Check crash evidence
  * before liveness or foreground: a crash dialog can keep a crashed process alive.
- * The first observation usually settles it.
+ * The first observation usually settles it, so it takes the command's own deadline: a slow
+ * device then fails against `--timeout`, not against the settle window.
  */
 export async function settle(
   context: CommandContext,
@@ -295,18 +296,17 @@ export async function settle(
       if (last !== undefined && deadline.remainingMs() === 0) {
         return { done: true, value: last };
       }
+      const reads = { deadline: last === undefined ? context.deadline : deadline };
       try {
-        const crash = (await watch.check({ deadline })).find(
-          (entry) => entry.process === processName,
-        );
+        const crash = (await watch.check(reads)).find((entry) => entry.process === processName);
         if (crash !== undefined) {
           return { done: true, value: { state: "crashed", pid: crash.pid, front: null } };
         }
-        const processes = await processImportance(adb, serial, app, { deadline });
+        const processes = await processImportance(adb, serial, app, reads);
         if (last !== undefined && deadline.remainingMs() === 0) {
           return { done: true, value: last };
         }
-        const front = await readForeground(adb, serial, { deadline, userId });
+        const front = await readForeground(adb, serial, { ...reads, userId });
         const pid = processes.find((process) => process.process === processName)?.pid ?? UNKNOWN;
         const inFront = front?.package === activity.package;
         const state = pid === UNKNOWN ? "stopped" : inFront ? "foreground" : "running";
