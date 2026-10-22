@@ -99,7 +99,7 @@ export async function restoreTask(
 ): Promise<Restored> {
   const adb = context.device.adb;
   const serial = context.device.serial;
-  const { userId, app } = installed;
+  const { userId, identity: app } = installed;
 
   const task = findTask(await readRecents(adb, serial, context.device.reads), pkg, userId);
   if (task === undefined || task.activity === null) throw noTask(context, pkg);

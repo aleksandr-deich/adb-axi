@@ -1,6 +1,5 @@
-import { identityOf, mainProcess, runningProcesses } from "../../android/app-processes.js";
+import { mainProcess, runningProcesses } from "../../android/app-processes.js";
 import { readForeground } from "../../android/foreground.js";
-import { readPackageSnapshot } from "../../android/packages.js";
 import { defineCommand } from "../define.js";
 import { UNKNOWN } from "./shared.js";
 
@@ -23,8 +22,8 @@ export const appCurrent = defineCommand({
         note: "no activity is resumed, the screen may be off",
       };
     }
-    const { info, dump } = await readPackageSnapshot(adb, serial, resumed.package, options, userId);
-    const app = info === null ? null : identityOf(info, dump);
+    const record = await context.device.app(resumed.package);
+    const app = record.installed ? record.identity : null;
     const main =
       app === null
         ? undefined

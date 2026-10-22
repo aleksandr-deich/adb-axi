@@ -1,7 +1,6 @@
-import { identityOf, mainProcess, runningProcesses } from "../../android/app-processes.js";
+import { mainProcess, runningProcesses } from "../../android/app-processes.js";
 import { readForeground } from "../../android/foreground.js";
 import { assertPackageName } from "../../android/component.js";
-import { readPackageSnapshot } from "../../android/packages.js";
 import { readShell } from "../../android/read.js";
 import { AdbAxiError } from "../../core/errors.js";
 import { defineCommand } from "../define.js";
@@ -31,14 +30,12 @@ export const appInfo = defineCommand({
     const serial = context.device.serial;
     const options = context.device.reads;
     const adb = context.device.adb;
-    const userId = await context.device.user();
-
-    const { info: record, dump } = await readPackageSnapshot(adb, serial, pkg, options, userId);
-    if (record === null || !record.installed) {
+    const resolved = await context.device.app(pkg);
+    if (!resolved.installed) {
       return { app: { package: pkg, installed: false } };
     }
 
-    const app = identityOf(record, dump);
+    const { userId, info: record, identity: app } = resolved;
     const main = mainProcess(app, await runningProcesses(adb, serial, app, options));
     const resumed = await readForeground(adb, serial, { ...options, userId });
     return {

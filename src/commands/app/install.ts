@@ -4,7 +4,7 @@ import { basename, resolve } from "node:path";
 import { ApkError, bufferSource, readApkFile, readApkInfo, type ApkInfo } from "../../apk/index.js";
 import type { AdbClient } from "../../adb/run.js";
 import { assertPackageName } from "../../android/component.js";
-import { readPackage, type PackageInfo } from "../../android/packages.js";
+import type { PackageInfo } from "../../android/packages.js";
 import { parsePmFailure } from "../../android/pm-result.js";
 import { invalidOutput, readShell, type ReadOptions } from "../../android/read.js";
 import { formatDuration } from "../../core/args.js";
@@ -98,10 +98,7 @@ async function runInstall(context: DeviceContext): Promise<Output> {
   }
   // Taken before the install, so the wipe below is tied to the very bytes adb installs.
   const digest = read.ok && clean ? await fileDigest(apkPath) : null;
-  const userId = read.ok ? await context.device.user() : 0;
-  const before = read.ok
-    ? await readPackage(adb, serial, read.info.package, options, userId)
-    : null;
+  const before = read.ok ? (await context.device.app(read.info.package)).info : null;
   const previous = before?.installed === true ? before : null;
 
   let shortcut: string | undefined;
@@ -134,12 +131,13 @@ async function runInstall(context: DeviceContext): Promise<Output> {
   }
 
   const info = read.info;
-  let installed = await waitForVersion(context, adb, serial, info, options, userId);
+  const userId = await context.device.user();
+  let installed = await waitForVersion(context, info);
   if (digest !== null) {
     await confirmInstalledFile(adb, serial, info.package, apkName, digest, options, userId);
     await clearData(adb, serial, info.package, options, userId);
     // The package must survive the wipe at the version just installed.
-    installed = await waitForVersion(context, adb, serial, info, options, userId);
+    installed = await waitForVersion(context, info);
   }
 
   // A swap between a debug and a release build keeps the version, so say what did change.
@@ -394,23 +392,16 @@ function failureContext(
  * Wait until the package manager reports the APK's versionCode. `adb install` returns when
  * the install is committed, so this normally holds at once; it is the proof, not a delay.
  */
-async function waitForVersion(
-  context: DeviceContext,
-  adb: AdbClient,
-  serial: string,
-  info: ApkInfo,
-  options: ReadOptions,
-  userId: number,
-): Promise<PackageInfo> {
+async function waitForVersion(context: DeviceContext, info: ApkInfo): Promise<PackageInfo> {
   assertPackageName(info.package);
   let latest: PackageInfo | null | undefined;
   const result = await poll({
     timeoutMs: context.deadline.remainingMs(),
     check: async (remainingMs) => {
       const reads =
-        remainingMs < MAX_INTERVAL_MS ? { deadline: new Deadline(MAX_INTERVAL_MS) } : options;
+        remainingMs < MAX_INTERVAL_MS ? { deadline: new Deadline(MAX_INTERVAL_MS) } : undefined;
       try {
-        latest = await readPackage(adb, serial, info.package, reads, userId);
+        latest = (await context.device.app(info.package, reads)).info;
       } catch (error) {
         // A read cut off by the deadline ends the wait; the last full read is the evidence.
         if (error instanceof AdbAxiError && error.code === "TIMEOUT") {

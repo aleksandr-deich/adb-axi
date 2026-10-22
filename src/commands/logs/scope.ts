@@ -1,7 +1,6 @@
 import type { DeviceSession } from "../../device/session.js";
-import { identityOf, runningProcesses } from "../../android/app-processes.js";
+import { runningProcesses } from "../../android/app-processes.js";
 import type { LogLine } from "../../android/logcat.js";
-import { readPackageSnapshot } from "../../android/packages.js";
 import { invalidOutput } from "../../android/read.js";
 import { AdbAxiError } from "../../core/errors.js";
 import { runHint } from "../../core/output.js";
@@ -24,16 +23,15 @@ export async function resolveScope(
   window: LogWindow,
 ): Promise<Scope> {
   const { adb, serial, reads: options } = session;
-  const userId = await session.user();
-  const { info: record, dump } = await readPackageSnapshot(adb, serial, pkg, options, userId);
-  if (record === null || !record.installed) {
+  const record = await session.app(pkg);
+  if (!record.installed) {
     throw new AdbAxiError("APP_NOT_INSTALLED", `${pkg} is not installed on ${serial}`, {
       help: [runHint(["app", "list"], "to see the installed packages")],
     });
   }
   const facts = await session.facts();
   if (facts.api === null) throw invalidOutput("reading the Android version", "");
-  const app = identityOf(record, dump);
+  const app = record.identity;
   if (facts.api >= PID_LIST_BELOW_API) return { kind: "uid", pkg, uid: app.uid };
   const marked = (window.mark?.processes ?? [])
     .filter((process) => process.uid === app.uid)

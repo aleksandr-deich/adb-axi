@@ -1,6 +1,6 @@
 import type { AdbClient } from "../../adb/run.js";
-import { identityOf, runningProcesses, type AppIdentity } from "../../android/app-processes.js";
-import { readPackageSnapshot, type PackageInfo } from "../../android/packages.js";
+import { runningProcesses, type AppIdentity } from "../../android/app-processes.js";
+import type { AppRecord } from "../../device/session.js";
 import { readShell, type ReadOptions } from "../../android/read.js";
 import { AdbAxiError } from "../../core/errors.js";
 import { commandLine, runHint } from "../../core/output.js";
@@ -9,13 +9,7 @@ import type { DeviceContext } from "../types.js";
 import { appInstall } from "./install.js";
 import { UNKNOWN } from "./shared.js";
 
-/** An installed package's record and the full `dumpsys package` text it came from. */
-export interface InstalledPackage {
-  info: PackageInfo;
-  dump: string;
-  userId: number;
-  app: AppIdentity;
-}
+export type InstalledPackage = AppRecord & { installed: true };
 
 export function lifecycleCommand(context: DeviceContext, args: string[]): string[] {
   const device = context.flags.device ?? context.env.ANDROID_SERIAL;
@@ -31,16 +25,9 @@ export async function requireInstalled(
   context: DeviceContext,
   pkg: string,
 ): Promise<InstalledPackage> {
-  const userId = await context.device.user();
-  const { info, dump } = await readPackageSnapshot(
-    context.device.adb,
-    context.device.serial,
-    pkg,
-    context.device.reads,
-    userId,
-  );
-  if (info === null || !info.installed) throw notInstalled(context, pkg);
-  return { info, dump, userId, app: identityOf(info, dump) };
+  const record = await context.device.app(pkg);
+  if (!record.installed) throw notInstalled(context, pkg);
+  return record;
 }
 
 /** `APP_NOT_INSTALLED`, with hints to find the package or install it. */

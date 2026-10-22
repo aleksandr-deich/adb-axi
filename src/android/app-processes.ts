@@ -1,6 +1,5 @@
 import type { AdbClient } from "../adb/run.js";
 import { assertPackageName } from "./component.js";
-import type { PackageInfo } from "./packages.js";
 import { importanceForAdj, type Importance } from "./processes.js";
 import { invalidOutput, readShell, type ReadOptions } from "./read.js";
 
@@ -11,12 +10,6 @@ import { invalidOutput, readShell, type ReadOptions } from "./read.js";
 export interface AppIdentity {
   pkg: string;
   uid: number;
-}
-
-/** The identity of a package record read for one Android user; `dump` is what it came from. */
-export function identityOf(info: PackageInfo, dump: string): AppIdentity {
-  if (info.uid === null) throw invalidOutput(`reading package ${info.package}`, dump);
-  return { pkg: info.package, uid: info.uid };
 }
 
 export interface RunningProcess {

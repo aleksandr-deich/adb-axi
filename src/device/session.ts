@@ -1,5 +1,5 @@
 import type { AdbClient } from "../adb/run.js";
-import { identityOf, type AppIdentity } from "../android/app-processes.js";
+import type { AppIdentity } from "../android/app-processes.js";
 import { readPackageSnapshot, type PackageInfo } from "../android/packages.js";
 import { invalidOutput, readShell, type ReadOptions } from "../android/read.js";
 import type { Deadline } from "../core/deadline.js";
@@ -15,7 +15,7 @@ export interface DeviceSession {
   user(): Promise<number>;
   facts(): Promise<DeviceFacts>;
   // Mutations can change the package record within one command.
-  app(pkg: string): Promise<AppRecord>;
+  app(pkg: string, reads?: ReadOptions): Promise<AppRecord>;
 }
 
 export type AppRecord =
@@ -53,15 +53,20 @@ export function openSession(
         },
       ));
     },
-    async app(pkg) {
+    async app(pkg, options = reads) {
       const userId = await session.user();
-      const { info, dump } = await readPackageSnapshot(adb, serial, pkg, reads, userId);
+      const { info, dump } = await readPackageSnapshot(adb, serial, pkg, options, userId);
       return info?.installed === true
         ? { installed: true, userId, info, dump, identity: identityOf(info, dump) }
         : { installed: false, userId, info, dump };
     },
   };
   return session;
+}
+
+function identityOf(info: PackageInfo, dump: string): AppIdentity {
+  if (info.uid === null) throw invalidOutput(`reading package ${info.package}`, dump);
+  return { pkg: info.package, uid: info.uid };
 }
 
 async function readUser(adb: AdbClient, serial: string, reads: ReadOptions): Promise<number> {

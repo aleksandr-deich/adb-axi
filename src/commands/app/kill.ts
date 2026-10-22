@@ -133,7 +133,7 @@ export async function killProcess(
 ): Promise<KillResult> {
   const adb = context.device.adb;
   const serial = context.device.serial;
-  const { userId, app } = installed;
+  const { userId, identity: app } = installed;
   const options = context.device.reads;
 
   const before = (await runningProcesses(adb, serial, app, options)).map(({ pid }) => pid);

@@ -1,6 +1,4 @@
-import { identityOf } from "../../android/app-processes.js";
 import { assertPackageName } from "../../android/component.js";
-import { readPackageSnapshot } from "../../android/packages.js";
 import { Deadline } from "../../core/deadline.js";
 import { AdbAxiError } from "../../core/errors.js";
 import { okLine, runHint } from "../../core/output.js";
@@ -36,10 +34,10 @@ export const waitApp = defineCommand({
     const serial = context.device.serial;
     const options = context.device.reads;
     const adb = context.device.adb;
-    const userId = await context.device.user();
-    const { info, dump } = await readPackageSnapshot(adb, serial, pkg, options, userId);
-    // Read once: a package installed during the wait is not waited for.
-    if (info === null || !info.installed) {
+    const record = await context.device.app(pkg);
+    const { userId } = record;
+    // A package installed during the wait is not waited for.
+    if (!record.installed) {
       if (wanted !== "stopped") throw notInstalled(context, pkg);
       return {
         ok: okLine("wait app", pkg, "stopped after 0 ms"),
@@ -47,7 +45,7 @@ export const waitApp = defineCommand({
         note: `${pkg} is not installed for Android user ${userId}`,
       };
     }
-    const app = identityOf(info, dump);
+    const app = record.identity;
 
     let latest: AppObservation | undefined;
     const result = await poll({

@@ -79,7 +79,7 @@ export const appStart = defineCommand({
       requested === null ? pkg : `${pkg}/${requested}`,
       ...(fresh ? ["--fresh"] : []),
     ]);
-    const { dump, userId, app } = await requireInstalled(context, pkg);
+    const { dump, userId, identity: app } = await requireInstalled(context, pkg);
     const filters = parseActivityFilters(dump);
     const activity =
       requested ?? (await resolveLauncherActivity(adb, serial, pkg, userId, context.device.reads));

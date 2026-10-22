@@ -33,7 +33,7 @@ export const appStop = defineCommand({
     const serial = context.device.serial;
     const adb = context.device.adb;
 
-    const { userId, app } = await requireInstalled(context, pkg);
+    const { userId, identity: app } = await requireInstalled(context, pkg);
     const before = await appPids(context, app);
     const started = realClock.now();
     const stop = () => forceStop(adb, serial, pkg, userId, context.device.reads);

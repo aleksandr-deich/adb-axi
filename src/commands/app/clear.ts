@@ -39,7 +39,7 @@ export const appClear = defineCommand({
     const serial = context.device.serial;
     const adb = context.device.adb;
 
-    const { info, userId, app } = await requireInstalled(context, pkg);
+    const { info, userId, identity: app } = await requireInstalled(context, pkg);
     const before = (await processTable(adb, serial, context.device.reads))
       .filter(({ uid }) => uid === app.uid)
       .map(({ pid }) => pid);
