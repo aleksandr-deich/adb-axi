@@ -30,5 +30,5 @@ export function ignoredServerSelectors(env: NodeJS.ProcessEnv): string[] {
 }
 
 function localHost(host: string): string {
-  return ["", "localhost", "127.0.0.1", "[::1]"].includes(host) ? "localhost" : host;
+  return ["", "localhost", "127.0.0.1"].includes(host) ? "localhost" : host;
 }

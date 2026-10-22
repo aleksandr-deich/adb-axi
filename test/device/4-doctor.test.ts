@@ -81,12 +81,38 @@ describe("doctor on a real emulator", () => {
     const version = /Version (\d+\.\d+\.\d+)/.exec((await axi.adbHost(["version"])).stdout)?.[1];
     expect(all.adb?.status).toBe("ok");
     expect(all.adb?.detail).toMatch(new RegExp(`^${(version ?? "-").replaceAll(".", "\\.")} at `));
+    const endpoint =
+      process.env.ADB_SERVER_SOCKET ??
+      `tcp:${process.env.ANDROID_ADB_SERVER_ADDRESS === undefined ? "" : `${process.env.ANDROID_ADB_SERVER_ADDRESS}:`}${process.env.ANDROID_ADB_SERVER_PORT || "5037"}`;
+    const ignored: string[] = [];
+    if (process.env.ADB_SERVER_SOCKET !== undefined) {
+      const tcp = endpoint.startsWith("tcp:");
+      const separator = endpoint.lastIndexOf(":");
+      const host = endpoint.slice(4, separator);
+      const equivalentHosts = ["", "localhost", "127.0.0.1"].includes(host)
+        ? ["", "localhost", "127.0.0.1"]
+        : [host];
+      const address = process.env.ANDROID_ADB_SERVER_ADDRESS;
+      if (address !== undefined && (!tcp || !equivalentHosts.includes(address))) {
+        ignored.push(`ANDROID_ADB_SERVER_ADDRESS=${address}`);
+      }
+      const port = process.env.ANDROID_ADB_SERVER_PORT;
+      if (
+        port !== undefined &&
+        port !== "" &&
+        (!tcp || !/^\d+$/.test(port) || Number(port) !== Number(endpoint.slice(separator + 1)))
+      ) {
+        ignored.push(`ANDROID_ADB_SERVER_PORT=${port}`);
+      }
+    }
     expect(all.server).toEqual({
       check: "server",
       status: "ok",
       detail:
-        process.env.ADB_SERVER_SOCKET ??
-        `tcp:${process.env.ANDROID_ADB_SERVER_ADDRESS === undefined ? "" : `${process.env.ANDROID_ADB_SERVER_ADDRESS}:`}${process.env.ANDROID_ADB_SERVER_PORT || "5037"}`,
+        endpoint +
+        (ignored.length === 0
+          ? ""
+          : ` (ADB_SERVER_SOCKET overrides ignored ${ignored.join(", ")})`),
     });
     const attached = (await axi.adbHost(["devices"])).stdout
       .split("\n")
