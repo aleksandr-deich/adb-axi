@@ -119,3 +119,9 @@ npm run capture -- --serial emulator-5554 --serial emulator-5556
 ```
 
 It installs, crashes and uninstalls `dev.probe`, clears logcat and presses HOME on every device named. `test/fixtures/EVIDENCE.md` describes each file and the facts recorded in each `index.json`.
+
+`--processes` captures only the process table and `pidof` reads of `src/android/app-processes.ts`, with the probe's main and `:ui` processes running, stopped and exiting, and adds them to each API directory without replacing its other captures:
+
+```
+npm run capture -- --processes --serial emulator-5554
+```

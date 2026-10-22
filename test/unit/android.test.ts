@@ -14,13 +14,8 @@ import {
   parsePackageList,
   parsePackageRecords,
 } from "../../src/android/packages.js";
-import { parsePidof } from "../../src/android/pidof.js";
-import {
-  amKillCanKill,
-  importanceForAdj,
-  parseLru,
-  parseProcesses,
-} from "../../src/android/processes.js";
+import { amKillCanKill, parsePidof, parseProcesses } from "../../src/android/app-processes.js";
+import { importanceForAdj, parseLru } from "../../src/android/processes.js";
 import { findTask, parseRecents } from "../../src/android/recents.js";
 import { FIXTURES_DIR } from "../fake-adb/harness.js";
 

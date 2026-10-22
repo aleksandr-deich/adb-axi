@@ -1,11 +1,18 @@
 import type { AdbClient } from "../../adb/run.js";
 import { runShell } from "../../adb/shell.js";
-import { parsePidof } from "../../android/pidof.js";
+import {
+  amKillCanKill,
+  mainProcess,
+  processImportance,
+  runningProcesses,
+  type AppIdentity,
+  type ProcessRecord,
+} from "../../android/app-processes.js";
 import { readForeground } from "../../android/foreground.js";
 import { assertPackageName } from "../../android/component.js";
-import { amKillCanKill, type Importance, type ProcessRecord } from "../../android/processes.js";
+import type { Importance } from "../../android/processes.js";
 import { readRecents, findTask } from "../../android/recents.js";
-import { invalidOutput, readShell } from "../../android/read.js";
+import { readShell } from "../../android/read.js";
 import { AdbAxiError } from "../../core/errors.js";
 import { noop, okLine, runHint, type Output } from "../../core/output.js";
 import { poll } from "../../core/poll.js";
@@ -14,7 +21,6 @@ import type { CommandContext } from "../types.js";
 import {
   formatDuration,
   lifecycleCommand,
-  packageProcesses,
   requireInstalled,
   type InstalledPackage,
 } from "./process.js";
@@ -126,12 +132,10 @@ export async function killProcess(
 ): Promise<KillResult> {
   const adb = context.adb();
   const serial = targetSerial(context);
-  const { userId } = installed;
+  const { userId, app } = installed;
   const options = readOptions(context);
-  const uid = installed.info.uid;
-  if (uid === null) throw invalidOutput(`reading package ${pkg}`, installed.dump);
 
-  const before = await packagePids(context, pkg, uid);
+  const before = (await runningProcesses(adb, serial, app, options)).map(({ pid }) => pid);
   if (before.length === 0) return { killed: false };
 
   const front = await readForeground(adb, serial, { ...options, userId });
@@ -147,7 +151,7 @@ export async function killProcess(
     );
   }
 
-  const killable = await awaitKillable(context, pkg, userId);
+  const killable = await awaitKillable(context, app);
   if (!killable.ok) throw killTimeout(context, pkg, killable.last, false, command);
   const cachedAfterMs = backgroundedFirst
     ? Math.round(performance.now() - backgroundedAt)
@@ -158,9 +162,7 @@ export async function killProcess(
   let method: KillEvidence["method"] = "am kill";
   let exit = await awaitGone(
     context,
-    pkg,
-    userId,
-    uid,
+    app,
     installed.info.debuggable
       ? Math.min(KILL_WINDOW_MS, context.deadline.remainingMs())
       : context.deadline.remainingMs(),
@@ -168,7 +170,7 @@ export async function killProcess(
   if (!exit.gone && installed.info.debuggable && context.deadline.remainingMs() > 0) {
     await runAsKill(adb, serial, pkg, userId, exit.last?.pids ?? before, context);
     method = "run-as kill";
-    exit = await awaitGone(context, pkg, userId, uid, context.deadline.remainingMs());
+    exit = await awaitGone(context, app, context.deadline.remainingMs());
   }
   if (!exit.gone) throw killTimeout(context, pkg, exit.last, true, command);
 
@@ -191,25 +193,26 @@ type Killable = { ok: true; waitedMs: number } | { ok: false; last: Seen | undef
  * launcher stays up, this still ends). A process with no record, or whose adj the dump
  * does not print, is left to the kill and the `pidof` check that follows it.
  */
-async function awaitKillable(
-  context: CommandContext,
-  pkg: string,
-  userId: number,
-): Promise<Killable> {
+async function awaitKillable(context: CommandContext, app: AppIdentity): Promise<Killable> {
   let last: Seen | undefined;
   const result = await poll<null, Seen>({
     timeoutMs: context.deadline.remainingMs(),
     check: async () => {
       let processes: ProcessRecord[];
       try {
-        processes = await packageProcesses(context, pkg, userId, readOptions(context));
+        processes = await processImportance(
+          context.adb(),
+          targetSerial(context),
+          app,
+          readOptions(context),
+        );
       } catch (error) {
         if (error instanceof AdbAxiError && error.code === "TIMEOUT") {
           return last === undefined ? { done: false, last: seenNothing() } : { done: false, last };
         }
         throw error;
       }
-      const main = processes.find((process) => process.process === pkg);
+      const main = mainProcess(app, processes);
       if (main === undefined || main.adj === null || amKillCanKill(main.adj)) {
         return { done: true, value: null };
       }
@@ -222,59 +225,6 @@ async function awaitKillable(
 
 type Gone = { gone: true } | { gone: false; last: Seen | undefined };
 
-async function packagePids(context: CommandContext, pkg: string, uid: number): Promise<number[]> {
-  const result = await readShell(
-    context.adb(),
-    targetSerial(context),
-    "ps -A -o PID,UID,NAME",
-    "reading package process names",
-    readOptions(context),
-  );
-  const lines = result.stdout.trim().split(/\r?\n/);
-  if (lines.shift()?.trim().replace(/\s+/g, " ") !== "PID UID NAME") {
-    throw invalidOutput("reading package process names", result.stdout);
-  }
-  const names = new Map<string, Set<number>>();
-  for (const line of lines) {
-    // Foreign rows, including those with an unreadable UID, cannot name this app.
-    // NAME is the rest of the row: kernel threads can carry spaces.
-    const row = /^\s*(\S+)\s+(\S+)(?:\s+(.+?))?\s*$/.exec(line);
-    const rowUid = row?.[2];
-    if (rowUid === undefined || !/^\d+$/.test(rowUid) || Number(rowUid) !== uid) continue;
-    const pid = Number(row?.[1]);
-    const name = row?.[3]?.replace(/^\[([A-Za-z_][A-Za-z0-9_.:-]*)\]$/, "$1");
-    if (
-      !Number.isSafeInteger(pid) ||
-      pid <= 0 ||
-      !name ||
-      !/^[A-Za-z_][A-Za-z0-9_.:-]*$/.test(name)
-    ) {
-      throw invalidOutput("reading package process names", line);
-    }
-    const known = names.get(name) ?? new Set<number>();
-    known.add(pid);
-    names.set(name, known);
-  }
-  const pids: number[] = [];
-  if (!names.has(pkg)) names.set(pkg, new Set());
-  for (const [name, known] of names) {
-    const check = await readShell(
-      context.adb(),
-      targetSerial(context),
-      `pidof ${name}`,
-      `reading the pid of ${name}`,
-      readOptions(context),
-      [0, 1],
-    );
-    const running = parsePidof(check.stdout);
-    if (running === null || (check.exitCode === 1) !== (running.length === 0)) {
-      throw invalidOutput(`reading the pid of ${name}`, check.stdout);
-    }
-    pids.push(...running.filter((pid) => known.has(pid)));
-  }
-  return pids;
-}
-
 /**
  * Poll `pidof` (the exit evidence; an ActivityManager record can vanish before its
  * process does) until the observed UID processes are gone or `windowMs` passes.
@@ -282,19 +232,21 @@ async function packagePids(context: CommandContext, pkg: string, uid: number): P
  */
 async function awaitGone(
   context: CommandContext,
-  pkg: string,
-  userId: number,
-  uid: number,
+  app: AppIdentity,
   windowMs: number,
 ): Promise<Gone> {
+  const adb = context.adb();
+  const serial = targetSerial(context);
   let last: Seen | undefined;
   const result = await poll<null, Seen | undefined>({
     timeoutMs: windowMs,
     check: async () => {
       try {
-        const pids = await packagePids(context, pkg, uid);
+        const pids = (await runningProcesses(adb, serial, app, readOptions(context))).map(
+          ({ pid }) => pid,
+        );
         if (pids.length === 0) return { done: true, value: null };
-        const processes = await packageProcesses(context, pkg, userId, readOptions(context));
+        const processes = await processImportance(adb, serial, app, readOptions(context));
         const main = processes.find((process) => process.pid === pids[0]);
         last = main === undefined ? { pids, state: UNKNOWN, adj: null } : seen(main, pids);
       } catch (error) {

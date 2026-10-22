@@ -18,7 +18,7 @@ function readIndex(group: string): Index {
 
 describe("captured real-device output", () => {
   it("holds the host captures and the emulator API levels", () => {
-    expect(groups).toEqual(["29", "35", "37", "host"]);
+    expect(groups).toEqual(["29", "30", "35", "37", "host"]);
   });
 
   it.each(groups)("indexes every file in captured/%s, and nothing more", (group) => {

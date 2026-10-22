@@ -6,12 +6,8 @@ import { AdbAxiError } from "../../core/errors.js";
 import { okLine, runHint, type Output } from "../../core/output.js";
 import { defineCommand } from "../define.js";
 import type { CommandContext } from "../types.js";
-import {
-  lifecycleCommand,
-  packageProcesses,
-  requireInstalled,
-  type InstalledPackage,
-} from "./process.js";
+import { processImportance } from "../../android/app-processes.js";
+import { lifecycleCommand, requireInstalled, type InstalledPackage } from "./process.js";
 import { readOptions, targetSerial, UNKNOWN } from "./shared.js";
 import { launchActivity, type Seen } from "./start.js";
 
@@ -103,7 +99,7 @@ export async function restoreTask(
 ): Promise<Restored> {
   const adb = context.adb();
   const serial = targetSerial(context);
-  const { userId } = installed;
+  const { userId, app } = installed;
 
   const task = findTask(await readRecents(adb, serial, readOptions(context)), pkg, userId);
   if (task === undefined || task.activity === null) throw noTask(context, pkg);
@@ -113,14 +109,14 @@ export async function restoreTask(
     component: `${pkg}/${task.activity}`,
   };
 
-  const pidsBefore = (await packageProcesses(context, pkg, userId, readOptions(context))).map(
+  const pidsBefore = (await processImportance(adb, serial, app, readOptions(context))).map(
     (process) => process.pid,
   );
   const { start, settled, launched, processName } = await launchActivity(
     context,
     component,
     userId,
-    installed.info.uid,
+    app,
     command,
     () => declaredActivities(parseActivityFilters(installed.dump), pkg),
     (launched, processName, last) => diedOnStart(context, launched, processName, last),

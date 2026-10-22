@@ -31,15 +31,15 @@ export const appStop = defineCommand({
     const serial = targetSerial(context);
     const adb = context.adb();
 
-    const { userId } = await requireInstalled(context, pkg);
-    const before = await mainPids(context, pkg, userId);
+    const { userId, app } = await requireInstalled(context, pkg);
+    const before = await mainPids(context, app);
     const started = realClock.now();
     await forceStop(adb, serial, pkg, userId, readOptions(context));
     if (before.length === 0) {
       return { ok: okLine("stop", pkg, noop("already not running")) };
     }
 
-    const exit = await waitForExit(context, pkg, userId);
+    const exit = await waitForExit(context, app);
     if (!exit.gone) {
       throw stopFailed(context, pkg, exit.last, context.timeoutMs, {
         command: lifecycleCommand(context, ["app", "stop", pkg]),

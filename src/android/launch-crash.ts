@@ -1,7 +1,7 @@
 import type { AdbClient } from "../adb/run.js";
 import { parseCrashes } from "./crash.js";
 import { parseLogcat, type LogLine } from "./logcat.js";
-import type { ProcessRecord } from "./processes.js";
+import type { ProcessRecord } from "./app-processes.js";
 import { invalidOutput, readShell, type ReadOptions } from "./read.js";
 
 export const LAUNCH_CRASH_COMMAND =

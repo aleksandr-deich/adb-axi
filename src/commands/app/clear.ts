@@ -33,7 +33,7 @@ export const appClear = defineCommand({
     const serial = targetSerial(context);
     const adb = context.adb();
 
-    const { info, userId } = await requireInstalled(context, pkg);
+    const { info, userId, app } = await requireInstalled(context, pkg);
 
     // `pm clear` waits for the system to report the data cleared, then prints `Success`;
     // a refusal prints `Failed` and exits 1 (AOSP `PackageManagerShellCommand.runClear`).
@@ -48,7 +48,7 @@ export const appClear = defineCommand({
     );
     if (result.stdout.trim() !== "Success") throw invalidOutput(step, result.stdout);
 
-    const exit = await waitForExit(context, pkg, userId);
+    const exit = await waitForExit(context, app);
     if (!exit.gone) {
       throw stopFailed(context, pkg, exit.last, context.timeoutMs, {
         command: lifecycleCommand(context, [

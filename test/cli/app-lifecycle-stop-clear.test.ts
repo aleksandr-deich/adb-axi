@@ -60,7 +60,7 @@ describe("app stop", () => {
         { match: shell(CURRENT_USER), respond: { stdout: "0\n" } },
         {
           match: shell(KERNEL_UIDS),
-          respond: { stdout: "  PID   UID\n 5120 10213\n 5187 10213\n" },
+          respond: { stdout: "  PID   UID NAME\n 5120 10213 dev.probe\n 5187 10213 dev.probe\n" },
         },
         { match: shell(PACKAGE), respond: INSTALLED },
         {

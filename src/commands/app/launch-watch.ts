@@ -1,6 +1,10 @@
 import type { AdbClient } from "../../adb/run.js";
+import {
+  processImportance,
+  type AppIdentity,
+  type ProcessRecord,
+} from "../../android/app-processes.js";
 import { readLaunchCrashes, type LaunchCrash } from "../../android/launch-crash.js";
-import { readProcesses, type ProcessRecord } from "../../android/processes.js";
 import type { ReadOptions } from "../../android/read.js";
 import { AdbAxiError } from "../../core/errors.js";
 import { poll, realClock } from "../../core/poll.js";
@@ -10,7 +14,7 @@ export class LaunchWatch {
     private readonly adb: AdbClient,
     private readonly serial: string,
     private readonly userId: number,
-    private readonly uid: number | null,
+    private readonly uid: number,
     private readonly options: ReadOptions,
     private readonly baseline: Set<string>,
     private readonly prelaunch: readonly ProcessRecord[],
@@ -19,24 +23,20 @@ export class LaunchWatch {
   static async open(
     adb: AdbClient,
     serial: string,
-    pkg: string,
+    app: AppIdentity,
     userId: number,
-    uid: number | null,
     options: ReadOptions,
   ): Promise<LaunchWatch> {
-    const prelaunch = await readProcesses(adb, serial, pkg, options);
+    const prelaunch = await processImportance(adb, serial, app, options);
     const baseline = new Set((await readLaunchCrashes(adb, serial, options, prelaunch)).keys);
-    return new LaunchWatch(adb, serial, userId, uid, options, baseline, prelaunch);
+    return new LaunchWatch(adb, serial, userId, app.uid, options, baseline, prelaunch);
   }
 
   async check(options = this.options): Promise<LaunchCrash[]> {
     const { crashes } = await readLaunchCrashes(this.adb, this.serial, options, this.prelaunch);
     return crashes.filter(
       (crash) =>
-        this.uid !== null &&
-        crash.uid === this.uid &&
-        crash.userId === this.userId &&
-        !this.baseline.has(crash.key),
+        crash.uid === this.uid && crash.userId === this.userId && !this.baseline.has(crash.key),
     );
   }
 

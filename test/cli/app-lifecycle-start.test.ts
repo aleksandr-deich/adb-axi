@@ -292,12 +292,14 @@ describe("lifecycle review regressions", () => {
             {
               match: shell(KERNEL_UIDS),
               when: { current: "running" },
-              respond: { stdout: "  PID   UID\n 9001 10213\n 8235 1010213\n" },
+              respond: {
+                stdout: "  PID   UID NAME\n 9001 10213 dev.probe\n 8235 1010213 dev.probe\n",
+              },
             },
             {
               match: shell(KERNEL_UIDS),
               when: { current: "stopped" },
-              respond: { stdout: "  PID   UID\n 9001 10213\n" },
+              respond: { stdout: "  PID   UID NAME\n 9001 10213 dev.probe\n" },
             },
             {
               match: shell(PROCESSES),
