@@ -3,9 +3,9 @@ import { noop, okLine } from "../../core/output.js";
 import { realClock } from "../../core/poll.js";
 import { defineCommand } from "../define.js";
 import {
+  appPids,
   forceStop,
   lifecycleCommand,
-  mainPids,
   pidLabel,
   requireInstalled,
   stopFailed,
@@ -32,7 +32,7 @@ export const appStop = defineCommand({
     const adb = context.adb();
 
     const { userId, app } = await requireInstalled(context, pkg);
-    const before = await mainPids(context, app);
+    const before = await appPids(context, app);
     const started = realClock.now();
     await forceStop(adb, serial, pkg, userId, readOptions(context));
     if (before.length === 0) {

@@ -131,7 +131,7 @@ describe("a second Android user in front, with the probe running only for user 0
 });
 
 describe("the probe started for the second user too", () => {
-  test("app info reads the current user's processes", async () => {
+  test("app info and app stop act on the current user's processes and leave the owner's", async () => {
     const n = user ?? 0;
     const owner = uidOf(0, probeAppId);
     const current = uidOf(n, probeAppId);
@@ -146,5 +146,25 @@ describe("the probe started for the second user too", () => {
     expect(await pidof(PKG)).toContain(main);
 
     expect((await axi.ok(["app", "info", PKG])).app).toMatchObject({ pid: main });
+
+    const since = (await raw("date +'%m-%d %H:%M:%S.000'")).trim();
+    const stopped = await axi.ok(["app", "stop", PKG]);
+    expect(String(stopped.ok)).toMatch(
+      /^stop dev\.probe -> not running \(pids \d+ \d+ gone after \d+ ms\)$/,
+    );
+    const named = /pids (\d+) (\d+)/.exec(String(stopped.ok))?.slice(1).map(Number) ?? [];
+    expect(named.sort((a, b) => a - b)).toEqual([main, ui].sort((a, b) => (a ?? 0) - (b ?? 0)));
+    expect(await pidsUnder(current, PKG)).toEqual([]);
+    expect(await pidsUnder(current, `${PKG}:ui`)).toEqual([]);
+    const alive = [...(await pidof(PKG)), ...(await pidof(`${PKG}:ui`))];
+    // The owner's processes are cached in the background, so lmkd may reclaim one meanwhile.
+    const log = await raw(`logcat -d -T '${since}'`);
+    expect(log).not.toContain(`Force stopping ${PKG} appid=${probeAppId} user=0`);
+    for (const pid of ownerPids) {
+      if (!alive.includes(pid))
+        expect(log).toMatch(new RegExp(`lowmemorykiller: Kill '[^']+' \\(${pid}\\)`));
+    }
+    expect(alive).not.toContain(main);
+    expect(alive).not.toContain(ui);
   });
 });

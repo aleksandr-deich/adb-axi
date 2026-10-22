@@ -78,20 +78,21 @@ export async function forceStop(
 
 export type ExitWait = { gone: true } | { gone: false; last: number[] | null };
 
-/** The pids of the app's main process. */
-export async function mainPids(context: CommandContext, app: AppIdentity): Promise<number[]> {
+/** The pids of every running process of the app. */
+export async function appPids(context: CommandContext, app: AppIdentity): Promise<number[]> {
   const processes = await runningProcesses(
     context.adb(),
     targetSerial(context),
     app,
     readOptions(context),
   );
-  return processes.filter(({ name }) => name === app.pkg).map(({ pid }) => pid);
+  return processes.map(({ pid }) => pid);
 }
 
 /**
- * Poll until the app's main process is gone or the command deadline passes. A read cut
- * off by the deadline ends the wait; the last full observation is the evidence.
+ * Poll until every process of the app is gone or the command deadline passes: force-stop
+ * and `pm clear` end them all. A read cut off by the deadline ends the wait; the last full
+ * observation is the evidence.
  */
 export async function waitForExit(context: CommandContext, app: AppIdentity): Promise<ExitWait> {
   let last: number[] | null = null;
@@ -99,7 +100,7 @@ export async function waitForExit(context: CommandContext, app: AppIdentity): Pr
     timeoutMs: context.deadline.remainingMs(),
     check: async () => {
       try {
-        last = await mainPids(context, app);
+        last = await appPids(context, app);
       } catch (error) {
         if (error instanceof AdbAxiError && error.code === "TIMEOUT") {
           return { done: false, last };

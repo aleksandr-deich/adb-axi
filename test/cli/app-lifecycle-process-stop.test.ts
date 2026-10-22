@@ -123,18 +123,4 @@ describe("lifecycle review regressions", () => {
     expect(shellCommands(f)).toContain(FORCE_STOP);
     expectClean(f);
   });
-
-  it("keeps stop's no-op and force-stop scoped when only another profile is running", async () => {
-    const f = device({
-      [PACKAGE]: INSTALLED,
-      [PIDOF]: { stdout: "9001\n" },
-      [FORCE_STOP]: {},
-      [KERNEL_UIDS]: { stdout: "  PID   UID NAME\n 9001 1010213 dev.probe\n" },
-    });
-    const { toon, data } = await both(["app", "stop", "dev.probe"], f);
-    expect(toon.exitCode).toBe(0);
-    expect(data).toEqual({ ok: "stop dev.probe -> already not running (no-op)" });
-    expect(shellCommands(f)).toContain(FORCE_STOP);
-    expectClean(f);
-  });
 });
