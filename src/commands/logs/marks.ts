@@ -1,7 +1,6 @@
 import { join } from "node:path";
 import { readShellFacts, type DeviceFacts } from "../../device/facts.js";
 import type { CommandContext } from "../types.js";
-import { isPackageName } from "../../android/component.js";
 import { parseDuration } from "../../core/args.js";
 import { AdbAxiError } from "../../core/errors.js";
 import { runHint } from "../../core/output.js";
@@ -225,15 +224,4 @@ function isMarkedProcess(value: unknown): value is MarkedProcess {
     typeof entry.name === "string" &&
     (entry.uid === undefined || typeof entry.uid === "number")
   );
-}
-
-/**
- * The processes worth keeping in a mark: apps, which are named after a dotted package
- * name. System processes (`init`, `[kworker/0:1]`, `/system/bin/...`) are never an app's pids.
- */
-export function appProcesses<T extends { name: string }>(processes: readonly T[]): T[] {
-  return processes.filter((process) => {
-    const base = process.name.split(":")[0] ?? "";
-    return base.includes(".") && isPackageName(base);
-  });
 }

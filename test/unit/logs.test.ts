@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { parseLogcat } from "../../src/android/logcat.js";
 import { belongsTo } from "../../src/android/crash.js";
-import { appProcesses, assertMarkName } from "../../src/commands/logs/marks.js";
+import { assertMarkName } from "../../src/commands/logs/marks.js";
 import { startedPids } from "../../src/commands/logs/scope.js";
 import { logcatCommand } from "../../src/commands/logs/window.js";
 import { timeoutWindow } from "../../src/commands/wait/log.js";
@@ -19,23 +19,6 @@ describe("process names", () => {
     expect(belongsTo({ name: "dev.probe:remote" }, "dev.probe")).toBe(true);
     expect(belongsTo({ name: "dev.probe.test" }, "dev.probe")).toBe(false);
     expect(belongsTo({ name: "dev.probe2" }, "dev.probe")).toBe(false);
-  });
-
-  it("keeps only package-named processes for a mark", () => {
-    const processes = [
-      { pid: 1, name: "init" },
-      { pid: 517, name: "system_server" },
-      { pid: 612, name: "[kworker/0:1]" },
-      { pid: 4400, name: "com.other.app" },
-      { pid: 6044, name: "dev.probe" },
-      { pid: 6050, name: "dev.probe:remote" },
-      { pid: 6101, name: "/system/bin/sh" },
-    ];
-    expect(appProcesses(processes)).toEqual([
-      { pid: 4400, name: "com.other.app" },
-      { pid: 6044, name: "dev.probe" },
-      { pid: 6050, name: "dev.probe:remote" },
-    ]);
   });
 });
 
