@@ -46,7 +46,7 @@ export const appStart = defineCommand({
   path: ["app", "start"],
   help: [
     "Starts the app for the current Android user",
-    "Post-launch observation is bounded to 2s or the remaining deadline, whichever is shorter; a live app may be reported with another app in front",
+    "Post-launch re-observation stops after 2s or the remaining deadline, whichever is shorter; the first observation may use the remaining --timeout on a slow device; a live app may be reported with another app in front",
   ],
   summary: "Start an app, then report what is in the foreground and how it launched",
   positionals: [
@@ -272,9 +272,11 @@ export async function launchActivity(
 }
 
 /**
- * Observe for at most `SETTLE_MS` of the remaining deadline. Check crash evidence
- * before liveness or foreground: a crash dialog can keep a crashed process alive.
- * The first observation usually settles it.
+ * The first observation uses the command's deadline so a slow device fails against
+ * `--timeout`, not the settle window. Further observations stop at `SETTLE_MS` from
+ * settle entry or the command deadline, whichever comes first, returning the last result.
+ * Check crash evidence before liveness or foreground: a crash dialog can keep a
+ * crashed process alive.
  */
 export async function settle(
   context: CommandContext,
@@ -295,18 +297,17 @@ export async function settle(
       if (last !== undefined && deadline.remainingMs() === 0) {
         return { done: true, value: last };
       }
+      const reads = { deadline: last === undefined ? context.deadline : deadline };
       try {
-        const crash = (await watch.check({ deadline })).find(
-          (entry) => entry.process === processName,
-        );
+        const crash = (await watch.check(reads)).find((entry) => entry.process === processName);
         if (crash !== undefined) {
           return { done: true, value: { state: "crashed", pid: crash.pid, front: null } };
         }
-        const processes = await processImportance(adb, serial, app, { deadline });
+        const processes = await processImportance(adb, serial, app, reads);
         if (last !== undefined && deadline.remainingMs() === 0) {
           return { done: true, value: last };
         }
-        const front = await readForeground(adb, serial, { deadline, userId });
+        const front = await readForeground(adb, serial, { ...reads, userId });
         const pid = processes.find((process) => process.process === processName)?.pid ?? UNKNOWN;
         const inFront = front?.package === activity.package;
         const state = pid === UNKNOWN ? "stopped" : inFront ? "foreground" : "running";

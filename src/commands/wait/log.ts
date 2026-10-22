@@ -51,7 +51,7 @@ export const waitLog = defineCommand({
     const window =
       since === undefined
         ? windowFromNow(now)
-        : resolveWindow(serial, context.env, since, now, context.marksVerified);
+        : resolveWindow(serial, context.env, since, now, context.marksVerified === true);
 
     let latest: Observation | undefined;
     const result = await poll({
