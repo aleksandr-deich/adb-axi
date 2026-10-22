@@ -1,11 +1,18 @@
 import { runShell } from "../../adb/shell.js";
+import { processTable } from "../../android/app-processes.js";
 import { assertPackageName } from "../../android/component.js";
 import { invalidOutput, readShell } from "../../android/read.js";
 import { AdbAxiError } from "../../core/errors.js";
 import { okLine, runHint } from "../../core/output.js";
 import { defineCommand } from "../define.js";
 import type { CommandContext } from "../types.js";
-import { appPids, lifecycleCommand, requireInstalled, stopFailed, waitForExit } from "./process.js";
+import {
+  forceStop,
+  lifecycleCommand,
+  requireInstalled,
+  stopFailed,
+  waitForExit,
+} from "./process.js";
 import { readOptions, targetSerial } from "./shared.js";
 
 /** How many of the files left after a clear the error lists. */
@@ -34,25 +41,26 @@ export const appClear = defineCommand({
     const adb = context.adb();
 
     const { info, userId, app } = await requireInstalled(context, pkg);
-    const before = await appPids(context, app);
+    const before = (await processTable(adb, serial, readOptions(context)))
+      .filter(({ uid }) => uid === app.uid)
+      .map(({ pid }) => pid);
 
     // `pm clear` waits for the system to report the data cleared, then prints `Success`;
     // a refusal prints `Failed` and exits 1 (AOSP `PackageManagerShellCommand.runClear`).
     // Clearing also force-stops the app, which the pid check below verifies.
     const step = `clearing the data of ${pkg}`;
-    const clear = async () => {
-      const result = await readShell(
-        adb,
-        serial,
-        `pm clear --user ${userId} ${pkg}`,
-        step,
-        readOptions(context),
-      );
-      if (result.stdout.trim() !== "Success") throw invalidOutput(step, result.stdout);
-    };
-    await clear();
+    const result = await readShell(
+      adb,
+      serial,
+      `pm clear --user ${userId} ${pkg}`,
+      step,
+      readOptions(context),
+    );
+    if (result.stdout.trim() !== "Success") throw invalidOutput(step, result.stdout);
 
-    const exit = await waitForExit(context, app, before, clear);
+    const exit = await waitForExit(context, app, before, () =>
+      forceStop(adb, serial, pkg, userId, readOptions(context)),
+    );
     if (!exit.gone) {
       throw stopFailed(context, pkg, exit.last, context.timeoutMs, {
         command: lifecycleCommand(context, [
