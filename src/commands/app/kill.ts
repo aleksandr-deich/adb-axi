@@ -35,7 +35,8 @@ const KILL_WINDOW_MS = 2000;
 export const appKill = defineCommand({
   path: ["app", "kill"],
   help: [
-    "Targets the current Android user; process-exit checks use the package UID, so they can include packages sharing that UID and miss isolated services",
+    "Targets the current Android user",
+    "Processes are matched by the app's uid, so other packages that share it are included and isolated services, which run under their own uid, are not",
   ],
   summary:
     "Kill an app's process the way the system does, keeping its task in recents. An app in front is sent to the background first (HOME), which changes what is on screen, and Android kills the app's other background processes with it.",
