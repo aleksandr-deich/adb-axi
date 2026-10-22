@@ -14,7 +14,7 @@ const SERIAL = "emulator-5554";
 const ONE_ONLINE = `List of devices attached\n${SERIAL}          device product:sdk_gphone64_arm64 model:sdk_gphone64_arm64 device:emu64a transport_id:1\n\n`;
 
 const FOREGROUND = "dumpsys activity activities";
-const PIDOF = "pidof dev.probe";
+const PIDOF = "pidof 'dev.probe'";
 const PROCESS_TABLE = "ps -A -o PID,UID,NAME";
 const NO_PROCESSES = { stdout: "  PID   UID NAME\n" };
 const PACKAGE = "dumpsys package dev.probe";

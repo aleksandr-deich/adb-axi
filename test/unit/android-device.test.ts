@@ -53,7 +53,7 @@ const running = (adb: AdbClient, pkg: string) =>
 
 describe("pidof", () => {
   it("never reads an inconsistent answer as not running", async () => {
-    const { adb } = device({ [PS]: PS_HEADER, "pidof dev.probe": { stdout: "", exit: 0 } });
+    const { adb } = device({ [PS]: PS_HEADER, "pidof 'dev.probe'": { stdout: "", exit: 0 } });
     expect(await failure(running(adb, "dev.probe"))).toMatchObject({
       code: "INVALID_OUTPUT",
       step: "reading the pid of dev.probe",
@@ -63,10 +63,10 @@ describe("pidof", () => {
   it("reports a failed pidof as REMOTE_EXIT with its stderr", async () => {
     const { adb } = device({
       [PS]: PS_HEADER,
-      "pidof dev.probe": { stderr: "/system/bin/sh: pidof: inaccessible\n", exit: 126 },
+      "pidof 'dev.probe'": { stderr: "/system/bin/sh: pidof: inaccessible\n", exit: 126 },
     });
     expect(await failure(running(adb, "dev.probe"))).toEqual({
-      error: "reading the pid of dev.probe failed: `pidof dev.probe` exited 126",
+      error: "reading the pid of dev.probe failed: `pidof 'dev.probe'` exited 126",
       code: "REMOTE_EXIT",
       step: "reading the pid of dev.probe",
       exit: 126,

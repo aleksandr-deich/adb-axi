@@ -68,7 +68,7 @@ export function scopePids(scope: Scope & { kind: "pids" }, lines: readonly LogLi
  * printed in user form, `u<user>a<app id - 10000>` (`UserHandle.formatUid`), so `u10a116` is
  * uid 1010116; a uid below 10000 prints as the number.
  */
-const START_PROC = /^Start proc (\d+):[^/\s]+\/(?:u(\d+)a(\d+)|(\d+)) for /;
+const START_PROC = /^Start proc (\d+):[^/\s]+\/(?:u(\d+)([as])(\d+)|(\d+)) for /;
 
 export function startedPids(lines: readonly LogLine[], uid: number): number[] {
   const pids: number[] = [];
@@ -77,9 +77,9 @@ export function startedPids(lines: readonly LogLine[], uid: number): number[] {
     const match = START_PROC.exec(line.message);
     if (match?.[1] === undefined) continue;
     const started =
-      match[2] !== undefined && match[3] !== undefined
-        ? Number(match[2]) * 100000 + 10000 + Number(match[3])
-        : Number(match[4]);
+      match[2] !== undefined
+        ? Number(match[2]) * 100000 + (match[3] === "a" ? 10000 : 0) + Number(match[4])
+        : Number(match[5]);
     if (started === uid) pids.push(Number(match[1]));
   }
   return pids;

@@ -16,7 +16,7 @@ const ONE_ONLINE = `List of devices attached\n${SERIAL}          device product:
 
 const CURRENT_USER = "am get-current-user";
 const PACKAGE = "dumpsys package dev.probe";
-const PIDOF = "pidof dev.probe";
+const PIDOF = "pidof 'dev.probe'";
 const KERNEL_UIDS = "ps -A -o PID,UID,NAME";
 const PROCESSES = "dumpsys activity processes dev.probe";
 const FOREGROUND = "dumpsys activity activities";
@@ -304,8 +304,8 @@ describe("app kill", () => {
     expectClean(fake);
   });
 
-  it.each(["[dev.probe];id"])(
-    "rejects the malformed target-UID process name %s without killing",
+  it.each([""])(
+    "rejects the missing target-UID process name %s without killing",
     async (name) => {
       const { toon, data, fake } = await both(["app", "kill", "dev.probe"], () =>
         probeDevice({
@@ -378,22 +378,23 @@ describe("app kill", () => {
               stdout: `PID UID NAME\n8333 10213 ${custom}\n9000 10214 dev.probe:unrelated\n`,
             },
           },
-          { match: shell(`pidof ${custom}`), respond: PIDOF_OF(8333) },
+          { match: shell(`pidof '${custom}'`), respond: PIDOF_OF(8333) },
           { match: shell("run-as dev.probe --user 0 kill -9 8333"), respond: {} },
         ],
       }),
     );
     expect(toon.exitCode).toBe(1);
     expect(data).toMatchObject({ code: "KILL_TIMEOUT", last: { pid: 8333 }, am_kill_sent: true });
-    expect(shellCommands(fake)).toContain(`pidof ${custom}`);
+    expect(shellCommands(fake)).toContain(`pidof '${custom}'`);
     expect(shellCommands(fake)).toContain("run-as dev.probe --user 0 kill -9 8333");
-    expect(shellCommands(fake)).not.toContain("pidof dev.probe:unrelated");
+    expect(shellCommands(fake)).not.toContain("pidof 'dev.probe:unrelated'");
     expect(shellCommands(fake)).not.toContain(START);
     expectClean(fake);
   });
 
-  it("rejects an unsafe process name before sending it to the device shell", async () => {
-    const unsafe = "worker;id";
+  it("quotes an unsafe process name before sending it to the device shell", async () => {
+    const unsafe = "worker';id";
+    const quoted = "pidof 'worker'\\'';id'";
     const { toon, data, fake } = await both(["app", "kill", "dev.probe"], () =>
       probeDevice({
         phase: "previous",
@@ -402,11 +403,13 @@ describe("app kill", () => {
             match: shell(KERNEL_UIDS),
             respond: { stdout: `PID UID NAME\n8333 10213 ${unsafe}\n` },
           },
+          { match: shell(quoted), respond: { stdout: "", exit: 1 } },
         ],
       }),
     );
-    expect(toon.exitCode).toBe(1);
-    expect(data).toMatchObject({ code: "INVALID_OUTPUT" });
+    expect(toon.exitCode).toBe(0);
+    expect(data).toEqual({ ok: "kill dev.probe -> already not running (no-op)" });
+    expect(shellCommands(fake)).toContain(quoted);
     expect(shellCommands(fake)).not.toContain(`pidof ${unsafe}`);
     expect(shellCommands(fake)).not.toContain("id");
     expect(shellCommands(fake)).not.toContain(AM_KILL);

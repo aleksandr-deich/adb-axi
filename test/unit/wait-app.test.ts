@@ -99,9 +99,9 @@ describe("wait app", () => {
       ["-s", SERIAL, "shell", "dumpsys package dev.probe"],
       ["-s", SERIAL, "shell", "pm path --user 0 dev.probe"],
       ["-s", SERIAL, "shell", "ps -A -o PID,UID,NAME"],
-      ["-s", SERIAL, "shell", "pidof dev.probe"],
+      ["-s", SERIAL, "shell", "pidof 'dev.probe'"],
       ["-s", SERIAL, "shell", "ps -A -o PID,UID,NAME"],
-      ["-s", SERIAL, "shell", "pidof dev.probe"],
+      ["-s", SERIAL, "shell", "pidof 'dev.probe'"],
     ]);
   });
 });

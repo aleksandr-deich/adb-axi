@@ -33,7 +33,6 @@ export interface ProcessRow extends RunningProcess {
 /** Every process with its pid, uid and name (toybox `ps -A -o PID,UID,NAME`, API 29 to 37). */
 const PS_COMMAND = "ps -A -o PID,UID,NAME";
 const PS_STEP = "reading package process names";
-const PROCESS_NAME = /^[A-Za-z_][A-Za-z0-9_.:-]*$/;
 
 /**
  * `pidof <name>` prints every matching pid on one line, space-separated, and exits 1 with
@@ -84,7 +83,7 @@ export function psCandidates(stdout: string, app: AppIdentity): Map<string, Set<
   for (const row of psRows(stdout)) {
     if (!/^\d+$/.test(row.uid) || Number(row.uid) !== app.uid) continue;
     const pid = Number(row.pid);
-    if (!Number.isSafeInteger(pid) || pid <= 0 || !row.name || !PROCESS_NAME.test(row.name)) {
+    if (!Number.isSafeInteger(pid) || pid <= 0 || !row.name) {
       throw invalidOutput(PS_STEP, row.line);
     }
     const known = names.get(row.name) ?? new Set<number>();
@@ -158,7 +157,14 @@ async function readPidof(
   options: ReadOptions,
 ): Promise<number[]> {
   const step = `reading the pid of ${name}`;
-  const result = await readShell(adb, serial, `pidof ${name}`, step, options, [0, 1]);
+  const result = await readShell(
+    adb,
+    serial,
+    `pidof '${name.replace(/'/g, "'\\''")}'`,
+    step,
+    options,
+    [0, 1],
+  );
   const pids = parsePidof(result.stdout);
   // Exit 1 with output, or exit 0 without, is not something pidof does.
   if (pids === null || (result.exitCode === 1) !== (pids.length === 0)) {
@@ -168,7 +174,7 @@ async function readPidof(
 }
 
 function unbracket(name: string): string {
-  return name.replace(/^\[([A-Za-z_][A-Za-z0-9_.:-]*)\]$/, "$1");
+  return name.replace(/^\[(.+)\]$/, "$1");
 }
 
 /** The app's main process: the one named exactly like the package. */
