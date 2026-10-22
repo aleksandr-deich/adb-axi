@@ -15,6 +15,8 @@ const ONE_ONLINE = `List of devices attached\n${SERIAL}          device product:
 
 const FOREGROUND = "dumpsys activity activities";
 const PIDOF = "pidof dev.probe";
+const PROCESS_TABLE = "ps -A -o PID,UID,NAME";
+const NO_PROCESSES = { stdout: "  PID   UID NAME\n" };
 const PACKAGES_ALL = "pm list packages --show-versioncode -U";
 const PACKAGES_USER = "pm list packages --show-versioncode -U -3";
 const PACKAGE_DUMP = "dumpsys package packages";
@@ -274,6 +276,7 @@ describe("app info", () => {
     const f = device({
       "am get-current-user": { stdout: "10\n" },
       "dumpsys package dev.probe": { stdout: dump },
+      [PROCESS_TABLE]: NO_PROCESSES,
       [PIDOF]: PROBE_STOPPED,
       [FOREGROUND]: LAUNCHER_FRONT,
       "run-as dev.probe --user 10 du -sk .": { stdout: "72\t.\n" },
