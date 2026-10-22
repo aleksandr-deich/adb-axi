@@ -121,6 +121,12 @@ describe("a second Android user in front, with the probe running only for user 0
       package: front,
       pid: frontPids[0],
     });
+
+    const since = await axi.mark("second-user");
+    expect(since).not.toBe("");
+    const api = Number((await axi.sh("getprop ro.build.version.sdk")).trim());
+    const scoped = await axi.ok(["logs", "--pkg", PKG, "--since", "second-user"]);
+    expect(scoped.scope).toBe(api >= 31 ? `${PKG} (uid ${current})` : `${PKG} (pids -)`);
   });
 });
 

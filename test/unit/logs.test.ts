@@ -45,17 +45,17 @@ describe("parsePs", () => {
 describe("startedPids", () => {
   const lines = parseLogcat(synthetic30("logcat-epoch-window.txt")).lines;
 
-  it("takes the pids ActivityManager started for the package, main and colon processes", () => {
-    expect(startedPids(lines, "dev.probe")).toEqual([6030, 6044]);
-    expect(startedPids(lines, "com.other.app")).toEqual([4400]);
-    expect(startedPids(lines, "dev.pro")).toEqual([]);
+  it("takes the pids ActivityManager started under the app's uid, printed as u<user>a<app id>", () => {
+    expect(startedPids(lines, 10213)).toEqual([6030, 6044]);
+    expect(startedPids(lines, 10099)).toEqual([4400]);
+    expect(startedPids(lines, 1010213)).toEqual([]);
   });
 
   it("ignores a Start proc text logged by another tag", () => {
     const forged = parseLogcat(
       "         1790834111.250   900   900 I SomeApp  : Start proc 1:dev.probe/u0a1 for x\n",
     ).lines;
-    expect(startedPids(forged, "dev.probe")).toEqual([]);
+    expect(startedPids(forged, 10001)).toEqual([]);
   });
 });
 
