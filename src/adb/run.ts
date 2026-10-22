@@ -10,6 +10,7 @@ import {
   classifyShellFailure,
   isTransportClosed,
 } from "./variants.js";
+import { serverEndpoint } from "./server-endpoint.js";
 import { hostAdbVersionError, parseAdbVersion } from "./version.js";
 
 /** Looks at `adb devices` after a device's connection closed: the server notices within a second. */
@@ -69,6 +70,10 @@ export class AdbClient {
   constructor(path: string, options: AdbClientOptions = {}) {
     this.path = path;
     this.options = options;
+  }
+
+  get serverEndpoint(): string {
+    return serverEndpoint(this.options.env ?? process.env);
   }
 
   /** A host-side call that targets no device, such as `devices -l`. */
@@ -178,7 +183,9 @@ export class AdbClient {
           : exitCode === 1 && stdout === ""
             ? classifyShellFailure(stderr)
             : undefined;
-      if (code !== undefined) throw adbFailureError(code, serial, `${stderr}\n${stdout}`);
+      if (code !== undefined) {
+        throw adbFailureError(code, serial, `${stderr}\n${stdout}`, this.serverEndpoint);
+      }
       // The connection to the device closed under the call: adb prints `error: closed`, or
       // exits 255 with nothing on stderr when the device dies mid-command. The device's
       // state says whether it went away; the call is never re-sent.

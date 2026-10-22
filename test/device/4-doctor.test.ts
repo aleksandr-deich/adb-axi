@@ -84,7 +84,9 @@ describe("doctor on a real emulator", () => {
     expect(all.server).toEqual({
       check: "server",
       status: "ok",
-      detail: `tcp:${process.env.ANDROID_ADB_SERVER_PORT ?? "5037"}`,
+      detail:
+        process.env.ADB_SERVER_SOCKET ??
+        `tcp:${process.env.ANDROID_ADB_SERVER_ADDRESS === undefined ? "" : `${process.env.ANDROID_ADB_SERVER_ADDRESS}:`}${process.env.ANDROID_ADB_SERVER_PORT || "5037"}`,
     });
     const attached = (await axi.adbHost(["devices"])).stdout
       .split("\n")
@@ -190,16 +192,30 @@ describe("doctor on a real emulator", () => {
   });
 
   test("an adb server that was not running is started, reported with its port, and stopped again", async () => {
+    const baseline = await axi.adbHost(["devices", "-l"]);
+    expect(baseline.exitCode).toBe(0);
     const port = String(await freePort());
     try {
-      const run = await axi.runWithEnv(["doctor"], { ANDROID_ADB_SERVER_PORT: port });
+      const run = await axi.runWithEnv(["doctor"], {
+        ADB_SERVER_SOCKET: undefined,
+        ANDROID_ADB_SERVER_ADDRESS: undefined,
+        ANDROID_ADB_SERVER_PORT: port,
+        ADB_USB: "0",
+        ADB_EMU: "0",
+        ADB_MDNS: "0",
+      });
       expect(checks(run.json).server).toEqual({
         check: "server",
         status: "warn",
         detail: `tcp:${port} was not running, adb started it just now`,
       });
     } finally {
-      await axi.adbHost(["-P", port, "kill-server"]);
+      const stopped = await axi.adbHost(["-L", `tcp:${port}`, "kill-server"]);
+      expect(stopped.exitCode).toBe(0);
+      const after = await axi.adbHost(["devices", "-l"]);
+      expect(after.exitCode).toBe(0);
+      expect(after.stdout).toBe(baseline.stdout);
+      expect(after.stderr).not.toMatch(/daemon not running|daemon started successfully/);
     }
   });
 });

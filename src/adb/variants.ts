@@ -78,6 +78,7 @@ export function adbFailureError(
   code: ErrorCode,
   serial: string | undefined,
   detail: string,
+  endpoint = "tcp:5037",
 ): AdbAxiError {
   const target = serial ?? "the adb server";
   const fields = { detail: detail.trim() };
@@ -99,7 +100,7 @@ export function adbFailureError(
         },
       );
     case "ADB_SERVER_UNREACHABLE":
-      return serverUnreachable(detail);
+      return serverUnreachable(detail, endpoint);
     case "DEVICE_AMBIGUOUS":
       return new AdbAxiError(code, "adb could not tell which device to use", { fields });
     default:
@@ -109,9 +110,9 @@ export function adbFailureError(
   }
 }
 
-export function serverUnreachable(detail?: string): AdbAxiError {
+export function serverUnreachable(detail?: string, endpoint = "tcp:5037"): AdbAxiError {
   return new AdbAxiError("ADB_SERVER_UNREACHABLE", "the adb server did not answer", {
     fields: detail === undefined || detail.trim() === "" ? {} : { detail: detail.trim() },
-    help: ["Check that nothing else holds tcp:5037, then run the command again"],
+    help: [`Check that nothing else holds ${endpoint}, then run the command again`],
   });
 }
