@@ -3,7 +3,7 @@ import { readShell } from "../../android/read.js";
 import { AdbAxiError } from "../../core/errors.js";
 import { runHint } from "../../core/output.js";
 import { defineCommand } from "../define.js";
-import { formatVersion, readOptions, targetSerial, UNKNOWN } from "./shared.js";
+import { formatVersion, UNKNOWN } from "./shared.js";
 
 export const appList = defineCommand({
   path: ["app", "list"],
@@ -22,9 +22,9 @@ export const appList = defineCommand({
   run: async (context) => {
     const all = context.flags.all === true;
     const matches = nameFilter(context.flags.grep);
-    const serial = targetSerial(context);
-    const options = readOptions(context);
-    const adb = context.adb();
+    const serial = context.device.serial;
+    const options = context.device.reads;
+    const adb = context.device.adb;
 
     // The user set and the full set are both read, so the count line can say how many
     // packages the device has beyond the user's, whichever of the two is shown.

@@ -6,7 +6,7 @@ import { AdbAxiError } from "../../core/errors.js";
 import { okLine, runHint } from "../../core/output.js";
 import { MAX_INTERVAL_MS, poll } from "../../core/poll.js";
 import { truncateField } from "../../core/truncate.js";
-import { readOptions, targetSerial, UNKNOWN } from "../app/shared.js";
+import { UNKNOWN } from "../app/shared.js";
 import { defineCommand } from "../define.js";
 import {
   clockTime,
@@ -41,9 +41,9 @@ export const waitLog = defineCommand({
     const source = String(context.positionals.regex);
     const regex = compileRegex("regex", source);
     const since = typeof context.flags.since === "string" ? context.flags.since : undefined;
-    const serial = targetSerial(context);
-    const options = readOptions(context);
-    const adb = context.adb();
+    const serial = context.device.serial;
+    const options = context.device.reads;
+    const adb = context.device.adb;
 
     // Without `--since` the window opens now, so only lines logged during the wait count.
     const now = await readDeviceClock(adb, serial, options);

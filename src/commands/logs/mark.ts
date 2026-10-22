@@ -3,7 +3,6 @@ import { formatDeviceTime, readDeviceClock } from "../../android/clock.js";
 import { invalidOutput } from "../../android/read.js";
 import { okLine } from "../../core/output.js";
 import { readShellFacts } from "../../device/facts.js";
-import { readOptions, targetSerial } from "../app/shared.js";
 import { defineCommand } from "../define.js";
 import { assertMarkName, assertMarkVerified, bindTargetMarks, writeMark } from "./marks.js";
 import { PID_LIST_BELOW_API } from "./scope.js";
@@ -27,11 +26,10 @@ export const logsMark = defineCommand({
   run: async (context) => {
     const given = context.positionals.name;
     if (given !== undefined) assertMarkName(String(given));
-    const serial = targetSerial(context);
-    const options = readOptions(context);
-    const adb = context.adb();
-    const device = context.target?.device;
-    if (device === undefined) throw new TypeError("logs mark ran without a resolved device");
+    const serial = context.device.serial;
+    const options = context.device.reads;
+    const adb = context.device.adb;
+    const device = context.device.target.device;
 
     // On API 29 and 30 `logs --pkg` is a pid list, so the mark keeps the app processes
     // that are running now. They are read before the clock, so the window starts after them.

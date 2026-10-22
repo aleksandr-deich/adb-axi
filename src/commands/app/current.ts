@@ -3,7 +3,7 @@ import { readForeground } from "../../android/foreground.js";
 import { readPackageSnapshot } from "../../android/packages.js";
 import { readCurrentUser } from "../../android/users.js";
 import { defineCommand } from "../define.js";
-import { readOptions, targetSerial, UNKNOWN } from "./shared.js";
+import { UNKNOWN } from "./shared.js";
 
 export const appCurrent = defineCommand({
   path: ["app", "current"],
@@ -11,9 +11,9 @@ export const appCurrent = defineCommand({
   examples: ["adb-axi app current", "adb-axi app current --device Pixel_Tablet"],
   shipped: true,
   run: async (context) => {
-    const serial = targetSerial(context);
-    const options = readOptions(context);
-    const adb = context.adb();
+    const serial = context.device.serial;
+    const options = context.device.reads;
+    const adb = context.device.adb;
     const userId = await readCurrentUser(adb, serial, options);
 
     // A launcher in front is an answer like any other app.

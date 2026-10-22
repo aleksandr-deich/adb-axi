@@ -17,14 +17,14 @@ import { AdbAxiError } from "../../core/errors.js";
 import { noop, okLine, runHint, type Output } from "../../core/output.js";
 import { poll } from "../../core/poll.js";
 import { defineCommand } from "../define.js";
-import type { CommandContext } from "../types.js";
+import type { DeviceContext } from "../types.js";
 import {
   formatDuration,
   lifecycleCommand,
   requireInstalled,
   type InstalledPackage,
 } from "./process.js";
-import { readOptions, targetSerial, UNKNOWN } from "./shared.js";
+import { UNKNOWN } from "./shared.js";
 
 /**
  * How long `am kill` gets to take the process down before a debuggable app is killed
@@ -126,15 +126,15 @@ interface Seen {
  * is what hints name to retry. A process that is not running is `killed: false`.
  */
 export async function killProcess(
-  context: CommandContext,
+  context: DeviceContext,
   pkg: string,
   installed: InstalledPackage,
   command: string[],
 ): Promise<KillResult> {
-  const adb = context.adb();
-  const serial = targetSerial(context);
+  const adb = context.device.adb;
+  const serial = context.device.serial;
   const { userId, app } = installed;
-  const options = readOptions(context);
+  const options = context.device.reads;
 
   const before = (await runningProcesses(adb, serial, app, options)).map(({ pid }) => pid);
   if (before.length === 0) return { killed: false };
@@ -194,7 +194,7 @@ type Killable = { ok: true; waitedMs: number } | { ok: false; last: Seen | undef
  * launcher stays up, this still ends). A process with no record, or whose adj the dump
  * does not print, is left to the kill and the `pidof` check that follows it.
  */
-async function awaitKillable(context: CommandContext, app: AppIdentity): Promise<Killable> {
+async function awaitKillable(context: DeviceContext, app: AppIdentity): Promise<Killable> {
   let last: Seen | undefined;
   const result = await poll<null, Seen>({
     timeoutMs: context.deadline.remainingMs(),
@@ -202,10 +202,10 @@ async function awaitKillable(context: CommandContext, app: AppIdentity): Promise
       let processes: ProcessRecord[];
       try {
         processes = await processImportance(
-          context.adb(),
-          targetSerial(context),
+          context.device.adb,
+          context.device.serial,
           app,
-          readOptions(context),
+          context.device.reads,
         );
       } catch (error) {
         if (error instanceof AdbAxiError && error.code === "TIMEOUT") {
@@ -232,22 +232,22 @@ type Gone = { gone: true } | { gone: false; last: Seen | undefined };
  * A process still alive is read once more from ActivityManager for the timeout state.
  */
 async function awaitGone(
-  context: CommandContext,
+  context: DeviceContext,
   app: AppIdentity,
   windowMs: number,
 ): Promise<Gone> {
-  const adb = context.adb();
-  const serial = targetSerial(context);
+  const adb = context.device.adb;
+  const serial = context.device.serial;
   let last: Seen | undefined;
   const result = await poll<null, Seen | undefined>({
     timeoutMs: windowMs,
     check: async () => {
       try {
-        const pids = (await runningProcesses(adb, serial, app, readOptions(context))).map(
+        const pids = (await runningProcesses(adb, serial, app, context.device.reads)).map(
           ({ pid }) => pid,
         );
         if (pids.length === 0) return { done: true, value: null };
-        const processes = await processImportance(adb, serial, app, readOptions(context));
+        const processes = await processImportance(adb, serial, app, context.device.reads);
         const main = processes.find((process) => process.pid === pids[0]);
         last = main === undefined ? { pids, state: UNKNOWN, adj: null } : seen(main, pids);
       } catch (error) {
@@ -278,7 +278,7 @@ async function runAsKill(
   pkg: string,
   userId: number,
   pids: readonly number[],
-  context: CommandContext,
+  context: DeviceContext,
 ): Promise<void> {
   await runShell(adb, serial, `run-as ${pkg} --user ${userId} kill -9 ${pids.join(" ")}`, {
     deadline: context.deadline,
@@ -288,7 +288,7 @@ async function runAsKill(
 
 /** `KILL_TIMEOUT`: the process was still alive at the deadline, in the state last seen. */
 function killTimeout(
-  context: CommandContext,
+  context: DeviceContext,
   pkg: string,
   last: Seen | undefined,
   amKillSent: boolean,
@@ -323,7 +323,7 @@ function killTimeout(
 }
 
 /** `TASK_NOT_IN_RECENTS` after a kill: the process is gone, but there is nothing to restore. */
-function taskGone(context: CommandContext, pkg: string, evidence: KillEvidence): AdbAxiError {
+function taskGone(context: DeviceContext, pkg: string, evidence: KillEvidence): AdbAxiError {
   return new AdbAxiError(
     "TASK_NOT_IN_RECENTS",
     `${pkg} was killed but its task is not in recents, so a restore would be a fresh launch`,

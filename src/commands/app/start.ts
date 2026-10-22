@@ -17,7 +17,7 @@ import { okLine, runHint, type Output } from "../../core/output.js";
 import { poll } from "../../core/poll.js";
 import { logsCrash } from "../logs/crash.js";
 import { defineCommand } from "../define.js";
-import type { CommandContext } from "../types.js";
+import type { DeviceContext } from "../types.js";
 import {
   appPids,
   formatDuration,
@@ -27,7 +27,7 @@ import {
   stopFailed,
   waitForExit,
 } from "./process.js";
-import { readOptions, targetSerial, UNKNOWN } from "./shared.js";
+import { UNKNOWN } from "./shared.js";
 import { LaunchWatch } from "./launch-watch.js";
 
 /**
@@ -69,8 +69,8 @@ export const appStart = defineCommand({
   shipped: true,
   run: async (context) => {
     const { pkg, activity: requested } = startTarget(context);
-    const serial = targetSerial(context);
-    const adb = context.adb();
+    const serial = context.device.serial;
+    const adb = context.device.adb;
 
     const fresh = context.flags.fresh === true;
     const command = lifecycleCommand(context, [
@@ -82,14 +82,14 @@ export const appStart = defineCommand({
     const { dump, userId, app } = await requireInstalled(context, pkg);
     const filters = parseActivityFilters(dump);
     const activity =
-      requested ?? (await resolveLauncherActivity(adb, serial, pkg, userId, readOptions(context)));
+      requested ?? (await resolveLauncherActivity(adb, serial, pkg, userId, context.device.reads));
     if (activity === null) {
       throw activityNotFound(context, pkg, null, declaredActivities(filters, pkg));
     }
 
     if (fresh) {
       const before = await appPids(context, app);
-      const stop = () => forceStop(adb, serial, pkg, userId, readOptions(context));
+      const stop = () => forceStop(adb, serial, pkg, userId, context.device.reads);
       await stop();
       const exit = await waitForExit(context, app, before, stop);
       if (!exit.gone) {
@@ -114,7 +114,7 @@ export const appStart = defineCommand({
 });
 
 /** `<pkg>[/<activity>]` and `--activity`, checked before any device call. */
-function startTarget(context: CommandContext): { pkg: string; activity: string | null } {
+function startTarget(context: DeviceContext): { pkg: string; activity: string | null } {
   const raw = String(context.positionals.pkg);
   const slash = raw.indexOf("/");
   const pkg = slash === -1 ? raw : raw.slice(0, slash);
@@ -154,7 +154,7 @@ function startTarget(context: CommandContext): { pkg: string; activity: string |
  * deadline, or that am itself reports as `Status: timeout` (with exit 0), is `WAIT_TIMEOUT`.
  */
 export async function amStart(
-  context: CommandContext,
+  context: DeviceContext,
   adb: AdbClient,
   serial: string,
   pkg: string,
@@ -223,7 +223,7 @@ export interface Seen {
 }
 
 export async function launchActivity(
-  context: CommandContext,
+  context: DeviceContext,
   component: Component,
   userId: number,
   app: AppIdentity,
@@ -231,9 +231,9 @@ export async function launchActivity(
   activities: () => string[],
   died: (activity: Component, processName: string, last: Seen) => AdbAxiError,
 ): Promise<{ start: AmStart; launched: Component; processName: string; settled: Seen }> {
-  const adb = context.adb();
-  const serial = targetSerial(context);
-  const watch = await LaunchWatch.open(adb, serial, app, userId, readOptions(context));
+  const adb = context.device.adb;
+  const serial = context.device.serial;
+  const watch = await LaunchWatch.open(adb, serial, app, userId, context.device.reads);
   const start = await watch.during(
     (signal) =>
       amStart(
@@ -249,7 +249,7 @@ export async function launchActivity(
       ),
     async (crash, signal) => {
       const processName = await readActivityProcessName(adb, serial, component, userId, {
-        ...readOptions(context),
+        ...context.device.reads,
         signal,
       });
       return crash.process === processName
@@ -263,7 +263,7 @@ export async function launchActivity(
     serial,
     launched,
     userId,
-    readOptions(context),
+    context.device.reads,
   );
   const settled = await settle(context, adb, serial, launched, app, userId, processName, watch);
   if (settled.state === "stopped" || settled.state === "crashed")
@@ -279,7 +279,7 @@ export async function launchActivity(
  * crashed process alive.
  */
 export async function settle(
-  context: CommandContext,
+  context: DeviceContext,
   adb: AdbClient,
   serial: string,
   activity: Component,
@@ -327,7 +327,7 @@ export async function settle(
 }
 
 function report(
-  context: CommandContext,
+  context: DeviceContext,
   pkg: string,
   activity: string,
   fresh: boolean,
@@ -379,7 +379,7 @@ function how(start: AmStart, recreated: boolean): string {
 }
 
 function activityNotFound(
-  context: CommandContext,
+  context: DeviceContext,
   pkg: string,
   activity: string | null,
   activities: readonly string[],
@@ -404,7 +404,7 @@ function activityNotFound(
 }
 
 function startTimeout(
-  context: CommandContext,
+  context: DeviceContext,
   pkg: string,
   last: { status: string; activity: string },
   command: string[],
@@ -426,7 +426,7 @@ function startTimeout(
 }
 
 function diedOnStart(
-  context: CommandContext,
+  context: DeviceContext,
   activity: Component,
   processName: string,
   last: Seen,

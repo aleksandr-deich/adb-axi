@@ -25,6 +25,7 @@ import {
 } from "./commands/registry.js";
 import type { CommandContext, CommandSpec, GroupSpec, Registry } from "./commands/types.js";
 import { resolveTarget } from "./device/resolve.js";
+import { openSession } from "./device/session.js";
 import { readHostProcesses, type HostProcessList } from "./host/processes.js";
 import { VERSION } from "./version.js";
 
@@ -49,7 +50,9 @@ interface Run {
 }
 
 /** What `resolveContext` hands a handler: output to print as is, or a validated command to run. */
-type Invocation = { kind: "output"; output: Output } | { kind: "run"; context: CommandContext };
+type Invocation =
+  | { kind: "output"; output: Output }
+  | { kind: "run"; context: CommandContext; execute: () => Promise<Output> };
 
 /** Global flags that take a value, for reading flags placed before the command. */
 const VALUE_FLAGS = new Set(["-s", "--device", "--timeout"]);
@@ -124,7 +127,7 @@ async function produce(invocation: Invocation | undefined): Promise<Output> {
   if (invocation.kind === "output") return invocation.output;
   const context = invocation.context;
   try {
-    const output = await context.spec.run(context);
+    const output = await invocation.execute();
     return context.marksNote === undefined ? output : { ...output, marks_note: context.marksNote };
   } catch (error) {
     if (error instanceof AdbAxiError && context.marksNote !== undefined)
@@ -394,23 +397,27 @@ async function leafInvocation(
         })
       : undefined;
 
-  return {
-    kind: "run",
-    context: {
-      spec,
-      flags: parsed.flags,
-      positionals: parsed.positionals,
-      mode: run.mode,
-      timeoutMs,
-      debug,
-      deadline,
-      adb,
-      target,
-      env: run.env,
-      hostProcesses: run.hostProcesses,
-      isShipped: (path) => isShippedPath(run.registry, path),
-    },
+  const context: CommandContext = {
+    spec,
+    flags: parsed.flags,
+    positionals: parsed.positionals,
+    mode: run.mode,
+    timeoutMs,
+    debug,
+    deadline,
+    adb,
+    env: run.env,
+    hostProcesses: run.hostProcesses,
+    isShipped: (path) => isShippedPath(run.registry, path),
   };
+  if (spec.device === "none") {
+    return { kind: "run", context, execute: () => spec.run(context) };
+  }
+  if (target === undefined) {
+    throw new AdbAxiError("INTERNAL_ERROR", "the command ran without a resolved device");
+  }
+  const deviceContext = { ...context, device: openSession(target, adb(), deadline, run.env) };
+  return { kind: "run", context: deviceContext, execute: () => spec.run(deviceContext) };
 }
 
 /**

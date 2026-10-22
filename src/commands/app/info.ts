@@ -6,8 +6,8 @@ import { readCurrentUser } from "../../android/users.js";
 import { readShell } from "../../android/read.js";
 import { AdbAxiError } from "../../core/errors.js";
 import { defineCommand } from "../define.js";
-import type { CommandContext } from "../types.js";
-import { formatVersion, readOptions, targetSerial, UNKNOWN } from "./shared.js";
+import type { DeviceContext } from "../types.js";
+import { formatVersion, UNKNOWN } from "./shared.js";
 
 export const appInfo = defineCommand({
   path: ["app", "info"],
@@ -29,9 +29,9 @@ export const appInfo = defineCommand({
   run: async (context) => {
     const pkg = String(context.positionals.pkg);
     assertPackageName(pkg);
-    const serial = targetSerial(context);
-    const options = readOptions(context);
-    const adb = context.adb();
+    const serial = context.device.serial;
+    const options = context.device.reads;
+    const adb = context.device.adb;
     const userId = await readCurrentUser(adb, serial, options);
 
     const { info: record, dump } = await readPackageSnapshot(adb, serial, pkg, options, userId);
@@ -60,14 +60,14 @@ export const appInfo = defineCommand({
  * The size of a debuggable app's data directory. Only `run-as` can read it, so a refusal
  * is an unknown size, not a failure of the command.
  */
-async function dataSize(context: CommandContext, pkg: string, userId: number): Promise<string> {
+async function dataSize(context: DeviceContext, pkg: string, userId: number): Promise<string> {
   try {
     const result = await readShell(
-      context.adb(),
-      targetSerial(context),
+      context.device.adb,
+      context.device.serial,
       `run-as ${pkg} --user ${userId} du -sk .`,
       `measuring the data of ${pkg}`,
-      readOptions(context),
+      context.device.reads,
     );
     const kb = /^(\d+)\s/.exec(result.stdout)?.[1];
     return kb === undefined ? UNKNOWN : formatKb(Number(kb));

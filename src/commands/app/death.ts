@@ -3,12 +3,11 @@ import { readForeground } from "../../android/foreground.js";
 import { AdbAxiError } from "../../core/errors.js";
 import { okLine, runHint } from "../../core/output.js";
 import { defineCommand } from "../define.js";
-import type { CommandContext } from "../types.js";
+import type { DeviceContext } from "../types.js";
 import { textDiff, takeSnapshot, type Snapshot } from "./compare.js";
 import { killProcess, killRecord, type KillResult } from "./kill.js";
 import { lifecycleCommand, requireInstalled } from "./process.js";
 import { restoreTask, type Restored } from "./restore.js";
-import { readOptions, targetSerial } from "./shared.js";
 
 export const appDeath = defineCommand({
   path: ["app", "death"],
@@ -47,8 +46,8 @@ export const appDeath = defineCommand({
     // fails is reported with their evidence once both are done.
     let before: Snapshot | undefined;
     if (compare) {
-      const front = await readForeground(context.adb(), targetSerial(context), {
-        ...readOptions(context),
+      const front = await readForeground(context.device.adb, context.device.serial, {
+        ...context.device.reads,
         userId: installed.userId,
       });
       before =
@@ -123,7 +122,7 @@ function failed(before: Snapshot, after: Snapshot): { reason: string; detail?: s
 
 /** `COMPARE_UNAVAILABLE`: the kill and restore ran; their evidence travels with the error. */
 function compareUnavailable(
-  context: CommandContext,
+  context: DeviceContext,
   pkg: string,
   killed: KillResult,
   death: Record<string, unknown>,

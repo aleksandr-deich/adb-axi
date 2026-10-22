@@ -11,7 +11,7 @@ import {
 } from "../core/truncate.js";
 import { runShell } from "../adb/shell.js";
 import { defineCommand } from "./define.js";
-import type { CommandContext } from "./types.js";
+import type { DeviceContext } from "./types.js";
 
 export const shell = defineCommand({
   path: ["shell"],
@@ -42,9 +42,8 @@ export const shell = defineCommand({
 
 type Stream = "stdout" | "stderr";
 
-async function runShellCommand(context: CommandContext): Promise<Output> {
-  const target = context.target;
-  if (target === undefined) throw new Error("shell was dispatched without a resolved device");
+async function runShellCommand(context: DeviceContext): Promise<Output> {
+  const target = context.device.target;
   const raw = context.positionals.cmd;
   const command = Array.isArray(raw) ? raw.join(" ") : (raw ?? "");
   const full = context.flags.full === true;
@@ -59,7 +58,7 @@ async function runShellCommand(context: CommandContext): Promise<Output> {
   try {
     let result;
     try {
-      result = await runShell(context.adb(), target.serial, command, {
+      result = await runShell(context.device.adb, target.serial, command, {
         deadline: context.deadline,
         step: "running the command",
         ...(spools === undefined

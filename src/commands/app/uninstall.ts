@@ -7,7 +7,6 @@ import { AdbAxiError } from "../../core/errors.js";
 import { noop, okLine, runHint } from "../../core/output.js";
 import { defineCommand } from "../define.js";
 import { forgetInstallRecord } from "./install-record.js";
-import { readOptions, targetSerial } from "./shared.js";
 
 export const appUninstall = defineCommand({
   path: ["app", "uninstall"],
@@ -26,9 +25,9 @@ export const appUninstall = defineCommand({
     const pkg = String(context.positionals.pkg);
     assertPackageName(pkg);
     const keepData = context.flags["keep-data"] === true;
-    const serial = targetSerial(context);
-    const options = readOptions(context);
-    const adb = context.adb();
+    const serial = context.device.serial;
+    const options = context.device.reads;
+    const adb = context.device.adb;
     const userId = await readCurrentUser(adb, serial, options);
 
     const record = await readPackage(adb, serial, pkg, options, userId);

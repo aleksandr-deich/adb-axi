@@ -8,7 +8,6 @@ import { okLine, runHint } from "../../core/output.js";
 import { MAX_INTERVAL_MS, poll } from "../../core/poll.js";
 import { notInstalled } from "../app/process.js";
 import { observeApp, type AppObservation, type AppState } from "../app/state.js";
-import { readOptions, targetSerial } from "../app/shared.js";
 import { defineCommand } from "../define.js";
 
 export const waitApp = defineCommand({
@@ -35,9 +34,9 @@ export const waitApp = defineCommand({
     const pkg = String(context.positionals.pkg);
     const wanted = String(context.flags.state) as AppState;
     assertPackageName(pkg);
-    const serial = targetSerial(context);
-    const options = readOptions(context);
-    const adb = context.adb();
+    const serial = context.device.serial;
+    const options = context.device.reads;
+    const adb = context.device.adb;
     const userId = await readCurrentUser(adb, serial, options);
     const { info, dump } = await readPackageSnapshot(adb, serial, pkg, options, userId);
     // Read once: a package installed during the wait is not waited for.

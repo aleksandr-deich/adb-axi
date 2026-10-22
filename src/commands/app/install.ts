@@ -15,10 +15,10 @@ import { noop, okLine, runHint, shellWords, type Output } from "../../core/outpu
 import { MAX_INTERVAL_MS, poll } from "../../core/poll.js";
 import { isErrno } from "../../core/state.js";
 import { defineCommand } from "../define.js";
-import type { CommandContext } from "../types.js";
+import type { DeviceContext } from "../types.js";
 import { installFailureError } from "./install-errors.js";
 import { readInstallRecord, writeInstallRecord, type InstallRecord } from "./install-record.js";
-import { formatVersion, readOptions, targetSerial, UNKNOWN } from "./shared.js";
+import { formatVersion, UNKNOWN } from "./shared.js";
 
 const MAX_INSTALLED_APK_BYTES = 64 * 1024 * 1024;
 
@@ -55,15 +55,15 @@ export const appInstall = defineCommand({
 /** What reading the APK gave: its facts, or why they are unknown. */
 type ApkRead = { ok: true; info: ApkInfo } | { ok: false; reason: string };
 
-async function runInstall(context: CommandContext): Promise<Output> {
+async function runInstall(context: DeviceContext): Promise<Output> {
   const started = performance.now();
   const clean = context.flags["clean-data"] === true;
   const ifChanged = context.flags["if-changed"] === true;
   const apkPath = apkFile(String(context.positionals.apk));
   const apkName = basename(apkPath);
-  const serial = targetSerial(context);
-  const options = readOptions(context);
-  const adb = context.adb();
+  const serial = context.device.serial;
+  const options = context.device.reads;
+  const adb = context.device.adb;
 
   let read = readApk(apkPath);
   const api = read.ok ? await readApi(adb, serial, options) : null;
@@ -362,7 +362,7 @@ async function readApi(
 }
 
 async function runAdbInstall(
-  context: CommandContext,
+  context: DeviceContext,
   adb: AdbClient,
   serial: string,
   apkPath: string,
@@ -391,7 +391,7 @@ async function runAdbInstall(
 }
 
 function failureContext(
-  context: CommandContext,
+  context: DeviceContext,
   apkName: string,
   info: ApkInfo | undefined,
   installed: string,
@@ -410,7 +410,7 @@ function failureContext(
  * the install is committed, so this normally holds at once; it is the proof, not a delay.
  */
 async function waitForVersion(
-  context: CommandContext,
+  context: DeviceContext,
   adb: AdbClient,
   serial: string,
   info: ApkInfo,

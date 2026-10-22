@@ -1,9 +1,8 @@
 import { AdbAxiError } from "../../core/errors.js";
 import { readShell } from "../../android/read.js";
 import { runHint } from "../../core/output.js";
-import type { CommandContext } from "../types.js";
+import type { DeviceContext } from "../types.js";
 import { lifecycleCommand } from "../app/process.js";
-import { readOptions, targetSerial } from "../app/shared.js";
 
 /** One database of an app: its main file and whether a write-ahead log sits next to it. */
 export interface DatabaseFile {
@@ -30,7 +29,7 @@ const COMPANION = /(-(wal|shm|journal)|\.lck)$/;
  * `APP_NOT_INSTALLED`.
  */
 export async function listDatabases(
-  context: CommandContext,
+  context: DeviceContext,
   pkg: string,
   userId: number,
 ): Promise<DatabaseFile[]> {
@@ -38,11 +37,11 @@ export async function listDatabases(
   let stdout: string;
   try {
     ({ stdout } = await readShell(
-      context.adb(),
-      targetSerial(context),
+      context.device.adb,
+      context.device.serial,
       `run-as ${pkg} --user ${userId} ls -l databases`,
       step,
-      readOptions(context),
+      context.device.reads,
     ));
   } catch (error) {
     if (error instanceof AdbAxiError && error.code === "REMOTE_EXIT") {
@@ -69,7 +68,7 @@ export async function listDatabases(
  * as the bytes of an `exec-out` call), or `undefined` when the text is not a refusal.
  */
 export function runAsRefusal(
-  context: CommandContext,
+  context: DeviceContext,
   pkg: string,
   text: string,
 ): AdbAxiError | undefined {
