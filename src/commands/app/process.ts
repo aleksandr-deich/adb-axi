@@ -1,9 +1,8 @@
 import type { AdbClient } from "../../adb/run.js";
+import { identityOf, runningProcesses, type AppIdentity } from "../../android/app-processes.js";
 import { readPackageSnapshot, type PackageInfo } from "../../android/packages.js";
-import { pidof } from "../../android/pidof.js";
 import { readCurrentUser } from "../../android/users.js";
-import { readProcesses, type ProcessRecord } from "../../android/processes.js";
-import { invalidOutput, readShell, type ReadOptions } from "../../android/read.js";
+import { readShell, type ReadOptions } from "../../android/read.js";
 import { AdbAxiError } from "../../core/errors.js";
 import { commandLine, runHint } from "../../core/output.js";
 import { poll } from "../../core/poll.js";
@@ -16,56 +15,12 @@ export interface InstalledPackage {
   info: PackageInfo;
   dump: string;
   userId: number;
+  app: AppIdentity;
 }
 
 export function lifecycleCommand(context: CommandContext, args: string[]): string[] {
   const device = context.flags.device ?? context.env.ANDROID_SERIAL;
   return typeof device === "string" && device !== "" ? [...args, "--device", device] : args;
-}
-
-export async function packageProcesses(
-  context: CommandContext,
-  pkg: string,
-  userId: number,
-  options: ReadOptions,
-): Promise<ProcessRecord[]> {
-  const processes = await readProcesses(context.adb(), targetSerial(context), pkg, options);
-  return processes.filter((process) => Math.floor(process.uid / 100000) === userId);
-}
-
-export async function mainPids(
-  context: CommandContext,
-  pkg: string,
-  userId: number,
-): Promise<number[]> {
-  const pids = await pidof(context.adb(), targetSerial(context), pkg, readOptions(context));
-  if (pids.length === 0) return pids;
-  const step = "reading process user IDs";
-  const result = await readShell(
-    context.adb(),
-    targetSerial(context),
-    "ps -A -o PID,UID",
-    step,
-    readOptions(context),
-  );
-  const [header, ...lines] = result.stdout.trim().split(/\r?\n/);
-  if (header?.trim().replace(/\s+/g, " ") !== "PID UID") {
-    throw invalidOutput(step, result.stdout);
-  }
-  const uids = new Map<number, number>();
-  for (const line of lines) {
-    const row = /^\s*(\d+)\s+(\d+)\s*$/.exec(line);
-    const pid = Number(row?.[1]);
-    const uid = Number(row?.[2]);
-    if (!Number.isSafeInteger(pid) || pid <= 0 || !Number.isSafeInteger(uid)) {
-      throw invalidOutput(step, result.stdout);
-    }
-    uids.set(pid, uid);
-  }
-  return pids.filter((pid) => {
-    const uid = uids.get(pid);
-    return uid !== undefined && Math.floor(uid / 100000) === userId;
-  });
 }
 
 /**
@@ -85,20 +40,23 @@ export async function requireInstalled(
     readOptions(context),
     userId,
   );
-  if (info === null || !info.installed) {
-    throw new AdbAxiError("APP_NOT_INSTALLED", `${pkg} is not installed on this device`, {
-      help: [
-        runHint(
-          lifecycleCommand(context, ["app", "list", "--grep", pkg.split(".").at(-1) ?? pkg]),
-          "to find the package",
-        ),
-        ...(appInstall.shipped
-          ? [runHint(lifecycleCommand(context, ["app", "install", "<apk>"]), "to install it")]
-          : []),
-      ],
-    });
-  }
-  return { info, dump, userId };
+  if (info === null || !info.installed) throw notInstalled(context, pkg);
+  return { info, dump, userId, app: identityOf(info, dump) };
+}
+
+/** `APP_NOT_INSTALLED`, with hints to find the package or install it. */
+export function notInstalled(context: CommandContext, pkg: string): AdbAxiError {
+  return new AdbAxiError("APP_NOT_INSTALLED", `${pkg} is not installed on this device`, {
+    help: [
+      runHint(
+        lifecycleCommand(context, ["app", "list", "--grep", pkg.split(".").at(-1) ?? pkg]),
+        "to find the package",
+      ),
+      ...(appInstall.shipped
+        ? [runHint(lifecycleCommand(context, ["app", "install", "<apk>"]), "to install it")]
+        : []),
+    ],
+  });
 }
 
 /** `am force-stop` prints nothing and exits 0 whether or not anything was running. */
@@ -120,30 +78,49 @@ export async function forceStop(
 
 export type ExitWait = { gone: true } | { gone: false; last: number[] | null };
 
+/** The pids of every running process of the app. */
+export async function appPids(context: CommandContext, app: AppIdentity): Promise<number[]> {
+  const processes = await runningProcesses(
+    context.adb(),
+    targetSerial(context),
+    app,
+    readOptions(context),
+  );
+  return processes.map(({ pid }) => pid);
+}
+
 /**
- * Poll main PIDs from `pidof`, scoped by kernel-backed `ps` UIDs, until none remain for
- * the selected user or the command deadline passes. ActivityManager membership is not
- * exit evidence: its record can disappear before the process dies. A read cut off by
- * the deadline ends the wait; the last full observation is the evidence.
+ * Poll until every process of the app is gone or the command deadline passes: force-stop
+ * and `pm clear` end them all. A read cut off by the deadline ends the wait; the last full
+ * observation is the evidence.
  */
 export async function waitForExit(
   context: CommandContext,
-  pkg: string,
-  userId: number,
+  app: AppIdentity,
+  before: readonly number[],
+  repeatStep: () => Promise<void>,
 ): Promise<ExitWait> {
+  const original = new Set(before);
   let last: number[] | null = null;
   const result = await poll({
     timeoutMs: context.deadline.remainingMs(),
     check: async () => {
       try {
-        last = await mainPids(context, pkg, userId);
+        last = await appPids(context, app);
+        const confirmingExit = last.length === 0;
+        if (confirmingExit) last = await appPids(context, app);
+        if (last.length === 0) return { done: true, value: null };
+        if (confirmingExit || last.some((pid) => !original.has(pid))) {
+          // Android 11 can resume the activity below a killed :ui and start a new main process mid force-stop.
+          await repeatStep();
+        }
       } catch (error) {
         if (error instanceof AdbAxiError && error.code === "TIMEOUT") {
           return { done: false, last };
         }
         throw error;
       }
-      return last.length === 0 ? { done: true, value: null } : { done: false, last };
+      return { done: false, last };
     },
   });
   return result.ok ? { gone: true } : { gone: false, last };

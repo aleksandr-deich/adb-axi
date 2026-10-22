@@ -124,6 +124,117 @@
       ],
       "exitCode": 0,
       "stderr": ""
+    },
+    {
+      "file": "processes-running-ps.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5790",
+        "shell",
+        "ps -A -o PID,UID,NAME"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 25,
+      "note": "main and :ui running"
+    },
+    {
+      "file": "processes-running-pidof-main.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5790",
+        "shell",
+        "pidof dev.probe"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 20,
+      "note": "main running"
+    },
+    {
+      "file": "processes-running-pidof-ui.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5790",
+        "shell",
+        "pidof dev.probe:ui"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 18,
+      "note": ":ui running"
+    },
+    {
+      "file": "processes-stopped-ps.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5790",
+        "shell",
+        "ps -A -o PID,UID,NAME"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 23,
+      "note": "nothing of the probe running"
+    },
+    {
+      "file": "processes-stopped-pidof-main.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5790",
+        "shell",
+        "pidof dev.probe"
+      ],
+      "exitCode": 1,
+      "stderr": "",
+      "durationMs": 17,
+      "note": "main not running"
+    },
+    {
+      "file": "processes-exiting-ps.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5790",
+        "shell",
+        "ps -A -o PID,UID,NAME"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 0,
+      "note": "an exiting [dev.probe] row; sampled on the device in a loop right after am force-stop (cycle 1, sample 28)"
+    },
+    {
+      "file": "processes-exiting-pidof-main.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5790",
+        "shell",
+        "pidof dev.probe"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 0,
+      "note": "pidof run right after that ps; sampled on the device in a loop right after am force-stop (cycle 1, sample 28)"
     }
-  ]
+  ],
+  "processCapture": {
+    "serial": "emulator-5790",
+    "avd": "fm_procs_29",
+    "capturedAt": "2026-10-22T07:55:06.439Z",
+    "probe": {
+      "package": "dev.probe",
+      "uid": 10117
+    },
+    "exiting": {
+      "cycle": 1,
+      "sample": 28
+    }
+  }
 }

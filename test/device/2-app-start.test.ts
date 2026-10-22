@@ -119,9 +119,16 @@ describe("app start on activities other than the launcher", () => {
     await axi.waitFocused((component) => component === `${PKG}/.Outer$Inner`);
 
     const stopped = await axi.ok(["app", "stop", PKG]);
-    expect(stopped.ok).toMatch(
-      new RegExp(`^stop ${PKG} -> not running \\(pid ${app(main).pid} gone after \\d+ ms\\)$`),
+    const named = /^stop dev\.probe -> not running \(pids (\d+) (\d+) gone after \d+ ms\)$/.exec(
+      String(stopped.ok),
     );
+    expect(named, String(stopped.ok)).not.toBeNull();
+    expect(
+      named
+        ?.slice(1)
+        .map(Number)
+        .sort((a, b) => a - b),
+    ).toEqual([app(main).pid, uiPid].sort((a, b) => (a ?? 0) - (b ?? 0)));
     expect(await axi.pidsOf(PKG)).toEqual([]);
     expect(await axi.pidsOf(`${PKG}:ui`)).toEqual([]);
   });

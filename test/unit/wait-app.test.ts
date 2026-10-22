@@ -7,7 +7,7 @@ import { AdbAxiError } from "../../src/core/errors.js";
 const SERIAL = "emulator-5554";
 
 /**
- * Answers `pidof` from a script, and refuses a call whose deadline has passed, as AdbClient does.
+ * Answers shell reads from a script, in order, and refuses a call whose deadline has passed, as AdbClient does.
  * The last answer is held until the command deadline has passed, so the final read is always
  * taken after it.
  */
@@ -43,20 +43,31 @@ class ScriptedAdb extends AdbClient {
   }
 }
 
-function pidofExit(stdout: string): AdbExit {
-  return {
-    stdout: Buffer.from(stdout),
-    stderr: Buffer.alloc(0),
-    exitCode: stdout === "" ? 1 : 0,
-    durationMs: 0,
-  };
+function exit(stdout: string, exitCode = 0): AdbExit {
+  return { stdout: Buffer.from(stdout), stderr: Buffer.alloc(0), exitCode, durationMs: 0 };
 }
+
+function pidofExit(stdout: string): AdbExit {
+  return exit(stdout, stdout === "" ? 1 : 0);
+}
+
+const PACKAGE =
+  "Packages:\n  Package [dev.probe] (abc):\n    appId=10213\n    User 0: installed=true hidden=false\n";
+const PS_HEADER = "  PID   UID NAME\n";
 
 describe("wait app", () => {
   it("gives the final observation at the deadline its own short deadline, so a state reached in the last interval is not missed", async () => {
     const timeoutMs = 300;
     const deadline = new Deadline(timeoutMs);
-    const adb = new ScriptedAdb(deadline, [pidofExit(""), pidofExit("8235\n")]);
+    const adb = new ScriptedAdb(deadline, [
+      exit("0\n"),
+      exit(PACKAGE),
+      exit("package:/data/app/probe/base.apk\n"),
+      exit(PS_HEADER),
+      pidofExit(""),
+      exit(`${PS_HEADER} 8235 10213 dev.probe\n`),
+      pidofExit("8235\n"),
+    ]);
     const result = await waitApp.run({
       spec: waitApp,
       flags: { state: "running" },
@@ -82,10 +93,15 @@ describe("wait app", () => {
       waited_ms: waited,
     });
     // The first read saw it stopped; the second, taken once the command deadline had passed, sees it running.
-    expect(adb.answeredWithMs[1]).toBeLessThanOrEqual(0);
+    expect(adb.answeredWithMs[6]).toBeLessThanOrEqual(0);
     expect(adb.calls).toEqual([
-      ["-s", SERIAL, "shell", "pidof dev.probe"],
-      ["-s", SERIAL, "shell", "pidof dev.probe"],
+      ["-s", SERIAL, "shell", "am get-current-user"],
+      ["-s", SERIAL, "shell", "dumpsys package dev.probe"],
+      ["-s", SERIAL, "shell", "pm path --user 0 dev.probe"],
+      ["-s", SERIAL, "shell", "ps -A -o PID,UID,NAME"],
+      ["-s", SERIAL, "shell", "pidof 'dev.probe'"],
+      ["-s", SERIAL, "shell", "ps -A -o PID,UID,NAME"],
+      ["-s", SERIAL, "shell", "pidof 'dev.probe'"],
     ]);
   });
 });

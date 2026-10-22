@@ -1,8 +1,12 @@
+import { identityOf } from "../../android/app-processes.js";
 import { assertPackageName } from "../../android/component.js";
+import { readPackageSnapshot } from "../../android/packages.js";
+import { readCurrentUser } from "../../android/users.js";
 import { Deadline } from "../../core/deadline.js";
 import { AdbAxiError } from "../../core/errors.js";
 import { okLine, runHint } from "../../core/output.js";
 import { MAX_INTERVAL_MS, poll } from "../../core/poll.js";
+import { notInstalled } from "../app/process.js";
 import { observeApp, type AppObservation, type AppState } from "../app/state.js";
 import { readOptions, targetSerial } from "../app/shared.js";
 import { defineCommand } from "../define.js";
@@ -34,6 +38,18 @@ export const waitApp = defineCommand({
     const serial = targetSerial(context);
     const options = readOptions(context);
     const adb = context.adb();
+    const userId = await readCurrentUser(adb, serial, options);
+    const { info, dump } = await readPackageSnapshot(adb, serial, pkg, options, userId);
+    // Read once: a package installed during the wait is not waited for.
+    if (info === null || !info.installed) {
+      if (wanted !== "stopped") throw notInstalled(context, pkg);
+      return {
+        ok: okLine("wait app", pkg, "stopped after 0 ms"),
+        waited_ms: 0,
+        note: `${pkg} is not installed for Android user ${userId}`,
+      };
+    }
+    const app = identityOf(info, dump);
 
     let latest: AppObservation | undefined;
     const result = await poll({
@@ -42,7 +58,7 @@ export const waitApp = defineCommand({
         const reads =
           remainingMs < MAX_INTERVAL_MS ? { deadline: new Deadline(MAX_INTERVAL_MS) } : options;
         try {
-          latest = await observeApp(adb, serial, pkg, wanted === "foreground", reads);
+          latest = await observeApp(adb, serial, app, userId, wanted === "foreground", reads);
         } catch (error) {
           // A read cut off by the deadline ends the wait; the last full observation is the evidence.
           if (error instanceof AdbAxiError && error.code === "TIMEOUT") {

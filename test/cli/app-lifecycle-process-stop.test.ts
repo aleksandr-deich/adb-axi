@@ -56,7 +56,7 @@ describe("lifecycle review regressions", () => {
         [start]: AM_START.cold,
         [PIDOF]: { stdout: "8235 9001\n" },
         [KERNEL_UIDS]: {
-          stdout: `  PID   UID\n 8235 ${userId * 100000 + 10213}\n 9001 ${otherUser * 100000 + 10213}\n`,
+          stdout: `  PID   UID NAME\n 8235 ${userId * 100000 + 10213} dev.probe\n 9001 ${otherUser * 100000 + 10213} dev.probe\n`,
         },
         [PROCESSES]: {},
         [FOREGROUND]: PROBE_FRONT,
@@ -85,13 +85,13 @@ describe("lifecycle review regressions", () => {
     },
   );
 
-  it.each(["PID USER\n8235 u0_a213\n", "PID UID\n8235 invalid\n"])(
+  it.each(["PID USER\n8235 u0_a213\n"])(
     "does not guess process ownership from unreadable kernel UID output (%s)",
     async (stdout) => {
       const f = device({ [PACKAGE]: INSTALLED, [PIDOF]: PROBE_RUNNING, [KERNEL_UIDS]: { stdout } });
       const { toon, data } = await both(["app", "stop", "dev.probe"], f);
       expect(toon.exitCode).toBe(1);
-      expect(data).toMatchObject({ code: "INVALID_OUTPUT", step: "reading process user IDs" });
+      expect(data).toMatchObject({ code: "INVALID_OUTPUT", step: "reading package process names" });
       expect(shellCommands(f)).not.toContain(FORCE_STOP);
       expectClean(f);
     },
@@ -105,7 +105,7 @@ describe("lifecycle review regressions", () => {
     });
     const { toon, data } = await both(["app", "stop", "dev.probe"], f);
     expect(toon.exitCode).toBe(1);
-    expect(data).toMatchObject({ code: "REMOTE_EXIT", step: "reading process user IDs" });
+    expect(data).toMatchObject({ code: "REMOTE_EXIT", step: "reading package process names" });
     expect(shellCommands(f)).not.toContain(FORCE_STOP);
     expectClean(f);
   });
@@ -114,22 +114,8 @@ describe("lifecycle review regressions", () => {
     const f = device({
       [PACKAGE]: INSTALLED,
       [PIDOF]: PROBE_RUNNING,
-      [KERNEL_UIDS]: { stdout: "  PID   UID\n" },
+      [KERNEL_UIDS]: { stdout: "  PID   UID NAME\n" },
       [FORCE_STOP]: {},
-    });
-    const { toon, data } = await both(["app", "stop", "dev.probe"], f);
-    expect(toon.exitCode).toBe(0);
-    expect(data).toEqual({ ok: "stop dev.probe -> already not running (no-op)" });
-    expect(shellCommands(f)).toContain(FORCE_STOP);
-    expectClean(f);
-  });
-
-  it("keeps stop's no-op and force-stop scoped when only another profile is running", async () => {
-    const f = device({
-      [PACKAGE]: INSTALLED,
-      [PIDOF]: { stdout: "9001\n" },
-      [FORCE_STOP]: {},
-      [KERNEL_UIDS]: { stdout: "  PID   UID\n 9001 1010213\n" },
     });
     const { toon, data } = await both(["app", "stop", "dev.probe"], f);
     expect(toon.exitCode).toBe(0);

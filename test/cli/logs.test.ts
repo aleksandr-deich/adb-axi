@@ -57,6 +57,7 @@ function deviceRules(device: Device): Rule[] {
       match: ["-s", device.serial, "shell", "pm path --user 0 dev.probe"],
       respond: { stdout: "package:/data/app/probe/base.apk\n" },
     },
+    { match: ["-s", device.serial, "shell", "am get-current-user"], respond: { stdout: "0\n" } },
   ];
 }
 

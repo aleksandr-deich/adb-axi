@@ -1,11 +1,18 @@
 import { runShell } from "../../adb/shell.js";
+import { processTable } from "../../android/app-processes.js";
 import { assertPackageName } from "../../android/component.js";
 import { invalidOutput, readShell } from "../../android/read.js";
 import { AdbAxiError } from "../../core/errors.js";
 import { okLine, runHint } from "../../core/output.js";
 import { defineCommand } from "../define.js";
 import type { CommandContext } from "../types.js";
-import { lifecycleCommand, requireInstalled, stopFailed, waitForExit } from "./process.js";
+import {
+  forceStop,
+  lifecycleCommand,
+  requireInstalled,
+  stopFailed,
+  waitForExit,
+} from "./process.js";
 import { readOptions, targetSerial } from "./shared.js";
 
 /** How many of the files left after a clear the error lists. */
@@ -33,7 +40,10 @@ export const appClear = defineCommand({
     const serial = targetSerial(context);
     const adb = context.adb();
 
-    const { info, userId } = await requireInstalled(context, pkg);
+    const { info, userId, app } = await requireInstalled(context, pkg);
+    const before = (await processTable(adb, serial, readOptions(context)))
+      .filter(({ uid }) => uid === app.uid)
+      .map(({ pid }) => pid);
 
     // `pm clear` waits for the system to report the data cleared, then prints `Success`;
     // a refusal prints `Failed` and exits 1 (AOSP `PackageManagerShellCommand.runClear`).
@@ -48,7 +58,9 @@ export const appClear = defineCommand({
     );
     if (result.stdout.trim() !== "Success") throw invalidOutput(step, result.stdout);
 
-    const exit = await waitForExit(context, pkg, userId);
+    const exit = await waitForExit(context, app, before, () =>
+      forceStop(adb, serial, pkg, userId, readOptions(context)),
+    );
     if (!exit.gone) {
       throw stopFailed(context, pkg, exit.last, context.timeoutMs, {
         command: lifecycleCommand(context, [

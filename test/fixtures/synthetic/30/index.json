@@ -85,14 +85,6 @@
       "note": "device clock west of UTC"
     },
     {
-      "file": "ps-pid-name.txt",
-      "argv": ["adb", "-s", "emulator-5562", "shell", "ps -A -o PID,NAME"],
-      "exitCode": 0,
-      "synthetic": true,
-      "source": "AOSP platform/external/toybox android-11.0.0_r1 toys/posix/ps.c ps_main (-A, -o PID,NAME)",
-      "note": "a PID NAME header, then one row per process: apps named after their package, a second process of the probe, system processes"
-    },
-    {
       "file": "logcat-epoch-window.txt",
       "argv": ["adb", "-s", "emulator-5562", "shell", "logcat -d -v epoch -T 1790834110.420"],
       "exitCode": 0,

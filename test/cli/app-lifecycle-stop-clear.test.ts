@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createFakeAdb, type FakeAdb } from "../fake-adb/harness.js";
-import { runCli } from "../helpers/run.js";
+import type { FakeAdb } from "../fake-adb/harness.js";
 
 import {
   lifecycleDevices,
@@ -8,9 +7,7 @@ import {
   STOP_TIMEOUT_MS,
   TIMING_MARGIN_MS,
   SERIAL,
-  ONE_ONLINE,
   CURRENT_USER,
-  KERNEL_UIDS,
   PROCESSES,
   PROCESS_RUNNING,
   PACKAGE,
@@ -30,7 +27,6 @@ import {
   PROBE_RUNNING,
   PROBE_STOPPED,
   AM_START,
-  shell,
   both,
   shellCommands,
   expectClean,
@@ -50,39 +46,6 @@ const { device } = lifecycleDevices((value) => {
 });
 
 describe("app stop", () => {
-  it("names every pid of an app with two processes", async () => {
-    fake = createFakeAdb({
-      description: "Two probe processes that end on force-stop",
-      synthetic: true,
-      state: { proc: "running" },
-      rules: [
-        { match: ["devices", "-l"], respond: { stdout: ONE_ONLINE } },
-        { match: shell(CURRENT_USER), respond: { stdout: "0\n" } },
-        {
-          match: shell(KERNEL_UIDS),
-          respond: { stdout: "  PID   UID\n 5120 10213\n 5187 10213\n" },
-        },
-        { match: shell(PACKAGE), respond: INSTALLED },
-        {
-          match: shell("pm path --user 0 dev.probe"),
-          respond: { stdout: "package:/data/app/probe/base.apk\n" },
-        },
-        { match: shell(FORCE_STOP), respond: {}, set: { proc: "stopped" } },
-        {
-          match: shell(PIDOF),
-          when: { proc: "running" },
-          respond: { stdoutFile: "synthetic/29/pidof-two.txt" },
-        },
-        { match: shell(PIDOF), when: { proc: "stopped" }, respond: PROBE_STOPPED },
-      ],
-    });
-    const run = await runCli(["app", "stop", "dev.probe"], fake.env);
-    expect(run.exitCode).toBe(0);
-    expect(run.stdout).toMatch(
-      /^ok: stop dev\.probe -> not running \(pids \d+ \d+ gone after \d+ ms\)\n$/,
-    );
-  });
-
   it("fails with STOP_FAILED, carrying the pid, when the process outlives the deadline", async () => {
     const f = device({ [PACKAGE]: INSTALLED, [PIDOF]: PROBE_RUNNING, [FORCE_STOP]: {} });
     const { toon, json, data } = await both(

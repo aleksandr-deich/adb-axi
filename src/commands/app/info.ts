@@ -1,7 +1,7 @@
+import { identityOf, mainProcess, runningProcesses } from "../../android/app-processes.js";
 import { readForeground } from "../../android/foreground.js";
 import { assertPackageName } from "../../android/component.js";
-import { readPackage } from "../../android/packages.js";
-import { pidof } from "../../android/pidof.js";
+import { readPackageSnapshot } from "../../android/packages.js";
 import { readCurrentUser } from "../../android/users.js";
 import { readShell } from "../../android/read.js";
 import { AdbAxiError } from "../../core/errors.js";
@@ -34,20 +34,21 @@ export const appInfo = defineCommand({
     const adb = context.adb();
     const userId = await readCurrentUser(adb, serial, options);
 
-    const record = await readPackage(adb, serial, pkg, options, userId);
+    const { info: record, dump } = await readPackageSnapshot(adb, serial, pkg, options, userId);
     if (record === null || !record.installed) {
       return { app: { package: pkg, installed: false } };
     }
 
-    const pids = await pidof(adb, serial, pkg, options);
-    const resumed = await readForeground(adb, serial, options);
+    const app = identityOf(record, dump);
+    const main = mainProcess(app, await runningProcesses(adb, serial, app, options));
+    const resumed = await readForeground(adb, serial, { ...options, userId });
     return {
       app: {
         package: pkg,
         installed: true,
         version: formatVersion(record.versionName, record.versionCode),
         debuggable: record.debuggable,
-        pid: pids[0] ?? UNKNOWN,
+        pid: main?.pid ?? UNKNOWN,
         foreground: resumed?.package === pkg,
         data_size: record.debuggable ? await dataSize(context, pkg, userId) : UNKNOWN,
       },

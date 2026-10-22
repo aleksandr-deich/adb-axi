@@ -47,6 +47,12 @@ async function gone(): Promise<void> {
   expect(activity.stdout).toBe("");
 }
 
+/** The pids `pidof` prints for a process name; empty when none runs. */
+async function pidof(name: string): Promise<number[]> {
+  const out = (await axi.sh(`pidof ${name} || true`)).trim();
+  return out === "" ? [] : out.split(/\s+/).map(Number);
+}
+
 async function emptyPrivateFiles(): Promise<void> {
   const files = await axi.ok(["shell", `run-as ${PKG} find . -type f`]);
   expect(files.exit).toBe(0);
@@ -145,6 +151,33 @@ describe("ordinary installed probe lifecycle", () => {
       expect((await stateAfterStart()).rows).toBe("1");
       await row();
     }
+
+    // A stop covers every process of the app, not only the main one.
+    await axi.ok(["app", "stop", PKG]);
+    await axi.sh(`am start -W -n ${PKG}/.UiActivity`);
+    expect(await pidof(PKG)).toEqual([]);
+    const [ui] = await pidof(`${PKG}:ui`);
+    expect(ui).toBeDefined();
+    const uiOnly = await axi.ok(["app", "stop", PKG]);
+    expect(String(uiOnly.ok)).toMatch(
+      new RegExp(`^stop ${PKG} -> not running \\(pid ${ui} gone after \\d+ ms\\)$`),
+    );
+    expect(await pidof(`${PKG}:ui`)).toEqual([]);
+
+    await axi.ok(["app", "start", PKG]);
+    await axi.sh(`am start -W -n ${PKG}/.UiActivity`);
+    const running = [...(await pidof(PKG)), ...(await pidof(`${PKG}:ui`))];
+    expect(running).toHaveLength(2);
+    const both = await axi.ok(["app", "stop", PKG]);
+    const named = /\(pids (\d+) (\d+) gone after \d+ ms\)$/.exec(String(both.ok));
+    expect(named, String(both.ok)).not.toBeNull();
+    expect(
+      named
+        ?.slice(1)
+        .map(Number)
+        .sort((a, b) => a - b),
+    ).toEqual(running.sort((a, b) => a - b));
+    await gone();
   });
 
   test("clear debug data removes real files and stops running or already-stopped probes", async () => {
@@ -240,6 +273,26 @@ describe("ordinary installed probe lifecycle", () => {
       expect(await axi.pidsOf(missing)).toEqual([]);
       expect((await axi.ok(["shell", `pm path ${missing} || true`])).stdout).toBe("");
     }
+
+    // No install happens during a wait, so waiting for a missing package to run fails at once.
+    const running = await axi.run([
+      "wait",
+      "app",
+      missing,
+      "--state",
+      "running",
+      "--timeout",
+      "60s",
+    ]);
+    expect(running.exitCode).toBe(1);
+    expect(running.json).toMatchObject({
+      code: "APP_NOT_INSTALLED",
+      error: `${missing} is not installed on this device`,
+    });
+    const stopped = await axi.ok(["wait", "app", missing, "--state", "stopped"]);
+    expect(stopped.ok).toBe(`wait app ${missing} -> stopped after 0 ms`);
+    expect(stopped.note).toBe(`${missing} is not installed for Android user 0`);
+    expect(await axi.pidsOf(missing)).toEqual([]);
   });
 
   test("clear release data is confirmed by package manager without claiming run-as evidence", async () => {

@@ -1,5 +1,7 @@
+import { identityOf, mainProcess, runningProcesses } from "../../android/app-processes.js";
 import { readForeground } from "../../android/foreground.js";
-import { pidof } from "../../android/pidof.js";
+import { readPackageSnapshot } from "../../android/packages.js";
+import { readCurrentUser } from "../../android/users.js";
 import { defineCommand } from "../define.js";
 import { readOptions, targetSerial, UNKNOWN } from "./shared.js";
 
@@ -12,18 +14,24 @@ export const appCurrent = defineCommand({
     const serial = targetSerial(context);
     const options = readOptions(context);
     const adb = context.adb();
+    const userId = await readCurrentUser(adb, serial, options);
 
     // A launcher in front is an answer like any other app.
-    const resumed = await readForeground(adb, serial, options);
+    const resumed = await readForeground(adb, serial, { ...options, userId });
     if (resumed === null) {
       return {
         app: { package: UNKNOWN, activity: UNKNOWN, pid: UNKNOWN },
         note: "no activity is resumed, the screen may be off",
       };
     }
-    const pids = await pidof(adb, serial, resumed.package, options);
+    const { info, dump } = await readPackageSnapshot(adb, serial, resumed.package, options, userId);
+    const app = info === null ? null : identityOf(info, dump);
+    const main =
+      app === null
+        ? undefined
+        : mainProcess(app, await runningProcesses(adb, serial, app, options));
     return {
-      app: { package: resumed.package, activity: resumed.activity, pid: pids[0] ?? UNKNOWN },
+      app: { package: resumed.package, activity: resumed.activity, pid: main?.pid ?? UNKNOWN },
     };
   },
 });

@@ -2,8 +2,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { parseLogcat } from "../../src/android/logcat.js";
-import { belongsTo, parsePs } from "../../src/android/ps.js";
-import { appProcesses, assertMarkName } from "../../src/commands/logs/marks.js";
+import { belongsTo } from "../../src/android/crash.js";
+import { assertMarkName } from "../../src/commands/logs/marks.js";
 import { startedPids } from "../../src/commands/logs/scope.js";
 import { logcatCommand } from "../../src/commands/logs/window.js";
 import { timeoutWindow } from "../../src/commands/wait/log.js";
@@ -13,49 +13,29 @@ import { FIXTURES_DIR } from "../fake-adb/harness.js";
 const synthetic30 = (name: string): string =>
   readFileSync(join(FIXTURES_DIR, "synthetic", "30", name), "utf8");
 
-describe("parsePs", () => {
-  it("reads pid and name rows after the PID NAME header", () => {
-    const processes = parsePs(synthetic30("ps-pid-name.txt"));
-    expect(processes).toHaveLength(7);
-    expect(processes?.[0]).toEqual({ pid: 1, name: "init" });
-    expect(processes?.[5]).toEqual({ pid: 6050, name: "dev.probe:remote" });
-  });
-
-  it("does not take output without the header for a process list", () => {
-    expect(parsePs("")).toBeNull();
-    expect(parsePs("ps: bad -o 'NAME'\n")).toBeNull();
-  });
-
+describe("process names", () => {
   it("matches a package's main process and its colon processes, nothing longer", () => {
-    expect(belongsTo({ pid: 1, name: "dev.probe" }, "dev.probe")).toBe(true);
-    expect(belongsTo({ pid: 1, name: "dev.probe:remote" }, "dev.probe")).toBe(true);
-    expect(belongsTo({ pid: 1, name: "dev.probe.test" }, "dev.probe")).toBe(false);
-    expect(belongsTo({ pid: 1, name: "dev.probe2" }, "dev.probe")).toBe(false);
-  });
-
-  it("keeps only package-named processes for a mark", () => {
-    expect(appProcesses(parsePs(synthetic30("ps-pid-name.txt")) ?? [])).toEqual([
-      { pid: 4400, name: "com.other.app" },
-      { pid: 6044, name: "dev.probe" },
-      { pid: 6050, name: "dev.probe:remote" },
-    ]);
+    expect(belongsTo({ name: "dev.probe" }, "dev.probe")).toBe(true);
+    expect(belongsTo({ name: "dev.probe:remote" }, "dev.probe")).toBe(true);
+    expect(belongsTo({ name: "dev.probe.test" }, "dev.probe")).toBe(false);
+    expect(belongsTo({ name: "dev.probe2" }, "dev.probe")).toBe(false);
   });
 });
 
 describe("startedPids", () => {
   const lines = parseLogcat(synthetic30("logcat-epoch-window.txt")).lines;
 
-  it("takes the pids ActivityManager started for the package, main and colon processes", () => {
-    expect(startedPids(lines, "dev.probe")).toEqual([6030, 6044]);
-    expect(startedPids(lines, "com.other.app")).toEqual([4400]);
-    expect(startedPids(lines, "dev.pro")).toEqual([]);
+  it("takes the pids ActivityManager started under the app's uid, printed as u<user>a<app id>", () => {
+    expect(startedPids(lines, 10213)).toEqual([6030, 6044]);
+    expect(startedPids(lines, 10099)).toEqual([4400]);
+    expect(startedPids(lines, 1010213)).toEqual([]);
   });
 
   it("ignores a Start proc text logged by another tag", () => {
     const forged = parseLogcat(
       "         1790834111.250   900   900 I SomeApp  : Start proc 1:dev.probe/u0a1 for x\n",
     ).lines;
-    expect(startedPids(forged, "dev.probe")).toEqual([]);
+    expect(startedPids(forged, 10001)).toEqual([]);
   });
 });
 

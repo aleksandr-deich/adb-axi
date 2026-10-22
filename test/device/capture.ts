@@ -15,7 +15,7 @@
  * records the facts later slices build on (how "cached" shows up, which buffer carries
  * the ANR report, whether `am kill` worked).
  */
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, userInfo } from "node:os";
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
@@ -674,12 +674,144 @@ async function captureDevice(serial: string): Promise<void> {
   writeFileSync(join(dir, "index.json"), `${JSON.stringify(index, null, 2)}\n`);
 }
 
+const PS_COMMAND = "ps -A -o PID,UID,NAME";
+const UI_PROCESS = `${PKG}:ui`;
+const UI_ACTIVITY = `${PKG}/.UiActivity`;
+/** Exiting rows are rare (1-4 in 180 samples per level), so each cycle samples this often. */
+const EXITING_SAMPLES = 100;
+const EXITING_CYCLES = 30;
+
+/**
+ * `--processes`: only the reads of `src/android/app-processes.ts`, the process table and
+ * `pidof` for the probe's main and `:ui` processes, running, stopped and exiting. They are
+ * added to the API directory under the `processes-` prefix; its other captures stay as
+ * they are, and the run is recorded under `processCapture` in its `index.json`.
+ */
+async function captureProcesses(serial: string): Promise<void> {
+  const device = new Device(serial);
+  const sdk = (await device.text("getprop ro.build.version.sdk")).trim();
+  if (!/^\d+$/.test(sdk)) throw new Error(`${serial}: could not read the API level (${sdk})`);
+  const dir = join(CAPTURED_DIR, sdk);
+  mkdirSync(dir, { recursive: true });
+  for (const name of readdirSync(dir)) {
+    if (name.startsWith("processes-")) rmSync(join(dir, name));
+  }
+  const rec = new Recorder(dir);
+  const sh = (command: string): string[] => device.args(["shell", command]);
+  console.log(`${serial}: API ${sdk} process captures -> ${dir}`);
+
+  const pids = async (name: string): Promise<string> => (await device.text(`pidof ${name}`)).trim();
+  const startBoth = async (): Promise<void> => {
+    await device.shell(`am start -W -n ${ACTIVITY}`);
+    await device.shell(`am start -W -n ${UI_ACTIVITY}`);
+    await waitFor("the main and :ui processes", 20_000, async () =>
+      (await pids(PKG)) !== "" && (await pids(UI_PROCESS)) !== "" ? true : null,
+    );
+  };
+
+  await run(device.args(["install", "-r", "-t", DEBUG_APK]), 180_000);
+  const uid = /uid:(\d+)/.exec(await device.text(`pm list packages -U ${PKG}`))?.[1];
+  if (uid === undefined) throw new Error(`${serial}: no uid in pm list packages -U`);
+
+  await startBoth();
+  await rec.capture("processes-running-ps.txt", sh(PS_COMMAND), "main and :ui running");
+  await rec.capture("processes-running-pidof-main.txt", sh(`pidof ${PKG}`), "main running");
+  await rec.capture("processes-running-pidof-ui.txt", sh(`pidof ${UI_PROCESS}`), ":ui running");
+
+  await device.shell(`am force-stop ${PKG}`);
+  await waitFor("no probe process", 10_000, async () =>
+    (await pids(PKG)) === "" && (await pids(UI_PROCESS)) === "" ? true : null,
+  );
+  await rec.capture("processes-stopped-ps.txt", sh(PS_COMMAND), "nothing of the probe running");
+  await rec.capture("processes-stopped-pidof-main.txt", sh(`pidof ${PKG}`), "main not running");
+
+  // ps and pidof run back to back on the device, so they describe the same moment; adb
+  // round trips between them would let the exiting process finish first. The sampler
+  // starts before the force-stop because on API 30 the rows are gone by the time it returns.
+  const tmp = "/data/local/tmp/adb-axi-capture";
+  const bracketed = ` \\[${PKG.replaceAll(".", "\\.")}\\]$`;
+  const sample = [
+    `mkdir -p ${tmp}`,
+    `rm -f ${tmp}/hit`,
+    `(for i in $(seq ${EXITING_SAMPLES}); do ${PS_COMMAND} > ${tmp}/ps; pidof ${PKG} > ${tmp}/main; echo $? > ${tmp}/main.exit; if grep -q '${bracketed}' ${tmp}/ps; then echo "hit $i" > ${tmp}/hit; break; fi; done) & sleep 0.2`,
+    `am force-stop ${PKG}`,
+    "wait",
+    `cat ${tmp}/hit 2>/dev/null`,
+  ].join("; ");
+  let hit: { cycle: number; sample: number } | undefined;
+  for (let cycle = 1; cycle <= EXITING_CYCLES && hit === undefined; cycle++) {
+    await startBoth();
+    const found = /^hit (\d+)$/m.exec(await device.text(sample));
+    if (found?.[1] !== undefined) hit = { cycle, sample: Number(found[1]) };
+  }
+  if (hit === undefined) {
+    throw new Error(`${serial}: no exiting [${PKG}] row in ${EXITING_CYCLES} force-stops`);
+  }
+  const where = hit;
+  const exitOf = async (file: string): Promise<number> =>
+    Number((await device.text(`cat ${tmp}/${file}`)).trim());
+  const sampled = async (file: string, from: string, command: string, note: string) => {
+    const result = await run(device.args(["shell", `cat ${tmp}/${from}`]));
+    writeFileSync(join(dir, file), result.stdout);
+    rec.captures.push({
+      file,
+      argv: ["adb", "-s", serial, "shell", command],
+      exitCode: from === "main" ? await exitOf("main.exit") : 0,
+      stderr: "",
+      durationMs: 0,
+      note: `${note}; sampled on the device in a loop right after am force-stop (cycle ${where.cycle}, sample ${where.sample})`,
+    });
+    console.log(`  ${file}`);
+  };
+  await sampled("processes-exiting-ps.txt", "ps", PS_COMMAND, `an exiting [${PKG}] row`);
+  await sampled(
+    "processes-exiting-pidof-main.txt",
+    "main",
+    `pidof ${PKG}`,
+    "pidof run right after that ps",
+  );
+  await device.shell(`rm -r ${tmp}`);
+  await device.shell(`am force-stop ${PKG}`);
+
+  const avd =
+    (await run(device.args(["emu", "avd", "name"]))).stdout.toString("utf8").split(/\r?\n/)[0] ??
+    "";
+  const indexPath = join(dir, "index.json");
+  const existing = existsSync(indexPath)
+    ? (JSON.parse(readFileSync(indexPath, "utf8")) as Record<string, unknown>)
+    : { api: Number(sdk) };
+  const earlier = ((existing.captures ?? []) as Capture[]).filter(
+    (capture) => !capture.file.startsWith("processes-"),
+  );
+  const index = {
+    ...existing,
+    captures: [...earlier, ...rec.captures],
+    processCapture: {
+      serial,
+      avd,
+      capturedAt: new Date().toISOString(),
+      probe: { package: PKG, uid: Number(uid) },
+      exiting: hit,
+    },
+  };
+  writeFileSync(indexPath, `${JSON.stringify(index, null, 2)}\n`);
+}
+
 async function main(): Promise<void> {
-  const { values } = parseArgs({ options: { serial: { type: "string", multiple: true } } });
+  const { values } = parseArgs({
+    options: {
+      serial: { type: "string", multiple: true },
+      processes: { type: "boolean" },
+    },
+  });
   const serials = values.serial ?? [];
   if (serials.length === 0) {
     console.error("Name every device to capture: --serial <serial> [--serial <serial> ...]");
     process.exit(2);
+  }
+  if (values.processes === true) {
+    for (const serial of serials) await captureProcesses(serial);
+    return;
   }
 
   const hostDir = join(CAPTURED_DIR, "host");

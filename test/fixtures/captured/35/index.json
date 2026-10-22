@@ -1058,6 +1058,117 @@
       "stderr": "",
       "durationMs": 131,
       "note": "uninstall of an installed package"
+    },
+    {
+      "file": "processes-running-ps.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5794",
+        "shell",
+        "ps -A -o PID,UID,NAME"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 81,
+      "note": "main and :ui running"
+    },
+    {
+      "file": "processes-running-pidof-main.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5794",
+        "shell",
+        "pidof dev.probe"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 70,
+      "note": "main running"
+    },
+    {
+      "file": "processes-running-pidof-ui.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5794",
+        "shell",
+        "pidof dev.probe:ui"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 35,
+      "note": ":ui running"
+    },
+    {
+      "file": "processes-stopped-ps.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5794",
+        "shell",
+        "ps -A -o PID,UID,NAME"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 54,
+      "note": "nothing of the probe running"
+    },
+    {
+      "file": "processes-stopped-pidof-main.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5794",
+        "shell",
+        "pidof dev.probe"
+      ],
+      "exitCode": 1,
+      "stderr": "",
+      "durationMs": 67,
+      "note": "main not running"
+    },
+    {
+      "file": "processes-exiting-ps.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5794",
+        "shell",
+        "ps -A -o PID,UID,NAME"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 0,
+      "note": "an exiting [dev.probe] row; sampled on the device in a loop right after am force-stop (cycle 1, sample 10)"
+    },
+    {
+      "file": "processes-exiting-pidof-main.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5794",
+        "shell",
+        "pidof dev.probe"
+      ],
+      "exitCode": 1,
+      "stderr": "",
+      "durationMs": 0,
+      "note": "pidof run right after that ps; sampled on the device in a loop right after am force-stop (cycle 1, sample 10)"
     }
-  ]
+  ],
+  "processCapture": {
+    "serial": "emulator-5794",
+    "avd": "fm_procs_35",
+    "capturedAt": "2026-10-22T07:55:17.682Z",
+    "probe": {
+      "package": "dev.probe",
+      "uid": 10208
+    },
+    "exiting": {
+      "cycle": 1,
+      "sample": 10
+    }
+  }
 }

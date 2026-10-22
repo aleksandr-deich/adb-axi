@@ -8,6 +8,7 @@ import {
 } from "../../android/activities.js";
 import { parseAmStart, wasRecreated, type AmStart } from "../../android/amstart.js";
 import { assertPackageName, type ActivityRecord, type Component } from "../../android/component.js";
+import { processImportance, type AppIdentity } from "../../android/app-processes.js";
 import { readForeground } from "../../android/foreground.js";
 import { invalidOutput } from "../../android/read.js";
 import { Deadline } from "../../core/deadline.js";
@@ -18,10 +19,10 @@ import { logsCrash } from "../logs/crash.js";
 import { defineCommand } from "../define.js";
 import type { CommandContext } from "../types.js";
 import {
+  appPids,
   formatDuration,
   forceStop,
   lifecycleCommand,
-  packageProcesses,
   requireInstalled,
   stopFailed,
   waitForExit,
@@ -78,7 +79,7 @@ export const appStart = defineCommand({
       requested === null ? pkg : `${pkg}/${requested}`,
       ...(fresh ? ["--fresh"] : []),
     ]);
-    const { dump, userId, info } = await requireInstalled(context, pkg);
+    const { dump, userId, app } = await requireInstalled(context, pkg);
     const filters = parseActivityFilters(dump);
     const activity =
       requested ?? (await resolveLauncherActivity(adb, serial, pkg, userId, readOptions(context)));
@@ -87,8 +88,10 @@ export const appStart = defineCommand({
     }
 
     if (fresh) {
-      await forceStop(adb, serial, pkg, userId, readOptions(context));
-      const exit = await waitForExit(context, pkg, userId);
+      const before = await appPids(context, app);
+      const stop = () => forceStop(adb, serial, pkg, userId, readOptions(context));
+      await stop();
+      const exit = await waitForExit(context, app, before, stop);
       if (!exit.gone) {
         throw stopFailed(context, pkg, exit.last, context.timeoutMs, {
           command,
@@ -101,7 +104,7 @@ export const appStart = defineCommand({
       context,
       { package: pkg, activity, component: `${pkg}/${activity}` },
       userId,
-      info.uid,
+      app,
       command,
       () => declaredActivities(filters, pkg),
       (launched, processName, last) => diedOnStart(context, launched, processName, last, command),
@@ -223,21 +226,14 @@ export async function launchActivity(
   context: CommandContext,
   component: Component,
   userId: number,
-  uid: number | null,
+  app: AppIdentity,
   command: string[],
   activities: () => string[],
   died: (activity: Component, processName: string, last: Seen) => AdbAxiError,
 ): Promise<{ start: AmStart; launched: Component; processName: string; settled: Seen }> {
   const adb = context.adb();
   const serial = targetSerial(context);
-  const watch = await LaunchWatch.open(
-    adb,
-    serial,
-    component.package,
-    userId,
-    uid,
-    readOptions(context),
-  );
+  const watch = await LaunchWatch.open(adb, serial, app, userId, readOptions(context));
   const start = await watch.during(
     (signal) =>
       amStart(
@@ -269,7 +265,7 @@ export async function launchActivity(
     userId,
     readOptions(context),
   );
-  const settled = await settle(context, adb, serial, launched, userId, processName, watch);
+  const settled = await settle(context, adb, serial, launched, app, userId, processName, watch);
   if (settled.state === "stopped" || settled.state === "crashed")
     throw died(launched, processName, settled);
   return { start, launched, processName, settled };
@@ -285,6 +281,7 @@ export async function settle(
   adb: AdbClient,
   serial: string,
   activity: Component,
+  app: AppIdentity,
   userId: number,
   processName: string,
   watch: LaunchWatch,
@@ -305,9 +302,7 @@ export async function settle(
         if (crash !== undefined) {
           return { done: true, value: { state: "crashed", pid: crash.pid, front: null } };
         }
-        const processes = await packageProcesses(context, activity.package, userId, {
-          deadline,
-        });
+        const processes = await processImportance(adb, serial, app, { deadline });
         if (last !== undefined && deadline.remainingMs() === 0) {
           return { done: true, value: last };
         }

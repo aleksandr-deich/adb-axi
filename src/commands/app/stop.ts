@@ -3,9 +3,9 @@ import { noop, okLine } from "../../core/output.js";
 import { realClock } from "../../core/poll.js";
 import { defineCommand } from "../define.js";
 import {
+  appPids,
   forceStop,
   lifecycleCommand,
-  mainPids,
   pidLabel,
   requireInstalled,
   stopFailed,
@@ -15,8 +15,11 @@ import { readOptions, targetSerial } from "./shared.js";
 
 export const appStop = defineCommand({
   path: ["app", "stop"],
-  help: ["Force-stops the app for the current Android user"],
-  summary: "Force-stop an app and verify its process is gone",
+  help: [
+    "Force-stops the app for the current Android user",
+    "Processes are matched by the app's uid, so other packages that share it are included and isolated services, which run under their own uid, are not",
+  ],
+  summary: "Force-stop an app and verify its processes are gone",
   positionals: [
     { name: "pkg", description: "Package name, for example com.example.notes", required: true },
   ],
@@ -31,20 +34,20 @@ export const appStop = defineCommand({
     const serial = targetSerial(context);
     const adb = context.adb();
 
-    const { userId } = await requireInstalled(context, pkg);
-    const before = await mainPids(context, pkg, userId);
+    const { userId, app } = await requireInstalled(context, pkg);
+    const before = await appPids(context, app);
     const started = realClock.now();
-    await forceStop(adb, serial, pkg, userId, readOptions(context));
-    if (before.length === 0) {
-      return { ok: okLine("stop", pkg, noop("already not running")) };
-    }
-
-    const exit = await waitForExit(context, pkg, userId);
+    const stop = () => forceStop(adb, serial, pkg, userId, readOptions(context));
+    await stop();
+    const exit = await waitForExit(context, app, before, stop);
     if (!exit.gone) {
       throw stopFailed(context, pkg, exit.last, context.timeoutMs, {
         command: lifecycleCommand(context, ["app", "stop", pkg]),
         step: "am force-stop",
       });
+    }
+    if (before.length === 0) {
+      return { ok: okLine("stop", pkg, noop("already not running")) };
     }
     const tookMs = Math.round(realClock.now() - started);
     return {

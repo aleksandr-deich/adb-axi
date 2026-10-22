@@ -1,0 +1,310 @@
+  PID   UID NAME                       
+    1     0 init
+    2     0 [kthreadd]
+    3     0 [pool_workqueue_release]
+    4     0 [kworker/R-rcu_g]
+    5     0 [kworker/R-slub_]
+    6     0 [kworker/R-netns]
+    7     0 [kworker/0:0-virtio_vsock]
+    9     0 [kworker/0:0H-events_highpri]
+   10     0 [kworker/u8:0-writeback]
+   11     0 [kworker/R-mm_pe]
+   12     0 [kworker/u8:1-ext4-rsv-conversion]
+   13     0 [rcu_tasks_kthread]
+   14     0 [rcu_tasks_trace_kthread]
+   15     0 [ksoftirqd/0]
+   16     0 [rcu_preempt]
+   17     0 [rcub/0]
+   18     0 [rcu_exp_gp_kthread_worker]
+   19     0 [rcu_exp_par_gp_kthread_worker]
+   20     0 [migration/0]
+   21     0 [idle_inject/0]
+   22     0 [cpuhp/0]
+   23     0 [cpuhp/1]
+   24     0 [idle_inject/1]
+   25     0 [migration/1]
+   26     0 [ksoftirqd/1]
+   28     0 [kworker/1:0H-kblockd]
+   29     0 [cpuhp/2]
+   30     0 [idle_inject/2]
+   31     0 [migration/2]
+   32     0 [ksoftirqd/2]
+   35     0 [cpuhp/3]
+   36     0 [idle_inject/3]
+   37     0 [migration/3]
+   38     0 [ksoftirqd/3]
+   40     0 [kworker/3:0H-kverityd]
+   41     0 [kworker/R-inet_]
+   42     0 [kauditd]
+   43     0 [khungtaskd]
+   44     0 [oom_reaper]
+   45     0 [kworker/R-write]
+   46     0 [kcompactd0]
+   47     0 [khugepaged]
+   48     0 [kworker/R-kbloc]
+   49     0 [kworker/R-edac-]
+   50     0 [kworker/R-devfr]
+   51     0 [watchdogd]
+   54     0 [kworker/1:1-virtio_vsock]
+   56     0 [kswapd0]
+   57     0 [kworker/u9:0-blk_crypto_wq]
+   58     0 [erofs_worker/0]
+   59     0 [erofs_worker/1]
+   60     0 [erofs_worker/2]
+   61     0 [erofs_worker/3]
+   62     0 [kworker/3:1-virtio_vsock]
+   63     0 [kworker/R-kthro]
+   64     0 [dmabuf-deferred-free-worker]
+   65     0 [kworker/R-nvme-]
+   66     0 [kworker/R-nvme-]
+   67     0 [kworker/R-nvme-]
+   68     0 [kworker/R-uas]
+   69     0 [kworker/R-dm_bu]
+   70     0 [kworker/R-mld]
+   71     0 [kworker/R-ipv6_]
+   73     0 [kworker/0:2-virtio_vsock]
+   74     0 [kworker/2:1-cgroup_destroy]
+   75     0 [khvcd]
+   76     0 [hwrng]
+   77     0 [jbd2/vdd1-8]
+   78     0 [kworker/R-ext4-]
+   80     0 [kworker/R-kdmfl]
+   81     0 [kworker/R-kdmfl]
+   82     0 [kworker/R-kdmfl]
+   83     0 [kworker/R-kdmfl]
+   84     0 [kworker/R-kdmfl]
+   88     0 init
+   89     0 [kworker/2:1H-kblockd]
+   90     0 ueventd
+  101     0 [kworker/R-kdmfl]
+  102     0 [kworker/R-kdmfl]
+  103     0 [kworker/R-kdmfl]
+  104     0 [kworker/R-kdmfl]
+  105     0 [kworker/R-kdmfl]
+  106     0 [kworker/R-kdmfl]
+  108     0 [kworker/R-kdmfl]
+  109     0 [kworker/R-kdmfl]
+  110     0 [kworker/R-kdmfl]
+  112     0 [kworker/R-kdmfl]
+  113     0 [kworker/R-kdmfl]
+  114     0 [kworker/R-kdmfl]
+  115     0 [kworker/R-kdmfl]
+  116     0 [kworker/R-kdmfl]
+  117     0 [kworker/R-kdmfl]
+  119     0 [kworker/R-kdmfl]
+  120     0 [kworker/R-kdmfl]
+  121     0 [kworker/R-kdmfl]
+  123     0 [kworker/R-kdmfl]
+  125     0 [kworker/R-kdmfl]
+  128     0 [kworker/R-kdmfl]
+  130     0 [kworker/R-kdmfl]
+  131     0 [kworker/R-kdmfl]
+  132     0 [kworker/R-kdmfl]
+  135     0 [kworker/R-kdmfl]
+  140     0 [kworker/R-ext4-]
+  141     0 [kworker/R-ext4-]
+  142     0 [kworker/R-ext4-]
+  148  1092 prng_seeder
+  150     0 [kworker/R-cfg80]
+  151     0 [sugov:0]
+  152     0 [sugov:1]
+  153     0 [sugov:2]
+  154     0 [sugov:3]
+  155  1036 logd
+  157  1069 lmkd
+  158  1000 servicemanager
+  159  1000 hwservicemanager
+  160     0 qemu-props
+  161     0 [irq/35-goldfish_pipe_dprctd]
+  171     0 vold
+  173     0 [kworker/R-kdmfl]
+  177     0 [kworker/R-usbip]
+  180  1000 android.system.suspend-service
+  181  1017 keystore2
+  182  1000 android.hardware.atrace@1.0-service
+  183  9999 android.hardware.security.keymint-service
+  204     0 [kworker/R-blk_c]
+  209     0 [jbd2/dm-44-8]
+  210     0 [kworker/R-ext4-]
+  214     0 [kworker/u9:2-blk_crypto_wq]
+  215  1058 tombstoned
+  262     0 [kworker/R-ext4-]
+  263     0 [kworker/R-ext4-]
+  264     0 [kworker/R-kveri]
+  265     0 [kworker/R-ext4-]
+  266     0 [kworker/R-ext4-]
+  267     0 [kworker/R-ext4-]
+  268     0 [kworker/R-ext4-]
+  269     0 [kworker/R-ext4-]
+  270     0 [kworker/R-kveri]
+  271     0 [kworker/R-ext4-]
+  273     0 [kworker/R-ext4-]
+  274     0 [kworker/R-ext4-]
+  275     0 [kworker/R-ext4-]
+  276     0 [kworker/R-ext4-]
+  278     0 [kworker/u8:5-events_unbound]
+  279     0 [kworker/R-ext4-]
+  280     0 [kworker/R-kveri]
+  281     0 [kworker/R-kveri]
+  282     0 [kworker/R-kveri]
+  283     0 [kworker/R-kveri]
+  284     0 [kworker/R-kveri]
+  285     0 [kworker/R-kveri]
+  286     0 [kworker/R-ext4-]
+  287     0 [kworker/R-ext4-]
+  288     0 [kworker/R-ext4-]
+  289     0 [kworker/3:2H-kblockd]
+  290     0 [kworker/R-ext4-]
+  291     0 [kworker/R-ext4-]
+  292     0 [kworker/R-ext4-]
+  293     0 [kworker/0:2H-kblockd]
+  294     0 [kworker/R-ext4-]
+  295     0 [kworker/R-ext4-]
+  296     0 [kworker/R-ext4-]
+  297     0 [kworker/R-kveri]
+  298     0 [kworker/R-ext4-]
+  299     0 [kworker/R-kveri]
+  300     0 [kworker/R-ext4-]
+  301     0 [kworker/R-kveri]
+  302     0 [kworker/R-kveri]
+  303     0 [kworker/R-kveri]
+  304     0 [kworker/R-kveri]
+  305     0 [kworker/R-ext4-]
+  306     0 [kworker/1:2H-kblockd]
+  307     0 [kworker/R-ext4-]
+  308     0 [kworker/R-ext4-]
+  309     0 [kworker/R-ext4-]
+  310     0 [kworker/R-kveri]
+  311     0 [kworker/R-ext4-]
+  312     0 [kworker/R-kveri]
+  313     0 [kworker/R-kveri]
+  314     0 [kworker/R-ext4-]
+  315     0 [kworker/R-ext4-]
+  316     0 [kworker/R-kveri]
+  317     0 [kworker/R-ext4-]
+  318     0 [kworker/R-kveri]
+  319     0 [kworker/R-kveri]
+  320     0 [kworker/R-kveri]
+  321     0 [kworker/R-ext4-]
+  322     0 [kworker/R-kveri]
+  323     0 [kworker/R-ext4-]
+  324     0 [kworker/R-ext4-]
+  325     0 [kworker/R-ext4-]
+  326     0 [kworker/R-kveri]
+  327     0 [kworker/R-ext4-]
+  328     0 [kworker/R-kveri]
+  329     0 [kworker/R-ext4-]
+  330     0 [kworker/R-kveri]
+  331     0 [kworker/R-ext4-]
+  361     0 dhcpclient
+  364  1066 statsd
+  365     0 netd
+  366     0 zygote64
+  373  1000 android.hidl.allocator@1.0-service
+  374  1041 android.hardware.audio.service
+  375  1000 android.hardware.camera.provider.ranchu
+  376  1000 android.hardware.camera.provider@2.7-service-google
+  377  1000 android.hardware.gatekeeper@1.0-service.software
+  378  1000 android.hardware.graphics.allocator@3.0-service.ranchu
+  379  1000 android.hardware.health-service.example
+  382  1013 android.hardware.media.c2@1.0-service-goldfish
+  383  1000 android.hardware.sensors-service.multihal
+  384     0 iptables-restore
+  385     0 ip6tables-restore
+  387  1000 android.hardware.thermal@2.0-service.mock
+  388  1000 android.hardware.usb-service.example
+  389  1010 android.hardware.wifi-service
+  390  1002 android.hardware.bluetooth-service.default
+  391  1080 android.hardware.contexthub-service.example
+  392  1000 android.hardware.graphics.composer3-service.ranchu
+  393  9999 android.hardware.identity-service.example
+  394  9999 android.hardware.lights-service.example
+  395  9999 android.hardware.power-service.example
+  396  1000 android.hardware.power.stats-service.example
+  397  9999 android.hardware.vibrator-service.example
+  398  1064 android.hardware.authsecret-service.example
+  399  1013 android.hardware.cas-service.example
+  400  1000 android.hardware.neuralnetworks-service-sample-all
+  401  1000 android.hardware.neuralnetworks-service-sample-limited
+  402  1000 android.hardware.neuralnetworks-shim-service-sample
+  403  1000 android.hardware.rebootescrow-service.default
+  404  1013 android.hardware.drm-service.widevine
+  406  1041 audioserver
+  407  1076 credstore
+  409  1072 gpuservice
+  411  1000 surfaceflinger
+  431  1019 drmserver
+  432  9999 traced_probes
+  433  9999 traced
+  437  1002 bt_vhci_forwarder
+  438  1047 cameraserver
+  440  1067 incidentd
+  441     0 installd
+  442  1040 media.extractor
+  443  1013 media.metrics
+  444  1013 mediaserver
+  445     0 storaged
+  446  1010 wificond
+  447  1001 libgoldfish-rild
+  448  1046 media.swcodec
+  449  1000 gatekeeperd
+  482  1020 mdnsd
+  556  1000 system_server
+  564     0 [kworker/2:5H-kverityd]
+  893  1000 android.hardware.biometrics.fingerprint-service.ranchu
+  894  9999 android.hardware.biometrics.face-service.example
+  928 10181 com.android.systemui
+  973  1021 android.hardware.gnss-service.ranchu
+  986  1053 webview_zygote
+  998     0 [kworker/u9:3-blk_crypto_wq]
+ 1018  1073 com.android.networkstack.process
+ 1048  1068 com.android.se
+ 1069  1001 com.android.phone
+ 1204 10176 com.google.android.apps.nexuslauncher
+ 1599 10199 com.google.android.providers.media.module
+ 1652  1000 com.android.emulator.multidisplay
+ 1819 10091 android.process.acore
+ 1842  1010 wpa_supplicant
+ 1865  2000 adbd
+ 1956 10128 com.google.android.as.oss
+ 3899 10206 com.google.android.ext.services
+ 4584     0 [kworker/0:1-virtio_vsock]
+ 4587  2000 abb
+ 4635     0 [kworker/u9:1-blk_crypto_wq]
+ 5023     0 [kworker/3:0-events]
+ 5043     0 [kworker/1:0-events]
+ 5062     0 [kworker/1:3-virtio_vsock]
+ 5958     0 [kworker/u8:2-events_unbound]
+12190     0 [kworker/2:3-rcu_gp]
+12211 10134 com.google.android.as
+12504 10140 com.google.android.apps.messaging:rcs
+12864 10140 com.google.android.apps.messaging
+13867 10202 com.google.android.rkpdapp
+14860 10099 com.android.externalstorage
+14886 10145 com.google.android.googlequicksearchbox:interactor
+14913 10194 com.google.android.permissioncontroller
+15011  1000 com.android.settings
+15096 10195 com.google.android.healthconnect.controller
+15309 10104 com.android.managedprovisioning
+15345  1002 com.google.android.bluetooth
+15698  1082 artd
+15699     0 [kworker/1:1H]
+15713  1000 com.android.keychain
+15764 10141 com.android.vending:background
+15966 10141 com.android.vending:quick_launch
+16001 10141 com.android.vending:instant_app_installer
+16070 10136 com.google.android.partnersetup
+16116 10146 com.android.chrome
+16348 10129 com.google.android.configupdater
+16387     0 [kworker/0:1H-kblockd]
+16469 10144 com.google.android.gms
+16591 10141 com.android.vending
+16639 10144 com.google.android.gms.unstable
+16750 10142 com.google.android.settings.intelligence
+16800 10143 com.google.android.apps.wellbeing
+16813 10157 com.google.android.inputmethod.latin
+16938 10145 com.google.android.googlequicksearchbox:search
+17011     0 [psimon]
+17106 10208 dev.probe
+17189 10208 dev.probe:ui
+17216  2000 ps

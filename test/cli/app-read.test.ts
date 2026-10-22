@@ -14,14 +14,17 @@ const SERIAL = "emulator-5554";
 const ONE_ONLINE = `List of devices attached\n${SERIAL}          device product:sdk_gphone64_arm64 model:sdk_gphone64_arm64 device:emu64a transport_id:1\n\n`;
 
 const FOREGROUND = "dumpsys activity activities";
-const PIDOF = "pidof dev.probe";
+const PIDOF = "pidof 'dev.probe'";
+const PROCESS_TABLE = "ps -A -o PID,UID,NAME";
+const NO_PROCESSES = { stdout: "  PID   UID NAME\n" };
+const PACKAGE = "dumpsys package dev.probe";
+const INSTALLED = { stdoutFile: "captured/35/dumpsys-package-debug.txt" };
 const PACKAGES_ALL = "pm list packages --show-versioncode -U";
 const PACKAGES_USER = "pm list packages --show-versioncode -U -3";
 const PACKAGE_DUMP = "dumpsys package packages";
 
 const PROBE_FRONT = { stdoutFile: "captured/35/dumpsys-activity-activities-probe-front.txt" };
 const LAUNCHER_FRONT = { stdoutFile: "captured/35/dumpsys-activity-activities-launcher-front.txt" };
-const PROBE_RUNNING = { stdoutFile: "captured/35/pidof-running.txt" };
 const PROBE_STOPPED = { stdoutFile: "captured/35/pidof-not-running.txt", exit: 1 };
 
 let fake: FakeAdb | undefined;
@@ -166,7 +169,12 @@ describe("app current", () => {
   });
 
   it("prints a dash for the pid when the process is not found by name", async () => {
-    const f = device({ [FOREGROUND]: PROBE_FRONT, [PIDOF]: PROBE_STOPPED });
+    const f = device({
+      [FOREGROUND]: PROBE_FRONT,
+      [PACKAGE]: INSTALLED,
+      [PROCESS_TABLE]: NO_PROCESSES,
+      [PIDOF]: PROBE_STOPPED,
+    });
     const { data } = await both(["app", "current"], f);
     expect(data).toEqual({ app: { package: "dev.probe", activity: ".MainActivity", pid: "-" } });
   });
@@ -187,6 +195,7 @@ describe("a device that goes away mid-command", () => {
           times: 1,
           then: { stdout: after },
         },
+        { match: ["-s", SERIAL, "shell", "am get-current-user"], respond: { stdout: "0\n" } },
         { match: ["-s", SERIAL, "shell", FOREGROUND], respond: command },
       ],
     });
@@ -274,6 +283,7 @@ describe("app info", () => {
     const f = device({
       "am get-current-user": { stdout: "10\n" },
       "dumpsys package dev.probe": { stdout: dump },
+      [PROCESS_TABLE]: NO_PROCESSES,
       [PIDOF]: PROBE_STOPPED,
       [FOREGROUND]: LAUNCHER_FRONT,
       "run-as dev.probe --user 10 du -sk .": { stdout: "72\t.\n" },
@@ -307,7 +317,10 @@ describe("app info", () => {
 
 describe("wait app", () => {
   it("reports an unknown last observation when the first read hangs past the deadline", async () => {
-    const f = device({ [PIDOF]: { ...PROBE_RUNNING, delayMs: 5000 } });
+    const f = device({
+      [PACKAGE]: INSTALLED,
+      [PROCESS_TABLE]: { ...NO_PROCESSES, delayMs: 5000 },
+    });
     const { toon, data } = await both(
       ["wait", "app", "dev.probe", "--state", "running", "--timeout", "1s"],
       f,

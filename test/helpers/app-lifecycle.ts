@@ -23,7 +23,7 @@ export const ONE_ONLINE = `List of devices attached\n${SERIAL}          device p
 export const CURRENT_USER = "am get-current-user";
 export const RESOLVE =
   "cmd package query-activities --components --user 0 -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -p dev.probe";
-export const KERNEL_UIDS = "ps -A -o PID,UID";
+export const KERNEL_UIDS = "ps -A -o PID,UID,NAME";
 export const PROCESSES = "dumpsys activity processes dev.probe";
 export const PROCESS_RUNNING = {
   stdoutFile: "captured/35/dumpsys-activity-processes-probe-front.txt",
@@ -31,7 +31,7 @@ export const PROCESS_RUNNING = {
 export const PACKAGE = "dumpsys package dev.probe";
 export const CODE_PATH = "pm path --user 0 dev.probe";
 export const FOREGROUND = "dumpsys activity activities";
-export const PIDOF = "pidof dev.probe";
+export const PIDOF = "pidof 'dev.probe'";
 export const FORCE_STOP = "am force-stop --user 0 dev.probe";
 export const CLEAR = "pm clear --user 0 dev.probe";
 export const DATA_FILES = "run-as dev.probe --user 0 find . -type f";
@@ -110,7 +110,10 @@ export function lifecycleDevices(track: (fake: FakeAdb) => void) {
         { match: shell(RESOLVE), respond: { stdout: "dev.probe/.MainActivity\n" } },
         { match: shell(PROCESSES), respond: PROCESS_RUNNING },
         { match: shell(METADATA), respond: activityInfo() },
-        { match: shell(KERNEL_UIDS), respond: { stdout: "  PID   UID\n 8235 10213\n" } },
+        {
+          match: shell(KERNEL_UIDS),
+          respond: { stdout: "  PID   UID NAME\n 8235 10213 dev.probe\n" },
+        },
       ],
     });
     track(fake);
@@ -141,12 +144,12 @@ export function lifecycleDevices(track: (fake: FakeAdb) => void) {
         {
           match: shell(KERNEL_UIDS),
           when: { proc: "running" },
-          respond: { stdout: "  PID   UID\n 8235 10213\n" },
+          respond: { stdout: "  PID   UID NAME\n 8235 10213 dev.probe\n" },
         },
         {
           match: shell(KERNEL_UIDS),
           when: { proc: "stopped" },
-          respond: { stdout: "  PID   UID\n" },
+          respond: { stdout: "  PID   UID NAME\n" },
         },
         { match: shell(PACKAGE), respond: INSTALLED },
         { match: shell(CODE_PATH), respond: { stdout: "package:/data/app/probe/base.apk\n" } },

@@ -1,5 +1,4 @@
 import type { AdbClient } from "../adb/run.js";
-import { assertPackageName } from "./component.js";
 import { readShell, type ReadOptions } from "./read.js";
 
 /**
@@ -36,80 +35,6 @@ const BANDS: readonly [number, Importance][] = [
 
 export function importanceForAdj(adj: number): Importance {
   return BANDS.find(([min]) => adj >= min)?.[1] ?? "persistent";
-}
-
-/**
- * `am kill` only kills processes at or above `SERVICE_ADJ` (500): it calls
- * `killBackgroundProcesses`, which passes that as the minimum oom adj (AOSP
- * `ActivityManagerService`, API 29 to 37). Below it, `am kill` is the silent no-op of S5.
- * The previous app (700) qualifies, so an app need not reach `cached` first.
- */
-export const AM_KILL_MIN_ADJ = 500;
-
-export function amKillCanKill(adj: number): boolean {
-  return adj >= AM_KILL_MIN_ADJ;
-}
-
-/** One process record from `dumpsys activity processes <pkg>`. */
-export interface ProcessRecord {
-  pid: number;
-  /** Process name: the package for the main process, `<pkg>:<name>` for others. */
-  process: string;
-  uid: number;
-  /** The oom adj the system last applied (`set=`), the value `am kill` compares. */
-  adj: number | null;
-  importance: Importance | null;
-  /** `curProcState=`, an `ActivityManager.PROCESS_STATE_*` number. */
-  procState: number | null;
-  /** The `cached=` flag. */
-  cached: boolean | null;
-}
-
-/**
- * Parse the `*APP*` and `*PERS*` records under "All known processes" (AOSP
- * `ActivityManagerService.dumpProcessesLocked` and `ProcessRecord.dump`). The oom line is
- * `oom: max=...` up to API 30 and `oom adj: max=...` from API 31. Records without a pid
- * are not running and are left out.
- */
-export function parseProcesses(stdout: string): ProcessRecord[] {
-  const records: ProcessRecord[] = [];
-  let current: ProcessRecord | undefined;
-  for (const line of stdout.split(/\r?\n/)) {
-    const header =
-      /^ {2}\*(?:APP|PERS)\* UID (\d+) ProcessRecord\{[0-9a-f]+ (\d+):([^/\s]+)\/\S+\}/.exec(line);
-    if (header?.[1] !== undefined && header[2] !== undefined && header[3] !== undefined) {
-      current = {
-        pid: Number(header[2]),
-        process: header[3],
-        uid: Number(header[1]),
-        adj: null,
-        importance: null,
-        procState: null,
-        cached: null,
-      };
-      if (current.pid > 0) records.push(current);
-      continue;
-    }
-    // A record's details are indented by four (API 35 puts a blank line among them);
-    // any shallower line ends the record.
-    if (line.trim() === "") continue;
-    if (current === undefined || !/^ {4}/.test(line)) {
-      current = undefined;
-      continue;
-    }
-    const oom = /^\s*oom(?: adj)?: max=-?\d+ curRaw=-?\d+ setRaw=-?\d+ cur=-?\d+ set=(-?\d+)/.exec(
-      line,
-    );
-    if (oom?.[1] !== undefined) {
-      current.adj = Number(oom[1]);
-      current.importance = importanceForAdj(current.adj);
-    }
-    const state = /^\s*curProcState=(-?\d+)/.exec(line);
-    if (state?.[1] !== undefined) current.procState = Number(state[1]);
-    const cached = /^\s*cached=(true|false)\b/.exec(line);
-    if (cached?.[1] !== undefined) current.cached = cached[1] === "true";
-  }
-  return records;
 }
 
 /** One line of `dumpsys activity lru`. */
@@ -187,24 +112,6 @@ export function parseLru(stdout: string): LruEntry[] {
     });
   }
   return entries;
-}
-
-/** The records of every running process of a package. */
-export async function readProcesses(
-  adb: AdbClient,
-  serial: string,
-  pkg: string,
-  options: ReadOptions,
-): Promise<ProcessRecord[]> {
-  assertPackageName(pkg);
-  const result = await readShell(
-    adb,
-    serial,
-    `dumpsys activity processes ${pkg}`,
-    `reading the processes of ${pkg}`,
-    options,
-  );
-  return parseProcesses(result.stdout);
 }
 
 /** Every process in LRU order, most recently used first. */
