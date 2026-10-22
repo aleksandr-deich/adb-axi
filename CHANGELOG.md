@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.2.3](https://github.com/aleksandr-deich/adb-axi/compare/v0.2.2...v0.2.3) (2026-10-22)
+
+
+### Bug Fixes
+
+* **android:** unify UID-scoped app process detection ([#66](https://github.com/aleksandr-deich/adb-axi/issues/66)) ([4690d21](https://github.com/aleksandr-deich/adb-axi/commit/4690d21ac32ef339a3abde24d0f4a80ea28ba1c0))
+* clarify CLI help and remove irrelevant update flags ([#64](https://github.com/aleksandr-deich/adb-axi/issues/64)) ([a3c0028](https://github.com/aleksandr-deich/adb-axi/commit/a3c0028f6e4f20bc54d70b020716b7830056fb17))
+* respect launch deadlines and require verified log marks ([#67](https://github.com/aleksandr-deich/adb-axi/issues/67)) ([af72b2f](https://github.com/aleksandr-deich/adb-axi/commit/af72b2f68eafa7c2c0525a3625b706d2b4cf8c72))
+
 ## [0.2.2](https://github.com/aleksandr-deich/adb-axi/compare/v0.2.1...v0.2.2) (2026-10-16)
 
 
