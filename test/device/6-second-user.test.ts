@@ -172,3 +172,32 @@ describe("the probe started for the second user too", () => {
     expect(alive).not.toContain(ui);
   });
 });
+
+describe("package reads follow the second user's installation state", () => {
+  afterAll(async () => {
+    await axi.sh(`pm install-existing --user 0 ${PKG}`);
+    await axi.sh(`pm install-existing --user ${user} ${PKG}`);
+  });
+
+  test("app list follows the current user, not the owner's installation", async () => {
+    const n = user;
+    await axi.sh(`pm install-existing --user ${n} ${PKG}`);
+    await axi.sh(`pm uninstall --user 0 ${PKG}`);
+    const installed = (await raw(`pm list packages --user ${n} ${PKG}`))
+      .trim()
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => line.replace(/^package:/, ""));
+    expect(installed).toEqual([PKG]);
+    const listed = await axi.ok(["app", "list", "--grep", "probe"]);
+    expect((listed.packages as { package: string }[]).map((row) => row.package)).toEqual(installed);
+
+    await axi.sh(`pm install-existing --user 0 ${PKG}`);
+    await axi.sh(`pm uninstall --user ${n} ${PKG}`);
+    const absent = (await raw(`pm list packages --user ${n} ${PKG}`)).trim();
+    expect(absent).toBe("");
+    const empty = await axi.ok(["app", "list", "--grep", "probe"]);
+    expect(empty.packages).toEqual([]);
+    expect(empty.count).toContain("0 user packages shown");
+  });
+});

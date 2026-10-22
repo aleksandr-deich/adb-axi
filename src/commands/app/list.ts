@@ -23,9 +23,9 @@ export const appList = defineCommand({
     const all = context.flags.all === true;
     const matches = nameFilter(context.flags.grep);
     const serial = context.device.serial;
-    const options = context.device.reads;
-    const adb = context.device.adb;
     const userId = await context.device.user();
+    const options = { ...context.device.reads, userId };
+    const adb = context.device.adb;
 
     // The user set and the full set are both read, so the count line can say how many
     // packages the device has beyond the user's, whichever of the two is shown.

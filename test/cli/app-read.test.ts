@@ -19,8 +19,8 @@ const PROCESS_TABLE = "ps -A -o PID,UID,NAME";
 const NO_PROCESSES = { stdout: "  PID   UID NAME\n" };
 const PACKAGE = "dumpsys package dev.probe";
 const INSTALLED = { stdoutFile: "captured/35/dumpsys-package-debug.txt" };
-const PACKAGES_ALL = "pm list packages --show-versioncode -U";
-const PACKAGES_USER = "pm list packages --show-versioncode -U -3";
+const PACKAGES_ALL = "pm list packages --show-versioncode -U --user 0";
+const PACKAGES_USER = "pm list packages --show-versioncode -U -3 --user 0";
 const PACKAGE_DUMP = "dumpsys package packages";
 
 const PROBE_FRONT = { stdoutFile: "captured/35/dumpsys-activity-activities-probe-front.txt" };

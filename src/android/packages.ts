@@ -204,9 +204,9 @@ export async function readPackageSnapshot(
 export async function listPackages(
   adb: AdbClient,
   serial: string,
-  options: ReadOptions & { thirdParty?: boolean },
+  options: ReadOptions & { userId: number; thirdParty?: boolean },
 ): Promise<ListedPackage[]> {
-  const command = `pm list packages --show-versioncode -U${options.thirdParty === true ? " -3" : ""}`;
+  const command = `pm list packages --show-versioncode -U${options.thirdParty === true ? " -3" : ""} --user ${options.userId}`;
   const result = await readShell(adb, serial, command, "listing packages", options);
   return parsePackageList(result.stdout);
 }
