@@ -59,10 +59,10 @@ export interface PackageInfo {
  *
  * Field names follow AOSP `Settings.dumpPackageLPr`: the app id is `userId=` up to API 30
  * and `appId=` from API 31; flags are `flags=[ DEBUGGABLE HAS_CODE ... ]`; each user has a
- * `User <n>: ... installed=<bool> ...` line. Installation is read for `userId` (default 0)
+ * `User <n>: ... installed=<bool> ...` line. Installation is read for `userId`
  * and is false if that user's line is absent. The UID is `userId * 100000 + appId`.
  */
-export function parsePackageRecords(stdout: string, userId = 0): Map<string, PackageInfo> {
+export function parsePackageRecords(stdout: string, userId: number): Map<string, PackageInfo> {
   const records = new Map<string, PackageInfo>();
   let inPackages = false;
   let current: { info: PackageInfo; seenUser: boolean } | undefined;
@@ -131,7 +131,11 @@ export function parsePackageRecords(stdout: string, userId = 0): Map<string, Pac
 }
 
 /** One package's raw record, or `null` when the dump has none. */
-export function parseDumpsysPackage(stdout: string, pkg: string, userId = 0): PackageInfo | null {
+export function parseDumpsysPackage(
+  stdout: string,
+  pkg: string,
+  userId: number,
+): PackageInfo | null {
   return parsePackageRecords(stdout, userId).get(pkg) ?? null;
 }
 
@@ -144,7 +148,7 @@ export async function readPackage(
   serial: string,
   pkg: string,
   options: ReadOptions,
-  userId = 0,
+  userId: number,
 ): Promise<PackageInfo | null> {
   return (await readPackageSnapshot(adb, serial, pkg, options, userId)).info;
 }
@@ -159,7 +163,7 @@ export async function readPackageSnapshot(
   serial: string,
   pkg: string,
   options: ReadOptions,
-  userId = 0,
+  userId: number,
 ): Promise<{ info: PackageInfo | null; dump: string }> {
   assertPackageName(pkg);
   const result = await readShell(

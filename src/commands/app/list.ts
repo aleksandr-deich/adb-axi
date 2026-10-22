@@ -25,6 +25,7 @@ export const appList = defineCommand({
     const serial = context.device.serial;
     const options = context.device.reads;
     const adb = context.device.adb;
+    const userId = await context.device.user();
 
     // The user set and the full set are both read, so the count line can say how many
     // packages the device has beyond the user's, whichever of the two is shown.
@@ -49,6 +50,7 @@ export const appList = defineCommand({
                 options,
               )
             ).stdout,
+            userId,
           );
 
     const rows = shown.map((listed) => {
