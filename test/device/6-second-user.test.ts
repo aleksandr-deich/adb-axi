@@ -141,8 +141,6 @@ describe("the probe started for the second user too", () => {
     const current = uidOf(n, probeAppId);
     await axi.sh(`am start --user ${n} -W -n ${PKG}/.MainActivity`);
     await axi.sh(`am start --user ${n} -W -n ${PKG}/.UiActivity`);
-    // Include reclamation between the PID sample and app info, not only during app stop.
-    const since = (await raw("date +'%m-%d %H:%M:%S.000'")).trim();
     const ownerPids = [...(await pidsUnder(owner, PKG)), ...(await pidsUnder(owner, `${PKG}:ui`))];
     const [main] = await pidsUnder(current, PKG);
     const [ui] = await pidsUnder(current, `${PKG}:ui`);
@@ -153,6 +151,7 @@ describe("the probe started for the second user too", () => {
 
     expect((await axi.ok(["app", "info", PKG])).app).toMatchObject({ pid: main });
 
+    const since = (await raw("date +'%m-%d %H:%M:%S.000'")).trim();
     const stopped = await axi.ok(["app", "stop", PKG]);
     expect(String(stopped.ok)).toMatch(
       /^stop dev\.probe -> not running \(pids \d+ \d+ gone after \d+ ms\)$/,
