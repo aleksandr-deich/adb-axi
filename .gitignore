@@ -4,5 +4,6 @@ coverage/
 *.tgz
 .DS_Store
 test-results/
+.emulators/
 
 bench/results/

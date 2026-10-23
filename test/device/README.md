@@ -4,6 +4,8 @@ The testing policy for adb-axi is in [`docs/testing.md`](../../docs/testing.md).
 
 Nothing here runs in `npm test` or `npm run check`. The device checks run on every pull request and on pushes to `main`, against API 29, 30 and 35 emulators (`.github/workflows/emulator.yml`). Everything here changes the devices it touches, so run it only on emulators reserved for the job, and always name each one by serial.
 
+Local device runs keep throwaway AVDs, emulator home (`ANDROID_AVD_HOME` / `ANDROID_EMULATOR_HOME`), temp and process files in the gitignored `.emulators/` folder at the repository root, deleted with the worktree copy. Use a dedicated adb server for the run.
+
 ## Device checks (`*.test.ts`)
 
 The checks drive adb-axi installed from a packed tarball against one emulator, use the probe app for app and log scenarios, and wait for app and log events with adb-axi's own `wait` commands instead of sleeping. Each expected result is grounded in probe state, Android window focus, kernel process state or database bytes, rather than another adb-axi summary. Window focus comes from current display contents, not historical last-ANR snapshots included in an unqualified window dump. These files cover adb-axi's ordinary flows and every failure a real emulator can produce:
