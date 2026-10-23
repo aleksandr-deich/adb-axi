@@ -50,17 +50,20 @@ test("native-precedence-and-loopback-aliases", () => {
     expect(Object.isFrozen(selected)).toBe(true);
   }
   const savedEnv = home();
-  writeJsonAtomic(join(savedEnv.ADB_AXI_HOME!, "server.json"), {
+  if (savedEnv.ADB_AXI_HOME === undefined) throw new Error("Missing saved selection home");
+  writeJsonAtomic(join(savedEnv.ADB_AXI_HOME, "server.json"), {
     version: 1,
     endpoint: "tcp:6137",
     start: "auto",
   });
-  const local = resolveServerSelection(savedEnv, "tcp:127.0.0.1:6137")!;
+  const local = resolveServerSelection(savedEnv, "tcp:127.0.0.1:6137");
+  if (local === undefined) throw new Error("Missing local server selection");
   expect(local.start).toBe("auto");
   const identities = new Set([local.identity]);
   const namespaces = new Set([serverStateEnv(savedEnv, local).ADB_AXI_HOME]);
   for (const endpoint of ["tcp:[::1]:6137", "tcp:127.0.0.2:6137", "tcp:127.1.2.3:6137"]) {
-    const distinct = resolveServerSelection(savedEnv, endpoint)!;
+    const distinct = resolveServerSelection(savedEnv, endpoint);
+    if (distinct === undefined) throw new Error("Missing distinct server selection");
     expect(distinct.local).toBe(true);
     expect(distinct.start).toBe("never");
     expect(resolveServerSelection(savedEnv, endpoint, "auto")?.start).toBe("auto");
