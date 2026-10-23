@@ -27,8 +27,8 @@ export const appList = defineCommand({
     const options = { ...context.device.reads, userId };
     const adb = context.device.adb;
 
-    // The user set and the full set are both read, so the count line can say how many
-    // packages the device has beyond the user's, whichever of the two is shown.
+    // Read both third-party and all packages for this Android user so the count can
+    // include hidden system packages, whichever set is shown.
     const everything = (await listPackages(adb, serial, options)).filter((p) => matches(p.package));
     const userNames = new Set(
       (await listPackages(adb, serial, { ...options, thirdParty: true })).map((p) => p.package),
