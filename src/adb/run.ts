@@ -11,6 +11,8 @@ import {
   isTransportClosed,
 } from "./variants.js";
 import { serverEndpoint } from "./server-endpoint.js";
+import { selectedChildEnv } from "./server-selection.js";
+import type { ServerSession } from "./server-session.js";
 import { hostAdbVersionError, parseAdbVersion } from "./version.js";
 
 /** Looks at `adb devices` after a device's connection closed: the server notices within a second. */
@@ -50,6 +52,7 @@ export interface AdbExit {
 }
 
 export interface AdbClientOptions {
+  server?: ServerSession;
   /** Print every adb argv (and its outcome) on stderr. */
   debug?: boolean;
   env?: NodeJS.ProcessEnv;
@@ -66,14 +69,21 @@ export class AdbClient {
   readonly path: string;
   private readonly options: AdbClientOptions;
   private versionRead: Promise<string | undefined> | undefined;
+  private protocol: number | undefined;
 
   constructor(path: string, options: AdbClientOptions = {}) {
     this.path = path;
     this.options = options;
   }
 
+  get hasSelectedServer(): boolean {
+    return this.options.server !== undefined;
+  }
+
   get serverEndpoint(): string {
-    return serverEndpoint(this.options.env ?? process.env);
+    return (
+      this.options.server?.selection.endpoint ?? serverEndpoint(this.options.env ?? process.env)
+    );
   }
 
   /** A host-side call that targets no device, such as `devices -l`. */
@@ -87,9 +97,13 @@ export class AdbClient {
       deadline: options.deadline,
       capMs: Math.min(options.capMs ?? 5_000, 5_000),
       step: "reading the adb client version",
-    }).then((answer) =>
-      answer.exitCode === 0 ? parseAdbVersion(answer.stdout.toString("utf8")) : undefined,
-    ));
+    }).then((answer) => {
+      if (answer.exitCode !== 0) return undefined;
+      const text = answer.stdout.toString("utf8");
+      const protocol = /^Android Debug Bridge version 1\.0\.(\d+)\s*$/m.exec(text)?.[1];
+      this.protocol = protocol === undefined ? undefined : Number(protocol);
+      return parseAdbVersion(text);
+    }));
   }
 
   /** A call on one device: always `adb -s <serial> <args>`. */
@@ -111,9 +125,56 @@ export class AdbClient {
     argv: string[],
     serial: string | undefined,
     options: AdbCallOptions,
+    bootstrap = false,
   ): Promise<AdbExit> {
+    const callStarted = Date.now();
+    const server = this.options.server;
+    const localVersion = argv.length === 1 && argv[0] === "version";
+    if (server !== undefined && !localVersion && !bootstrap) {
+      await this.version(options);
+      await server.preflight({
+        protocol: this.protocol,
+        deadline: options.deadline,
+        capMs: options.capMs,
+        signal: options.signal,
+        start: async () => {
+          const result = await this.call(
+            ["start-server"],
+            undefined,
+            {
+              deadline: options.deadline,
+              ...(options.capMs === undefined ? {} : { capMs: options.capMs }),
+              ...(options.signal === undefined ? {} : { signal: options.signal }),
+              step: "starting the selected adb server",
+            },
+            true,
+          );
+          if (result.exitCode !== 0)
+            throw new AdbAxiError(
+              "ADB_SERVER_UNREACHABLE",
+              "The explicit selected-server start failed",
+            );
+        },
+      });
+    }
+    if (server !== undefined && !localVersion) {
+      const selection = server.selection;
+      // Native adb only supports local listener creation with the short TCP spelling.
+      const endpoint =
+        bootstrap && ["localhost", "127.0.0.1"].includes(selection.host)
+          ? `tcp:${selection.port}`
+          : bootstrap
+            ? selection.endpoint
+            : server.nativeEndpoint;
+      argv = ["-L", endpoint, ...argv];
+    }
     const remaining = options.deadline.remainingMs();
-    const budget = Math.min(remaining, options.capMs ?? Number.POSITIVE_INFINITY);
+    const budget = Math.min(
+      remaining,
+      options.capMs === undefined
+        ? Number.POSITIVE_INFINITY
+        : options.capMs - (server === undefined ? 0 : Date.now() - callStarted),
+    );
     if (budget <= 0) {
       throw timeoutError(
         options.step,
@@ -128,12 +189,17 @@ export class AdbClient {
       args: argv,
       deadlineMs: budget,
       ...(options.signal === undefined ? {} : { signal: options.signal }),
-      ...(this.options.env === undefined ? {} : { env: this.options.env }),
+      ...(server !== undefined
+        ? { env: selectedChildEnv(this.options.env ?? process.env) }
+        : this.options.env === undefined
+          ? {}
+          : { env: this.options.env }),
       ...(options.input === undefined ? {} : { input: options.input }),
       ...(options.maxOutputBytes === undefined ? {} : { maxOutputBytes: options.maxOutputBytes }),
       ...(options.sink === undefined ? {} : { sink: options.sink }),
     });
 
+    if (!localVersion) server?.observe(result.stderr, serial === undefined);
     if (result.kind === "spawn-error") {
       this.debug(`  failed to start: ${result.error.message}`);
       throw new AdbAxiError("ADB_NOT_FOUND", `adb at ${this.path} could not be started`, {

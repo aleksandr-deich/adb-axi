@@ -11,6 +11,8 @@ export const ERROR_CATALOGUE = {
   HOST_ADB_TOO_OLD:
     "The adb client predates reliable shell disconnect exit codes; update platform-tools",
   ADB_SERVER_UNREACHABLE: "The adb server did not answer within the deadline",
+  ADB_SERVER_CONFLICT: "A native server selector disagrees with the selected server",
+  ADB_SERVER_INCOMPATIBLE: "The selected server and client protocol versions differ",
   DEVICE_AMBIGUOUS: "Several devices match and none was selected",
   DEVICE_SELECTION_REQUIRED: "A physical device requires explicit selection",
   DEVICE_OFFLINE: "The target device is offline",
@@ -99,7 +101,7 @@ function checkedCode(code: string): ErrorCode {
 }
 
 export function exitCodeForCode(code: string): 1 | 2 {
-  return code === "VALIDATION_ERROR" ? 2 : 1;
+  return code === "VALIDATION_ERROR" || code === "ADB_SERVER_CONFLICT" ? 2 : 1;
 }
 
 /**

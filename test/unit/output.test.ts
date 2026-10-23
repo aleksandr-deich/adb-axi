@@ -8,9 +8,41 @@ import {
   runHint,
   TextBlock,
   withDeviceSelection,
+  withServerSelection,
 } from "../../src/core/output.js";
 
 describe("output", () => {
+  it("selected-server-evidence-and-recovery", () => {
+    const selection = { endpoint: "tcp:localhost:6137", start: "never" };
+    const evidence = {
+      ...selection,
+      source: "config",
+      peer: "127.0.0.1:6137",
+      answered: true,
+      startup: "not_observed",
+    };
+    const output = withServerSelection(
+      {
+        error: "No device",
+        code: "DEVICE_NOT_FOUND",
+        help: [
+          runHint(["shell", "--device", "emulator-5600", "--", "echo", "hello"]),
+          runHint(["doctor"]),
+        ],
+      },
+      selection,
+      evidence,
+    );
+    expect(Object.keys(output).slice(0, 3)).toEqual(["error", "code", "server"]);
+    expect(output.server).toEqual(evidence);
+    expect(output.help).toEqual([
+      "Run `adb-axi shell --device emulator-5600 --server tcp:localhost:6137 --server-start never -- echo hello`",
+      "Run `adb-axi doctor --server tcp:localhost:6137 --server-start never`",
+    ]);
+    expect(decode(render(output, "toon"))).toEqual(JSON.parse(render(output, "json")));
+    expect(withServerSelection(output, selection, evidence)).toEqual(output);
+  });
+
   it("builds the mutation lead line and no-op state", () => {
     expect(okLine("stop", "com.example.notes", noop("already not running"))).toBe(
       "stop com.example.notes -> already not running (no-op)",

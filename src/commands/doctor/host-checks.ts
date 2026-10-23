@@ -2,7 +2,7 @@ import { realpathSync } from "node:fs";
 import { homedir } from "node:os";
 import { findSdkTool } from "../../adb/locate.js";
 import { AdbClient } from "../../adb/run.js";
-import { ignoredServerSelectors, serverEndpoint } from "../../adb/server-endpoint.js";
+import { ignoredServerSelectors } from "../../adb/server-endpoint.js";
 import { hostAdbVersionError } from "../../adb/version.js";
 export { parseAdbVersion } from "../../adb/version.js";
 import { AdbAxiError } from "../../core/errors.js";
@@ -85,8 +85,9 @@ export interface ServerReading {
 }
 
 export async function checkServer(context: CommandContext): Promise<ServerReading> {
-  const endpoint = serverEndpoint(context.env);
-  const ignored = ignoredServerSelectors(context.env);
+  const adb = context.adb();
+  const endpoint = adb.serverEndpoint;
+  const ignored = adb.hasSelectedServer ? [] : ignoredServerSelectors(context.env);
   const where =
     ignored.length === 0
       ? endpoint
@@ -94,7 +95,6 @@ export async function checkServer(context: CommandContext): Promise<ServerReadin
   const stuckServer = [
     `Check that nothing else holds the adb server port at ${endpoint}, then run \`adb-axi doctor\` again`,
   ];
-  const adb = context.adb();
   let devices: AttachedDevice[] | undefined;
   const result = await settle("server", async () => {
     try {
@@ -118,7 +118,9 @@ export async function checkServer(context: CommandContext): Promise<ServerReadin
     } catch (error) {
       if (
         error instanceof AdbAxiError &&
-        (error.code === "TIMEOUT" || error.code === "ADB_SERVER_UNREACHABLE")
+        (error.code === "TIMEOUT" ||
+          error.code === "ADB_SERVER_UNREACHABLE" ||
+          error.code === "ADB_SERVER_INCOMPATIBLE")
       ) {
         return failed(
           "server",

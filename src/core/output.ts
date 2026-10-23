@@ -69,8 +69,9 @@ export function renderError(
   error: unknown,
   mode: OutputMode,
   device?: string,
+  select: (output: Output) => Output = (output) => output,
 ): { output: string; exitCode: number } {
-  const shape = errorObject(error);
+  const shape = select(errorObject(error));
   const output = device === undefined ? shape : withDeviceSelection(shape, device);
   return { output: `${render(output, mode)}\n`, exitCode: exitCodeForError(error) };
 }
@@ -188,6 +189,39 @@ function splitShellWords(text: string): string[] {
   }
   if (current !== "") words.push(current);
   return words;
+}
+
+export function withServerSelection(
+  output: Output,
+  selection: { endpoint: string; start: string },
+  evidence: Record<string, unknown>,
+): Output {
+  const entries = Object.entries(output);
+  const prefix = entries[0]?.[0] === "error" ? 2 : 1;
+  const scoped = Object.fromEntries([
+    ...entries.slice(0, prefix),
+    ["server", evidence],
+    ...entries.slice(prefix).filter(([key]) => key !== "server"),
+  ]);
+  if (!Array.isArray(scoped.help)) return scoped;
+  scoped.help = scoped.help.map((line: unknown) =>
+    typeof line !== "string"
+      ? line
+      : line.replace(/`adb-axi((?: [^`]*)?)`/g, (whole, args: string) => {
+          const words = splitShellWords(args.trim());
+          const end = words.indexOf("--");
+          const flags = end === -1 ? words : words.slice(0, end);
+          if (
+            flags.includes("--help") ||
+            flags[0] === "update" ||
+            flags.some((word) => word === "--server" || word.startsWith("--server="))
+          )
+            return whole;
+          const rest = end === -1 ? [] : words.slice(end);
+          return `\`${[BIN, ...flags, "--server", quoteArg(selection.endpoint), "--server-start", selection.start, ...rest].join(" ")}\``;
+        }),
+  );
+  return scoped;
 }
 
 /** The home view header, with the user's home directory collapsed to `~`. */

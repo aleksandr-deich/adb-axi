@@ -57,6 +57,20 @@ export const GLOBAL_FLAGS: readonly FlagSpec[] = [
     default: "$ANDROID_SERIAL, else the only online emulator",
   },
   {
+    name: "--server",
+    type: "string",
+    valueName: "<tcp-endpoint>",
+    description: "Select one TCP adb server; refuse conflicting native selectors",
+    default: "$ADB_AXI_HOME/server.json, else ~/.adb-axi/server.json, else legacy adb selection",
+  },
+  {
+    name: "--server-start",
+    type: "enum",
+    values: ["never", "auto"],
+    description: "Preflight before each adb call; auto explicitly starts a missing local server",
+    default: "saved policy for the same endpoint, else never in selected mode",
+  },
+  {
     name: "--timeout",
     type: "duration",
     valueName: "<dur>",

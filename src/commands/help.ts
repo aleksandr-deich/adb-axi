@@ -23,6 +23,7 @@ export function topLevelHelp(registry: Registry): Output {
       "Requires Android SDK Platform-Tools 35.0.0 or newer for reliable shell disconnect exit codes; adb-axi never updates it",
       "Only a lone online emulator is auto-selected; physical devices require --device <serial> or ANDROID_SERIAL",
       "Flags go after the command, for example `adb-axi app start <pkg> --device <serial|avd>`",
+      ...SERVER_HELP,
       runHint(["<command>", "--help"], "for its arguments, flags and examples"),
     ],
   };
@@ -55,7 +56,11 @@ export function commandHelp(spec: CommandSpec): Output {
       ),
     ),
     examples: [...spec.examples],
-    ...(spec.help === undefined ? {} : { help: [...spec.help] }),
+    ...(spec.path[0] === "doctor" && spec.path.length === 1
+      ? { help: [...(spec.help ?? []), ...SERVER_HELP] }
+      : spec.help === undefined
+        ? {}
+        : { help: [...spec.help] }),
   };
 }
 
@@ -85,6 +90,7 @@ export function groupHelp(group: GroupSpec): Output {
     ),
     help: [
       ...(defaultCommand?.help ?? []),
+      ...(group.name === "doctor" ? SERVER_HELP : []),
       ...(example === undefined
         ? []
         : [
@@ -102,6 +108,16 @@ function familyUsage(spec: CommandSpec): string {
   );
   return usageLine(spec).replace("[flags]", [...flags, "[global flags]"].join(" "));
 }
+
+const SERVER_HELP = [
+  "Without --server, --server-start or saved selection, native adb behavior is unchanged: ADB_SERVER_SOCKET wins, else ANDROID_ADB_SERVER_ADDRESS and ANDROID_ADB_SERVER_PORT (local:5037 by default); adb may auto-start",
+  "Selected mode accepts TCP destinations with an explicit port (tcp:<port>, tcp:<host>:<port>, tcp:[<ipv6>]:<port>); every nonempty native selector must agree, including ignored selectors",
+  "--server overrides saved selection only for this invocation; a different endpoint defaults to never rather than inheriting auto permission. --server-start alone requires a saved or native selector",
+  "Before each adb call, selected mode probes host:version directly and refuses unavailable, non-adb or incompatible endpoints; start=never makes no explicit start request; start=auto may explicitly start a missing local endpoint. adb-axi never runs kill-server",
+  "This preflight is not airtight: if the server dies or changes after the check, native adb can still start or replace one on that same selected endpoint, never a fallback default endpoint",
+  "Persist selection by writing version 1, endpoint and start to $ADB_AXI_HOME/server.json (otherwise ~/.adb-axi/server.json); this routes adb-axi only, not raw adb, Gradle or UI tools",
+  'For example: mkdir -p "$ADB_AXI_HOME" && printf \'%s\\n\' \'{"version":1,"endpoint":"tcp:localhost:6137","start":"never"}\' > "$ADB_AXI_HOME/server.json" (set ADB_AXI_HOME to a task directory first); remove server.json to restore legacy mode',
+];
 
 const HELP_FLAG: FlagSpec = { name: "--help", type: "boolean", description: "Show this help" };
 
