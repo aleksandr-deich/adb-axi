@@ -1,5 +1,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
-import { describe, expect, test } from "vitest";
+import { appendFileSync, closeSync, openSync } from "node:fs";
+import { join } from "node:path";
+import { describe, expect, inject, test } from "vitest";
 import { locateAdb } from "../../src/adb/locate.js";
 import { Axi } from "./support.js";
 
@@ -15,8 +17,42 @@ async function uiautomation(state: "free" | "in use"): Promise<Record<string, un
   }
 }
 
+function startReader(transport: "shell" | "exec-out"): ChildProcess {
+  const trace = join(inject("device").transcripts, `4-doctor-ui.${transport}.reader`);
+  const status = (message: string): void => {
+    appendFileSync(`${trace}.txt`, `${new Date().toISOString()} ${message}\n`);
+  };
+  const started = performance.now();
+  const stdout = openSync(`${trace}.stdout.txt`, "a");
+  try {
+    const stderr = openSync(`${trace}.stderr.txt`, "a");
+    try {
+      // Files preserve the reader's output without pipe backpressure or per-event callbacks.
+      const reader = spawn(locateAdb(), ["-s", axi.serial, transport, "uiautomator", "events"], {
+        stdio: ["ignore", stdout, stderr],
+      });
+      status(
+        `started adb -s ${axi.serial} ${transport} uiautomator events, host pid ${reader.pid}`,
+      );
+      reader.once("error", (error) => {
+        status(`spawn error: ${error.message}`);
+      });
+      reader.once("exit", (code, signal) => {
+        status(
+          `exit ${code ?? "-"}, signal ${signal ?? "-"}, ${Math.round(performance.now() - started)} ms`,
+        );
+      });
+      return reader;
+    } finally {
+      closeSync(stderr);
+    }
+  } finally {
+    closeSync(stdout);
+  }
+}
+
 async function stop(reader: ChildProcess): Promise<void> {
-  if (reader.exitCode !== null || reader.signalCode !== null) return;
+  if (reader.pid === undefined || reader.exitCode !== null || reader.signalCode !== null) return;
   const exited = new Promise((resolve) => reader.once("exit", resolve));
   reader.kill();
   await exited;
@@ -38,9 +74,7 @@ describe("doctor ui", () => {
 
   for (const transport of ["shell", "exec-out"] as const) {
     test(`a live adb ${transport} uiautomator reader is named, protected from --fix, and gone once it ends`, async () => {
-      const reader = spawn(locateAdb(), ["-s", axi.serial, transport, "uiautomator", "events"], {
-        stdio: "ignore",
-      });
+      const reader = startReader(transport);
       try {
         const report = await uiautomation("in use");
         const why = `adb ${transport} uiautomator pid ${reader.pid} on the host`;
@@ -67,6 +101,10 @@ describe("doctor ui", () => {
           protected: [{ pid: devicePid, holder: "uiautomator (adb uiautomator)", why }],
         });
         expect(reader.exitCode).toBeNull();
+      } catch (error) {
+        // Capture the holder before cleanup removes the process the failed report may have missed.
+        await axi.adb(["shell", "ps -A -o PID,ARGS; dumpsys accessibility"], 5_000);
+        throw error;
       } finally {
         await stop(reader);
       }
