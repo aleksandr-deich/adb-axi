@@ -1,6 +1,5 @@
 import { exec } from "../../core/exec.js";
-import type { CommandContext } from "../types.js";
-import { targetSerial } from "./shared.js";
+import type { DeviceContext } from "../types.js";
 
 /** The most `agent-device snapshot --json` output read; a UI tree is far smaller. */
 const MAX_SNAPSHOT_BYTES = 8 * 1024 * 1024;
@@ -14,12 +13,12 @@ export type Snapshot =
  * `app death --compare`. The tool runs for the device the command targets and under what
  * is left of the command deadline.
  */
-export async function takeSnapshot(context: CommandContext): Promise<Snapshot> {
+export async function takeSnapshot(context: DeviceContext): Promise<Snapshot> {
   const result = await exec({
     file: "agent-device",
     args: ["snapshot", "--json"],
     deadlineMs: context.deadline.remainingMs(),
-    env: { ...context.env, ANDROID_SERIAL: targetSerial(context) },
+    env: { ...context.env, ANDROID_SERIAL: context.device.serial },
     maxOutputBytes: MAX_SNAPSHOT_BYTES,
   });
   switch (result.kind) {

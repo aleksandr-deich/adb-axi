@@ -6,15 +6,14 @@ import {
   type Forward,
 } from "../../android/holders.js";
 import { runShell } from "../../adb/shell.js";
-import { readCurrentUser } from "../../android/users.js";
 import { AdbAxiError } from "../../core/errors.js";
 import { listDevices } from "../../device/list.js";
 import { avdName } from "../../device/facts.js";
 import { commandLine, noop, okLine, runHint, type Output } from "../../core/output.js";
 import { poll } from "../../core/poll.js";
-import { UNKNOWN, readOptions, targetSerial } from "../app/shared.js";
+import { UNKNOWN } from "../app/shared.js";
 import { defineCommand } from "../define.js";
-import type { CommandContext } from "../types.js";
+import type { DeviceContext } from "../types.js";
 import { CHECK_CAP_MS } from "./host-checks.js";
 import { classifyHolders, findHolders, type ClassifiedHolder } from "./ui-holders.js";
 
@@ -43,10 +42,10 @@ export const doctorUi = defineCommand({
 });
 
 /** Every UiAutomation holder on the target, classified against the host. */
-async function inspect(context: CommandContext): Promise<ClassifiedHolder[]> {
-  const serial = targetSerial(context);
-  const adb = context.adb();
-  const reads = readOptions(context);
+async function inspect(context: DeviceContext): Promise<ClassifiedHolder[]> {
+  const serial = context.device.serial;
+  const adb = context.device.adb;
+  const reads = context.device.reads;
   const [instrumentations, servers] = await allFinished([
     probeHolders(adb, serial, reads),
     probeAppProcessServers(adb, serial, reads),
@@ -86,9 +85,9 @@ async function allFinished<T extends readonly unknown[]>(
 }
 
 /** `adb forward --list`, or `null` when they cannot be listed: liveness is then unknown. */
-async function readForwards(context: CommandContext): Promise<Forward[] | null> {
+async function readForwards(context: DeviceContext): Promise<Forward[] | null> {
   try {
-    const answer = await context.adb().host(["forward", "--list"], {
+    const answer = await context.device.adb.host(["forward", "--list"], {
       deadline: context.deadline,
       capMs: CHECK_CAP_MS,
       step: "listing adb forwards",
@@ -144,8 +143,8 @@ const isStuck = (holder: ClassifiedHolder): boolean =>
   holder.state === "leaked" || holder.state === "wedged";
 
 /** Possible effects of a resident Android CLI connection, and how to clear it. */
-function residentNote(context: CommandContext): string {
-  const fix = commandLine(["doctor", "ui", "--fix", "--device", targetSerial(context)]);
+function residentNote(context: DeviceContext): string {
+  const fix = commandLine(["doctor", "ui", "--fix", "--device", context.device.serial]);
   return `The Android CLI's UI server holds UiAutomation with no host client; its connection can interfere with other readers and can be what blocks instrumented tests (Gradle connected* tasks, \`am instrument\`) and makes accessibility show as enabled; run \`${fix}\` to clear it`;
 }
 
@@ -154,9 +153,9 @@ function releaseLines(holders: readonly ClassifiedHolder[]): string[] {
   return [...new Set(holders.flatMap((holder) => holder.release ?? []))];
 }
 
-function fixHint(context: CommandContext, stuck: readonly ClassifiedHolder[]): string {
+function fixHint(context: DeviceContext, stuck: readonly ClassifiedHolder[]): string {
   return runHint(
-    ["doctor", "ui", "--fix", "--device", targetSerial(context)],
+    ["doctor", "ui", "--fix", "--device", context.device.serial],
     `to ${joinWords(stuck.map(clearWords))}`,
   );
 }
@@ -166,7 +165,7 @@ function joinWords(parts: readonly string[]): string {
   return `${parts.slice(0, -1).join(", ")} and ${parts.at(-1) ?? ""}`;
 }
 
-async function report(context: CommandContext): Promise<Output> {
+async function report(context: DeviceContext): Promise<Output> {
   const holders = await inspect(context);
   if (holders.length === 0) return { uiautomation: "free" };
   const stuck = holders.filter(isStuck);
@@ -186,14 +185,14 @@ async function report(context: CommandContext): Promise<Output> {
   };
 }
 
-async function fix(context: CommandContext): Promise<Output> {
-  const serial = targetSerial(context);
+async function fix(context: DeviceContext): Promise<Output> {
+  const serial = context.device.serial;
   const before = await inspect(context);
   if (before.length === 0) {
     return { ok: okLine("doctor ui", serial, noop("uiautomation free")) };
   }
 
-  const userId = await readCurrentUser(context.adb(), serial, readOptions(context));
+  const userId = await context.device.user();
   const livePackages = new Set(before.filter(isLive).flatMap(holderPackages));
   const blocked = before.filter(
     (holder) => !isLive(holder) && holderPackages(holder).some((pkg) => livePackages.has(pkg)),
@@ -202,7 +201,7 @@ async function fix(context: CommandContext): Promise<Output> {
   for (const holder of targets) {
     // A failed kill shows in the re-check, which is what decides the outcome.
     for (const command of clearCommands(holder, userId)) {
-      await runShell(context.adb(), serial, command, {
+      await runShell(context.device.adb, serial, command, {
         deadline: context.deadline,
         step: `clearing ${holder.label}`,
       });
@@ -276,7 +275,7 @@ async function fix(context: CommandContext): Promise<Output> {
 
 /** Look again until every cleared holder is gone, or the settle time passes. */
 async function recheck(
-  context: CommandContext,
+  context: DeviceContext,
   targets: readonly ClassifiedHolder[],
 ): Promise<ClassifiedHolder[]> {
   let last: ClassifiedHolder[] | undefined;

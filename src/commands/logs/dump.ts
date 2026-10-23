@@ -11,7 +11,6 @@ import {
 } from "../../core/truncate.js";
 import { parseCrashes } from "../../android/crash.js";
 import { runHint } from "../../core/output.js";
-import { readOptions, targetSerial } from "../app/shared.js";
 import { defineCommand } from "../define.js";
 import { describeScope, resolveScope, scopePids, type Scope } from "./scope.js";
 import {
@@ -74,14 +73,12 @@ export const logsDump = defineCommand({
     const level =
       typeof context.flags.level === "string" ? (context.flags.level as LogLevel) : undefined;
     const since = typeof context.flags.since === "string" ? context.flags.since : undefined;
-    const serial = targetSerial(context);
-    const options = readOptions(context);
-    const adb = context.adb();
-    const device = context.target?.device;
-    if (device === undefined) throw new TypeError("logs ran without a resolved device");
+    const serial = context.device.serial;
+    const options = context.device.reads;
+    const adb = context.device.adb;
 
     const now = await readDeviceClock(adb, serial, options);
-    const facts = await refreshMarks(context);
+    await refreshMarks(context);
     const window = resolveWindow(
       serial,
       context.env,
@@ -89,10 +86,7 @@ export const logsDump = defineCommand({
       now,
       context.marksVerified === true,
     );
-    const scope =
-      pkg === undefined
-        ? undefined
-        : await resolveScope(adb, device, pkg, window, { ...options, env: context.env }, facts);
+    const scope = pkg === undefined ? undefined : await resolveScope(context.device, pkg, window);
     const scanned = await readWindowLines(
       adb,
       serial,

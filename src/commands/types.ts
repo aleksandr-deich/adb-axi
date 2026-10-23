@@ -2,7 +2,7 @@ import type { AdbClient } from "../adb/run.js";
 import type { FlagSpec, FlagValue, PositionalSpec } from "../core/args.js";
 import type { Deadline } from "../core/deadline.js";
 import type { Output, OutputMode } from "../core/output.js";
-import type { Target } from "../device/resolve.js";
+import type { DeviceSession } from "../device/session.js";
 import type { HostProcessList } from "../host/processes.js";
 
 /** Everything a command handler receives once its arguments are validated. */
@@ -18,8 +18,6 @@ export interface CommandContext {
   deadline: Deadline;
   /** The adb client, located on first use (`ADB_NOT_FOUND` when there is none). */
   adb: () => AdbClient;
-  /** The resolved device for commands with `device: "target"`, checked online. */
-  target: Target | undefined;
   env: NodeJS.ProcessEnv;
   /** A one-time notice if this invocation dropped marks from another device boot. */
   marksNote?: string;
@@ -31,12 +29,22 @@ export interface CommandContext {
   isShipped: (path: readonly string[]) => boolean;
 }
 
+export interface DeviceContext extends CommandContext {
+  device: DeviceSession;
+}
+
 export type CommandRun = (context: CommandContext) => Promise<Output>;
 
 /** Whether the command acts on one resolved device (7.2) or on the host / all devices. */
 export type DeviceUse = "target" | "none";
 
-export interface CommandSpec {
+export type CommandSpec = CommandDetails &
+  (
+    | { device: "target"; run: (context: DeviceContext) => Promise<Output> }
+    | { device: "none"; run: CommandRun }
+  );
+
+interface CommandDetails {
   kind: "command";
   /** Full path after `adb-axi`, for example `["app", "start"]`. */
   path: readonly string[];
@@ -50,13 +58,11 @@ export interface CommandSpec {
   /** Accepted globals that are irrelevant to this command's help; parsing is unchanged. */
   hiddenGlobalFlags?: readonly string[];
   defaultTimeoutMs: number;
-  device: DeviceUse;
   /**
    * Shipped commands appear in help and suggestions. Unshipped ones are hidden stubs:
    * dispatchable (so the core can be tested end to end through them) but never advertised.
    */
   shipped: boolean;
-  run: CommandRun;
 }
 
 /** A noun with subcommands, such as `app`. `defaultCommand` runs when no subcommand is named. */

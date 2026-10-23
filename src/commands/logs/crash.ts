@@ -3,7 +3,7 @@ import { readDeviceClock, formatDeviceTime } from "../../android/clock.js";
 import { assertPackageName } from "../../android/component.js";
 import { crashBelongsTo, parseCrashes, type Crash } from "../../android/crash.js";
 import { truncateField, writeFullOutput } from "../../core/truncate.js";
-import { UNKNOWN, readOptions, targetSerial } from "../app/shared.js";
+import { UNKNOWN } from "../app/shared.js";
 import { defineCommand } from "../define.js";
 import { DEFAULT_SINCE } from "./dump.js";
 import { clockTime, readWindowLines, resolveWindow } from "./window.js";
@@ -46,9 +46,9 @@ export const logsCrash = defineCommand({
     const pkg = typeof context.flags.pkg === "string" ? context.flags.pkg : undefined;
     if (pkg !== undefined) assertPackageName(pkg);
     const since = typeof context.flags.since === "string" ? context.flags.since : DEFAULT_SINCE;
-    const serial = targetSerial(context);
-    const options = readOptions(context);
-    const adb = context.adb();
+    const serial = context.device.serial;
+    const options = context.device.reads;
+    const adb = context.device.adb;
 
     const now = await readDeviceClock(adb, serial, options);
     await refreshMarks(context);

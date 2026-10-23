@@ -32,9 +32,13 @@ it("reads retained API 29/30 package records as not installed when captured code
       });
       try {
         const adb = new AdbClient(join(fake.binDir, "adb"), { env: fake.env });
-        const info = await readPackage(adb, "emulator-5554", "dev.probe", {
-          deadline: new Deadline(10_000),
-        });
+        const info = await readPackage(
+          adb,
+          "emulator-5554",
+          "dev.probe",
+          { deadline: new Deadline(10_000) },
+          0,
+        );
         expect(info, `API ${api} ${state}`).toMatchObject({
           package: "dev.probe",
           installed: state === "before",

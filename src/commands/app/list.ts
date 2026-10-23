@@ -3,7 +3,7 @@ import { readShell } from "../../android/read.js";
 import { AdbAxiError } from "../../core/errors.js";
 import { runHint } from "../../core/output.js";
 import { defineCommand } from "../define.js";
-import { formatVersion, readOptions, targetSerial, UNKNOWN } from "./shared.js";
+import { formatVersion, UNKNOWN } from "./shared.js";
 
 export const appList = defineCommand({
   path: ["app", "list"],
@@ -22,12 +22,13 @@ export const appList = defineCommand({
   run: async (context) => {
     const all = context.flags.all === true;
     const matches = nameFilter(context.flags.grep);
-    const serial = targetSerial(context);
-    const options = readOptions(context);
-    const adb = context.adb();
+    const serial = context.device.serial;
+    const userId = await context.device.user();
+    const options = { ...context.device.reads, userId };
+    const adb = context.device.adb;
 
-    // The user set and the full set are both read, so the count line can say how many
-    // packages the device has beyond the user's, whichever of the two is shown.
+    // Read both third-party and all packages for this Android user so the count can
+    // include hidden system packages, whichever set is shown.
     const everything = (await listPackages(adb, serial, options)).filter((p) => matches(p.package));
     const userNames = new Set(
       (await listPackages(adb, serial, { ...options, thirdParty: true })).map((p) => p.package),
@@ -49,6 +50,7 @@ export const appList = defineCommand({
                 options,
               )
             ).stdout,
+            userId,
           );
 
     const rows = shown.map((listed) => {

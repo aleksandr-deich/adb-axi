@@ -5,14 +5,26 @@ import type { CommandRun, CommandSpec, GroupSpec } from "./types.js";
 /** Deadline for reads and ordinary actions when a command sets no other default (7.4). */
 export const DEFAULT_TIMEOUT_MS = 15_000;
 
-type CommandInput = Pick<CommandSpec, "path" | "summary" | "examples"> &
-  Partial<Omit<CommandSpec, "kind" | "path" | "summary" | "examples">>;
+type CommandInput<D extends CommandSpec["device"]> = Pick<
+  CommandSpec,
+  "path" | "summary" | "examples"
+> &
+  Partial<Omit<CommandSpec, "kind" | "path" | "summary" | "examples" | "device" | "run">> &
+  (D extends "target"
+    ? { device?: "target"; run?: Extract<CommandSpec, { device: "target" }>["run"] }
+    : { device: "none"; run?: CommandRun });
 
 /**
  * Build a command spec. Commands start as hidden stubs (`shipped: false`, `run`
  * throwing `NOT_IMPLEMENTED`); the slice that implements one sets both.
  */
-export function defineCommand(input: CommandInput): CommandSpec {
+export function defineCommand(
+  input: CommandInput<"none">,
+): Extract<CommandSpec, { device: "none" }>;
+export function defineCommand(
+  input: CommandInput<"target">,
+): Extract<CommandSpec, { device: "target" }>;
+export function defineCommand(input: CommandInput<"none" | "target">): CommandSpec {
   return {
     kind: "command",
     positionals: [],

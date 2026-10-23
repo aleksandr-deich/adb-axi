@@ -3,6 +3,7 @@ import { AdbClient, type AdbCallOptions, type AdbExit } from "../../src/adb/run.
 import { waitApp } from "../../src/commands/wait/app.js";
 import { Deadline } from "../../src/core/deadline.js";
 import { AdbAxiError } from "../../src/core/errors.js";
+import { openSession } from "../../src/device/session.js";
 
 const SERIAL = "emulator-5554";
 
@@ -77,11 +78,16 @@ describe("wait app", () => {
       debug: false,
       deadline,
       adb: () => adb,
-      target: {
-        serial: SERIAL,
-        device: { serial: SERIAL, state: "device", props: {} },
-        selectedBy: "flag",
-      },
+      device: openSession(
+        {
+          serial: SERIAL,
+          device: { serial: SERIAL, state: "device", props: {} },
+          selectedBy: "flag",
+        },
+        adb,
+        deadline,
+        {},
+      ),
       env: {},
       hostProcesses: () => Promise.resolve([]),
       isShipped: () => true,

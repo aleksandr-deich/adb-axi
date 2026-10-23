@@ -5,10 +5,10 @@ import { findTask, readRecents } from "../../android/recents.js";
 import { AdbAxiError } from "../../core/errors.js";
 import { okLine, runHint, type Output } from "../../core/output.js";
 import { defineCommand } from "../define.js";
-import type { CommandContext } from "../types.js";
+import type { DeviceContext } from "../types.js";
 import { processImportance } from "../../android/app-processes.js";
 import { lifecycleCommand, requireInstalled, type InstalledPackage } from "./process.js";
-import { readOptions, targetSerial, UNKNOWN } from "./shared.js";
+import { UNKNOWN } from "./shared.js";
 import { launchActivity, type Seen } from "./start.js";
 
 export const appRestore = defineCommand({
@@ -92,16 +92,16 @@ export function appRecord(restored: Restored): Record<string, unknown> {
  * `command` is what hints name to retry.
  */
 export async function restoreTask(
-  context: CommandContext,
+  context: DeviceContext,
   pkg: string,
   installed: InstalledPackage,
   command: string[],
 ): Promise<Restored> {
-  const adb = context.adb();
-  const serial = targetSerial(context);
-  const { userId, app } = installed;
+  const adb = context.device.adb;
+  const serial = context.device.serial;
+  const { userId, identity: app } = installed;
 
-  const task = findTask(await readRecents(adb, serial, readOptions(context)), pkg, userId);
+  const task = findTask(await readRecents(adb, serial, context.device.reads), pkg, userId);
   if (task === undefined || task.activity === null) throw noTask(context, pkg);
   const component: Component = {
     package: pkg,
@@ -109,7 +109,7 @@ export async function restoreTask(
     component: `${pkg}/${task.activity}`,
   };
 
-  const pidsBefore = (await processImportance(adb, serial, app, readOptions(context))).map(
+  const pidsBefore = (await processImportance(adb, serial, app, context.device.reads)).map(
     (process) => process.pid,
   );
   const { start, settled, launched, processName } = await launchActivity(
@@ -138,7 +138,7 @@ export async function restoreTask(
 }
 
 /** `TASK_NOT_IN_RECENTS`: nothing to restore, and a start would be a fresh launch. */
-function noTask(context: CommandContext, pkg: string): AdbAxiError {
+function noTask(context: DeviceContext, pkg: string): AdbAxiError {
   return new AdbAxiError(
     "TASK_NOT_IN_RECENTS",
     `${pkg} has no task in recents, so there is nothing to restore`,
@@ -157,7 +157,7 @@ function noTask(context: CommandContext, pkg: string): AdbAxiError {
 
 /** `APP_DIED_ON_START`: a crash dialog can keep the restored process alive. */
 function diedOnStart(
-  context: CommandContext,
+  context: DeviceContext,
   activity: Component,
   processName: string,
   last: Seen,

@@ -1,6 +1,6 @@
 import { join } from "node:path";
-import { readShellFacts, type DeviceFacts } from "../../device/facts.js";
-import type { CommandContext } from "../types.js";
+import type { DeviceFacts } from "../../device/facts.js";
+import type { DeviceContext } from "../types.js";
 import { parseDuration } from "../../core/args.js";
 import { AdbAxiError } from "../../core/errors.js";
 import { runHint } from "../../core/output.js";
@@ -68,18 +68,12 @@ export function marksPath(serial: string, env: NodeJS.ProcessEnv): string {
 
 /**
  * Refresh the boot identity before any mark is stored or used, after validating input.
- * Returns the facts it read, or `undefined` when the device did not answer, so the command
- * never reads them twice.
+ * Uses the device session's facts, returning `undefined` when the device did not answer.
  */
-export async function refreshMarks(context: CommandContext): Promise<DeviceFacts | undefined> {
-  const target = context.target;
-  if (target === undefined) throw new Error("Marks need a resolved device");
+export async function refreshMarks(context: DeviceContext): Promise<DeviceFacts | undefined> {
   let facts: DeviceFacts | undefined;
   try {
-    facts = await readShellFacts(context.adb(), target.device, {
-      deadline: context.deadline,
-      env: context.env,
-    });
+    facts = await context.device.facts();
   } catch (error) {
     if (!(error instanceof AdbAxiError)) throw error;
   }
@@ -88,9 +82,8 @@ export async function refreshMarks(context: CommandContext): Promise<DeviceFacts
 }
 
 /** Bind the target's marks to the boot ID this command read, `null` when it could not. */
-export function bindTargetMarks(context: CommandContext, bootId: string | null): void {
-  const target = context.target;
-  if (target === undefined) throw new Error("Marks need a resolved device");
+export function bindTargetMarks(context: DeviceContext, bootId: string | null): void {
+  const target = context.device.target;
   context.marksVerified = bootId !== null;
   const note = bindMarks(target.serial, context.env, bootId);
   if (note !== undefined) context.marksNote = note;
