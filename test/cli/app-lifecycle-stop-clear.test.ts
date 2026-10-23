@@ -8,6 +8,7 @@ import {
   TIMING_MARGIN_MS,
   SERIAL,
   CURRENT_USER,
+  KERNEL_UIDS,
   PROCESSES,
   PROCESS_RUNNING,
   PACKAGE,
@@ -215,7 +216,10 @@ describe("launched activity process identity", () => {
         },
         [start]: AM_START.cold,
         [FORCE_STOP.replace("--user 0", `--user ${userId}`)]: {},
-        [PIDOF]: PROBE_STOPPED,
+        [PIDOF]: { stdout: "9001\n" },
+        [KERNEL_UIDS]: {
+          stdout: `  PID UID NAME\n 8111 ${uid} dev.probe:sync\n 9001 ${other * 100000 + 10213} ${process}\n`,
+        },
         [metadataOf(".MainActivity", userId)]: activityInfo(".MainActivity", process),
         [PROCESSES]: {
           stdout: [
@@ -255,6 +259,11 @@ describe("launched activity process identity", () => {
       [FORCE_STOP.replace("--user 0", "--user 10")]: {},
       [PIDOF]: PROBE_STOPPED,
       [metadataOf(".MainActivity", 10)]: activityInfo(".MainActivity", "dev.probe:ui"),
+      [KERNEL_UIDS]: {
+        stdout:
+          "  PID UID NAME\n 9001 10213 dev.probe:ui\n 8235 1010213 dev.probe\n 8123 1010213 dev.probe:ui\n",
+      },
+      ["pidof 'dev.probe:ui'"]: { stdout: "9001 8123\n" },
       [PROCESSES]: {
         stdout:
           "  *APP* UID 10213 ProcessRecord{abc 9001:dev.probe:ui/u0a213}\n  *APP* UID 1010213 ProcessRecord{def 8235:dev.probe/u10a213}\n  *APP* UID 1010213 ProcessRecord{fed 8123:dev.probe:ui/u10a213}\n",
@@ -281,6 +290,9 @@ describe("launched activity process identity", () => {
       [PACKAGE]: INSTALLED,
       [startOf("dev.probe.MainActivity")]: { stdout: "Status: ok\nLaunchState: COLD\nComplete\n" },
       [metadataOf("dev.probe.MainActivity")]: activityInfo(".MainActivity", "dev.probe:ui"),
+      [KERNEL_UIDS]: {
+        stdout: "  PID UID NAME\n 8111 10213 dev.probe:sync\n 8123 10213 dev.probe:ui\n",
+      },
       [PROCESSES]: {
         stdout:
           "  *APP* UID 10213 ProcessRecord{abc 8111:dev.probe:sync/u0a213}\n  *APP* UID 10213 ProcessRecord{def 8123:dev.probe:ui/u0a213}\n",

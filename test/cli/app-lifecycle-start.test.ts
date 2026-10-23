@@ -386,9 +386,10 @@ describe("lifecycle review regressions", () => {
         },
         [start]: AM_START.cold,
         [metadataOf(".MainActivity", userId)]: activityInfo(),
-        [PROCESSES]: {
-          stdout: `  *APP* UID ${other * 100000 + 10213} ProcessRecord{abc 9001:dev.probe/u${other}a213}\n`,
+        [KERNEL_UIDS]: {
+          stdout: `  PID UID NAME\n 9001 ${other * 100000 + 10213} dev.probe\n`,
         },
+        [PIDOF]: { stdout: "9001\n" },
         [FOREGROUND]: {
           stdout: `  ResumedActivity: ActivityRecord{abc u${other} dev.probe/.MainActivity t8}\n`,
         },
@@ -439,7 +440,7 @@ describe("app start settle deadlines", () => {
   };
 
   it.each(
-    [PROCESSES].flatMap((command) => [SHORT_TIMEOUT_MS].map((timeout) => ({ command, timeout }))),
+    [KERNEL_UIDS].flatMap((command) => [SHORT_TIMEOUT_MS].map((timeout) => ({ command, timeout }))),
   )(
     "fails when $command expires before any complete observation with timeout=$timeout",
     async ({ command, timeout }) => {
@@ -470,8 +471,8 @@ describe("app start settle deadlines", () => {
       expect(data).toMatchObject({
         code: "TIMEOUT",
         step:
-          command === PROCESSES
-            ? "reading the processes of dev.probe"
+          command === KERNEL_UIDS
+            ? "reading package process names"
             : "reading the foreground activity",
       });
       expect(data).not.toHaveProperty("app");

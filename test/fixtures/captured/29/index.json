@@ -222,6 +222,76 @@
       "stderr": "",
       "durationMs": 0,
       "note": "pidof run right after that ps; sampled on the device in a loop right after am force-stop (cycle 1, sample 28)"
+    },
+    {
+      "file": "launch-crashes-running.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5840",
+        "shell",
+        "logcat -d -b events,crash -v epoch -T 1792779302.793 -s am_crash am_proc_start am_proc_died DEBUG:F"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 103,
+      "note": "running, no crash"
+    },
+    {
+      "file": "launch-crashes-prelaunch.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5840",
+        "shell",
+        "dumpsys activity processes dev.probe"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 86,
+      "note": "pre-existing Java process, before the crash window"
+    },
+    {
+      "file": "launch-crashes-java-start.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5840",
+        "shell",
+        "logcat -d -b events,crash -v epoch -T 1792779302.793 -s am_crash am_proc_start am_proc_died DEBUG:F"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 87,
+      "note": "Java crash including am_proc_start uid evidence"
+    },
+    {
+      "file": "launch-crashes-java-preexisting.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5840",
+        "shell",
+        "logcat -d -b events,crash -v epoch -T 1792779303.590 -s am_crash am_proc_start am_proc_died DEBUG:F"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 83,
+      "note": "Java crash after the process start, attributed using prelaunch evidence"
+    },
+    {
+      "file": "launch-crashes-native.txt",
+      "argv": [
+        "adb",
+        "-s",
+        "emulator-5840",
+        "shell",
+        "logcat -d -b events,crash -v epoch -T 1792779304.114 -s am_crash am_proc_start am_proc_died DEBUG:F"
+      ],
+      "exitCode": 0,
+      "stderr": "",
+      "durationMs": 109,
+      "note": "native tombstone uid, death event, and system-server am_crash pid"
     }
   ],
   "processCapture": {
@@ -235,6 +305,16 @@
     "exiting": {
       "cycle": 1,
       "sample": 28
+    }
+  },
+  "launchCrashCapture": {
+    "serial": "emulator-5840",
+    "capturedAt": "2026-10-23T18:15:05.509Z",
+    "probe": {
+      "package": "dev.probe",
+      "uid": 10116,
+      "user": 0,
+      "running": "1792779303.211  2201  2201 I ProbeState: event=start saved=0 volatile=0 rows=0 restored=false pid=2201"
     }
   }
 }

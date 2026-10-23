@@ -1,0 +1,101 @@
+--------- beginning of events
+         1792779304.223   357   384 I am_proc_start: [0,2266,10116,dev.probe,activity,{dev.probe/dev.probe.MainActivity}]
+--------- beginning of crash
+         1792779304.377  2296  2296 F DEBUG   : *** *** *** *** *** *** *** *** *** *** *** *** *** *** *** ***
+         1792779304.377  2296  2296 F DEBUG   : Build fingerprint: 'Android/sdk_phone64_arm64/emulator64_arm64:10/QSR1.211112.002/7910984:userdebug/test-keys'
+         1792779304.377  2296  2296 F DEBUG   : Revision: '0'
+         1792779304.377  2296  2296 F DEBUG   : ABI: 'arm64'
+         1792779304.377  2296  2296 F DEBUG   : Timestamp: 2026-10-23 20:15:04+0200
+         1792779304.377  2296  2296 F DEBUG   : pid: 2266, tid: 2266, name: dev.probe  >>> dev.probe <<<
+         1792779304.377  2296  2296 F DEBUG   : uid: 10116
+         1792779304.377  2296  2296 F DEBUG   : signal 11 (SIGSEGV), code 0 (SI_USER), fault addr --------
+         1792779304.377  2296  2296 F DEBUG   :     x0  0000000000000000  x1  000000000000000b  x2  0000000000000004  x3  0000000000000003
+         1792779304.377  2296  2296 F DEBUG   :     x4  0000000000000000  x5  8080800000000000  x6  fefeff7a56c01f1f  x7  7f7f7f7f7fff7f7f
+         1792779304.377  2296  2296 F DEBUG   :     x8  0000000000000081  x9  a513370e228ae27d  x10 0000007ff4bb8080  x11 0000000000000022
+         1792779304.377  2296  2296 F DEBUG   :     x12 0000000000000018  x13 ffffffffffffffff  x14 0000000000000004  x15 ffffffffffffffff
+         1792779304.377  2296  2296 F DEBUG   :     x16 0000007b541ba120  x17 0000007b556291c0  x18 0000007b57ed8000  x19 0000007b57a5d000
+         1792779304.377  2296  2296 F DEBUG   :     x20 0000007b5411a360  x21 0000007b57a5d000  x22 0000007ff4bb8860  x23 0000007ad11237a8
+         1792779304.377  2296  2296 F DEBUG   :     x24 0000000000000008  x25 0000007b57c12020  x26 0000007b57a5d0b0  x27 0000000000000002
+         1792779304.377  2296  2296 F DEBUG   :     x28 0000000000000000  x29 0000007ff4bb86e0
+         1792779304.377  2296  2296 F DEBUG   :     sp  0000007ff4bb8610  lr  000000007073d064  pc  0000007b556291c8
+         1792779304.472  2296  2296 F DEBUG   : 
+         1792779304.472  2296  2296 F DEBUG   : backtrace:
+         1792779304.472  2296  2296 F DEBUG   :       #00 pc 00000000000cd1c8  /apex/com.android.runtime/lib64/bionic/libc.so (kill+8) (BuildId: c042ffb4e195c9462700c20f99189c2b)
+         1792779304.472  2296  2296 F DEBUG   :       #01 pc 00000000002ab060  /system/framework/arm64/boot-framework.oat (art_jni_trampoline+160) (BuildId: 09bb78a514ef3553105c4854eb815ce4118b0d46)
+         1792779304.472  2296  2296 F DEBUG   :       #02 pc 00000000001365b8  /apex/com.android.runtime/lib64/libart.so (art_quick_invoke_static_stub+568) (BuildId: 56f24a055ef0b5ed91239cf5f97c50c2)
+         1792779304.472  2296  2296 F DEBUG   :       #03 pc 000000000014508c  /apex/com.android.runtime/lib64/libart.so (art::ArtMethod::Invoke(art::Thread*, unsigned int*, unsigned int, art::JValue*, char const*)+276) (BuildId: 56f24a055ef0b5ed91239cf5f97c50c2)
+         1792779304.472  2296  2296 F DEBUG   :       #04 pc 00000000002df780  /apex/com.android.runtime/lib64/libart.so (art::interpreter::ArtInterpreterToCompiledCodeBridge(art::Thread*, art::ArtMethod*, art::ShadowFrame*, unsigned short, art::JValue*)+384) (BuildId: 56f24a055ef0b5ed91239cf5f97c50c2)
+         1792779304.472  2296  2296 F DEBUG   :       #05 pc 00000000002daa60  /apex/com.android.runtime/lib64/libart.so (bool art::interpreter::DoCall<false, false>(art::ArtMethod*, art::Thread*, art::ShadowFrame&, art::Instruction const*, unsigned short, art::JValue*)+912) (BuildId: 56f24a055ef0b5ed91239cf5f97c50c2)
+         1792779304.472  2296  2296 F DEBUG   :       #06 pc 000000000059ae00  /apex/com.android.runtime/lib64/libart.so (MterpInvokeStatic+368) (BuildId: 56f24a055ef0b5ed91239cf5f97c50c2)
+         1792779304.472  2296  2296 F DEBUG   :       #07 pc 0000000000130994  /apex/com.android.runtime/lib64/libart.so (mterp_op_invoke_static+20) (BuildId: 56f24a055ef0b5ed91239cf5f97c50c2)
+         1792779304.472  2296  2296 F DEBUG   :       #08 pc 00000000001b1f30  /data/app/dev.probe-qCtUUgaE-mBXIhdrS9dP7Q==/base.apk (dev.probe.MainActivity.dispatch+696)
+         1792779304.472  2296  2296 F DEBUG   :       #09 pc 0000000000598564  /apex/com.android.runtime/lib64/libart.so (MterpInvokeVirtual+1432) (BuildId: 56f24a055ef0b5ed91239cf5f97c50c2)
+         1792779304.472  2296  2296 F DEBUG   :       #10 pc 0000000000130814  /apex/com.android.runtime/lib64/libart.so (mterp_op_invoke_virtual+20) (BuildId: 56f24a055ef0b5ed91239cf5f97c50c2)
+         1792779304.472  2296  2296 F DEBUG   :       #11 pc 00000000001b2282  /data/app/dev.probe-qCtUUgaE-mBXIhdrS9dP7Q==/base.apk (dev.probe.MainActivity.onCreate+74)
+         1792779304.472  2296  2296 F DEBUG   :       #12 pc 0000000000598564  /apex/com.android.runtime/lib64/libart.so (MterpInvokeVirtual+1432) (BuildId: 56f24a055ef0b5ed91239cf5f97c50c2)
+         1792779304.472  2296  2296 F DEBUG   :       #13 pc 0000000000130814  /apex/com.android.runtime/lib64/libart.so (mterp_op_invoke_virtual+20) (BuildId: 56f24a055ef0b5ed91239cf5f97c50c2)
+         1792779304.472  2296  2296 F DEBUG   :       #14 pc 000000000019176e  /system/framework/framework.jar (android.app.Activity.performCreate+30)
+         1792779304.472  2296  2296 F DEBUG   :       #15 pc 0000000000598564  /apex/com.android.runtime/lib64/libart.so (MterpInvokeVirtual+1432) (BuildId: 56f24a055ef0b5ed91239cf5f97c50c2)
+         1792779304.472  2296  2296 F DEBUG   :       #16 pc 0000000000130814  /apex/com.android.runtime/lib64/libart.so (mterp_op_invoke_virtual+20) (BuildId: 56f24a055ef0b5ed91239cf5f97c50c2)
+         1792779304.472  2296  2296 F DEBUG   :       #17 pc 0000000000191736  /system/framework/framework.jar (android.app.Activity.performCreate+2)
+         1792779304.472  2296  2296 F DEBUG   :       #18 pc 0000000000598564  /apex/com.android.runtime/lib64/libart.so (MterpInvokeVirtual+1432) (BuildId: 56f24a055ef0b5ed91239cf5f97c50c2)
+         1792779304.472  2296  2296 F DEBUG   :       #19 pc 0000000000130814  /apex/com.android.runtime/lib64/libart.so (mterp_op_invoke_virtual+20) (BuildId: 56f24a055ef0b5ed91239cf5f97c50c2)
+         1792779304.472  2296  2296 F DEBUG   :       #20 pc 00000000001eefea  /system/framework/framework.jar (android.app.Instrumentation.callActivityOnCreate+6)
+         1792779304.472  2296  2296 F DEBUG   :       #21 pc 0000000000598564  /apex/com.android.runtime/lib64/libart.so (MterpInvokeVirtual+1432) (BuildId: 56f24a055ef0b5ed91239cf5f97c50c2)
+         1792779304.472  2296  2296 F DEBUG   :       #22 pc 0000000000130814  /apex/com.android.runtime/lib64/libart.so (mterp_op_invoke_virtual+20) (BuildId: 56f24a055ef0b5ed91239cf5f97c50c2)
+         1792779304.472  2296  2296 F DEBUG   :       #23 pc 0000000000180bc8  /system/framework/framework.jar (android.app.ActivityThread.performLaunchActivity+752)
+         1792779304.472  2296  2296 F DEBUG   :       #24 pc 000000000059a8f4  /apex/com.android.runtime/lib64/libart.so (MterpInvokeDirect+1168) (BuildId: 56f24a055ef0b5ed91239cf5f97c50c2)
+         1792779304.472  2296  2296 F DEBUG   :       #25 pc 0000000000130914  /apex/com.android.runtime/lib64/libart.so (mterp_op_invoke_direct+20) (BuildId: 56f24a055ef0b5ed91239cf5f97c50c2)
+         1792779304.472  2296  2296 F DEBUG   :       #26 pc 0000000000180846  /system/framework/framework.jar (android.app.ActivityThread.handleLaunchActivity+94)
+         1792779304.472  2296  2296 F DEBUG   :       #27 pc 0000000000598564  /apex/com.android.runtime/lib64/libart.so (MterpInvokeVirtual+1432) (BuildId: 56f24a055ef0b5ed91239cf5f97c50c2)
+         1792779304.472  2296  2296 F DEBUG   :       #28 pc 0000000000130814  /apex/com.android.runtime/lib64/libart.so (mterp_op_invoke_virtual+20) (BuildId: 56f24a055ef0b5ed91239cf5f97c50c2)
+         1792779304.472  2296  2296 F DEBUG   :       #29 pc 000000000025e29e  /system/framework/framework.jar (android.app.servertransaction.LaunchActivityItem.execute+126)
+         1792779304.472  2296  2296 F DEBUG   :       #30 pc 0000000000598564  /apex/com.android.runtime/lib64/libart.so (MterpInvokeVirtual+1432) (BuildId: 56f24a055ef0b5ed91239cf5f97c50c2)
+         1792779304.472  2296  2296 F DEBUG   :       #31 pc 0000000000130814  /apex/com.android.runtime/lib64/libart.so (mterp_op_invoke_virtual+20) (BuildId: 56f24a055ef0b5ed91239cf5f97c50c2)
+         1792779304.472  2296  2296 F DEBUG   :       #32 pc 00000000002607ea  /system/framework/framework.jar (android.app.servertransaction.TransactionExecutor.executeCallbacks+154)
+         1792779304.472  2296  2296 F DEBUG   :       #33 pc 0000000000598564  /apex/com.android.runtime/lib64/libart.so (MterpInvokeVirtual+1432) (BuildId: 56f24a055ef0b5ed91239cf5f97c50c2)
+         1792779304.472  2296  2296 F DEBUG   :       #34 pc 0000000000130814  /apex/com.android.runtime/lib64/libart.so (mterp_op_invoke_virtual+20) (BuildId: 56f24a055ef0b5ed91239cf5f97c50c2)
+         1792779304.472  2296  2296 F DEBUG   :       #35 pc 0000000000260726  /system/framework/framework.jar (android.app.servertransaction.TransactionExecutor.execute+146)
+         1792779304.472  2296  2296 F DEBUG   :       #36 pc 0000000000598564  /apex/com.android.runtime/lib64/libart.so (MterpInvokeVirtual+1432) (BuildId: 56f24a055ef0b5ed91239cf5f97c50c2)
+         1792779304.472  2296  2296 F DEBUG   :       #37 pc 0000000000130814  /apex/com.android.runtime/lib64/libart.so (mterp_op_invoke_virtual+20) (BuildId: 56f24a055ef0b5ed91239cf5f97c50c2)
+         1792779304.472  2296  2296 F DEBUG   :       #38 pc 000000000017fb7e  /system/framework/framework.jar (android.app.ActivityThread$H.handleMessage+78)
+         1792779304.472  2296  2296 F DEBUG   :       #39 pc 0000000000598564  /apex/com.android.runtime/lib64/libart.so (MterpInvokeVirtual+1432) (BuildId: 56f24a055ef0b5ed91239cf5f97c50c2)
+         1792779304.472  2296  2296 F DEBUG   :       #40 pc 0000000000130814  /apex/com.android.runtime/lib64/libart.so (mterp_op_invoke_virtual+20) (BuildId: 56f24a055ef0b5ed91239cf5f97c50c2)
+         1792779304.472  2296  2296 F DEBUG   :       #41 pc 00000000002f58a2  /system/framework/framework.jar (android.os.Handler.dispatchMessage+38)
+         1792779304.472  2296  2296 F DEBUG   :       #42 pc 0000000000598564  /apex/com.android.runtime/lib64/libart.so (MterpInvokeVirtual+1432) (BuildId: 56f24a055ef0b5ed91239cf5f97c50c2)
+         1792779304.472  2296  2296 F DEBUG   :       #43 pc 0000000000130814  /apex/com.android.runtime/lib64/libart.so (mterp_op_invoke_virtual+20) (BuildId: 56f24a055ef0b5ed91239cf5f97c50c2)
+         1792779304.472  2296  2296 F DEBUG   :       #44 pc 0000000000319f42  /system/framework/framework.jar (android.os.Looper.loop+466)
+         1792779304.472  2296  2296 F DEBUG   :       #45 pc 000000000059b100  /apex/com.android.runtime/lib64/libart.so (MterpInvokeStatic+1136) (BuildId: 56f24a055ef0b5ed91239cf5f97c50c2)
+         1792779304.472  2296  2296 F DEBUG   :       #46 pc 0000000000130994  /apex/com.android.runtime/lib64/libart.so (mterp_op_invoke_static+20) (BuildId: 56f24a055ef0b5ed91239cf5f97c50c2)
+         1792779304.472  2296  2296 F DEBUG   :       #47 pc 0000000000189476  /system/framework/framework.jar (android.app.ActivityThread.main+194)
+         1792779304.472  2296  2296 F DEBUG   :       #48 pc 00000000002b03cc  /apex/com.android.runtime/lib64/libart.so (_ZN3art11interpreterL7ExecuteEPNS_6ThreadERKNS_20CodeItemDataAccessorERNS_11ShadowFrameENS_6JValueEbb.llvm.11038381426500388515+240) (BuildId: 56f24a055ef0b5ed91239cf5f97c50c2)
+         1792779304.472  2296  2296 F DEBUG   :       #49 pc 000000000058985c  /apex/com.android.runtime/lib64/libart.so (artQuickToInterpreterBridge+1012) (BuildId: 56f24a055ef0b5ed91239cf5f97c50c2)
+         1792779304.472  2296  2296 F DEBUG   :       #50 pc 000000000013f468  /apex/com.android.runtime/lib64/libart.so (art_quick_to_interpreter_bridge+88) (BuildId: 56f24a055ef0b5ed91239cf5f97c50c2)
+         1792779304.472  2296  2296 F DEBUG   :       #51 pc 00000000001365b8  /apex/com.android.runtime/lib64/libart.so (art_quick_invoke_static_stub+568) (BuildId: 56f24a055ef0b5ed91239cf5f97c50c2)
+         1792779304.472  2296  2296 F DEBUG   :       #52 pc 000000000014508c  /apex/com.android.runtime/lib64/libart.so (art::ArtMethod::Invoke(art::Thread*, unsigned int*, unsigned int, art::JValue*, char const*)+276) (BuildId: 56f24a055ef0b5ed91239cf5f97c50c2)
+         1792779304.472  2296  2296 F DEBUG   :       #53 pc 00000000004a9b48  /apex/com.android.runtime/lib64/libart.so (art::(anonymous namespace)::InvokeWithArgArray(art::ScopedObjectAccessAlreadyRunnable const&, art::ArtMethod*, art::(anonymous namespace)::ArgArray*, art::JValue*, char const*)+104) (BuildId: 56f24a055ef0b5ed91239cf5f97c50c2)
+         1792779304.472  2296  2296 F DEBUG   :       #54 pc 00000000004ab570  /apex/com.android.runtime/lib64/libart.so (art::InvokeMethod(art::ScopedObjectAccessAlreadyRunnable const&, _jobject*, _jobject*, _jobject*, unsigned long)+1476) (BuildId: 56f24a055ef0b5ed91239cf5f97c50c2)
+         1792779304.472  2296  2296 F DEBUG   :       #55 pc 0000000000437f84  /apex/com.android.runtime/lib64/libart.so (art::Method_invoke(_JNIEnv*, _jobject*, _jobject*, _jobjectArray*)+52) (BuildId: 56f24a055ef0b5ed91239cf5f97c50c2)
+         1792779304.472  2296  2296 F DEBUG   :       #56 pc 00000000000c2c34  /system/framework/arm64/boot.oat (art_jni_trampoline+180) (BuildId: 27f700b1582a9ea583ab8532afd70422ed2afdbd)
+         1792779304.472  2296  2296 F DEBUG   :       #57 pc 0000000000136334  /apex/com.android.runtime/lib64/libart.so (art_quick_invoke_stub+548) (BuildId: 56f24a055ef0b5ed91239cf5f97c50c2)
+         1792779304.472  2296  2296 F DEBUG   :       #58 pc 000000000014506c  /apex/com.android.runtime/lib64/libart.so (art::ArtMethod::Invoke(art::Thread*, unsigned int*, unsigned int, art::JValue*, char const*)+244) (BuildId: 56f24a055ef0b5ed91239cf5f97c50c2)
+         1792779304.472  2296  2296 F DEBUG   :       #59 pc 00000000002df780  /apex/com.android.runtime/lib64/libart.so (art::interpreter::ArtInterpreterToCompiledCodeBridge(art::Thread*, art::ArtMethod*, art::ShadowFrame*, unsigned short, art::JValue*)+384) (BuildId: 56f24a055ef0b5ed91239cf5f97c50c2)
+         1792779304.472  2296  2296 F DEBUG   :       #60 pc 00000000002daa60  /apex/com.android.runtime/lib64/libart.so (bool art::interpreter::DoCall<false, false>(art::ArtMethod*, art::Thread*, art::ShadowFrame&, art::Instruction const*, unsigned short, art::JValue*)+912) (BuildId: 56f24a055ef0b5ed91239cf5f97c50c2)
+         1792779304.472  2296  2296 F DEBUG   :       #61 pc 0000000000598254  /apex/com.android.runtime/lib64/libart.so (MterpInvokeVirtual+648) (BuildId: 56f24a055ef0b5ed91239cf5f97c50c2)
+         1792779304.472  2296  2296 F DEBUG   :       #62 pc 0000000000130814  /apex/com.android.runtime/lib64/libart.so (mterp_op_invoke_virtual+20) (BuildId: 56f24a055ef0b5ed91239cf5f97c50c2)
+         1792779304.472  2296  2296 F DEBUG   :       #63 pc 000000000034cde6  /system/framework/framework.jar (com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run+22)
+         1792779304.472  2296  2296 F DEBUG   :       #64 pc 00000000002b03cc  /apex/com.android.runtime/lib64/libart.so (_ZN3art11interpreterL7ExecuteEPNS_6ThreadERKNS_20CodeItemDataAccessorERNS_11ShadowFrameENS_6JValueEbb.llvm.11038381426500388515+240) (BuildId: 56f24a055ef0b5ed91239cf5f97c50c2)
+         1792779304.472  2296  2296 F DEBUG   :       #65 pc 000000000058985c  /apex/com.android.runtime/lib64/libart.so (artQuickToInterpreterBridge+1012) (BuildId: 56f24a055ef0b5ed91239cf5f97c50c2)
+         1792779304.472  2296  2296 F DEBUG   :       #66 pc 000000000013f468  /apex/com.android.runtime/lib64/libart.so (art_quick_to_interpreter_bridge+88) (BuildId: 56f24a055ef0b5ed91239cf5f97c50c2)
+         1792779304.472  2296  2296 F DEBUG   :       #67 pc 00000000009b031c  /system/framework/arm64/boot-framework.oat (com.android.internal.os.ZygoteInit.main+2076) (BuildId: 09bb78a514ef3553105c4854eb815ce4118b0d46)
+         1792779304.472  2296  2296 F DEBUG   :       #68 pc 00000000001365b8  /apex/com.android.runtime/lib64/libart.so (art_quick_invoke_static_stub+568) (BuildId: 56f24a055ef0b5ed91239cf5f97c50c2)
+         1792779304.472  2296  2296 F DEBUG   :       #69 pc 000000000014508c  /apex/com.android.runtime/lib64/libart.so (art::ArtMethod::Invoke(art::Thread*, unsigned int*, unsigned int, art::JValue*, char const*)+276) (BuildId: 56f24a055ef0b5ed91239cf5f97c50c2)
+         1792779304.472  2296  2296 F DEBUG   :       #70 pc 00000000004a9b48  /apex/com.android.runtime/lib64/libart.so (art::(anonymous namespace)::InvokeWithArgArray(art::ScopedObjectAccessAlreadyRunnable const&, art::ArtMethod*, art::(anonymous namespace)::ArgArray*, art::JValue*, char const*)+104) (BuildId: 56f24a055ef0b5ed91239cf5f97c50c2)
+         1792779304.472  2296  2296 F DEBUG   :       #71 pc 00000000004a97b4  /apex/com.android.runtime/lib64/libart.so (art::InvokeWithVarArgs(art::ScopedObjectAccessAlreadyRunnable const&, _jobject*, _jmethodID*, std::__va_list)+408) (BuildId: 56f24a055ef0b5ed91239cf5f97c50c2)
+         1792779304.472  2296  2296 F DEBUG   :       #72 pc 00000000003b6814  /apex/com.android.runtime/lib64/libart.so (art::JNI::CallStaticVoidMethodV(_JNIEnv*, _jclass*, _jmethodID*, std::__va_list)+628) (BuildId: 56f24a055ef0b5ed91239cf5f97c50c2)
+         1792779304.472  2296  2296 F DEBUG   :       #73 pc 00000000000be560  /system/lib64/libandroid_runtime.so (_JNIEnv::CallStaticVoidMethod(_jclass*, _jmethodID*, ...)+116) (BuildId: db2b7ccfc9ccb008135e97c034940a43)
+         1792779304.472  2296  2296 F DEBUG   :       #74 pc 00000000000c13e8  /system/lib64/libandroid_runtime.so (android::AndroidRuntime::start(char const*, android::Vector<android::String8> const&, bool)+780) (BuildId: db2b7ccfc9ccb008135e97c034940a43)
+         1792779304.472  2296  2296 F DEBUG   :       #75 pc 00000000000034e0  /system/bin/app_process64 (main+1168) (BuildId: 17c28587f58ba3244a8f195cab83135f)
+         1792779304.472  2296  2296 F DEBUG   :       #76 pc 000000000007d798  /apex/com.android.runtime/lib64/bionic/libc.so (__libc_init+108) (BuildId: c042ffb4e195c9462700c20f99189c2b)
+         1792779304.546   357  2303 I am_crash: [357,0,dev.probe,552091206,Native crash,Segmentation fault,unknown,0]
+         1792779304.568   357  1576 I am_proc_died: [0,2266,dev.probe,0,2]

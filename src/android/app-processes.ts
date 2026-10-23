@@ -13,6 +13,10 @@ export interface AppIdentity {
   uid: number;
 }
 
+export function userIdFromUid(uid: number): number {
+  return Math.floor(uid / 100000);
+}
+
 export interface RunningProcess {
   pid: number;
   name: string;

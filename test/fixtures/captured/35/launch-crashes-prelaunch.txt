@@ -1,0 +1,122 @@
+ACTIVITY MANAGER RUNNING PROCESSES (dumpsys activity processes)
+  All known processes:
+  *APP* UID 10207 ProcessRecord{ba66d5 3347:dev.probe/u0a207}
+    user #0 uid=10207 gids={50207, 20207, 9997}
+    mRequiredAbi=arm64-v8a instructionSet=arm64
+    dir=/data/app/~~4lJhhFq7linFnI1yXgmKkA==/dev.probe-b789BM1L4ztRUF8aYilePg==/base.apk publicDir=/data/app/~~4lJhhFq7linFnI1yXgmKkA==/dev.probe-b789BM1L4ztRUF8aYilePg==/base.apk data=/data/user/0/dev.probe
+    packageList={dev.probe}
+    compat={420dpi}
+    thread=android.app.IApplicationThread$Stub$Proxy@1b28024
+    pid=3347
+    lastActivityTime=-1s385ms    startUpTime=-2s261ms    startElapsedTime=-2s261ms
+    startSeq=52
+    mountMode=DEFAULT
+    lastRssTime=-2s262ms rssProcState=20 rssStatType=0 nextRssTime=+19m50s344ms
+    lastRss=0.00 lastCachedRss=0.00
+    trimMemoryLevel=0
+    procStateMemTracker: best=4 () / pending state=1 highest=1 1.0x
+    lastRequestedGc=-1s634ms lastLowMemory=-1s634ms reportLowMemory=false
+    currentHostingComponentTypes=0x0 historicalHostingComponentTypes=0x0
+    reportedInteraction=true time=-1s656ms
+    adjSeq=865 lruSeq=767
+    oom adj: max=1001 curRaw=0 setRaw=0 cur=0 set=0
+    mCurSchedGroup=3 setSchedGroup=3 systemNoUi=false
+    curProcState=2 mRepProcState=2 setProcState=2 lastStateTime=-1s636ms
+    curCapability=LCMNFUA setCapability=LCMNFUA
+
+    hasShownUi=true pendingUiClean=true
+    cached=false empty=false
+    foregroundActivities=true (rep=true)
+    scheduleServiceTimeoutPending=false
+    Published Providers:
+      - androidx.startup.InitializationProvider
+        -> ContentProviderRecord{be13f89 u0 dev.probe/androidx.startup.InitializationProvider}
+    Connected Providers:
+      - d39fb8e/com.android.providers.settings/.SettingsProvider->3347:dev.probe/u0a207 s1/1 u0/0 +1s381ms
+      - aa60568/com.google.android.gms/.fonts.provider.FontsProvider->3347:dev.probe/u0a207 s0/2 u1/3 +369ms
+    lastCompactTime=0 lastCompactProfile=null
+    hasPendingCompaction=false    isFreezeExempt=false isPendingFreeze=false isFrozen=false
+    earliestFreezableTimeMs=--
+    Activities:
+      - ActivityRecord{caffa6 u0 dev.probe/.MainActivity t7}
+    Recent Tasks:
+      - Task{7f4cd94 #7 type=standard A=10207:dev.probe}
+     Configuration={1.0 310mcc260mnc [en_US] ldltr sw411dp w411dp h731dp 420dpi nrml long port finger qwerty/v/v dpad/v winConfig={ mBounds=Rect(0, 0 - 1080, 1920) mAppBounds=Rect(0, 0 - 1080, 1920) mMaxBounds=Rect(0, 0 - 1080, 1920) mDisplayRotation=ROTATION_0 mWindowingMode=fullscreen mActivityType=undefined mAlwaysOnTop=undefined mRotation=ROTATION_0} s.8 fontWeightAdjustment=0}
+     OverrideConfiguration={1.0 310mcc260mnc [en_US] ldltr sw411dp w411dp h731dp 420dpi nrml long port finger qwerty/v/v dpad/v winConfig={ mBounds=Rect(0, 0 - 1080, 1920) mAppBounds=Rect(0, 0 - 1080, 1920) mMaxBounds=Rect(0, 0 - 1080, 1920) mDisplayRotation=ROTATION_0 mWindowingMode=fullscreen mActivityType=standard mAlwaysOnTop=undefined mRotation=ROTATION_0} s.3 fontWeightAdjustment=0}
+     mLastReportedConfiguration={1.0 310mcc260mnc [en_US] ldltr sw411dp w411dp h731dp 420dpi nrml long port finger qwerty/v/v dpad/v winConfig={ mBounds=Rect(0, 0 - 1080, 1920) mAppBounds=Rect(0, 0 - 1080, 1920) mMaxBounds=Rect(0, 0 - 1080, 1920) mDisplayRotation=ROTATION_0 mWindowingMode=fullscreen mActivityType=undefined mAlwaysOnTop=undefined mRotation=ROTATION_0} s.8 fontWeightAdjustment=0}
+     mActivityStateFlags=W|V|R|VT|taskLayer=1
+
+  OOM levels:
+    -900: SYSTEM_ADJ (   73,728K)
+    -800: PERSISTENT_PROC_ADJ (   73,728K)
+    -700: PERSISTENT_SERVICE_ADJ (   73,728K)
+      0: FOREGROUND_APP_ADJ (   73,728K)
+     100: VISIBLE_APP_ADJ (   92,160K)
+     200: PERCEPTIBLE_APP_ADJ (  110,592K)
+     225: PERCEPTIBLE_MEDIUM_APP_ADJ (  129,024K)
+     250: PERCEPTIBLE_LOW_APP_ADJ (  129,024K)
+     300: BACKUP_APP_ADJ (  221,184K)
+     400: HEAVY_WEIGHT_APP_ADJ (  221,184K)
+     500: SERVICE_ADJ (  221,184K)
+     600: HOME_APP_ADJ (  221,184K)
+     700: PREVIOUS_APP_ADJ (  221,184K)
+     800: SERVICE_B_ADJ (  221,184K)
+     900: CACHED_APP_MIN_ADJ (  221,184K)
+     999: CACHED_APP_MAX_ADJ (  322,560K)
+
+  Process OOM control (54 total, non-act at 2, non-svc at 2):
+    Proc # 0: fg     T/A/TOP  LCMNFUA  t: 0 3347:dev.probe/u0a207 (top-activity)
+        oom: max=1001 curRaw=0 setRaw=0 cur=0 set=0
+        state: cur=TOP  set=TOP  lastRss=0.00 lastCachedRss=0.00
+        cached=false empty=false hasAboveClient=false
+
+  mHomeProcess: ProcessRecord{83270dd 1488:com.google.android.apps.nexuslauncher/u0a176}
+  mPreviousProcess: null
+
+  Raw LRU list (dumpsys activity lru):
+    Activities:
+    #53: fg     TOP  LCMNFUA 3347:dev.probe/u0a207 act:activities|recents
+
+  Process LRU list (sorted by oom_adj, 54 total, non-act at 2, non-svc at 2):
+    Proc # 0: fg     T/A/TOP  LCMNFUA  t: 0 3347:dev.probe/u0a207 (top-activity)
+
+  PID mappings:
+    PID #3347: ProcessRecord{ba66d5 3347:dev.probe/u0a207}
+  mPreviousProcessVisibleTime: 0
+  mDeviceIdleAllowlist=[2000, 10092, 10095, 10098, 10139, 10144, 10183, 10186, 10194]
+  mDeviceIdleExceptIdleAllowlist=[2000, 10091, 10092, 10095, 10098, 10107, 10132, 10139, 10142, 10144, 10183, 10186, 10194]
+  mDeviceIdleTempAllowlist=[1000, 1001, 2000, 10092, 10098, 10103, 10104, 10127, 10128, 10130, 10131, 10132, 10136, 10137, 10139, 10140, 10141, 10142, 10143, 10144, 10145, 10147, 10148, 10156, 10180, 10181, 10185, 10194, 10196, 10197, 10200, 10203, 10205]
+  mFgsStartTempAllowList:
+    1000:  duration=20000 callingUid=1000 reasonCode=BOOT_COMPLETED reason=a880e28 android.intent.action.BOOT_COMPLETED/u0 expiration=2026-10-23 18:34:02.378 (+12s965ms)
+    1001:  duration=20000 callingUid=1000 reasonCode=BOOT_COMPLETED reason=a880e28 android.intent.action.BOOT_COMPLETED/u0 expiration=2026-10-23 18:34:00.997 (+11s584ms)
+    2000:  duration=20000 callingUid=1000 reasonCode=BOOT_COMPLETED reason=a880e28 android.intent.action.BOOT_COMPLETED/u0 expiration=2026-10-23 18:34:03.352 (+13s939ms)
+    u0a92:  duration=20000 callingUid=1000 reasonCode=BOOT_COMPLETED reason=a880e28 android.intent.action.BOOT_COMPLETED/u0 expiration=2026-10-23 18:34:03.316 (+13s903ms)
+    u0a98:  duration=20000 callingUid=1000 reasonCode=BOOT_COMPLETED reason=a880e28 android.intent.action.BOOT_COMPLETED/u0 expiration=2026-10-23 18:34:01.365 (+11s952ms)
+    u0a103:  duration=20000 callingUid=1000 reasonCode=BOOT_COMPLETED reason=a880e28 android.intent.action.BOOT_COMPLETED/u0 expiration=2026-10-23 18:34:02.802 (+13s389ms)
+    u0a104:  duration=20000 callingUid=1000 reasonCode=BOOT_COMPLETED reason=a880e28 android.intent.action.BOOT_COMPLETED/u0 expiration=2026-10-23 18:34:04.504 (+15s91ms)
+    u0a127:  duration=20000 callingUid=1000 reasonCode=BOOT_COMPLETED reason=a880e28 android.intent.action.BOOT_COMPLETED/u0 expiration=2026-10-23 18:33:55.212 (+5s799ms)
+    u0a128:  duration=20000 callingUid=1000 reasonCode=BOOT_COMPLETED reason=a880e28 android.intent.action.BOOT_COMPLETED/u0 expiration=2026-10-23 18:34:04.106 (+14s693ms)
+    u0a130:  duration=20000 callingUid=1000 reasonCode=BOOT_COMPLETED reason=a880e28 android.intent.action.BOOT_COMPLETED/u0 expiration=2026-10-23 18:34:02.230 (+12s817ms)
+    u0a132:  duration=20000 callingUid=1000 reasonCode=BOOT_COMPLETED reason=a880e28 android.intent.action.BOOT_COMPLETED/u0 expiration=2026-10-23 18:34:02.193 (+12s780ms)
+    u0a136:  duration=20000 callingUid=1000 reasonCode=BOOT_COMPLETED reason=a880e28 android.intent.action.BOOT_COMPLETED/u0 expiration=2026-10-23 18:34:05.305 (+15s892ms)
+    u0a137:  duration=20000 callingUid=1000 reasonCode=BOOT_COMPLETED reason=a880e28 android.intent.action.BOOT_COMPLETED/u0 expiration=2026-10-23 18:34:03.108 (+13s695ms)
+    u0a139:  duration=20000 callingUid=1000 reasonCode=BOOT_COMPLETED reason=a880e28 android.intent.action.BOOT_COMPLETED/u0 expiration=2026-10-23 18:34:03.860 (+14s447ms)
+    u0a140:  duration=20000 callingUid=1000 reasonCode=BOOT_COMPLETED reason=a880e28 android.intent.action.BOOT_COMPLETED/u0 expiration=2026-10-23 18:34:04.359 (+14s946ms)
+    u0a141:  duration=20000 callingUid=u0a141 reasonCode=UNKNOWN reason=cd2582b Intent { flg=0x10 cmp=com.google.android.settings.intelligence/.modules.routines.impl.WifiBroadcastReceiver (has extras) }/u0 expiration=2026-10-23 18:34:08.870 (+19s457ms)
+    u0a142:  duration=20000 callingUid=1000 reasonCode=BOOT_COMPLETED reason=a880e28 android.intent.action.BOOT_COMPLETED/u0 expiration=2026-10-23 18:34:01.146 (+11s733ms)
+    u0a143:  duration=20000 callingUid=u0a143 reasonCode=UNKNOWN reason=f5b563 com.google.android.apps.wellbeing.action.SCREEN_TURNING_OFF/u0 expiration=2026-10-23 18:34:03.714 (+14s301ms)
+    u0a144:  duration=20000 callingUid=1000 reasonCode=BOOT_COMPLETED reason=a880e28 android.intent.action.BOOT_COMPLETED/u0 expiration=2026-10-23 18:34:01.857 (+12s444ms)
+    u0a145:  duration=20000 callingUid=1000 reasonCode=BOOT_COMPLETED reason=a880e28 android.intent.action.BOOT_COMPLETED/u0 expiration=2026-10-23 18:34:05.919 (+16s506ms)
+    u0a147:  duration=20000 callingUid=1000 reasonCode=BOOT_COMPLETED reason=a880e28 android.intent.action.BOOT_COMPLETED/u0 expiration=2026-10-23 18:34:01.790 (+12s377ms)
+    u0a148:  duration=20000 callingUid=1000 reasonCode=BOOT_COMPLETED reason=a880e28 android.intent.action.BOOT_COMPLETED/u0 expiration=2026-10-23 18:34:06.321 (+16s908ms)
+    u0a156:  duration=20000 callingUid=1000 reasonCode=BOOT_COMPLETED reason=a880e28 android.intent.action.BOOT_COMPLETED/u0 expiration=2026-10-23 18:34:03.129 (+13s716ms)
+    u0a180:  duration=20000 callingUid=1000 reasonCode=BOOT_COMPLETED reason=a880e28 android.intent.action.BOOT_COMPLETED/u0 expiration=2026-10-23 18:33:56.480 (+7s67ms)
+    u0a181:  duration=20000 callingUid=1000 reasonCode=BOOT_COMPLETED reason=a880e28 android.intent.action.BOOT_COMPLETED/u0 expiration=2026-10-23 18:34:01.926 (+12s513ms)
+    u0a185:  duration=20000 callingUid=1000 reasonCode=BOOT_COMPLETED reason=a880e28 android.intent.action.BOOT_COMPLETED/u0 expiration=2026-10-23 18:34:02.311 (+12s898ms)
+    u0a194:  duration=20000 callingUid=1000 reasonCode=BOOT_COMPLETED reason=a880e28 android.intent.action.BOOT_COMPLETED/u0 expiration=2026-10-23 18:34:01.315 (+11s902ms)
+    u0a196:  duration=20000 callingUid=1000 reasonCode=BOOT_COMPLETED reason=a880e28 android.intent.action.BOOT_COMPLETED/u0 expiration=2026-10-23 18:34:04.394 (+14s981ms)
+    u0a197:  duration=20000 callingUid=1000 reasonCode=BOOT_COMPLETED reason=a880e28 android.intent.action.BOOT_COMPLETED/u0 expiration=2026-10-23 18:34:04.168 (+14s755ms)
+    u0a200:  duration=20000 callingUid=1000 reasonCode=BOOT_COMPLETED reason=a880e28 android.intent.action.BOOT_COMPLETED/u0 expiration=2026-10-23 18:34:03.048 (+13s635ms)
+    u0a203:  duration=20000 callingUid=1000 reasonCode=BOOT_COMPLETED reason=a880e28 android.intent.action.BOOT_COMPLETED/u0 expiration=2026-10-23 18:34:04.255 (+14s842ms)
+    u0a205:  duration=20000 callingUid=1000 reasonCode=BOOT_COMPLETED reason=a880e28 android.intent.action.BOOT_COMPLETED/u0 expiration=2026-10-23 18:34:02.494 (+13s81ms)
+  mForceBackgroundCheck=false

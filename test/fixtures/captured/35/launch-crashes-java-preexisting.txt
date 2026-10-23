@@ -1,0 +1,3 @@
+--------- beginning of events
+         1792780429.762   536  3050 I am_crash: [3347,0,dev.probe,552091206,java.lang.IllegalStateException,probe crash requested,MainActivity.kt,78,0]
+         1792780429.916   536  1498 I am_proc_died: [0,3347,dev.probe,0,2]

@@ -110,6 +110,9 @@ export function lifecycleDevices(track: (fake: FakeAdb) => void) {
         { match: shell(RESOLVE), respond: { stdout: "dev.probe/.MainActivity\n" } },
         { match: shell(PROCESSES), respond: PROCESS_RUNNING },
         { match: shell(METADATA), respond: activityInfo() },
+        { match: shell(PIDOF), respond: PROBE_RUNNING },
+        { match: shell("pidof 'dev.probe:ui'"), respond: { stdout: "8123 9123\n" } },
+        { match: shell("pidof 'dev.probe:sync'"), respond: { stdout: "8111\n" } },
         {
           match: shell(KERNEL_UIDS),
           respond: { stdout: "  PID   UID NAME\n 8235 10213 dev.probe\n" },

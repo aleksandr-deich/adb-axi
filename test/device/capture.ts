@@ -20,6 +20,7 @@ import { homedir, userInfo } from "node:os";
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { locateAdb } from "../../src/adb/locate.js";
+import { LAUNCH_CRASH_COMMAND } from "../../src/android/launch-crash.js";
 import { exec } from "../../src/core/exec.js";
 import { poll } from "../../src/core/poll.js";
 
@@ -797,17 +798,103 @@ async function captureProcesses(serial: string): Promise<void> {
   writeFileSync(indexPath, `${JSON.stringify(index, null, 2)}\n`);
 }
 
+async function captureLaunchCrashes(serial: string): Promise<void> {
+  const device = new Device(serial);
+  const sdk = (await device.text("getprop ro.build.version.sdk")).trim();
+  if (!/^\d+$/.test(sdk)) throw new Error(`${serial}: could not read the API level (${sdk})`);
+  const dir = join(CAPTURED_DIR, sdk);
+  mkdirSync(dir, { recursive: true });
+  const rec = new Recorder(dir);
+  const sh = (command: string): string[] => device.args(["shell", command]);
+  const events = (since: string): string =>
+    LAUNCH_CRASH_COMMAND.replace(" -v epoch ", ` -v epoch -T ${since} `);
+  await run(device.args(["install", "-r", "-t", DEBUG_APK]), 180_000);
+  const user = (await device.text("am get-current-user")).trim();
+  const uid = /uid:(\d+)/.exec(await device.text(`pm list packages -U --user ${user} ${PKG}`))?.[1];
+  if (uid === undefined) throw new Error(`${serial}: no uid in pm list packages -U`);
+  try {
+    await device.shell(`am force-stop --user ${user} ${PKG}`);
+    const startMark = await device.clock();
+    await device.shell(`am start --user ${user} -W -n ${ACTIVITY}`);
+    const running = await waitForOracle(device, startMark, /event=start /);
+    await rec.capture("launch-crashes-running.txt", sh(events(startMark)), "running, no crash");
+    await rec.capture(
+      "launch-crashes-prelaunch.txt",
+      sh(`dumpsys activity processes ${PKG}`),
+      "pre-existing Java process, before the crash window",
+    );
+    const javaMark = await device.clock();
+    await device.shell(`am start --user ${user} -n ${ACTIVITY} --es probe crash`);
+    await waitForLog(device, javaMark, "the Java crash event", [
+      /am_crash:.*probe crash requested/,
+    ]);
+    await rec.capture(
+      "launch-crashes-java-start.txt",
+      sh(events(startMark)),
+      "Java crash including am_proc_start uid evidence",
+    );
+    await rec.capture(
+      "launch-crashes-java-preexisting.txt",
+      sh(events(javaMark)),
+      "Java crash after the process start, attributed using prelaunch evidence",
+    );
+    await device.shell(`am force-stop --user ${user} ${PKG}`);
+    const nativeMark = await device.clock();
+    await device.shell(`am start --user ${user} -n ${ACTIVITY} --es probe native`);
+    await waitForLog(device, nativeMark, "native tombstone and confirmed death", [
+      /DEBUG\s*: uid: \d+/,
+      /am_proc_died:.*dev\.probe/,
+      /am_crash:.*Native crash/,
+    ]);
+    await rec.capture(
+      "launch-crashes-native.txt",
+      sh(events(nativeMark)),
+      "native tombstone uid, death event, and system-server am_crash pid",
+    );
+    const indexPath = join(dir, "index.json");
+    const existing = existsSync(indexPath)
+      ? (JSON.parse(readFileSync(indexPath, "utf8")) as Record<string, unknown>)
+      : { api: Number(sdk) };
+    const earlier = ((existing.captures ?? []) as Capture[]).filter(
+      (capture) => !capture.file.startsWith("launch-crashes-"),
+    );
+    writeFileSync(
+      indexPath,
+      `${JSON.stringify(
+        {
+          ...existing,
+          captures: [...earlier, ...rec.captures],
+          launchCrashCapture: {
+            serial,
+            capturedAt: new Date().toISOString(),
+            probe: { package: PKG, uid: Number(uid), user: Number(user), running },
+          },
+        },
+        null,
+        2,
+      )}\n`,
+    );
+  } finally {
+    await device.shell(`am force-stop --user ${user} ${PKG}`);
+  }
+}
+
 async function main(): Promise<void> {
   const { values } = parseArgs({
     options: {
       serial: { type: "string", multiple: true },
       processes: { type: "boolean" },
+      "launch-crashes": { type: "boolean" },
     },
   });
   const serials = values.serial ?? [];
   if (serials.length === 0) {
     console.error("Name every device to capture: --serial <serial> [--serial <serial> ...]");
     process.exit(2);
+  }
+  if (values["launch-crashes"] === true) {
+    for (const serial of serials) await captureLaunchCrashes(serial);
+    return;
   }
   if (values.processes === true) {
     for (const serial of serials) await captureProcesses(serial);

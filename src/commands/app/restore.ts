@@ -1,15 +1,12 @@
 import type { LaunchType } from "../../android/amstart.js";
-import { declaredActivities, parseActivityFilters } from "../../android/activities.js";
 import { assertPackageName, type Component } from "../../android/component.js";
 import { findTask, readRecents } from "../../android/recents.js";
 import { AdbAxiError } from "../../core/errors.js";
 import { okLine, runHint, type Output } from "../../core/output.js";
 import { defineCommand } from "../define.js";
 import type { DeviceContext } from "../types.js";
-import { processImportance } from "../../android/app-processes.js";
 import { lifecycleCommand, requireInstalled, type InstalledPackage } from "./process.js";
-import { UNKNOWN } from "./shared.js";
-import { launchActivity, type Seen } from "./start.js";
+import { launchApp } from "./launch.js";
 
 export const appRestore = defineCommand({
   path: ["app", "restore"],
@@ -99,7 +96,7 @@ export async function restoreTask(
 ): Promise<Restored> {
   const adb = context.device.adb;
   const serial = context.device.serial;
-  const { userId, identity: app } = installed;
+  const { userId } = installed;
 
   const task = findTask(await readRecents(adb, serial, context.device.reads), pkg, userId);
   if (task === undefined || task.activity === null) throw noTask(context, pkg);
@@ -109,20 +106,11 @@ export async function restoreTask(
     component: `${pkg}/${task.activity}`,
   };
 
-  const pidsBefore = (await processImportance(adb, serial, app, context.device.reads)).map(
-    (process) => process.pid,
-  );
-  const { start, settled, launched, processName } = await launchActivity(
-    context,
-    component,
-    userId,
-    app,
+  const { start, settled, before } = await launchApp(context, installed, component, {
+    operation: "restore",
     command,
-    () => declaredActivities(parseActivityFilters(installed.dump), pkg),
-    (launched, processName, last) => diedOnStart(context, launched, processName, last),
-  );
+  });
   const pid = settled.pid;
-  if (pid === UNKNOWN) throw diedOnStart(context, launched, processName, settled);
   const inFront = settled.state === "foreground";
   return {
     app: {
@@ -131,7 +119,7 @@ export async function restoreTask(
         : (start.activity?.activity ?? component.activity),
       pid,
       launch: start.launch,
-      newProcess: !pidsBefore.includes(pid),
+      newProcess: !before.some((process) => process.pid === pid),
     },
     front: settled.front?.package ?? null,
   };
@@ -148,41 +136,6 @@ function noTask(context: DeviceContext, pkg: string): AdbAxiError {
             runHint(
               lifecycleCommand(context, ["app", "start", pkg]),
               "to start it fresh (its saved state is not restored)",
-            ),
-          ]
-        : [],
-    },
-  );
-}
-
-/** `APP_DIED_ON_START`: a crash dialog can keep the restored process alive. */
-function diedOnStart(
-  context: DeviceContext,
-  activity: Component,
-  processName: string,
-  last: Seen,
-): AdbAxiError {
-  return new AdbAxiError(
-    "APP_DIED_ON_START",
-    last.state === "crashed"
-      ? `the ${processName} process of ${activity.component} crashed during its restore`
-      : `the ${processName} process of ${activity.component} is gone right after its restore`,
-    {
-      fields: {
-        last: { state: last.state, pid: last.pid, foreground: last.front?.package ?? UNKNOWN },
-      },
-      help: context.isShipped(["logs", "crash"])
-        ? [
-            runHint(
-              lifecycleCommand(context, [
-                "logs",
-                "crash",
-                "--pkg",
-                activity.package,
-                "--since",
-                "1m",
-              ]),
-              "for the crash",
             ),
           ]
         : [],
