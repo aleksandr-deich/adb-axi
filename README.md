@@ -52,7 +52,7 @@ help[1]: Run `adb-axi logs --pkg dev.probe --since 1m` for recent app logs
 
 `adb-axi --help` lists every command; `adb-axi <command> --help` gives its arguments, flags, defaults and examples. Flags go after the command: `adb-axi app start com.example.notes --device emulator-5554`. adb-axi picks a device on its own only when exactly one emulator is online; otherwise pass `--device <serial|avd>` or set `ANDROID_SERIAL`.
 
-Without opt-in server selection, adb-axi inherits adb's server selection: `ADB_SERVER_SOCKET` takes priority over `ANDROID_ADB_SERVER_ADDRESS` and `ANDROID_ADB_SERVER_PORT`; without a socket setting, adb uses those address and port settings, defaulting to the local host and port 5037. `doctor` reports the selected endpoint and notes contradictory address or port settings ignored because of `ADB_SERVER_SOCKET`. Server recovery hints use the selected endpoint too. These settings select the server, independently of `--device` or `ANDROID_SERIAL`. Opt in with `--server tcp:localhost:6137` or a saved `server.json` selection (see `doctor --help`): selected mode checks the endpoint before each adb call and defaults to no explicit startup, refuses conflicting selectors, reports the answering peer, and isolates per-device state by endpoint. `--server-start auto` permits an explicit local bootstrap. The preflight is not airtight: native adb may still start or replace a server on that same endpoint if it disappears or changes after the check. Saved selection affects adb-axi only, not raw adb or Gradle.
+adb-axi inherits adb's server selection: `ADB_SERVER_SOCKET` takes priority over `ANDROID_ADB_SERVER_ADDRESS` and `ANDROID_ADB_SERVER_PORT`; without a socket setting, adb uses those address and port settings, defaulting to the local host and port 5037. `doctor` reports the selected endpoint and notes contradictory address or port settings ignored because of `ADB_SERVER_SOCKET`. Server recovery hints use the selected endpoint too. These settings select the server, independently of `--device` or `ANDROID_SERIAL`. To pin adb-axi to one server, use `--server tcp:<port>` or a saved selection; see `doctor --help`.
 
 ## Output and exit codes
 
@@ -62,7 +62,7 @@ Without opt-in server selection, adb-axi inherits adb's server selection: `ADB_S
 - **Deadlines:** every command has one deadline shared by all its device calls; `--help` shows each command's default and `--timeout` overrides it.
 - **Long output:** `logs`, `shell` and `data db` print a bounded view and say how much of it was shown; `--full` writes the complete output to a file.
 
-adb-axi keeps log marks, install records and cached AVD names under `~/.adb-axi/`; set `ADB_AXI_HOME` to use another directory. Selected mode stores them separately under `servers/<endpoint-identity-hash>/` within that directory, without reusing legacy state. For conflict checks, saved startup permission and state isolation, `tcp:<port>`, `tcp:localhost:<port>` and `tcp:127.0.0.1:<port>` share one endpoint identity; `::1` and other `127.x.x.x` addresses are distinct identities, even though they are local endpoints eligible for `--server-start auto`.
+adb-axi keeps log marks, install records and cached AVD names under `~/.adb-axi/`; set `ADB_AXI_HOME` to use another directory.
 
 ## Commands
 
