@@ -1,24 +1,17 @@
 import type { AdbClient } from "../../adb/run.js";
-import { identityOf, runningProcesses, type AppIdentity } from "../../android/app-processes.js";
-import { readPackageSnapshot, type PackageInfo } from "../../android/packages.js";
-import { readCurrentUser } from "../../android/users.js";
+import { runningProcesses, type AppIdentity } from "../../android/app-processes.js";
+import type { AppRecord } from "../../device/session.js";
 import { readShell, type ReadOptions } from "../../android/read.js";
 import { AdbAxiError } from "../../core/errors.js";
 import { commandLine, runHint } from "../../core/output.js";
 import { poll } from "../../core/poll.js";
-import type { CommandContext } from "../types.js";
+import type { DeviceContext } from "../types.js";
 import { appInstall } from "./install.js";
-import { readOptions, targetSerial, UNKNOWN } from "./shared.js";
+import { UNKNOWN } from "./shared.js";
 
-/** An installed package's record and the full `dumpsys package` text it came from. */
-export interface InstalledPackage {
-  info: PackageInfo;
-  dump: string;
-  userId: number;
-  app: AppIdentity;
-}
+export type InstalledPackage = AppRecord & { installed: true };
 
-export function lifecycleCommand(context: CommandContext, args: string[]): string[] {
+export function lifecycleCommand(context: DeviceContext, args: string[]): string[] {
   const device = context.flags.device ?? context.env.ANDROID_SERIAL;
   return typeof device === "string" && device !== "" ? [...args, "--device", device] : args;
 }
@@ -29,23 +22,16 @@ export function lifecycleCommand(context: CommandContext, args: string[]): strin
  * The returned user ID scopes subsequent mutations and observations even if users switch.
  */
 export async function requireInstalled(
-  context: CommandContext,
+  context: DeviceContext,
   pkg: string,
 ): Promise<InstalledPackage> {
-  const userId = await readCurrentUser(context.adb(), targetSerial(context), readOptions(context));
-  const { info, dump } = await readPackageSnapshot(
-    context.adb(),
-    targetSerial(context),
-    pkg,
-    readOptions(context),
-    userId,
-  );
-  if (info === null || !info.installed) throw notInstalled(context, pkg);
-  return { info, dump, userId, app: identityOf(info, dump) };
+  const record = await context.device.app(pkg);
+  if (!record.installed) throw notInstalled(context, pkg);
+  return record;
 }
 
 /** `APP_NOT_INSTALLED`, with hints to find the package or install it. */
-export function notInstalled(context: CommandContext, pkg: string): AdbAxiError {
+export function notInstalled(context: DeviceContext, pkg: string): AdbAxiError {
   return new AdbAxiError("APP_NOT_INSTALLED", `${pkg} is not installed on this device`, {
     help: [
       runHint(
@@ -79,12 +65,12 @@ export async function forceStop(
 export type ExitWait = { gone: true } | { gone: false; last: number[] | null };
 
 /** The pids of every running process of the app. */
-export async function appPids(context: CommandContext, app: AppIdentity): Promise<number[]> {
+export async function appPids(context: DeviceContext, app: AppIdentity): Promise<number[]> {
   const processes = await runningProcesses(
-    context.adb(),
-    targetSerial(context),
+    context.device.adb,
+    context.device.serial,
     app,
-    readOptions(context),
+    context.device.reads,
   );
   return processes.map(({ pid }) => pid);
 }
@@ -95,7 +81,7 @@ export async function appPids(context: CommandContext, app: AppIdentity): Promis
  * observation is the evidence.
  */
 export async function waitForExit(
-  context: CommandContext,
+  context: DeviceContext,
   app: AppIdentity,
   before: readonly number[],
   repeatStep: () => Promise<void>,
@@ -134,7 +120,7 @@ export interface StopStep {
 
 /** `STOP_FAILED`: the process outlived the step's deadline. */
 export function stopFailed(
-  context: CommandContext,
+  context: DeviceContext,
   pkg: string,
   last: number[] | null,
   timeoutMs: number,

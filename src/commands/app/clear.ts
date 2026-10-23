@@ -5,7 +5,7 @@ import { invalidOutput, readShell } from "../../android/read.js";
 import { AdbAxiError } from "../../core/errors.js";
 import { okLine, runHint } from "../../core/output.js";
 import { defineCommand } from "../define.js";
-import type { CommandContext } from "../types.js";
+import type { DeviceContext } from "../types.js";
 import {
   forceStop,
   lifecycleCommand,
@@ -13,7 +13,6 @@ import {
   stopFailed,
   waitForExit,
 } from "./process.js";
-import { readOptions, targetSerial } from "./shared.js";
 
 /** How many of the files left after a clear the error lists. */
 const LISTED_FILES = 10;
@@ -37,11 +36,11 @@ export const appClear = defineCommand({
   run: async (context) => {
     const pkg = String(context.positionals.pkg);
     assertPackageName(pkg);
-    const serial = targetSerial(context);
-    const adb = context.adb();
+    const serial = context.device.serial;
+    const adb = context.device.adb;
 
-    const { info, userId, app } = await requireInstalled(context, pkg);
-    const before = (await processTable(adb, serial, readOptions(context)))
+    const { info, userId, identity: app } = await requireInstalled(context, pkg);
+    const before = (await processTable(adb, serial, context.device.reads))
       .filter(({ uid }) => uid === app.uid)
       .map(({ pid }) => pid);
 
@@ -54,12 +53,12 @@ export const appClear = defineCommand({
       serial,
       `pm clear --user ${userId} ${pkg}`,
       step,
-      readOptions(context),
+      context.device.reads,
     );
     if (result.stdout.trim() !== "Success") throw invalidOutput(step, result.stdout);
 
     const exit = await waitForExit(context, app, before, () =>
-      forceStop(adb, serial, pkg, userId, readOptions(context)),
+      forceStop(adb, serial, pkg, userId, context.device.reads),
     );
     if (!exit.gone) {
       throw stopFailed(context, pkg, exit.last, context.timeoutMs, {
@@ -86,14 +85,10 @@ export const appClear = defineCommand({
  * `files`, ...). An empty `cache` or `code_cache` directory is not data; any file is.
  * Only `run-as` can list them, so a refusal means the files were not listed (`false`).
  */
-async function checkNoFiles(
-  context: CommandContext,
-  pkg: string,
-  userId: number,
-): Promise<boolean> {
+async function checkNoFiles(context: DeviceContext, pkg: string, userId: number): Promise<boolean> {
   const result = await runShell(
-    context.adb(),
-    targetSerial(context),
+    context.device.adb,
+    context.device.serial,
     `run-as ${pkg} --user ${userId} find . -type f`,
     { deadline: context.deadline, step: `listing the data files of ${pkg}` },
   );

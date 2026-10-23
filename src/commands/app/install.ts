@@ -4,9 +4,8 @@ import { basename, resolve } from "node:path";
 import { ApkError, bufferSource, readApkFile, readApkInfo, type ApkInfo } from "../../apk/index.js";
 import type { AdbClient } from "../../adb/run.js";
 import { assertPackageName } from "../../android/component.js";
-import { readPackage, type PackageInfo } from "../../android/packages.js";
+import type { PackageInfo } from "../../android/packages.js";
 import { parsePmFailure } from "../../android/pm-result.js";
-import { readCurrentUser } from "../../android/users.js";
 import { invalidOutput, readShell, type ReadOptions } from "../../android/read.js";
 import { formatDuration } from "../../core/args.js";
 import { Deadline } from "../../core/deadline.js";
@@ -15,10 +14,11 @@ import { noop, okLine, runHint, shellWords, type Output } from "../../core/outpu
 import { MAX_INTERVAL_MS, poll } from "../../core/poll.js";
 import { isErrno } from "../../core/state.js";
 import { defineCommand } from "../define.js";
-import type { CommandContext } from "../types.js";
+import type { DeviceContext } from "../types.js";
+import type { DeviceSession } from "../../device/session.js";
 import { installFailureError } from "./install-errors.js";
 import { readInstallRecord, writeInstallRecord, type InstallRecord } from "./install-record.js";
-import { formatVersion, readOptions, targetSerial, UNKNOWN } from "./shared.js";
+import { formatVersion, UNKNOWN } from "./shared.js";
 
 const MAX_INSTALLED_APK_BYTES = 64 * 1024 * 1024;
 
@@ -55,18 +55,25 @@ export const appInstall = defineCommand({
 /** What reading the APK gave: its facts, or why they are unknown. */
 type ApkRead = { ok: true; info: ApkInfo } | { ok: false; reason: string };
 
-async function runInstall(context: CommandContext): Promise<Output> {
+async function runInstall(context: DeviceContext): Promise<Output> {
   const started = performance.now();
   const clean = context.flags["clean-data"] === true;
   const ifChanged = context.flags["if-changed"] === true;
   const apkPath = apkFile(String(context.positionals.apk));
   const apkName = basename(apkPath);
-  const serial = targetSerial(context);
-  const options = readOptions(context);
-  const adb = context.adb();
+  const serial = context.device.serial;
+  const options = context.device.reads;
+  const adb = context.device.adb;
 
   let read = readApk(apkPath);
-  const api = read.ok ? await readApi(adb, serial, options) : null;
+  let api: number | null = null;
+  if (read.ok) {
+    try {
+      api = (await context.device.facts()).api;
+    } catch (error) {
+      if (!(error instanceof AdbAxiError && error.code === "REMOTE_EXIT")) throw error;
+    }
+  }
   if (read.ok) {
     read =
       api === null
@@ -92,15 +99,12 @@ async function runInstall(context: CommandContext): Promise<Output> {
   }
   // Taken before the install, so the wipe below is tied to the very bytes adb installs.
   const digest = read.ok && clean ? await fileDigest(apkPath) : null;
-  const userId = read.ok ? await readCurrentUser(adb, serial, options) : 0;
-  const before = read.ok
-    ? await readPackage(adb, serial, read.info.package, options, userId)
-    : null;
+  const before = read.ok ? (await context.device.app(read.info.package)).info : null;
   const previous = before?.installed === true ? before : null;
 
   let shortcut: string | undefined;
   if (ifChanged && !clean) {
-    const decision = await decideShortcut(read, previous, adb, serial, api, options);
+    const decision = await decideShortcut(read, previous, context.device, api);
     if (decision.kind === "unchanged" && read.ok) {
       return {
         ok: okLine(
@@ -128,12 +132,13 @@ async function runInstall(context: CommandContext): Promise<Output> {
   }
 
   const info = read.info;
-  let installed = await waitForVersion(context, adb, serial, info, options, userId);
+  const userId = await context.device.user();
+  let installed = await waitForVersion(context, info);
   if (digest !== null) {
     await confirmInstalledFile(adb, serial, info.package, apkName, digest, options, userId);
     await clearData(adb, serial, info.package, options, userId);
     // The package must survive the wipe at the version just installed.
-    installed = await waitForVersion(context, adb, serial, info, options, userId);
+    installed = await waitForVersion(context, info);
   }
 
   // A swap between a debug and a release build keeps the version, so say what did change.
@@ -211,11 +216,10 @@ type Shortcut =
 async function decideShortcut(
   read: ApkRead,
   previous: PackageInfo | null,
-  adb: AdbClient,
-  serial: string,
+  device: DeviceSession,
   api: number | null,
-  options: ReadOptions,
 ): Promise<Shortcut> {
+  const { adb, serial, reads: options } = device;
   if (!read.ok)
     return { kind: "skipped", reason: `the APK metadata cannot be read (${read.reason})` };
   const info = read.info;
@@ -233,7 +237,13 @@ async function decideShortcut(
     capMs: Math.min(30_000, options.deadline.remainingMs() / 2, options.capMs ?? Infinity),
   };
   try {
-    const path = await installedApkPath(adb, serial, `pm path ${info.package}`, evidenceOptions);
+    const userId = await device.user();
+    const path = await installedApkPath(
+      adb,
+      serial,
+      `pm path --user ${userId} ${info.package}`,
+      evidenceOptions,
+    );
     if (path === undefined) {
       return { kind: "skipped", reason: "the installed APK path cannot be established" };
     }
@@ -340,29 +350,8 @@ async function confirmInstalledFile(
   if (installed !== digest) throw refuse(`the APK it runs is not ${apkName}`);
 }
 
-async function readApi(
-  adb: AdbClient,
-  serial: string,
-  options: ReadOptions,
-): Promise<number | null> {
-  try {
-    const result = await readShell(
-      adb,
-      serial,
-      "getprop ro.build.version.sdk",
-      "reading the device API level",
-      options,
-    );
-    const value = result.stdout.trim();
-    return /^[1-9]\d*$/.test(value) && Number.isSafeInteger(Number(value)) ? Number(value) : null;
-  } catch (error) {
-    if (error instanceof AdbAxiError && error.code === "REMOTE_EXIT") return null;
-    throw error;
-  }
-}
-
 async function runAdbInstall(
-  context: CommandContext,
+  context: DeviceContext,
   adb: AdbClient,
   serial: string,
   apkPath: string,
@@ -391,7 +380,7 @@ async function runAdbInstall(
 }
 
 function failureContext(
-  context: CommandContext,
+  context: DeviceContext,
   apkName: string,
   info: ApkInfo | undefined,
   installed: string,
@@ -409,23 +398,16 @@ function failureContext(
  * Wait until the package manager reports the APK's versionCode. `adb install` returns when
  * the install is committed, so this normally holds at once; it is the proof, not a delay.
  */
-async function waitForVersion(
-  context: CommandContext,
-  adb: AdbClient,
-  serial: string,
-  info: ApkInfo,
-  options: ReadOptions,
-  userId: number,
-): Promise<PackageInfo> {
+async function waitForVersion(context: DeviceContext, info: ApkInfo): Promise<PackageInfo> {
   assertPackageName(info.package);
   let latest: PackageInfo | null | undefined;
   const result = await poll({
     timeoutMs: context.deadline.remainingMs(),
     check: async (remainingMs) => {
       const reads =
-        remainingMs < MAX_INTERVAL_MS ? { deadline: new Deadline(MAX_INTERVAL_MS) } : options;
+        remainingMs < MAX_INTERVAL_MS ? { deadline: new Deadline(MAX_INTERVAL_MS) } : undefined;
       try {
-        latest = await readPackage(adb, serial, info.package, reads, userId);
+        latest = (await context.device.app(info.package, reads)).info;
       } catch (error) {
         // A read cut off by the deadline ends the wait; the last full read is the evidence.
         if (error instanceof AdbAxiError && error.code === "TIMEOUT") {

@@ -1,14 +1,10 @@
-import { identityOf } from "../../android/app-processes.js";
 import { assertPackageName } from "../../android/component.js";
-import { readPackageSnapshot } from "../../android/packages.js";
-import { readCurrentUser } from "../../android/users.js";
 import { Deadline } from "../../core/deadline.js";
 import { AdbAxiError } from "../../core/errors.js";
 import { okLine, runHint } from "../../core/output.js";
 import { MAX_INTERVAL_MS, poll } from "../../core/poll.js";
 import { notInstalled } from "../app/process.js";
 import { observeApp, type AppObservation, type AppState } from "../app/state.js";
-import { readOptions, targetSerial } from "../app/shared.js";
 import { defineCommand } from "../define.js";
 
 export const waitApp = defineCommand({
@@ -35,13 +31,13 @@ export const waitApp = defineCommand({
     const pkg = String(context.positionals.pkg);
     const wanted = String(context.flags.state) as AppState;
     assertPackageName(pkg);
-    const serial = targetSerial(context);
-    const options = readOptions(context);
-    const adb = context.adb();
-    const userId = await readCurrentUser(adb, serial, options);
-    const { info, dump } = await readPackageSnapshot(adb, serial, pkg, options, userId);
-    // Read once: a package installed during the wait is not waited for.
-    if (info === null || !info.installed) {
+    const serial = context.device.serial;
+    const options = context.device.reads;
+    const adb = context.device.adb;
+    const record = await context.device.app(pkg);
+    const { userId } = record;
+    // A package installed during the wait is not waited for.
+    if (!record.installed) {
       if (wanted !== "stopped") throw notInstalled(context, pkg);
       return {
         ok: okLine("wait app", pkg, "stopped after 0 ms"),
@@ -49,7 +45,7 @@ export const waitApp = defineCommand({
         note: `${pkg} is not installed for Android user ${userId}`,
       };
     }
-    const app = identityOf(info, dump);
+    const app = record.identity;
 
     let latest: AppObservation | undefined;
     const result = await poll({

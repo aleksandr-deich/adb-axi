@@ -3,15 +3,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execOut } from "../../adb/execout.js";
 import { assertPackageName } from "../../android/component.js";
-import { readCurrentUser } from "../../android/users.js";
 import { AdbAxiError } from "../../core/errors.js";
 import { onInterrupt } from "../../core/interrupt.js";
 import { render, runHint, shellWords, type Output } from "../../core/output.js";
 import { truncateField, writeFullOutput, MAX_FIELD_CHARS } from "../../core/truncate.js";
 import { lifecycleCommand } from "../app/process.js";
-import { readOptions, targetSerial } from "../app/shared.js";
 import { defineCommand } from "../define.js";
-import type { CommandContext } from "../types.js";
+import type { DeviceContext } from "../types.js";
 import { listDatabases, runAsRefusal, type DatabaseFile } from "./databases.js";
 import { assertReadOnlySql } from "./sql-guard.js";
 import { assertQueryRuntime, runQuery, type Row } from "./sqlite-query.js";
@@ -83,28 +81,20 @@ export const dataDb = defineCommand({
           },
         );
       }
-      const userId = await readCurrentUser(
-        context.adb(),
-        targetSerial(context),
-        readOptions(context),
-      );
+      const userId = await context.device.user();
       return listing(context, pkg, await listDatabases(context, pkg, userId));
     }
 
     assertReadOnlySql(sql);
     assertQueryRuntime();
-    const userId = await readCurrentUser(
-      context.adb(),
-      targetSerial(context),
-      readOptions(context),
-    );
+    const userId = await context.device.user();
     const databases = await listDatabases(context, pkg, userId);
     const database = pick(context, pkg, databases, requested);
     return query(context, { pkg, database, sql, full, userId });
   },
 });
 
-function listing(context: CommandContext, pkg: string, databases: DatabaseFile[]): Output {
+function listing(context: DeviceContext, pkg: string, databases: DatabaseFile[]): Output {
   const first = databases[0];
   const several = databases.length > 1;
   return {
@@ -135,7 +125,7 @@ function listing(context: CommandContext, pkg: string, databases: DatabaseFile[]
 
 /** The database a query runs on: `--db`, or the only one the app has. */
 function pick(
-  context: CommandContext,
+  context: DeviceContext,
   pkg: string,
   databases: readonly DatabaseFile[],
   requested: string | undefined,
@@ -181,7 +171,7 @@ interface QueryPlan {
   full: boolean;
 }
 
-async function query(context: CommandContext, plan: QueryPlan): Promise<Output> {
+async function query(context: DeviceContext, plan: QueryPlan): Promise<Output> {
   const { database, sql } = plan;
   const dir = mkdtempSync(join(tmpdir(), "adb-axi-db-"));
   const removeDir = (): void => {
@@ -221,7 +211,7 @@ async function query(context: CommandContext, plan: QueryPlan): Promise<Output> 
  * disagree with it. The log goes first, so the main file is never older than its log.
  */
 async function copyDatabase(
-  context: CommandContext,
+  context: DeviceContext,
   plan: QueryPlan,
   dir: string,
 ): Promise<boolean> {
@@ -247,10 +237,10 @@ async function copyDatabase(
  * The bytes of one file in `databases/`. `exec-out` has no stderr and exits 0 whatever
  * the remote command did (S1), so a failure arrives as these bytes: callers validate them.
  */
-function pull(context: CommandContext, pkg: string, name: string, userId: number): Promise<Buffer> {
+function pull(context: DeviceContext, pkg: string, name: string, userId: number): Promise<Buffer> {
   return execOut(
-    context.adb(),
-    targetSerial(context),
+    context.device.adb,
+    context.device.serial,
     ["run-as", pkg, "--user", String(userId), "cat", shellWords([`databases/${name}`])],
     {
       deadline: context.deadline,
@@ -266,7 +256,7 @@ function isWal(bytes: Buffer): boolean {
 
 /** What `exec-out` copied is not the file asked for: a `run-as` refusal or the error text of `cat`. */
 function notSqlite(
-  context: CommandContext,
+  context: DeviceContext,
   pkg: string,
   name: string,
   bytes: Buffer,
@@ -292,7 +282,7 @@ function notSqlite(
 }
 
 /** The result as TOON rows, capped at 50, with the whole result in a file for `--full`. */
-function present(context: CommandContext, plan: QueryPlan, rows: Row[], label: string): Output {
+function present(context: DeviceContext, plan: QueryPlan, rows: Row[], label: string): Output {
   const shown = rows.slice(0, MAX_ROWS).map(shortenCells);
   const cutRows = rows.length > MAX_ROWS;
   const cutCells = shown.some((row, i) => Object.entries(row).some(([k, v]) => v !== rows[i]?.[k]));

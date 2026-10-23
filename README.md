@@ -76,7 +76,7 @@ adb-axi keeps log marks, install records and cached AVD names under `~/.adb-axi/
 | `wait app <pkg> --state <foreground\|running\|stopped>`   | Waits until an app reaches a state                                             |
 | `wait log <regex> [--since <mark\|dur>]`                  | Waits until a log line matches                                                 |
 | `app current`                                             | The foreground app: package, activity and pid                                  |
-| `app list [--all] [--grep <re>]`                          | Installed packages with a count                                                |
+| `app list [--all] [--grep <re>]`                          | Packages installed for the current Android user, with a count                  |
 | `app info <pkg>`                                          | One package: installed, version, debuggable, pid, foreground, data size        |
 | `app install <apk> [--clean-data] [--if-changed]`         | Installs and waits until the new version is live, keeping app data by default  |
 | `app uninstall <pkg> [--keep-data]`                       | Uninstalls a package for the current Android user                              |

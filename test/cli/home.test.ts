@@ -53,6 +53,7 @@ function device(
         match: ["-s", SERIAL, "emu", "avd", "name"],
         respond: { stdout: "Pixel_10_Pro_XL\r\nOK\r\n" },
       },
+      ...shell("am get-current-user", { stdout: "0\n" }),
       ...shell(FOREGROUND, answers.foreground),
       ...shell(CLOCK, answers.clock),
       ...shell(LOGCAT, answers.logcat),

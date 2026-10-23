@@ -30,8 +30,8 @@ const SERIAL = "emulator-5554";
 const PKG = "com.example.notes";
 const ONE_ONLINE = `List of devices attached\n${SERIAL}          device product:sdk_gphone64_arm64 model:sdk_gphone64_arm64 device:emu64a transport_id:1\n\n`;
 const DUMPSYS = `dumpsys package ${PKG}`;
-const SDK = "getprop ro.build.version.sdk";
-const APK_PATH = `pm path ${PKG}`;
+const FACTS = { re: "^echo @sdk; .*" };
+const APK_PATH = `pm path --user 0 ${PKG}`;
 const CAT_APK = "cat /data/app/notes/base.apk";
 const SHA_APK = "sha256sum /data/app/notes/base.apk";
 const INSTALL_OK = { stdout: "Performing Streamed Install\nSuccess\n" };
@@ -126,7 +126,12 @@ const ABSENT: Response = { stdout: "Unable to find package: com.example.notes\n"
 const V56 = packageDump(PKG, "1.4.0", 56);
 const V57 = packageDump(PKG, "1.4.0", 57);
 
-const shell = (command: string): string[] => ["-s", SERIAL, "shell", command];
+const shell = (command: string | { re: string }): (string | { re: string })[] => [
+  "-s",
+  SERIAL,
+  "shell",
+  command,
+];
 
 interface World {
   /** What `dumpsys package` says in each state of the package, and the state to start in. */
@@ -156,8 +161,10 @@ function world(options: World): FakeAdb {
       })),
       ...(options.rules ?? []),
       { match: shell("am get-current-user"), respond: { stdout: `${options.userId ?? 0}\n` } },
-      { match: shell(SDK), respond: options.api ?? { stdout: "35\n" } },
-      { match: shell(APK_PATH), respond: { stdout: "package:/data/app/notes/base.apk\n" } },
+      {
+        match: shell(FACTS),
+        respond: { ...options.api, stdout: `@sdk\n${options.api?.stdout ?? "35\n"}` },
+      },
       {
         match: shell(`pm path --user ${options.userId ?? 0} ${PKG}`),
         respond: { stdout: "package:/data/app/notes/base.apk\n" },
@@ -376,7 +383,15 @@ describe("app install", () => {
             start: "current",
             dumps: { current: V57, new: V57 },
             installedApk: APK,
-            rules: [{ match: shell(APK_PATH), respond: response }, installs(APK)],
+            rules: [
+              {
+                match: shell(APK_PATH),
+                respond: { stdout: "package:/data/app/notes/base.apk\n" },
+                times: 1,
+              },
+              { match: shell(APK_PATH), respond: response, times: 1 },
+              installs(APK),
+            ],
           }),
         ["app", "install", APK, "--if-changed"],
       );

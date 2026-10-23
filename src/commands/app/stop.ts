@@ -11,7 +11,6 @@ import {
   stopFailed,
   waitForExit,
 } from "./process.js";
-import { readOptions, targetSerial } from "./shared.js";
 
 export const appStop = defineCommand({
   path: ["app", "stop"],
@@ -31,13 +30,13 @@ export const appStop = defineCommand({
   run: async (context) => {
     const pkg = String(context.positionals.pkg);
     assertPackageName(pkg);
-    const serial = targetSerial(context);
-    const adb = context.adb();
+    const serial = context.device.serial;
+    const adb = context.device.adb;
 
-    const { userId, app } = await requireInstalled(context, pkg);
+    const { userId, identity: app } = await requireInstalled(context, pkg);
     const before = await appPids(context, app);
     const started = realClock.now();
-    const stop = () => forceStop(adb, serial, pkg, userId, readOptions(context));
+    const stop = () => forceStop(adb, serial, pkg, userId, context.device.reads);
     await stop();
     const exit = await waitForExit(context, app, before, stop);
     if (!exit.gone) {

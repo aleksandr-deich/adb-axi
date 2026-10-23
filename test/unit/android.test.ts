@@ -148,32 +148,38 @@ describe("parsePackageList", () => {
 
 describe("parseDumpsysPackage", () => {
   it.each(APIS)("reads the debuggable and the release build on API %s", (api) => {
-    expect(parseDumpsysPackage(captured(api, "dumpsys-package-debug.txt"), "dev.probe")).toEqual({
-      package: "dev.probe",
-      installed: true,
-      versionName: "1.0",
-      versionCode: 1,
-      debuggable: true,
-      system: false,
-      uid: PROBE[api].uid,
-      minSdk: 29,
-      targetSdk: 36,
-    });
+    expect(parseDumpsysPackage(captured(api, "dumpsys-package-debug.txt"), "dev.probe", 0)).toEqual(
+      {
+        package: "dev.probe",
+        installed: true,
+        versionName: "1.0",
+        versionCode: 1,
+        debuggable: true,
+        system: false,
+        uid: PROBE[api].uid,
+        minSdk: 29,
+        targetSdk: 36,
+      },
+    );
     expect(
-      parseDumpsysPackage(captured(api, "dumpsys-package-release.txt"), "dev.probe"),
+      parseDumpsysPackage(captured(api, "dumpsys-package-release.txt"), "dev.probe", 0),
     ).toMatchObject({ installed: true, versionCode: 1, debuggable: false, uid: PROBE[api].uid });
   });
 
   it.each(APIS)("answers null for a package that is not installed on API %s", (api) => {
     expect(
-      parseDumpsysPackage(captured(api, "dumpsys-package-absent.txt"), "dev.probe.missing"),
+      parseDumpsysPackage(captured(api, "dumpsys-package-absent.txt"), "dev.probe.missing", 0),
     ).toBeNull();
     // A name that is not the record's is not the record.
-    expect(parseDumpsysPackage(captured(api, "dumpsys-package-debug.txt"), "dev.prob")).toBeNull();
+    expect(
+      parseDumpsysPackage(captured(api, "dumpsys-package-debug.txt"), "dev.prob", 0),
+    ).toBeNull();
   });
 
   it("reads the userId= form of API 29 and 30 (synthetic)", () => {
-    expect(parseDumpsysPackage(synthetic("29", "dumpsys-package-debug.txt"), "dev.probe")).toEqual({
+    expect(
+      parseDumpsysPackage(synthetic("29", "dumpsys-package-debug.txt"), "dev.probe", 0),
+    ).toEqual({
       package: "dev.probe",
       installed: true,
       versionName: "1.0",
@@ -185,16 +191,16 @@ describe("parseDumpsysPackage", () => {
       targetSdk: 29,
     });
     expect(
-      parseDumpsysPackage(synthetic("29", "dumpsys-package-absent.txt"), "dev.probe.missing"),
+      parseDumpsysPackage(synthetic("29", "dumpsys-package-absent.txt"), "dev.probe.missing", 0),
     ).toBeNull();
     expect(
-      parseDumpsysPackage(synthetic("30", "dumpsys-package-release.txt"), "dev.probe"),
+      parseDumpsysPackage(synthetic("30", "dumpsys-package-release.txt"), "dev.probe", 0),
     ).toMatchObject({ installed: true, debuggable: false, uid: 10123, targetSdk: 30 });
   });
 
   it("reports a package uninstalled with its data kept as not installed (API 30, synthetic)", () => {
     expect(
-      parseDumpsysPackage(synthetic("30", "dumpsys-package-kept-data.txt"), "dev.probe"),
+      parseDumpsysPackage(synthetic("30", "dumpsys-package-kept-data.txt"), "dev.probe", 0),
     ).toEqual({
       package: "dev.probe",
       installed: false,
@@ -224,14 +230,11 @@ describe("parseDumpsysPackage", () => {
         installed: false,
         uid: 1110213,
       });
-      expect(parseDumpsysPackage(text, "dev.probe")).toEqual(
-        parseDumpsysPackage(text, "dev.probe", 0),
-      );
     },
   );
 
   it("ignores hidden system packages, which are not the installed copy", () => {
-    const records = parsePackageRecords(synthetic("30", "dumpsys-package-release.txt"));
+    const records = parsePackageRecords(synthetic("30", "dumpsys-package-release.txt"), 0);
     expect([...records.keys()]).toEqual(["dev.probe"]);
   });
 });
