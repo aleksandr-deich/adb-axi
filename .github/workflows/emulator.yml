@@ -52,7 +52,9 @@ jobs:
           disable-animations: true
           disk-size: 6000M
           heap-size: 600M
-          script: npx vitest run --config vitest.device.config.ts
+          script: |
+            npx vitest run --config vitest.device.config.ts test/device/2-app-start.test.ts test/device/3-data-db.test.ts
+            for round in $(seq 1 20); do echo "DOCTOR ROUND $round"; npx vitest run --config vitest.device.config.ts test/device/4-doctor-ui.test.ts || exit 1; done
       - name: Upload transcripts
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7

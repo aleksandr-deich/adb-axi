@@ -39,8 +39,18 @@ describe("doctor ui", () => {
   for (const transport of ["shell", "exec-out"] as const) {
     test(`a live adb ${transport} uiautomator reader is named, protected from --fix, and gone once it ends`, async () => {
       const reader = spawn(locateAdb(), ["-s", axi.serial, transport, "uiautomator", "events"], {
-        stdio: "ignore",
+        stdio: ["ignore", "pipe", "pipe"],
       });
+      let output = "";
+      reader.stdout?.on("data", (data: Buffer) => {
+        output += data.toString();
+      });
+      reader.stderr?.on("data", (data: Buffer) => {
+        output += data.toString();
+      });
+      reader.on("exit", (code, signal) =>
+        console.error("READER_EXIT", transport, code, signal, output),
+      );
       try {
         const report = await uiautomation("in use");
         const why = `adb ${transport} uiautomator pid ${reader.pid} on the host`;
@@ -68,6 +78,21 @@ describe("doctor ui", () => {
         });
         expect(reader.exitCode).toBeNull();
       } finally {
+        console.error(
+          "READER_FINAL",
+          transport,
+          reader.pid,
+          reader.exitCode,
+          reader.signalCode,
+          output,
+        );
+        console.error(
+          "READER_DEVICE",
+          await axi.adb([
+            "shell",
+            "ps -A -o PID,ARGS; dumpsys accessibility; logcat -d -t 100 -s UiAutomation UiAutomationConnection AndroidRuntime",
+          ]),
+        );
         await stop(reader);
       }
       expect(await uiautomation("free")).toEqual({ uiautomation: "free" });
