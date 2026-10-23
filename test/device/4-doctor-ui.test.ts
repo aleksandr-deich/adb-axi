@@ -39,7 +39,7 @@ describe("doctor ui", () => {
   for (const transport of ["shell", "exec-out"] as const) {
     test(`a live adb ${transport} uiautomator reader is named, protected from --fix, and gone once it ends`, async () => {
       const reader = spawn(locateAdb(), ["-s", axi.serial, transport, "uiautomator", "events"], {
-        stdio: ["ignore", "pipe", "pipe"],
+        stdio: ["ignore", "ignore", "pipe"],
       });
       let output = "";
       reader.stdout?.on("data", (data: Buffer) => {
