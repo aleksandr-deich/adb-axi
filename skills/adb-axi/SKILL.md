@@ -29,6 +29,8 @@ Output is short and the first line is the verdict. Do not pipe it through `tail`
 
 Target a known device with `--device <serial|avd>` after the command, or set `ANDROID_SERIAL=<serial>`. Only a lone online emulator is auto-selected; physical devices and multiple online devices require explicit selection. Consult the relevant command's `--help` when you need flag details.
 
+If other tools or agents may share the default adb server, pin your own with `--server tcp:<port>` or a saved selection, and check the `server` field in the output. Consult `npx -y adb-axi doctor --help` for saved-selection and server-start policies; this selection routes adb-axi only, not other tools.
+
 ## App-build loop
 
 Typical usages (flags go after the command; confirm details with `--help`):
