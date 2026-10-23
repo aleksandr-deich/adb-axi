@@ -14,6 +14,12 @@ export type Snapshot =
  * is left of the command deadline.
  */
 export async function takeSnapshot(context: DeviceContext): Promise<Snapshot> {
+  if (context.device.adb.hasSelectedServer) {
+    return {
+      ok: false,
+      reason: "agent-device snapshot cannot guarantee routing to the selected adb server",
+    };
+  }
   const result = await exec({
     file: "agent-device",
     args: ["snapshot", "--json"],

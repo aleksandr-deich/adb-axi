@@ -1,10 +1,12 @@
 import { LAUNCH_CRASH_COMMAND } from "../../src/android/launch-crash.js";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
+import { once } from "node:events";
+import { createServer } from "node:net";
 import { join } from "node:path";
 import { decode } from "@toon-format/toon";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createFakeAdb, FIXTURES_DIR, type FakeAdb } from "../fake-adb/harness.js";
-import type { Response, Rule } from "../fake-adb/scenario.js";
+import type { Response, Rule, Scenario } from "../fake-adb/scenario.js";
 import { runCli, type CliRun } from "../helpers/run.js";
 import { sharedWithToon } from "../helpers/json.js";
 
@@ -469,6 +471,62 @@ const diedAndRestored = {
 };
 
 describe("app death", () => {
+  it("refuses unproven snapshot routing on a selected server while retaining lifecycle evidence", async () => {
+    const server = createServer((socket) => {
+      socket.on("data", () => socket.end("OKAY00040029"));
+    });
+    server.listen(0, "127.0.0.1");
+    await once(server, "listening");
+    try {
+      const address = server.address();
+      if (address === null || typeof address === "string") throw new Error("no server port");
+      const endpoint = `tcp:127.0.0.1:${address.port}`;
+      const fake = probeDevice({
+        phase: "front",
+        rules: [snapshotRule({ stdout: SNAPSHOT_BEFORE }, { stdout: SNAPSHOT_AFTER })],
+      });
+      const path = join(fake.dir, "scenario.json");
+      const scenario = JSON.parse(readFileSync(path, "utf8")) as Scenario;
+      scenario.rules = scenario.rules.map((rule) =>
+        rule.tool === "agent-device" ? rule : { ...rule, match: ["-L", endpoint, ...rule.match] },
+      );
+      writeFileSync(path, JSON.stringify(scenario));
+      delete fake.env.ADB_SERVER_SOCKET;
+      delete fake.env.ANDROID_ADB_SERVER_ADDRESS;
+      delete fake.env.ANDROID_ADB_SERVER_PORT;
+      const result = await runCli(
+        [
+          "app",
+          "death",
+          "dev.probe",
+          "--compare",
+          "--server",
+          endpoint,
+          "--device",
+          SERIAL,
+          "--json",
+        ],
+        fake.env,
+      );
+      expect(result.exitCode).toBe(1);
+      expect(normalized(JSON.parse(result.stdout) as Record<string, unknown>)).toMatchObject({
+        code: "COMPARE_UNAVAILABLE",
+        death: diedAndRestored,
+        server: { endpoint, answered: true },
+      });
+      expect(fake.vars().app).toBe("restored");
+      expect(fake.calls().filter((call) => call.tool === "agent-device")).toHaveLength(0);
+      expect(fake.unmatched()).toEqual([]);
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        server.close((error) => {
+          if (error === undefined) resolve();
+          else reject(error);
+        });
+      });
+    }
+  });
+
   it("diffs the visible text before and after with --compare", async () => {
     const { toon, data, fake } = await both(["app", "death", "dev.probe", "--compare"], () =>
       probeDevice({
