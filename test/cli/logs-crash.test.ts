@@ -122,9 +122,8 @@ async function crashSince(f: FakeAdb, ...args: string[]): Promise<Both> {
 }
 
 describe("logs crash", () => {
-  describe("matching by package name", () => {
+  it("excludes and counts matching crashes without provable user metadata", async () => {
     const window = [
-      // The app's own crash, a second process of the app, a look-alike package, another app.
       ...[
         ["com.example.notes", 100],
         ["com.example.notes:sync", 101],
@@ -132,58 +131,54 @@ describe("logs crash", () => {
         ["com.example.notes.debug", 103],
         ["com.other.app", 104],
       ].flatMap(([process, pid]) => [
+        logLine(1790834320000, Number(pid), "E", "AndroidRuntime", "FATAL EXCEPTION: main"),
         logLine(
-          1790834320000 + Number(pid),
-          Number(pid),
-          "E",
-          "AndroidRuntime",
-          "FATAL EXCEPTION: main",
-        ),
-        logLine(
-          1790834320000 + Number(pid),
+          1790834320000,
           Number(pid),
           "E",
           "AndroidRuntime",
           `Process: ${String(process)}, PID: ${String(pid)}`,
         ),
         logLine(
-          1790834320000 + Number(pid),
+          1790834320000,
           Number(pid),
           "E",
           "AndroidRuntime",
           "java.lang.IllegalStateException: boom",
         ),
       ]),
-      // An ANR of the app, printed by system_server (pid 552, another uid).
-      logLine(
-        1790834330000,
-        552,
-        "E",
-        "ActivityManager",
-        "ANR in com.example.notes (com.example.notes/.Main)",
-      ),
+      logLine(1790834330000, 552, "E", "ActivityManager", "ANR in com.example.notes"),
       logLine(1790834330000, 552, "E", "ActivityManager", "PID: 100"),
-      logLine(1790834330000, 552, "E", "ActivityManager", "Reason: Input dispatching timed out"),
+      logLine(1790834330000, 552, "E", "ActivityManager", "Reason: blocked"),
+      logLine(1790834331000, 500, "F", "DEBUG", "*** *** *** ***"),
+      logLine(
+        1790834331000,
+        500,
+        "F",
+        "DEBUG",
+        "pid: 105, tid: 105, name: notes  >>> com.example.notes <<<",
+      ),
+      logLine(1790834331000, 500, "F", "DEBUG", "signal 11 (SIGSEGV), code 0 (SI_USER)"),
     ].join("\n");
-
-    it("counts the app's processes by the name in the report, not look-alikes, uids or pids", async () => {
-      const f = device({ window: { stdout: window } });
-      const { data } = await crashSince(f, "--pkg", "com.example.notes");
-      expect((data.crash as Record<string, unknown>[]).map((c) => [c.kind, c.process])).toEqual([
-        ["java", "com.example.notes"],
-        ["java", "com.example.notes:sync"],
-        ["anr", "com.example.notes"],
-      ]);
-      expect(data.crashes).toMatch(/^3 since before-run/);
-      // No package lookup, process list or uid is needed: only the clock and the window.
-      expect(
-        shellCommands(f).filter(
-          (c) => !c.startsWith("logcat") && !c.startsWith("echo @sdk") && c !== CLOCK,
-        ),
-      ).toEqual([]);
-      expect(logcatCommands(f).join(" ")).not.toContain("--uid");
-      expectClean(f);
+    const f = device({
+      window: { stdout: window },
+      scenarioRules: [
+        { match: ["-s", SERIAL, "shell", "am get-current-user"], respond: { stdout: "11\n" } },
+        {
+          match: ["-s", SERIAL, "shell", { re: "^logcat -d -b events .*" }],
+          respond: { stdout: "" },
+        },
+      ],
     });
+    const { toon, data } = await crashSince(f, "--pkg", "com.example.notes");
+    expect(toon.exitCode).toBe(0);
+    expect(data).toMatchObject({
+      crashes: "0 since before-run (40 s, 21 lines scanned)",
+      omitted: "4 matching crash reports without a verified Android user",
+    });
+    expect(data.crash).toBeUndefined();
+    expect(logcatCommands(f).join(" ")).not.toContain("--uid");
+    expectClean(f);
   });
 
   describe("the window", () => {
@@ -221,7 +216,7 @@ describe("logs crash", () => {
           ].join("\n"),
         },
       });
-      const { toon, data } = await crashSince(f, "--pkg", "dev.probe");
+      const { toon, data } = await crashSince(f);
       expect(toon.exitCode).toBe(0);
       expect(data).toEqual({ crashes: "0 since before-run (40 s, 4 lines scanned)" });
     });
@@ -249,7 +244,7 @@ describe("logs crash", () => {
           ].join("\n"),
         },
       });
-      const { data } = await crashSince(f, "--pkg", "dev.probe");
+      const { data } = await crashSince(f);
       expect(data).toEqual({ crashes: "0 since before-run (40 s, 3 lines scanned)" });
       expect(logcatCommands(f)).toEqual([
         "logcat -d -v epoch -T 1790834240.000",
@@ -280,7 +275,7 @@ describe("logs crash", () => {
           ].join("\n"),
         },
       });
-      const { data } = await crashSince(f, "--pkg", "dev.probe");
+      const { data } = await crashSince(f);
       expect(data).toEqual({ crashes: "0 since before-run (40 s, 2 lines scanned)" });
     });
 
@@ -307,7 +302,7 @@ describe("logs crash", () => {
           ].join("\n"),
         },
       });
-      const { data } = await crashSince(f, "--pkg", "dev.probe");
+      const { data } = await crashSince(f);
       expect(data.crashes).toBe("1 since before-run (40 s, 3 lines scanned)");
       expect(data.crash).toMatchObject({ kind: "native", at: "2026-10-01 07:58:20.200" });
     });
@@ -342,7 +337,7 @@ describe("logs crash", () => {
           ].join("\n"),
         },
       });
-      const { data } = await crashSince(f, "--pkg", "dev.probe");
+      const { data } = await crashSince(f);
       expect(data.crashes).toBe("1 since before-run (40 s, 4 lines scanned)");
       expect(data.crash).toMatchObject({ kind: "native", at: "2026-10-01 07:58:20.200" });
     });
@@ -369,7 +364,7 @@ describe("logs crash", () => {
       });
       await runCli(["logs", "mark", "before-run"], f.env);
       const run = await runCli(
-        ["logs", "crash", "--since", "before-run", "--pkg", "dev.probe", "--full", "--json"],
+        ["logs", "crash", "--since", "before-run", "--full", "--json"],
         f.env,
       );
       const data = JSON.parse(run.stdout) as Record<string, unknown>;

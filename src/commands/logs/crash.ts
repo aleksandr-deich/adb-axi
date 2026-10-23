@@ -12,15 +12,16 @@ const MAX_CRASHES = 5;
 
 export const logsCrash = defineCommand({
   path: ["logs", "crash"],
-  summary: "Java crashes, ANRs and native crashes in one window, matched by package name",
+  summary: "Java crashes, ANRs and native crashes in one window",
   flags: [
     {
       name: "--pkg",
       type: "string",
       valueName: "<pkg>",
       description:
-        "Only this app, by the process name in the crash report (the package or <pkg>:<name>), " +
-        "never by uid or pid; a package that is not installed, or that never crashed, counts 0",
+        "Only this app's reports (the package or <pkg>:<name>) proven to belong to the current Android user, " +
+        "using crash events or tombstone uid; reports without user evidence are omitted and counted. " +
+        "No installed package is required. Without --pkg, history spans all users",
     },
     {
       name: "--since",
@@ -48,7 +49,7 @@ export const logsCrash = defineCommand({
     const window = await openLogWindow(context.device, since, context.env);
     return withMarksNote(window.marksNote, async () => {
       const { now } = window;
-      const { crashes, scanned } = await window.readCrashes(pkg);
+      const { crashes, scanned, unverified } = await window.readCrashes(pkg);
 
       const seconds = Math.max(0, Math.round((now.epochMs - window.startMs) / 1000));
       const full = context.flags.full === true;
@@ -57,6 +58,9 @@ export const logsCrash = defineCommand({
       const rows = shown.map((crash) => describe(crash, now.utcOffsetMinutes, includeCause));
       return {
         crashes: `${crashes.length} since ${window.label} (${seconds} s, ${scanned.length} lines scanned)`,
+        ...(unverified === 0
+          ? {}
+          : { omitted: `${unverified} matching crash reports without a verified Android user` }),
         // One crash prints as a block, several as a table.
         ...(rows.length === 1 ? { crash: rows[0] } : rows.length > 1 ? { crash: rows } : {}),
         ...(crashes.length > shown.length
