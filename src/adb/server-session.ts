@@ -24,6 +24,7 @@ function probe(
   signal?: AbortSignal,
 ): Promise<ProbeResult> {
   return new Promise((resolve, reject) => {
+    timeoutMs = Number.isFinite(timeoutMs) ? Math.max(0, Math.floor(timeoutMs)) : 0;
     if (timeoutMs <= 0) {
       reject(new ProbeFailure("server check deadline expired", false));
       return;
