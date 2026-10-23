@@ -52,17 +52,18 @@ help[1]: Run `adb-axi logs --pkg dev.probe --since 1m` for recent app logs
 
 `adb-axi --help` lists every command; `adb-axi <command> --help` gives its arguments, flags, defaults and examples. Flags go after the command: `adb-axi app start com.example.notes --device emulator-5554`. adb-axi picks a device on its own only when exactly one emulator is online; otherwise pass `--device <serial|avd>` or set `ANDROID_SERIAL`.
 
-adb-axi inherits adb's server selection: `ADB_SERVER_SOCKET` takes priority over `ANDROID_ADB_SERVER_ADDRESS` and `ANDROID_ADB_SERVER_PORT`; without a socket setting, adb uses those address and port settings, defaulting to the local host and port 5037. `doctor` reports the selected endpoint and notes contradictory address or port settings ignored because of `ADB_SERVER_SOCKET`. Server recovery hints use the selected endpoint too. These settings select the server, independently of `--device` or `ANDROID_SERIAL`. To pin adb-axi to one server, use `--server tcp:<port>` or a saved selection; see `doctor --help`.
+Without `--server`, `--server-start` or a saved selection, adb-axi inherits adb's server selection: `ADB_SERVER_SOCKET` takes priority over `ANDROID_ADB_SERVER_ADDRESS` and `ANDROID_ADB_SERVER_PORT`; without a socket setting, adb uses those address and port settings, defaulting to the local host and port 5037. `doctor` reports the selected endpoint and notes contradictory address or port settings ignored because of `ADB_SERVER_SOCKET`. Server recovery hints use the selected endpoint too. These settings select the server, independently of `--device` or `ANDROID_SERIAL`. To pin adb-axi to one server, use `--server tcp:<port>` or a saved selection; see `doctor --help`.
 
 ## Output and exit codes
 
 - **Output:** TOON on stdout, or the same data as JSON with `--json`. A mutation leads with `ok: <verb> <target> -> <resulting state>` and says `(no-op)` when the state was already true. Next steps come as `help` lines that name real commands. `--debug` prints every adb call on stderr.
 - **Exit codes:** 0 when the requested state is true, including no-ops and reads that find nothing; 1 when it is not; 2 for a usage error.
+- **Selected-server evidence:** selected-mode results include `server` with the endpoint, selection source (`flag`, `config` or `env`), start policy, whether the probe answered, and the observed peer when available. `startup` reports `observed`, `not_observed` or `unknown`; it is not proof that no startup occurred.
 - **Errors:** one shape: `error`, a stable `code`, the fields that explain it, then `help`.
 - **Deadlines:** every command has one deadline shared by all its device calls; `--help` shows each command's default and `--timeout` overrides it.
 - **Long output:** `logs`, `shell` and `data db` print a bounded view and say how much of it was shown; `--full` writes the complete output to a file.
 
-adb-axi keeps log marks, install records and cached AVD names under `~/.adb-axi/`; set `ADB_AXI_HOME` to use another directory.
+adb-axi keeps log marks, install records and cached AVD names under `~/.adb-axi/`; set `ADB_AXI_HOME` to use another directory. Selected mode isolates these records under `servers/<endpoint-identity-hash>/` within that directory, without moving legacy records. For endpoint identity, `tcp:<port>`, `localhost` and `127.0.0.1` share a namespace at the same port; `::1` and other `127.x` addresses remain distinct. The saved `server.json` stays at the home directory root; see `doctor --help` for its format and selection rules.
 
 ## Commands
 
