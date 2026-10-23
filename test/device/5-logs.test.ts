@@ -179,14 +179,17 @@ describe("logs on real device logs", () => {
     await burst("late buffer", 1);
     const uptime = Number((await axi.sh("cat /proc/uptime")).trim().split(/\s+/)[0]);
     expect(Number.isFinite(uptime) && uptime > 0).toBe(true);
+    const duration = Math.ceil(uptime) + 60;
+    // Early boot logs can predate the clock being set and fall outside the requested window.
+    const start = Number((await axi.sh("date +%s")).trim()) - duration;
     const oldestTime = async (): Promise<string> => {
-      const raw = await axi.sh("logcat -d -v time -m 1");
+      const raw = await axi.sh(`logcat -d -v time -m 1 -T ${start.toFixed(3)}`);
       const match = /^\d\d-\d\d (\d\d:\d\d:\d\d\.\d{3})\s/m.exec(raw);
       expect(match, raw).not.toBeNull();
       return match?.[1] ?? "";
     };
     const before = await oldestTime();
-    const late = await axi.ok(["logs", "--since", `${Math.ceil(uptime) + 60}s`]);
+    const late = await axi.ok(["logs", "--since", `${duration}s`]);
     const after = await oldestTime();
     const first =
       /^first log line in this window is at (\d\d:\d\d:\d\d\.\d{3}), after the window start; the device log buffer may have dropped earlier lines$/.exec(
