@@ -1,4 +1,5 @@
 import { cpSync, mkdirSync, mkdtempSync, readdirSync, rmSync, symlinkSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { decode } from "@toon-format/toon";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -31,7 +32,8 @@ async function run(
 }
 
 beforeAll(async () => {
-  dir = mkdtempSync(join(ROOT, ".adb-axi-install-"));
+  // Keep disposable package copies outside the tree scanned by source rules.
+  dir = mkdtempSync(join(tmpdir(), "adb-axi-install-"));
   const source = join(dir, "source");
   mkdirSync(source);
   for (const path of [
