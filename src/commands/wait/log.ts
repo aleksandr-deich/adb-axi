@@ -1,8 +1,8 @@
 import type { LogLine } from "../../android/logcat.js";
-import { Deadline } from "../../core/deadline.js";
+import { formatDuration } from "../../core/duration.js";
 import { AdbAxiError } from "../../core/errors.js";
 import { okLine, runHint } from "../../core/output.js";
-import { MAX_INTERVAL_MS, poll } from "../../core/poll.js";
+import { observe } from "../../core/poll.js";
 import { truncateField } from "../../core/truncate.js";
 import { UNKNOWN } from "../app/shared.js";
 import { defineCommand } from "../define.js";
@@ -33,27 +33,13 @@ export const waitLog = defineCommand({
     const source = String(context.positionals.regex);
     const regex = compileRegex("regex", source);
     const since = typeof context.flags.since === "string" ? context.flags.since : undefined;
-    const options = context.device.reads;
     const window = await openLogWindow(context.device, since, context.env);
     return withMarksNote(window.marksNote, async () => {
       const { now } = window;
-      let latest: Observation | undefined;
-      const result = await poll({
-        timeoutMs: context.deadline.remainingMs(),
-        check: async (remainingMs) => {
-          // The last read, at the deadline, still gets a short deadline of its own.
-          const reads =
-            remainingMs < MAX_INTERVAL_MS ? { deadline: new Deadline(MAX_INTERVAL_MS) } : options;
-          let lines: LogLine[];
-          try {
-            lines = await window.readLines(reads);
-          } catch (error) {
-            // A read cut off by the deadline ends the wait; the last full observation is the evidence.
-            if (error instanceof AdbAxiError && error.code === "TIMEOUT") {
-              return { done: false, last: latest };
-            }
-            throw error;
-          }
+      const result = await observe({
+        deadline: context.deadline,
+        read: async (deadline) => {
+          const lines = await window.readLines({ ...context.device.reads, deadline });
           // adbd echoes our shell commands, including this poll, into the next dump.
           // Keep those lines in `logs` for diagnostics, but never use them as wait evidence.
           const found = lines.find(
@@ -62,12 +48,15 @@ export const waitLog = defineCommand({
               regex.test(line.message),
           );
           const newest = lines.at(-1);
-          latest = {
-            lines_scanned: lines.length,
-            newest: newest === undefined ? UNKNOWN : describe(newest, now.utcOffsetMinutes),
+          return {
+            summary: {
+              lines_scanned: lines.length,
+              newest: newest === undefined ? UNKNOWN : describe(newest, now.utcOffsetMinutes),
+            },
+            found,
           };
-          return found === undefined ? { done: false, last: latest } : { done: true, value: found };
         },
+        done: (latest): latest is typeof latest & { found: LogLine } => latest.found !== undefined,
       });
 
       if (!result.ok) {
@@ -75,7 +64,7 @@ export const waitLog = defineCommand({
           "WAIT_TIMEOUT",
           `no log line matching "${source}" within ${formatDuration(context.timeoutMs)}`,
           {
-            fields: { last: latest ?? { lines_scanned: UNKNOWN, newest: UNKNOWN } },
+            fields: { last: result.last?.summary ?? { lines_scanned: UNKNOWN, newest: UNKNOWN } },
             help: [
               runHint(
                 ["logs", "--since", since ?? timeoutWindow(context.timeoutMs)],
@@ -85,7 +74,7 @@ export const waitLog = defineCommand({
           },
         );
       }
-      const line = result.value;
+      const line = result.value.found;
       return {
         ok: okLine("wait log", source, `matched after ${result.waitedMs} ms`),
         waited_ms: result.waitedMs,
@@ -100,12 +89,6 @@ export const waitLog = defineCommand({
   },
 });
 
-/** What one read saw: how many lines the window held and the newest of them. */
-interface Observation {
-  lines_scanned: number;
-  newest: string;
-}
-
 function describe(line: LogLine, utcOffsetMinutes: number | null): string {
   return truncateField(
     `${clockTime(line.epochMs, utcOffsetMinutes)} ${line.level} ${line.tag}: ${line.message}`,
@@ -115,8 +98,4 @@ function describe(line: LogLine, utcOffsetMinutes: number | null): string {
 
 export function timeoutWindow(timeoutMs: number): string {
   return `${Math.max(1, Math.ceil((timeoutMs + 1000) / 60_000))}m`;
-}
-
-function formatDuration(ms: number): string {
-  return ms % 1000 === 0 ? `${ms / 1000} s` : `${ms} ms`;
 }

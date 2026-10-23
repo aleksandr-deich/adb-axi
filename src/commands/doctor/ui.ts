@@ -10,7 +10,8 @@ import { AdbAxiError } from "../../core/errors.js";
 import { listDevices } from "../../device/list.js";
 import { avdName } from "../../device/facts.js";
 import { commandLine, noop, okLine, runHint, type Output } from "../../core/output.js";
-import { poll } from "../../core/poll.js";
+import { observe } from "../../core/poll.js";
+import type { Deadline } from "../../core/deadline.js";
 import { UNKNOWN } from "../app/shared.js";
 import { defineCommand } from "../define.js";
 import type { DeviceContext } from "../types.js";
@@ -42,10 +43,13 @@ export const doctorUi = defineCommand({
 });
 
 /** Every UiAutomation holder on the target, classified against the host. */
-async function inspect(context: DeviceContext): Promise<ClassifiedHolder[]> {
+async function inspect(
+  context: DeviceContext,
+  deadline = context.deadline,
+): Promise<ClassifiedHolder[]> {
   const serial = context.device.serial;
   const adb = context.device.adb;
-  const reads = context.device.reads;
+  const reads = { ...context.device.reads, deadline };
   const [instrumentations, servers] = await allFinished([
     probeHolders(adb, serial, reads),
     probeAppProcessServers(adb, serial, reads),
@@ -55,10 +59,10 @@ async function inspect(context: DeviceContext): Promise<ClassifiedHolder[]> {
 
   const [wedgedPids, host, forwards, devices, avd] = await allFinished([
     readWedgedPids(adb, serial, reads),
-    context.hostProcesses(Math.min(context.deadline.remainingMs(), CHECK_CAP_MS)),
-    found.some((holder) => holder.kind === "server") ? readForwards(context) : [],
-    listDevices(adb, context.deadline),
-    avdName(adb, serial, null, { deadline: context.deadline, env: context.env }),
+    context.hostProcesses(Math.min(deadline.remainingMs(), CHECK_CAP_MS)),
+    found.some((holder) => holder.kind === "server") ? readForwards(context, deadline) : [],
+    listDevices(adb, deadline),
+    avdName(adb, serial, null, { deadline, env: context.env }),
   ]);
   return classifyHolders({
     serial,
@@ -85,10 +89,10 @@ async function allFinished<T extends readonly unknown[]>(
 }
 
 /** `adb forward --list`, or `null` when they cannot be listed: liveness is then unknown. */
-async function readForwards(context: DeviceContext): Promise<Forward[] | null> {
+async function readForwards(context: DeviceContext, deadline: Deadline): Promise<Forward[] | null> {
   try {
     const answer = await context.device.adb.host(["forward", "--list"], {
-      deadline: context.deadline,
+      deadline,
       capMs: CHECK_CAP_MS,
       step: "listing adb forwards",
     });
@@ -278,26 +282,14 @@ async function recheck(
   context: DeviceContext,
   targets: readonly ClassifiedHolder[],
 ): Promise<ClassifiedHolder[]> {
-  let last: ClassifiedHolder[] | undefined;
-  const result = await poll<ClassifiedHolder[], ClassifiedHolder[] | undefined>({
-    timeoutMs: Math.min(context.deadline.remainingMs(), SETTLE_MS),
-    check: async () => {
-      try {
-        last = await inspect(context);
-      } catch (error) {
-        // A look cut short by the deadline leaves the previous one as the evidence.
-        if (error instanceof AdbAxiError && error.code === "TIMEOUT" && last !== undefined) {
-          return { done: false, last };
-        }
-        throw error;
-      }
-      const holders = last;
-      const gone = targets.every((target) => !holders.some((h) => sameHolder(h, target)));
-      return gone ? { done: true, value: holders } : { done: false, last: holders };
-    },
+  const result = await observe({
+    deadline: context.deadline,
+    windowMs: SETTLE_MS,
+    requireObservation: true,
+    read: (deadline) => inspect(context, deadline),
+    done: (holders) => targets.every((target) => !holders.some((h) => sameHolder(h, target))),
   });
   if (result.ok) return result.value;
-  // The first look either answered or threw, so there is always a last one here.
-  if (last === undefined) throw new Error("re-check ended without a look at the device");
-  return last;
+  if (result.last === undefined) throw new Error("re-check ended without a look at the device");
+  return result.last;
 }

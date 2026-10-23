@@ -7,23 +7,20 @@ import {
   runningProcesses,
   type AppIdentity,
   type ProcessRecord,
+  waitUntilGone,
 } from "../../android/app-processes.js";
 import { readForeground } from "../../android/foreground.js";
 import { assertPackageName } from "../../android/component.js";
 import type { Importance } from "../../android/processes.js";
 import { readRecents, findTask } from "../../android/recents.js";
 import { readShell } from "../../android/read.js";
+import { formatDuration } from "../../core/duration.js";
 import { AdbAxiError } from "../../core/errors.js";
 import { noop, okLine, runHint, type Output } from "../../core/output.js";
-import { poll } from "../../core/poll.js";
+import { observe } from "../../core/poll.js";
 import { defineCommand } from "../define.js";
 import type { DeviceContext } from "../types.js";
-import {
-  formatDuration,
-  lifecycleCommand,
-  requireInstalled,
-  type InstalledPackage,
-} from "./process.js";
+import { lifecycleCommand, requireInstalled, type InstalledPackage } from "./process.js";
 import { UNKNOWN } from "./shared.js";
 
 /**
@@ -195,31 +192,17 @@ type Killable = { ok: true; waitedMs: number } | { ok: false; last: Seen | undef
  * does not print, is left to the kill and the `pidof` check that follows it.
  */
 async function awaitKillable(context: DeviceContext, app: AppIdentity): Promise<Killable> {
-  let last: Seen | undefined;
-  const result = await poll<null, Seen>({
-    timeoutMs: context.deadline.remainingMs(),
-    check: async () => {
-      let processes: ProcessRecord[];
-      try {
-        processes = await processImportance(
-          context.device.adb,
-          context.device.serial,
-          app,
-          context.device.reads,
-        );
-      } catch (error) {
-        if (error instanceof AdbAxiError && error.code === "TIMEOUT") {
-          return last === undefined ? { done: false, last: seenNothing() } : { done: false, last };
-        }
-        throw error;
-      }
+  const result = await observe({
+    deadline: context.deadline,
+    read: async (deadline) => {
+      const processes = await processImportance(context.device.adb, context.device.serial, app, {
+        ...context.device.reads,
+        deadline,
+      });
       const main = mainProcess(app, processes);
-      if (main === undefined || main.adj === null || amKillCanKill(main.adj)) {
-        return { done: true, value: null };
-      }
-      last = seen(main, [main.pid]);
-      return { done: false, last };
+      return main === undefined ? seenNothing() : seen(main, [main.pid]);
     },
+    done: (state) => state.adj === null || amKillCanKill(state.adj),
   });
   return result.ok ? { ok: true, waitedMs: result.waitedMs } : { ok: false, last: result.last };
 }
@@ -227,9 +210,8 @@ async function awaitKillable(context: DeviceContext, app: AppIdentity): Promise<
 type Gone = { gone: true } | { gone: false; last: Seen | undefined };
 
 /**
- * Poll `pidof` (the exit evidence; an ActivityManager record can vanish before its
- * process does) until the observed UID processes are gone or `windowMs` passes.
- * A process still alive is read once more from ActivityManager for the timeout state.
+ * Use `waitUntilGone` for exit evidence; retain ActivityManager importance only to
+ * describe processes still running in the kill-timeout error.
  */
 async function awaitGone(
   context: DeviceContext,
@@ -239,24 +221,16 @@ async function awaitGone(
   const adb = context.device.adb;
   const serial = context.device.serial;
   let last: Seen | undefined;
-  const result = await poll<null, Seen | undefined>({
-    timeoutMs: windowMs,
-    check: async () => {
-      try {
-        const pids = (await runningProcesses(adb, serial, app, context.device.reads)).map(
-          ({ pid }) => pid,
-        );
-        if (pids.length === 0) return { done: true, value: null };
-        const processes = await processImportance(adb, serial, app, context.device.reads);
-        const main = processes.find((process) => process.pid === pids[0]);
-        last = main === undefined ? { pids, state: UNKNOWN, adj: null } : seen(main, pids);
-      } catch (error) {
-        if (!(error instanceof AdbAxiError && error.code === "TIMEOUT")) throw error;
-      }
-      return { done: false, last };
+  const result = await waitUntilGone(adb, serial, app, {
+    ...context.device.reads,
+    windowMs,
+    onRunning: async (pids, reads) => {
+      const processes = await processImportance(adb, serial, app, reads);
+      const main = processes.find((process) => process.pid === pids[0]);
+      last = main === undefined ? { pids, state: UNKNOWN, adj: null } : seen(main, pids);
     },
   });
-  return result.ok ? { gone: true } : { gone: false, last: result.last };
+  return result.ok ? { gone: true } : { gone: false, last };
 }
 
 function seen(record: ProcessRecord, pids: number[]): Seen {

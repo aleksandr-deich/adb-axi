@@ -3,7 +3,7 @@ import { runShell, type ShellResult } from "../adb/shell.js";
 import type { Deadline } from "../core/deadline.js";
 import { AdbAxiError } from "../core/errors.js";
 
-/** What every device read takes: the command's one deadline, and an optional tighter cap. */
+/** A device read's deadline and optional tighter cap; see `observe` in core/poll.ts for state waits. */
 export interface ReadOptions {
   deadline: Deadline;
   capMs?: number;

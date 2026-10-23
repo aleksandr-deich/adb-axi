@@ -1,8 +1,8 @@
 import { readBoot } from "../../android/boot.js";
-import { Deadline } from "../../core/deadline.js";
+import { formatDuration } from "../../core/duration.js";
 import { AdbAxiError } from "../../core/errors.js";
 import { noop, okLine, runHint } from "../../core/output.js";
-import { MAX_INTERVAL_MS, poll } from "../../core/poll.js";
+import { observe } from "../../core/poll.js";
 import { resolveTarget } from "../../device/resolve.js";
 import { UNKNOWN } from "../app/shared.js";
 import { defineCommand } from "../define.js";
@@ -56,16 +56,12 @@ export const waitBoot = defineCommand({
     const requested = typeof flag === "string" ? flag : undefined;
 
     let serial: string | undefined;
-    let latest: BootObservation | undefined;
     // The system_server pid that has answered since `since` (ms on the host clock).
     let settling: { pid: number; since: number } | undefined;
-    const result = await poll({
-      timeoutMs: context.deadline.remainingMs(),
-      check: async (remainingMs) => {
-        // The final look, taken at the deadline, still gets a short deadline of its own.
-        const deadline = new Deadline(
-          Math.max(MAX_INTERVAL_MS, Math.min(remainingMs, OBSERVATION_CAP_MS)),
-        );
+    const result = await observe({
+      deadline: context.deadline,
+      readCapMs: OBSERVATION_CAP_MS,
+      read: async (deadline) => {
         try {
           const target = await resolveTarget({
             adb,
@@ -77,7 +73,7 @@ export const waitBoot = defineCommand({
           });
           serial = target.serial;
           const boot = await readBoot(adb, target.serial, { deadline });
-          latest = {
+          const latest: BootObservation = {
             state: "device",
             boot_completed: boot.bootCompleted ? 1 : 0,
             uptime_s: boot.uptimeS ?? UNKNOWN,
@@ -91,26 +87,25 @@ export const waitBoot = defineCommand({
             boot.systemServerPid === null
           ) {
             settling = undefined;
-            return { done: false, last: latest };
+            return { latest, ready: false };
           }
           if (boot.uptimeS !== null && boot.uptimeS >= FRESH_UPTIME_S) {
-            return { done: true, value: latest };
+            return { latest, ready: true };
           }
           const now = performance.now();
           if (settling?.pid !== boot.systemServerPid) {
             settling = { pid: boot.systemServerPid, since: now };
           }
-          return now - settling.since >= SETTLE_MS
-            ? { done: true, value: latest }
-            : { done: false, last: latest };
+          return { latest, ready: now - settling.since >= SETTLE_MS };
         } catch (error) {
           const seen = observationFromError(error, serial);
           if (seen === undefined) throw error;
-          latest = seen;
+          // A failed boot probe breaks readiness, unlike a timed-out state read.
           settling = undefined;
-          return { done: false, last: latest };
+          return { latest: seen, ready: false };
         }
       },
+      done: (value) => value.ready,
     });
 
     const who = serial ?? requested ?? (context.env.ANDROID_SERIAL || undefined);
@@ -124,7 +119,7 @@ export const waitBoot = defineCommand({
           : `${who ?? "the device"} had not finished booting after ${after}`,
         {
           fields: {
-            last: latest ?? { state: "unknown", ...UNREAD },
+            last: result.last?.latest ?? { state: "unknown", ...UNREAD },
           },
           help: context.isShipped(["doctor"])
             ? [runHint(who === undefined ? ["doctor"] : ["doctor", "--device", who], "to see why")]
@@ -178,8 +173,4 @@ function observationFromError(
 
 function flag01(value: boolean | null): number | typeof UNKNOWN {
   return value === null ? UNKNOWN : value ? 1 : 0;
-}
-
-function formatDuration(ms: number): string {
-  return ms % 1000 === 0 ? `${ms / 1000} s` : `${ms} ms`;
 }

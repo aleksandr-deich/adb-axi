@@ -1,20 +1,66 @@
-import { setTimeout } from "node:timers/promises";
+import { realClock, type Clock } from "./clock.js";
+import { Deadline } from "./deadline.js";
+import { AdbAxiError } from "./errors.js";
+
+export { realClock, type Clock } from "./clock.js";
 
 /** Poll interval bounds for every wait (7.4): never busier than 250 ms, never lazier than 500 ms. */
 export const MIN_INTERVAL_MS = 250;
 export const MAX_INTERVAL_MS = 500;
 export const DEFAULT_INTERVAL_MS = 400;
 
-/** Time source for polling. Tests inject a fake one; production uses the real clock. */
-export interface Clock {
-  now(): number;
-  sleep(ms: number, signal?: AbortSignal): Promise<void>;
+export interface ObserveOptions<T> {
+  deadline: Deadline;
+  read: (deadline: Deadline) => Promise<T>;
+  done: (value: T) => boolean;
+  intervalMs?: number;
+  clock?: Clock;
+  readCapMs?: number;
+  windowMs?: number;
+  requireObservation?: boolean;
 }
 
-export const realClock: Clock = {
-  now: () => performance.now(),
-  sleep: (ms, signal) => setTimeout(ms, undefined, { signal }),
-};
+export function observe<T, TDone extends T>(
+  options: Omit<ObserveOptions<T>, "done"> & { done: (value: T) => value is TDone },
+): Promise<PollResult<TDone, T>>;
+export function observe<T>(options: ObserveOptions<T>): Promise<PollResult<T, T>>;
+/**
+ * A timed-out read keeps the last completed observation; `requireObservation` instead
+ * propagates TIMEOUT until a read completes. Other errors always propagate.
+ * A deadline-edge read needs its own budget or AdbClient refuses it without reading.
+ * See the final-interval regression in test/unit/poll.test.ts.
+ */
+export async function observe<T>(options: ObserveOptions<T>): Promise<PollResult<T, T>> {
+  const clock = options.clock ?? realClock;
+  let last: T | undefined;
+  return poll({
+    timeoutMs: Math.min(options.windowMs ?? Infinity, options.deadline.remainingMs()),
+    ...(options.intervalMs === undefined ? {} : { intervalMs: options.intervalMs }),
+    clock,
+    check: async () => {
+      const remaining = options.deadline.remainingMs();
+      const deadline =
+        remaining < MAX_INTERVAL_MS
+          ? new Deadline(MAX_INTERVAL_MS, clock)
+          : options.readCapMs === undefined || remaining <= options.readCapMs
+            ? options.deadline
+            : new Deadline(options.readCapMs, clock);
+      let value: T;
+      try {
+        value = await options.read(deadline);
+      } catch (error) {
+        if (
+          !(error instanceof AdbAxiError && error.code === "TIMEOUT") ||
+          (options.requireObservation === true && last === undefined)
+        )
+          throw error;
+        return { done: false, last };
+      }
+      last = value;
+      return options.done(value) ? { done: true, value } : { done: false, last: value };
+    },
+  });
+}
 
 export type Observation<TValue, TLast> =
   { done: true; value: TValue } | { done: false; last: TLast };
@@ -25,8 +71,8 @@ export interface PollOptions<TValue, TLast> {
   intervalMs?: number;
   clock?: Clock;
   /**
-   * One observation. Receives the time left so a device call can take it as its deadline.
-   * The final observation, taken at the deadline, receives 0.
+   * One observation with the time left in the polling window (0 at its edge).
+   * For device state reads, prefer `observe`, which supplies a usable read deadline.
    */
   check: (remainingMs: number) => Promise<Observation<TValue, TLast>>;
 }
@@ -36,9 +82,9 @@ export type PollResult<TValue, TLast> =
   | { ok: false; last: TLast | undefined; waitedMs: number; attempts: number };
 
 /**
- * Observe until `check` reports done or the deadline passes. Observations start one
- * interval apart; one slower than the interval is followed by the next at once. A final
- * observation is taken at the deadline, so a state reached during the last interval is not missed.
+ * Schedule `check` until done or the polling window ends. Checks start one interval
+ * apart; one slower than the interval is followed by the next at once. Sleeping stops
+ * at the deadline for a final check; an in-flight check can finish later.
  * The caller turns a timeout into its own error (`WAIT_TIMEOUT`, `KILL_TIMEOUT`, ...)
  * with `last` as the evidence.
  */

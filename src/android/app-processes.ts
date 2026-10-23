@@ -1,4 +1,5 @@
 import type { AdbClient } from "../adb/run.js";
+import { observe, type PollResult } from "../core/poll.js";
 import { assertPackageName } from "./component.js";
 import { importanceForAdj, type Importance } from "./processes.js";
 import { invalidOutput, readShell, type ReadOptions } from "./read.js";
@@ -129,6 +130,36 @@ export async function runningProcesses(
     running.set(name, await readPidof(adb, serial, name, options));
   }
   return confirmRunning(candidates, running);
+}
+
+export interface ExitOptions extends ReadOptions {
+  windowMs?: number;
+  confirm?: boolean;
+  onRunning?: (pids: number[], reads: ReadOptions, resumed: boolean) => Promise<void>;
+}
+
+// Force-stop and clear need two empty reads because Android can resume a process mid-stop.
+export async function waitUntilGone(
+  adb: AdbClient,
+  serial: string,
+  app: AppIdentity,
+  options: ExitOptions,
+): Promise<PollResult<number[], number[]>> {
+  return observe({
+    deadline: options.deadline,
+    ...(options.windowMs === undefined ? {} : { windowMs: options.windowMs }),
+    read: async (deadline) => {
+      const reads = { ...options, deadline };
+      let pids = (await runningProcesses(adb, serial, app, reads)).map(({ pid }) => pid);
+      const confirmingExit = options.confirm === true && pids.length === 0;
+      if (confirmingExit) {
+        pids = (await runningProcesses(adb, serial, app, reads)).map(({ pid }) => pid);
+      }
+      if (pids.length > 0) await options.onRunning?.(pids, reads, confirmingExit);
+      return pids;
+    },
+    done: (pids) => pids.length === 0,
+  });
 }
 
 /** Every process on the device, without `pidof`: a mark only records which pids existed. */

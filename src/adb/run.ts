@@ -1,4 +1,5 @@
 import type { Deadline } from "../core/deadline.js";
+import { formatDuration } from "../core/duration.js";
 import { AdbAxiError } from "../core/errors.js";
 import { DEFAULT_MAX_OUTPUT_BYTES, exec } from "../core/exec.js";
 import { runHint, shellWords } from "../core/output.js";
@@ -352,11 +353,6 @@ function timeoutError(
       "Run the same command with a longer `--timeout`, for example `--timeout 60s`",
     ],
   });
-}
-
-function formatDuration(ms: number): string {
-  if (ms < 1000) return `${ms} ms`;
-  return ms % 1000 === 0 ? `${ms / 1000} s` : `${(ms / 1000).toFixed(1)} s`;
 }
 
 function formatBytes(bytes: number): string {

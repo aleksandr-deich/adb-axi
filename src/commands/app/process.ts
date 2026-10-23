@@ -1,10 +1,10 @@
 import type { AdbClient } from "../../adb/run.js";
-import { runningProcesses, type AppIdentity } from "../../android/app-processes.js";
+import { runningProcesses, waitUntilGone, type AppIdentity } from "../../android/app-processes.js";
 import type { AppRecord } from "../../device/session.js";
 import { readShell, type ReadOptions } from "../../android/read.js";
+import { formatDuration } from "../../core/duration.js";
 import { AdbAxiError } from "../../core/errors.js";
 import { commandLine, runHint } from "../../core/output.js";
-import { poll } from "../../core/poll.js";
 import type { DeviceContext } from "../types.js";
 import { appInstall } from "./install.js";
 import { UNKNOWN } from "./shared.js";
@@ -76,9 +76,8 @@ export async function appPids(context: DeviceContext, app: AppIdentity): Promise
 }
 
 /**
- * Poll until every process of the app is gone or the command deadline passes: force-stop
- * and `pm clear` end them all. A read cut off by the deadline ends the wait; the last full
- * observation is the evidence.
+ * Wait for force-stop or clear via `waitUntilGone`, retrying the stop if Android starts
+ * a replacement process. The app-processes module owns exit confirmation.
  */
 export async function waitForExit(
   context: DeviceContext,
@@ -87,29 +86,15 @@ export async function waitForExit(
   repeatStep: () => Promise<void>,
 ): Promise<ExitWait> {
   const original = new Set(before);
-  let last: number[] | null = null;
-  const result = await poll({
-    timeoutMs: context.deadline.remainingMs(),
-    check: async () => {
-      try {
-        last = await appPids(context, app);
-        const confirmingExit = last.length === 0;
-        if (confirmingExit) last = await appPids(context, app);
-        if (last.length === 0) return { done: true, value: null };
-        if (confirmingExit || last.some((pid) => !original.has(pid))) {
-          // Android 11 can resume the activity below a killed :ui and start a new main process mid force-stop.
-          await repeatStep();
-        }
-      } catch (error) {
-        if (error instanceof AdbAxiError && error.code === "TIMEOUT") {
-          return { done: false, last };
-        }
-        throw error;
-      }
-      return { done: false, last };
+  const result = await waitUntilGone(context.device.adb, context.device.serial, app, {
+    ...context.device.reads,
+    confirm: true,
+    onRunning: async (pids, _reads, resumed) => {
+      // Android 11 can resume the activity below a killed :ui and start a new main process mid force-stop.
+      if (resumed || pids.some((pid) => !original.has(pid))) await repeatStep();
     },
   });
-  return result.ok ? { gone: true } : { gone: false, last };
+  return result.ok ? { gone: true } : { gone: false, last: result.last ?? null };
 }
 
 /** The command a stop belongs to, and the step after which the process had to be gone. */
@@ -147,8 +132,4 @@ export function stopFailed(
 /** Pids as the ok line names them: `pid 5120`, `pids 5120 5121`. */
 export function pidLabel(pids: readonly number[]): string {
   return `${pids.length === 1 ? "pid" : "pids"} ${pids.join(" ")}`;
-}
-
-export function formatDuration(ms: number): string {
-  return ms % 1000 === 0 ? `${ms / 1000} s` : `${ms} ms`;
 }

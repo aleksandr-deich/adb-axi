@@ -1,6 +1,7 @@
 import { extname } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Deadline } from "../../core/deadline.js";
+import { formatDuration } from "../../core/duration.js";
 import { AdbAxiError } from "../../core/errors.js";
 import { exec } from "../../core/exec.js";
 
@@ -194,9 +195,4 @@ function sqlError(label: string, stderr: string, exitCode: number | null): AdbAx
     ...(detail === "" ? {} : { fields: { detail: detail.slice(0, 500) } }),
     help: ["Check the table and column names with `SELECT name, sql FROM sqlite_master`"],
   });
-}
-
-function formatDuration(ms: number): string {
-  if (ms < 1000) return `${ms} ms`;
-  return ms % 1000 === 0 ? `${ms / 1000} s` : `${(ms / 1000).toFixed(1)} s`;
 }
