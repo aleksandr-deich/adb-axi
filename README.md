@@ -93,8 +93,6 @@ adb-axi keeps log marks, install records and cached AVD names under `~/.adb-axi/
 | `shell -- <cmd>`                                          | One device shell command with its real exit code                               |
 | `update [--check]`                                        | Upgrades adb-axi from npm, or compares against the latest version with --check |
 
-`app install --if-changed` checks the current Android user's installed APK and skips installation when its versionCode and signing certificates match the host APK. If that evidence cannot be read, it explains why and installs normally. `--clean-data` disables this shortcut.
-
 Device settings such as dark mode and display density have no command of their own; change them with `shell`.
 
 ## Example: does an app survive process death?
