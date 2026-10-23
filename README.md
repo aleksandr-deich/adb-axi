@@ -102,7 +102,7 @@ Android kills background apps to free memory, and a well-built app restores its 
 1. `logs mark` records the start of the test, so the crash check at the end covers only this run.
 2. `app kill` sends the app to the background if it is in front, then kills its process the way Android does. `pid_after: null` proves the process is gone.
 3. `app restore` reopens the app from the recent-apps list. `launch: cold` and a new `pid` prove it really restarted.
-4. `logs crash` confirms nothing crashed since the mark.
+4. Review `logs crash` for crashes since the mark, including any `omitted` reports. See `logs crash --help` for package and Android-user attribution rules.
 
 Use any UI tool to put some state on screen before step 2 and to check it came back after step 3.
 
