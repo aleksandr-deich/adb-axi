@@ -22,9 +22,7 @@ function invalid(message: string): never {
 }
 
 function hostIdentity(host: string): string {
-  return host === "localhost" || host === "::1" || (isIP(host) === 4 && /^127\./.test(host))
-    ? "loopback"
-    : host;
+  return host === "localhost" ? "127.0.0.1" : host;
 }
 
 export function parseTcpEndpoint(value: string): TcpEndpoint {
@@ -52,7 +50,7 @@ export function parseTcpEndpoint(value: string): TcpEndpoint {
     host,
     port,
     identity: `${identity}:${port}`,
-    local: identity === "loopback",
+    local: host === "localhost" || host === "::1" || (isIP(host) === 4 && /^127\./.test(host)),
   });
 }
 

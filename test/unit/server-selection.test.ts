@@ -35,13 +35,7 @@ test("native-precedence-and-loopback-aliases", () => {
   expect(
     serverEndpoint({ ANDROID_ADB_SERVER_ADDRESS: "example.test", ANDROID_ADB_SERVER_PORT: "6138" }),
   ).toBe("tcp:example.test:6138");
-  for (const endpoint of [
-    "tcp:6137",
-    "tcp:localhost:6137",
-    "tcp:127.0.0.1:6137",
-    "tcp:[::1]:6137",
-    "tcp:[0:0:0:0:0:0:0:1]:6137",
-  ]) {
+  for (const endpoint of ["tcp:6137", "tcp:localhost:6137", "tcp:127.0.0.1:6137"]) {
     const selected = resolveServerSelection(
       {
         ...env,
@@ -51,16 +45,54 @@ test("native-precedence-and-loopback-aliases", () => {
       },
       "tcp:6137",
     );
-    expect(selected?.identity).toBe("loopback:6137");
+    expect(selected?.identity).toBe("127.0.0.1:6137");
     expect(selected?.start).toBe("never");
     expect(Object.isFrozen(selected)).toBe(true);
   }
+  const savedEnv = home();
+  writeJsonAtomic(join(savedEnv.ADB_AXI_HOME!, "server.json"), {
+    version: 1,
+    endpoint: "tcp:6137",
+    start: "auto",
+  });
+  const local = resolveServerSelection(savedEnv, "tcp:127.0.0.1:6137")!;
+  expect(local.start).toBe("auto");
+  const identities = new Set([local.identity]);
+  const namespaces = new Set([serverStateEnv(savedEnv, local).ADB_AXI_HOME]);
+  for (const endpoint of ["tcp:[::1]:6137", "tcp:127.0.0.2:6137", "tcp:127.1.2.3:6137"]) {
+    const distinct = resolveServerSelection(savedEnv, endpoint)!;
+    expect(distinct.local).toBe(true);
+    expect(distinct.start).toBe("never");
+    expect(resolveServerSelection(savedEnv, endpoint, "auto")?.start).toBe("auto");
+    expect(identities.has(distinct.identity)).toBe(false);
+    identities.add(distinct.identity);
+    const namespace = serverStateEnv(savedEnv, distinct).ADB_AXI_HOME;
+    expect(namespaces.has(namespace)).toBe(false);
+    namespaces.add(namespace);
+    for (const [selected, native] of [
+      [local, distinct],
+      [distinct, local],
+    ] as const) {
+      expect(() =>
+        resolveServerSelection({ ...env, ADB_SERVER_SOCKET: native.endpoint }, selected.endpoint),
+      ).toThrow(/ADB_SERVER_SOCKET=.*disagrees/);
+      expect(() =>
+        resolveServerSelection(
+          { ...env, ANDROID_ADB_SERVER_ADDRESS: native.host },
+          selected.endpoint,
+        ),
+      ).toThrow(/ANDROID_ADB_SERVER_ADDRESS=.*disagrees/);
+    }
+  }
+  expect(() =>
+    resolveServerSelection({ ...env, ADB_SERVER_SOCKET: "tcp:[0:0:0:0:0:0:0:1]:6137" }, "tcp:6137"),
+  ).toThrow(/disagrees/);
   expect(
     resolveServerSelection(
-      { ...env, ANDROID_ADB_SERVER_ADDRESS: "::1", ANDROID_ADB_SERVER_PORT: "6137" },
-      "tcp:6137",
+      { ...env, ADB_SERVER_SOCKET: "tcp:[0:0:0:0:0:0:0:1]:6137" },
+      "tcp:[::1]:6137",
     )?.identity,
-  ).toBe("loopback:6137");
+  ).toBe("::1:6137");
   expect(
     resolveServerSelection({ ...env, ANDROID_ADB_SERVER_PORT: "6137" }, undefined, "never")?.source,
   ).toBe("env");
