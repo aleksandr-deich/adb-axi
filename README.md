@@ -58,12 +58,11 @@ Without `--server`, `--server-start` or a saved selection, adb-axi inherits adb'
 
 - **Output:** TOON on stdout, or the same data as JSON with `--json`. A mutation leads with `ok: <verb> <target> -> <resulting state>` and says `(no-op)` when the state was already true. Next steps come as `help` lines that name real commands. `--debug` prints every adb call on stderr.
 - **Exit codes:** 0 when the requested state is true, including no-ops and reads that find nothing; 1 when it is not; 2 for a usage error.
-- **Selected-server evidence:** selected-mode results include `server` with the endpoint, selection source (`flag`, `config` or `env`), start policy, whether the probe answered, and the observed peer when available. `startup` reports `observed`, `not_observed` or `unknown`; it is not proof that no startup occurred.
 - **Errors:** one shape: `error`, a stable `code`, the fields that explain it, then `help`.
 - **Deadlines:** every command has one deadline shared by all its device calls; `--help` shows each command's default and `--timeout` overrides it.
 - **Long output:** `logs`, `shell` and `data db` print a bounded view and say how much of it was shown; `--full` writes the complete output to a file.
 
-adb-axi keeps log marks, install records and cached AVD names under `~/.adb-axi/`; set `ADB_AXI_HOME` to use another directory. Selected mode isolates these records under `servers/<endpoint-identity-hash>/` within that directory, without moving legacy records. For endpoint identity, `tcp:<port>`, `localhost` and `127.0.0.1` share a namespace at the same port; `::1` and other `127.x` addresses remain distinct. The saved `server.json` stays at the home directory root; see `doctor --help` for its format and selection rules.
+adb-axi keeps log marks, install records and cached AVD names under `~/.adb-axi/`; set `ADB_AXI_HOME` to use another directory.
 
 ## Commands
 
