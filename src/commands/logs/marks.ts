@@ -1,6 +1,4 @@
 import { join } from "node:path";
-import type { DeviceFacts } from "../../device/facts.js";
-import type { DeviceContext } from "../types.js";
 import { parseDuration } from "../../core/args.js";
 import { AdbAxiError } from "../../core/errors.js";
 import { runHint } from "../../core/output.js";
@@ -64,29 +62,6 @@ export function assertMarkName(name: string): void {
 /** The marks file of one device, so two devices never see each other's marks (7.2). */
 export function marksPath(serial: string, env: NodeJS.ProcessEnv): string {
   return join(deviceStateDir(serial, env), "marks.json");
-}
-
-/**
- * Refresh the boot identity before any mark is stored or used, after validating input.
- * Uses the device session's facts, returning `undefined` when the device did not answer.
- */
-export async function refreshMarks(context: DeviceContext): Promise<DeviceFacts | undefined> {
-  let facts: DeviceFacts | undefined;
-  try {
-    facts = await context.device.facts();
-  } catch (error) {
-    if (!(error instanceof AdbAxiError)) throw error;
-  }
-  bindTargetMarks(context, facts?.bootId ?? null);
-  return facts;
-}
-
-/** Bind the target's marks to the boot ID this command read, `null` when it could not. */
-export function bindTargetMarks(context: DeviceContext, bootId: string | null): void {
-  const target = context.device.target;
-  context.marksVerified = bootId !== null;
-  const note = bindMarks(target.serial, context.env, bootId);
-  if (note !== undefined) context.marksNote = note;
 }
 
 /** Bind the serial's marks to the current boot, dropping unbound legacy marks too. */

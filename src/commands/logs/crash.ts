@@ -1,12 +1,11 @@
-import { refreshMarks } from "./marks.js";
-import { readDeviceClock, formatDeviceTime } from "../../android/clock.js";
+import { formatDeviceTime } from "../../android/clock.js";
 import { assertPackageName } from "../../android/component.js";
-import { crashBelongsTo, parseCrashes, type Crash } from "../../android/crash.js";
+import type { Crash } from "../../android/crash.js";
 import { truncateField, writeFullOutput } from "../../core/truncate.js";
 import { UNKNOWN } from "../app/shared.js";
 import { defineCommand } from "../define.js";
 import { DEFAULT_SINCE } from "./dump.js";
-import { clockTime, readWindowLines, resolveWindow } from "./window.js";
+import { clockTime, openLogWindow, withMarksNote } from "./window.js";
 
 /** How many crashes one answer describes; a crash loop prints its first few and counts the rest. */
 const MAX_CRASHES = 5;
@@ -46,46 +45,36 @@ export const logsCrash = defineCommand({
     const pkg = typeof context.flags.pkg === "string" ? context.flags.pkg : undefined;
     if (pkg !== undefined) assertPackageName(pkg);
     const since = typeof context.flags.since === "string" ? context.flags.since : DEFAULT_SINCE;
-    const serial = context.device.serial;
-    const options = context.device.reads;
-    const adb = context.device.adb;
+    const window = await openLogWindow(context.device, since, context.env);
+    return withMarksNote(window.marksNote, async () => {
+      const { now } = window;
+      const { crashes, scanned } = await window.readCrashes(pkg);
 
-    const now = await readDeviceClock(adb, serial, options);
-    await refreshMarks(context);
-    const window = resolveWindow(serial, context.env, since, now, context.marksVerified === true);
-    // The scan is never narrowed to the app: its ANR is printed by system_server and its
-    // tombstone by crash_dump, which a uid or pid filter would drop.
-    const lines = await readWindowLines(adb, serial, window, options, undefined, true);
-    const crashes = parseCrashes(lines).filter(
-      (crash) =>
-        crash.epochMs >= window.startMs && (pkg === undefined || crashBelongsTo(crash, pkg)),
-    );
-    const scanned = lines.filter((line) => line.epochMs >= window.startMs);
-
-    const seconds = Math.max(0, Math.round((now.epochMs - window.startMs) / 1000));
-    const full = context.flags.full === true;
-    const shown = crashes.slice(0, MAX_CRASHES);
-    const includeCause = shown.some((crash) => crash.rootCause !== undefined);
-    const rows = shown.map((crash) => describe(crash, now.utcOffsetMinutes, includeCause));
-    return {
-      crashes: `${crashes.length} since ${window.label} (${seconds} s, ${scanned.length} lines scanned)`,
-      // One crash prints as a block, several as a table.
-      ...(rows.length === 1 ? { crash: rows[0] } : rows.length > 1 ? { crash: rows } : {}),
-      ...(crashes.length > shown.length
-        ? { shown: `${shown.length} of ${crashes.length} crashes` }
-        : {}),
-      ...(full
-        ? {
-            full: writeFullOutput(
-              `crash-${window.label}-${clockTime(now.epochMs, now.utcOffsetMinutes).slice(0, 8).replaceAll(":", "")}`,
-              crashes.map((crash) => traceText(crash, now.utcOffsetMinutes)).join(""),
-            ),
-          }
-        : {}),
-      ...(crashes.length > 0 && !full
-        ? { help: ["Run the same command with `--full` to write the whole trace to a file"] }
-        : {}),
-    };
+      const seconds = Math.max(0, Math.round((now.epochMs - window.startMs) / 1000));
+      const full = context.flags.full === true;
+      const shown = crashes.slice(0, MAX_CRASHES);
+      const includeCause = shown.some((crash) => crash.rootCause !== undefined);
+      const rows = shown.map((crash) => describe(crash, now.utcOffsetMinutes, includeCause));
+      return {
+        crashes: `${crashes.length} since ${window.label} (${seconds} s, ${scanned.length} lines scanned)`,
+        // One crash prints as a block, several as a table.
+        ...(rows.length === 1 ? { crash: rows[0] } : rows.length > 1 ? { crash: rows } : {}),
+        ...(crashes.length > shown.length
+          ? { shown: `${shown.length} of ${crashes.length} crashes` }
+          : {}),
+        ...(full
+          ? {
+              full: writeFullOutput(
+                `crash-${window.label}-${clockTime(now.epochMs, now.utcOffsetMinutes).slice(0, 8).replaceAll(":", "")}`,
+                crashes.map((crash) => traceText(crash, now.utcOffsetMinutes)).join(""),
+              ),
+            }
+          : {}),
+        ...(crashes.length > 0 && !full
+          ? { help: ["Run the same command with `--full` to write the whole trace to a file"] }
+          : {}),
+      };
+    });
   },
 });
 
