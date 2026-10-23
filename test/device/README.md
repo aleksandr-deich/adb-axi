@@ -123,7 +123,7 @@ Runs the adb commands adb-axi reads, plus the probe's actions, and saves the raw
 npm run capture -- --serial emulator-5554 --serial emulator-5556
 ```
 
-It installs, crashes and uninstalls `dev.probe`, clears logcat and presses HOME on every device named. `test/fixtures/EVIDENCE.md` describes each file and the facts recorded in each `index.json`.
+The default capture installs, crashes and uninstalls `dev.probe`, clears logcat and presses HOME on every device named. `test/fixtures/EVIDENCE.md` describes each file and the facts recorded in each `index.json`. For the `--launch-crashes` mode and its device side effects, see [Launch parser captures](../fixtures/EVIDENCE.md#launch-parser-captures).
 
 `--processes` captures only the process table and `pidof` reads of `src/android/app-processes.ts`, with the probe's main and `:ui` processes running, stopped and exiting, and adds them to each API directory without replacing its other captures:
 
