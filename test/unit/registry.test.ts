@@ -143,7 +143,7 @@ describe("command registry", () => {
         }
         for (const arg of command.positionals) expect(row?.usage).toContain(`<${arg.name}>`);
       }
-      expect(help.global_flags).toHaveLength(5);
+      expect(help.global_flags).toHaveLength(7);
       if (entry.defaultCommand?.shipped) {
         expect(help.flags).toHaveLength(entry.defaultCommand.flags.length);
       }

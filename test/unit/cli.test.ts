@@ -169,8 +169,10 @@ describe("dispatch", () => {
         summary: App lifecycle
         subcommands[1]{command,usage,summary}:
           adb-axi app start,"adb-axi app start <pkg> [--fresh] [global flags]",Start an app in the test registry
-        global_flags[5]{flag,default,description}:
+        global_flags[7]{flag,default,description}:
           "--device <serial|avd>, -s","$ANDROID_SERIAL, else the only online emulator",Target device by serial or AVD name
+          "--server <tcp-endpoint>","$ADB_AXI_HOME/server.json, else ~/.adb-axi/server.json, else legacy adb selection",Select one TCP adb server; refuse conflicting native selectors
+          "--server-start <never|auto>","saved policy for the same endpoint, else never in selected mode",Preflight before each adb call; auto explicitly starts a missing local server
           "--timeout <dur>",per command,"Deadline for the whole command, for example 500ms, 30s or 5m"
           "--json","-",Print the same data as JSON
           "--debug","-",Print the underlying adb calls on stderr

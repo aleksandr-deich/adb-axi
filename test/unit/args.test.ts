@@ -79,6 +79,8 @@ describe("parseArgs", () => {
       "--full",
       "--since <mark|dur>",
       "--device <serial|avd>",
+      "--server <tcp-endpoint>",
+      "--server-start <never|auto>",
       "--timeout <dur>",
       "--json",
       "--debug",

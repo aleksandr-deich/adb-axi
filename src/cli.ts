@@ -1,6 +1,8 @@
 import { runAxiCli, type AxiCliCommand } from "axi-sdk-js";
 import { locateAdb } from "./adb/locate.js";
 import { AdbClient } from "./adb/run.js";
+import { resolveServerSelection, serverStateEnv } from "./adb/server-selection.js";
+import { ServerSession } from "./adb/server-session.js";
 import { editDistance, parseArgs } from "./core/args.js";
 import { Deadline } from "./core/deadline.js";
 import { AdbAxiError } from "./core/errors.js";
@@ -11,6 +13,7 @@ import {
   renderError,
   runHint,
   withDeviceSelection,
+  withServerSelection,
   type Output,
   type OutputMode,
 } from "./core/output.js";
@@ -43,6 +46,7 @@ export interface MainOptions {
 
 /** Per-run inputs every resolution step needs. */
 interface Run {
+  server?: ServerSession;
   registry: Registry;
   mode: OutputMode;
   env: NodeJS.ProcessEnv;
@@ -55,7 +59,7 @@ type Invocation =
   | { kind: "run"; context: CommandContext; execute: () => Promise<Output> };
 
 /** Global flags that take a value, for reading flags placed before the command. */
-const VALUE_FLAGS = new Set(["-s", "--device", "--timeout"]);
+const VALUE_FLAGS = new Set(["-s", "--device", "--timeout", "--server", "--server-start"]);
 
 export async function main(options: MainOptions = {}): Promise<void> {
   const registry = options.registry ?? REGISTRY;
@@ -69,17 +73,28 @@ export async function main(options: MainOptions = {}): Promise<void> {
   };
   // Every suggested next step carries the device the user picked (7.2).
   const device = selectedDevice(argv);
-  const selected = (output: Output): Output =>
-    device === undefined ? output : withDeviceSelection(output, device);
+  const selected = (output: Output): Output => {
+    const scoped =
+      run.server === undefined
+        ? output
+        : withServerSelection(output, run.server.selection, run.server.evidence());
+    return device === undefined ? scoped : withDeviceSelection(scoped, device);
+  };
 
   // The home view takes the global flags alone (`adb-axi --device emulator-5556`), and the
   // SDK always renders TOON, so JSON home and JSON top-level help render here too.
   if (argv.length === 0 ? mode === "json" : isHomeFlags(argv)) {
-    await runDirect(stdout, mode, device, async () => {
-      const invocation = await resolveInvocation(run, undefined, argv);
-      const output = selected(await produce(invocation));
-      return invocation.kind === "run" ? { ...homeHeader(DESCRIPTION), ...output } : output;
-    });
+    await runDirect(
+      stdout,
+      mode,
+      device,
+      async () => {
+        const invocation = await resolveInvocation(run, undefined, argv);
+        const output = selected(await produce(invocation));
+        return invocation.kind === "run" ? { ...homeHeader(DESCRIPTION), ...output } : output;
+      },
+      selected,
+    );
     return;
   }
 
@@ -116,7 +131,7 @@ export async function main(options: MainOptions = {}): Promise<void> {
     renderUnknownCommand: (command) =>
       render(selected(unknownCommandError(command, argv, registry)), mode) + "\n",
     // G3: structured fields, the `error, code, <fields>, help` order, and exit codes.
-    formatError: (error) => renderError(error, mode, device),
+    formatError: (error) => renderError(error, mode, device, selected),
   });
 }
 
@@ -141,11 +156,12 @@ async function runDirect(
   mode: OutputMode,
   device: string | undefined,
   produceOutput: () => Promise<Output>,
+  selected: (output: Output) => Output,
 ): Promise<void> {
   try {
     stdout.write(`${render(await produceOutput(), mode)}\n`);
   } catch (error) {
-    writeError(stdout, error, mode, device);
+    writeError(stdout, error, mode, device, selected);
   }
 }
 
@@ -154,8 +170,9 @@ function writeError(
   error: unknown,
   mode: OutputMode,
   device: string | undefined,
+  selected?: (output: Output) => Output,
 ): void {
-  const formatted = renderError(error, mode, device);
+  const formatted = renderError(error, mode, device, selected);
   stdout.write(formatted.output);
   process.exitCode = formatted.exitCode;
 }
@@ -198,7 +215,7 @@ function isHomeFlags(argv: readonly string[]): boolean {
     const token = argv[i] ?? "";
     if (VALUE_FLAGS.has(token)) {
       i++;
-    } else if (token !== "--debug" && !/^--(?:device|timeout)=/.test(token)) {
+    } else if (token !== "--debug" && !/^--(?:device|timeout|server|server-start)=/.test(token)) {
       return false;
     }
   }
@@ -229,7 +246,8 @@ export function leadingFlagError(argv: readonly string[], registry: Registry): A
     } else {
       leading.push(token);
       i += 1;
-      unknownLast = token !== "--debug" && !/^--(?:device|timeout)=/.test(token);
+      unknownLast =
+        token !== "--debug" && !/^--(?:device|timeout|server|server-start)=/.test(token);
     }
   }
   const rest = argv.slice(i);
@@ -380,9 +398,25 @@ async function leafInvocation(
   const timeoutMs = typeof timeout === "number" ? timeout : spec.defaultTimeoutMs;
   const debug = parsed.flags.debug === true;
   const deadline = new Deadline(timeoutMs);
+  const selection =
+    spec.path[0] === "update"
+      ? undefined
+      : resolveServerSelection(
+          run.env,
+          typeof parsed.flags.server === "string" ? parsed.flags.server : undefined,
+          typeof parsed.flags["server-start"] === "string"
+            ? parsed.flags["server-start"]
+            : undefined,
+        );
+  if (selection !== undefined) run.server = new ServerSession(selection);
+  const env = selection === undefined ? run.env : serverStateEnv(run.env, selection);
   let client: AdbClient | undefined;
   const adb = (): AdbClient =>
-    (client ??= new AdbClient(locateAdb(run.env), { debug, env: run.env }));
+    (client ??= new AdbClient(locateAdb(env), {
+      debug,
+      env,
+      ...(run.server === undefined ? {} : { server: run.server }),
+    }));
 
   const device = parsed.flags.device;
   const target =
@@ -390,7 +424,7 @@ async function leafInvocation(
       ? await resolveTarget({
           adb: adb(),
           deadline,
-          env: run.env,
+          env,
           requested: typeof device === "string" ? device : undefined,
           commandArgs: [...spec.path, ...withoutDeviceFlag(args)],
           isShipped: (path) => isShippedPath(run.registry, path),
@@ -406,7 +440,7 @@ async function leafInvocation(
     debug,
     deadline,
     adb,
-    env: run.env,
+    env,
     hostProcesses: run.hostProcesses,
     isShipped: (path) => isShippedPath(run.registry, path),
   };
@@ -416,7 +450,7 @@ async function leafInvocation(
   if (target === undefined) {
     throw new AdbAxiError("INTERNAL_ERROR", "the command ran without a resolved device");
   }
-  const deviceContext = { ...context, device: openSession(target, adb(), deadline, run.env) };
+  const deviceContext = { ...context, device: openSession(target, adb(), deadline, env) };
   return { kind: "run", context: deviceContext, execute: () => spec.run(deviceContext) };
 }
 
