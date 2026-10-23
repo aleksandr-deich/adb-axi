@@ -1,9 +1,8 @@
 import { realClock, type Clock } from "./clock.js";
 
 /**
- * One deadline for a whole command (`--timeout` or the command's default). Every device
- * call takes what is left of it, so a command can never outlive its deadline by more than
- * one killed child.
+ * A monotonic time budget for a command or a bounded read. See `observe` in poll.ts
+ * for deadline-edge read handling and README.md for user-facing timeout semantics.
  */
 export class Deadline {
   readonly totalMs: number;

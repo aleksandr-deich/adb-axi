@@ -14,7 +14,7 @@ export interface CommandContext {
   /** `--timeout` when given, otherwise the command's default. */
   timeoutMs: number;
   debug: boolean;
-  /** The command's single deadline; every device call takes what is left of it. */
+  /** The command deadline; `observe` in core/poll.ts owns state-read budget handling. */
   deadline: Deadline;
   /** The adb client, located on first use (`ADB_NOT_FOUND` when there is none). */
   adb: () => AdbClient;

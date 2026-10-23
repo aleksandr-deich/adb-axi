@@ -24,7 +24,12 @@ export function observe<T, TDone extends T>(
   options: Omit<ObserveOptions<T>, "done"> & { done: (value: T) => value is TDone },
 ): Promise<PollResult<TDone, T>>;
 export function observe<T>(options: ObserveOptions<T>): Promise<PollResult<T, T>>;
-// A deadline-edge observation needs its own budget or AdbClient refuses it without reading.
+/**
+ * A timed-out read keeps the last completed observation; `requireObservation` instead
+ * propagates TIMEOUT until a read completes. Other errors always propagate.
+ * A deadline-edge read needs its own budget or AdbClient refuses it without reading.
+ * See the final-interval regression in test/unit/poll.test.ts.
+ */
 export async function observe<T>(options: ObserveOptions<T>): Promise<PollResult<T, T>> {
   const clock = options.clock ?? realClock;
   let last: T | undefined;
@@ -66,8 +71,8 @@ export interface PollOptions<TValue, TLast> {
   intervalMs?: number;
   clock?: Clock;
   /**
-   * One observation. Receives the time left so a device call can take it as its deadline.
-   * The final observation, taken at the deadline, receives 0.
+   * One observation with the time left in the polling window (0 at its edge).
+   * For device state reads, prefer `observe`, which supplies a usable read deadline.
    */
   check: (remainingMs: number) => Promise<Observation<TValue, TLast>>;
 }
@@ -77,9 +82,9 @@ export type PollResult<TValue, TLast> =
   | { ok: false; last: TLast | undefined; waitedMs: number; attempts: number };
 
 /**
- * Observe until `check` reports done or the deadline passes. Observations start one
- * interval apart; one slower than the interval is followed by the next at once. A final
- * observation is taken at the deadline, so a state reached during the last interval is not missed.
+ * Schedule `check` until done or the polling window ends. Checks start one interval
+ * apart; one slower than the interval is followed by the next at once. Sleeping stops
+ * at the deadline for a final check; an in-flight check can finish later.
  * The caller turns a timeout into its own error (`WAIT_TIMEOUT`, `KILL_TIMEOUT`, ...)
  * with `last` as the evidence.
  */

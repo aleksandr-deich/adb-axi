@@ -76,9 +76,8 @@ export async function appPids(context: DeviceContext, app: AppIdentity): Promise
 }
 
 /**
- * Poll until every process of the app is gone or the command deadline passes: force-stop
- * and `pm clear` end them all. A read cut off by the deadline ends the wait; the last full
- * observation is the evidence.
+ * Wait for force-stop or clear via `waitUntilGone`, retrying the stop if Android starts
+ * a replacement process. The app-processes module owns exit confirmation.
  */
 export async function waitForExit(
   context: DeviceContext,

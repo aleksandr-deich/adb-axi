@@ -59,7 +59,7 @@ Without `--server`, `--server-start` or a saved selection, adb-axi inherits adb'
 - **Output:** TOON on stdout, or the same data as JSON with `--json`. A mutation leads with `ok: <verb> <target> -> <resulting state>` and says `(no-op)` when the state was already true. Next steps come as `help` lines that name real commands. `--debug` prints every adb call on stderr.
 - **Exit codes:** 0 when the requested state is true, including no-ops and reads that find nothing; 1 when it is not; 2 for a usage error.
 - **Errors:** one shape: `error`, a stable `code`, the fields that explain it, then `help`.
-- **Deadlines:** every command has one deadline shared by all its device calls; `--help` shows each command's default and `--timeout` overrides it.
+- **Deadlines:** commands share one deadline across their device calls; state waits may finish a final bounded observation just past it to check for a state reached during the last polling interval. `--help` shows each command's default and `--timeout` overrides it.
 - **Long output:** `logs`, `shell` and `data db` print a bounded view and say how much of it was shown; `--full` writes the complete output to a file.
 
 adb-axi keeps log marks, install records and cached AVD names under `~/.adb-axi/`; set `ADB_AXI_HOME` to use another directory.

@@ -210,9 +210,8 @@ async function awaitKillable(context: DeviceContext, app: AppIdentity): Promise<
 type Gone = { gone: true } | { gone: false; last: Seen | undefined };
 
 /**
- * Poll `pidof` (the exit evidence; an ActivityManager record can vanish before its
- * process does) until the observed UID processes are gone or `windowMs` passes.
- * A process still alive is read once more from ActivityManager for the timeout state.
+ * Use `waitUntilGone` for exit evidence; retain ActivityManager importance only to
+ * describe processes still running in the kill-timeout error.
  */
 async function awaitGone(
   context: DeviceContext,
