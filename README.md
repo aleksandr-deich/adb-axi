@@ -62,7 +62,7 @@ Without opt-in server selection, adb-axi inherits adb's server selection: `ADB_S
 - **Deadlines:** every command has one deadline shared by all its device calls; `--help` shows each command's default and `--timeout` overrides it.
 - **Long output:** `logs`, `shell` and `data db` print a bounded view and say how much of it was shown; `--full` writes the complete output to a file.
 
-adb-axi keeps log marks, install records and cached AVD names under `~/.adb-axi/`; set `ADB_AXI_HOME` to use another directory.
+adb-axi keeps log marks, install records and cached AVD names under `~/.adb-axi/`; set `ADB_AXI_HOME` to use another directory. Selected mode stores them separately under `servers/<endpoint-identity-hash>/` within that directory, without reusing legacy state. For conflict checks, saved startup permission and state isolation, `tcp:<port>`, `tcp:localhost:<port>` and `tcp:127.0.0.1:<port>` share one endpoint identity; `::1` and other `127.x.x.x` addresses are distinct identities, even though they are local endpoints eligible for `--server-start auto`.
 
 ## Commands
 
