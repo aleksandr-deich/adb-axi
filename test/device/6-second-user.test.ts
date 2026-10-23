@@ -1,9 +1,10 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
-import { Axi, DEBUG_APK, PKG } from "./support.js";
+import { Axi, DEBUG_APK, PKG, hideErrorDialogs } from "./support.js";
 
 const axi = new Axi(import.meta.filename);
+hideErrorDialogs(axi);
 
 /** Bounds each readiness poll; a second user is unlocked and in front within 20 s locally. */
 const READY_MS = 120_000;
@@ -172,6 +173,79 @@ describe("the probe started for the second user too", () => {
     }
     expect(alive).not.toContain(main);
     expect(alive).not.toContain(ui);
+  });
+});
+
+describe("crash history under a second Android user", () => {
+  test("crash reports use the resolved user's history", async () => {
+    const n = user ?? 0;
+    const switchTo = async (id: number): Promise<void> => {
+      await axi.sh(`am switch-user ${id}`);
+      await until(`user ${id} to unlock`, async () =>
+        (await axi.sh(`am get-started-user-state ${id}`)).includes("RUNNING_UNLOCKED"),
+      );
+      await axi.sh("wm dismiss-keyguard");
+      await until(
+        `user ${id} in front`,
+        async () =>
+          (await raw("am get-current-user")).trim() === String(id) &&
+          (await resumedOf(id)) !== undefined,
+      );
+    };
+    const crashAs = async (
+      id: number,
+      kind: "java" | "native",
+    ): Promise<{ kind: string; pid: number }> => {
+      await axi.ok(["app", "start", PKG, "--fresh"]);
+      const pids = await pidsUnder(uidOf(id, probeAppId), PKG);
+      expect(pids).toHaveLength(1);
+      const pid = pids[0] ?? -1;
+      const mark = `crash-user-${id}-${kind}`;
+      const since = await axi.mark(mark);
+      await axi.sh(
+        `am start --user ${id} -n ${PKG}/.MainActivity --es probe ${kind === "java" ? "crash" : "native"}`,
+      );
+      await axi.waitLog(`Process dev\\.probe \\(pid ${pid}\\) has died`, mark);
+      if (kind === "java") {
+        const events = await raw(`logcat -d -b events -v epoch -T '${since}' -s am_crash:I`);
+        expect(events).toMatch(new RegExp(`am_crash\\s*: \\[${pid},${id},dev\\.probe,`));
+      } else {
+        await axi.waitLog(`pid: ${pid},.*>>> dev\\.probe <<<`, mark);
+        const tombstone = await raw(`logcat -d -b crash -v epoch -T '${since}' -s DEBUG:F`);
+        expect(tombstone).toContain(`pid: ${pid},`);
+        expect(tombstone).toMatch(new RegExp(`uid: ${uidOf(id, probeAppId)}\\s*$`, "m"));
+      }
+      return { kind, pid };
+    };
+
+    await switchTo(0);
+    await axi.mark("crash-users");
+    const owner = [await crashAs(0, "java"), await crashAs(0, "native")];
+    await switchTo(n);
+    expect((await axi.ok(["app", "info", PKG])).app).toMatchObject({ installed: true, pid: "-" });
+    const excluded = await axi.ok(["logs", "crash", "--pkg", PKG, "--since", "crash-users"]);
+    expect(String(excluded.crashes)).toMatch(/^0 since crash-users /);
+    expect(excluded.crash).toBeUndefined();
+    expect(excluded.omitted).toBeUndefined();
+
+    const current = [await crashAs(n, "java"), await crashAs(n, "native")];
+    const included = await axi.ok(["logs", "crash", "--pkg", PKG, "--since", "crash-users"]);
+    expect(String(included.crashes)).toMatch(/^2 since crash-users /);
+    expect(
+      (included.crash as { kind: string; process: string }[]).map(({ kind, process }) => [
+        kind,
+        process,
+      ]),
+    ).toEqual([
+      ["java", PKG],
+      ["native", PKG],
+    ]);
+    expect(included.omitted).toBeUndefined();
+    const all = await axi.ok(["logs", "crash", "--since", "crash-users", "--full"]);
+    const trace = readFileSync(String(all.full), "utf8");
+    for (const { kind, pid } of [...owner, ...current]) {
+      expect(trace).toMatch(new RegExp(`^== ${kind} .* in dev\\.probe \\(pid ${pid}\\)$`, "m"));
+    }
   });
 });
 

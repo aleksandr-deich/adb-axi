@@ -1,5 +1,4 @@
-import { formatSpan, readDeviceClock } from "../android/clock.js";
-import { parseCrashes } from "../android/crash.js";
+import { formatSpan } from "../android/clock.js";
 import { readForeground } from "../android/foreground.js";
 import { AdbAxiError } from "../core/errors.js";
 import { runHint, type Output } from "../core/output.js";
@@ -10,8 +9,7 @@ import { UNKNOWN } from "./app/shared.js";
 import { defineCommand } from "./define.js";
 import { deviceRow, readRow, type Row } from "./devices.js";
 import { DEFAULT_SINCE } from "./logs/dump.js";
-import { bindMarks, readMarks } from "./logs/marks.js";
-import { clockTime, readWindowLines, resolveWindow } from "./logs/window.js";
+import { clockTime, openLogWindow } from "./logs/window.js";
 import type { CommandContext } from "./types.js";
 
 /** Errors that mean adb itself is unusable; the home view has no answer without adb. */
@@ -59,11 +57,8 @@ async function runHome(context: CommandContext): Promise<Output> {
   }).then(
     async (target) => {
       const row = await rowPromises.get(target.serial);
-      const bootId = row?.facts.bootId ?? null;
-      context.marksVerified = bootId !== null;
-      const marksNote = bindMarks(target.serial, context.env, bootId);
       const device = openSession(target, adb, context.deadline, context.env, row?.facts);
-      return { target, state: await readTargetState(device, context), marksNote };
+      return { target, state: await readTargetState(device, context.env) };
     },
     (error: unknown) => {
       if (!(error instanceof AdbAxiError) || !SELECTION_CODES.has(error.code)) throw error;
@@ -119,7 +114,7 @@ async function runHome(context: CommandContext): Promise<Output> {
     target: target.serial,
     foreground: state.foreground,
     crashes: state.crashes,
-    ...(selected.marksNote === undefined ? {} : { marks_note: selected.marksNote }),
+    ...(state.marksNote === undefined ? {} : { marks_note: state.marksNote }),
     ...withHelp(help),
   };
 }
@@ -134,6 +129,7 @@ interface TargetState {
   /** What `logs crash --since` takes for the same window. */
   since: string;
   degraded: boolean;
+  marksNote: string | undefined;
 }
 
 /**
@@ -142,15 +138,17 @@ interface TargetState {
  */
 async function readTargetState(
   device: DeviceSession,
-  context: CommandContext,
+  env: NodeJS.ProcessEnv,
 ): Promise<TargetState> {
   const { adb, serial, reads: options } = device;
   let degraded = false;
+  let marksNote: string | undefined;
   const settle = async <T>(read: () => Promise<T>): Promise<T | undefined> => {
     try {
       return await read();
     } catch (error) {
       if (error instanceof AdbAxiError && !FATAL_CODES.has(error.code)) {
+        if (typeof error.fields.marks_note === "string") marksNote = error.fields.marks_note;
         degraded = true;
         return undefined;
       }
@@ -161,12 +159,12 @@ async function readTargetState(
   const [resumed, counted] = await Promise.all([
     settle(async () => readForeground(adb, serial, { ...options, userId: await device.user() })),
     settle(async () => {
-      const now = await readDeviceClock(adb, serial, options);
-      const marksVerified = context.marksVerified === true;
-      const mark = marksVerified ? latestMark(serial, context.env) : undefined;
-      const window = resolveWindow(serial, context.env, mark ?? DEFAULT_SINCE, now, marksVerified);
-      const lines = await readWindowLines(adb, serial, window, options, undefined, true);
-      const count = parseCrashes(lines).filter((crash) => crash.epochMs >= window.startMs).length;
+      const window = await openLogWindow(device, { latest: DEFAULT_SINCE }, env);
+      marksNote = window.marksNote;
+      const { now } = window;
+      const mark = window.mark === undefined ? undefined : window.label;
+      const { crashes } = await window.readCrashes();
+      const count = crashes.length;
       // The age is by the host's clock, so a stale mark shows even when the device clock is off.
       const hostEpochMs = window.mark?.hostEpochMs;
       const age =
@@ -186,17 +184,8 @@ async function readTargetState(
     crashCount: counted?.count ?? 0,
     since: counted?.since ?? DEFAULT_SINCE,
     degraded,
+    marksNote,
   };
-}
-
-/** The name of the target's most recent log mark, if it has any. */
-function latestMark(serial: string, env: NodeJS.ProcessEnv): string | undefined {
-  let latest: { name: string; epochMs: number } | undefined;
-  for (const [name, mark] of readMarks(serial, env)) {
-    if (latest === undefined || mark.epochMs > latest.epochMs)
-      latest = { name, epochMs: mark.epochMs };
-  }
-  return latest?.name;
 }
 
 /** Point every attached device that is not online, other than the target, at `doctor`. */

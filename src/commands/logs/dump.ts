@@ -1,6 +1,4 @@
 import { assertPackageName } from "../../android/component.js";
-import { refreshMarks } from "./marks.js";
-import { readDeviceClock } from "../../android/clock.js";
 import { LOG_LEVELS, atLeast, type LogLevel, type LogLine } from "../../android/logcat.js";
 import {
   capLines,
@@ -12,14 +10,8 @@ import {
 import { parseCrashes } from "../../android/crash.js";
 import { runHint } from "../../core/output.js";
 import { defineCommand } from "../define.js";
-import { describeScope, resolveScope, scopePids, type Scope } from "./scope.js";
-import {
-  clockTime,
-  compileRegex,
-  readFirstWindowLine,
-  readWindowLines,
-  resolveWindow,
-} from "./window.js";
+import { describeScope, scopePids, type Scope } from "./scope.js";
+import { clockTime, compileRegex, openLogWindow, withMarksNote } from "./window.js";
 
 /** The window of `logs` without `--since`, counted back from the device's now. */
 export const DEFAULT_SINCE = "15m";
@@ -73,118 +65,97 @@ export const logsDump = defineCommand({
     const level =
       typeof context.flags.level === "string" ? (context.flags.level as LogLevel) : undefined;
     const since = typeof context.flags.since === "string" ? context.flags.since : undefined;
-    const serial = context.device.serial;
-    const options = context.device.reads;
-    const adb = context.device.adb;
-
-    const now = await readDeviceClock(adb, serial, options);
-    await refreshMarks(context);
-    const window = resolveWindow(
-      serial,
-      context.env,
-      since ?? DEFAULT_SINCE,
-      now,
-      context.marksVerified === true,
-    );
-    const scope = pkg === undefined ? undefined : await resolveScope(context.device, pkg, window);
-    const scanned = await readWindowLines(
-      adb,
-      serial,
-      window,
-      options,
-      scope?.kind === "uid" ? scope.uid : undefined,
-    );
-
-    // A uid-filtered scan starts at the app's first line; the buffer depth needs every app's.
-    const firstLine =
-      scope?.kind === "uid" ? await readFirstWindowLine(adb, serial, window, options) : scanned[0];
-
-    const lines = select(scanned, { scope, level, grep });
-    const rows = collapse(lines, now.utcOffsetMinutes);
-    const shown = capLines(
-      rows.map((row) => formatRow(row)),
-      { keep: "tail" },
-    );
-    const visible = rows.slice(rows.length - shown.lines.length);
-    const displayed = visible.map((row) => {
-      const capped = shown.cut === undefined ? undefined : shown.lines[0];
-      const tagStart = `${row.time},${row.level},`.length;
-      const messageStart = tagStart + row.tag.length + 1;
-      const tag = capped === undefined ? row.tag : capped.slice(tagStart, messageStart - 1);
+    const window = await openLogWindow(context.device, since ?? DEFAULT_SINCE, context.env);
+    return withMarksNote(window.marksNote, async () => {
+      const { now } = window;
+      const { lines: scanned, scope, firstLine } = await window.readLogs(pkg);
+      const lines = select(scanned, { scope, level, grep });
+      const rows = collapse(lines, now.utcOffsetMinutes);
+      const shown = capLines(
+        rows.map((row) => formatRow(row)),
+        { keep: "tail" },
+      );
+      const visible = rows.slice(rows.length - shown.lines.length);
+      const displayed = visible.map((row) => {
+        const capped = shown.cut === undefined ? undefined : shown.lines[0];
+        const tagStart = `${row.time},${row.level},`.length;
+        const messageStart = tagStart + row.tag.length + 1;
+        const tag = capped === undefined ? row.tag : capped.slice(tagStart, messageStart - 1);
+        return {
+          time: row.time,
+          level: row.level,
+          tag:
+            capped !== undefined && capped.length < messageStart
+              ? Array.from(tag).slice(0, -1).join("")
+              : tag,
+          message: capped === undefined ? displayMessage(row) : capped.slice(messageStart),
+        };
+      });
+      const seconds = Math.max(0, Math.round((now.epochMs - window.startMs) / 1000));
+      const full = context.flags.full === true;
+      const counts = countLevels(lines);
+      // A row cut at the byte cap is measured as printed, with its tag and message.
+      const cutRow = displayed[0];
+      const printed =
+        shown.cut === undefined || cutRow === undefined
+          ? shown
+          : {
+              ...shown,
+              cut: {
+                ...shown.cut,
+                shownBytes: Buffer.byteLength(
+                  `${cutRow.time},${cutRow.level},${cutRow.tag},${cutRow.message}`,
+                ),
+              },
+            };
+      const accounting = account(lines.length, rows, visible, printed);
+      const cut = accounting.lossy;
+      const crashed = parseCrashes(lines).length > 0;
       return {
-        time: row.time,
-        level: row.level,
-        tag:
-          capped !== undefined && capped.length < messageStart
-            ? Array.from(tag).slice(0, -1).join("")
-            : tag,
-        message: capped === undefined ? displayMessage(row) : capped.slice(messageStart),
+        window: `${window.label} -> now (${seconds} s), ${scanned.length} lines scanned`,
+        ...(firstLine !== undefined && firstLine.epochMs - window.startMs > 2000
+          ? {
+              note: `first log line in this window is at ${clockTime(firstLine.epochMs, now.utcOffsetMinutes)}, after the window start; the device log buffer may have dropped earlier lines`,
+            }
+          : {}),
+        ...(scope === undefined ? {} : { scope: describeScope(scope, scanned) }),
+        counts,
+        lines: displayed,
+        ...(accounting.shown === undefined ? {} : { shown: accounting.shown }),
+        ...(full
+          ? {
+              full: cut
+                ? writeFullOutput(
+                    `logs-${window.label}-${clockTime(now.epochMs, now.utcOffsetMinutes).slice(0, 8).replaceAll(":", "")}`,
+                    lines.map((line) => `${formatFullLine(line, now.utcOffsetMinutes)}\n`).join(""),
+                  )
+                : "not written: nothing was cut",
+            }
+          : {}),
+        ...withHelp([
+          ...(cut && !full
+            ? [
+                `Run the same command with \`--full\` to write all ${lines.length} matched lines to a file`,
+              ]
+            : []),
+          // A crash in a plain dump is better read as one summary than as its stack rows.
+          ...(crashed
+            ? [
+                runHint(
+                  [
+                    "logs",
+                    "crash",
+                    ...(pkg === undefined ? [] : ["--pkg", pkg]),
+                    "--since",
+                    since ?? DEFAULT_SINCE,
+                  ],
+                  "for the crash with its exception and app frame",
+                ),
+              ]
+            : []),
+        ]),
       };
     });
-    const seconds = Math.max(0, Math.round((now.epochMs - window.startMs) / 1000));
-    const full = context.flags.full === true;
-    const counts = countLevels(lines);
-    // A row cut at the byte cap is measured as printed, with its tag and message.
-    const cutRow = displayed[0];
-    const printed =
-      shown.cut === undefined || cutRow === undefined
-        ? shown
-        : {
-            ...shown,
-            cut: {
-              ...shown.cut,
-              shownBytes: Buffer.byteLength(
-                `${cutRow.time},${cutRow.level},${cutRow.tag},${cutRow.message}`,
-              ),
-            },
-          };
-    const accounting = account(lines.length, rows, visible, printed);
-    const cut = accounting.lossy;
-    const crashed = parseCrashes(lines).length > 0;
-    return {
-      window: `${window.label} -> now (${seconds} s), ${scanned.length} lines scanned`,
-      ...(firstLine !== undefined && firstLine.epochMs - window.startMs > 2000
-        ? {
-            note: `first log line in this window is at ${clockTime(firstLine.epochMs, now.utcOffsetMinutes)}, after the window start; the device log buffer may have dropped earlier lines`,
-          }
-        : {}),
-      ...(scope === undefined ? {} : { scope: describeScope(scope, scanned) }),
-      counts,
-      lines: displayed,
-      ...(accounting.shown === undefined ? {} : { shown: accounting.shown }),
-      ...(full
-        ? {
-            full: cut
-              ? writeFullOutput(
-                  `logs-${window.label}-${clockTime(now.epochMs, now.utcOffsetMinutes).slice(0, 8).replaceAll(":", "")}`,
-                  lines.map((line) => `${formatFullLine(line, now.utcOffsetMinutes)}\n`).join(""),
-                )
-              : "not written: nothing was cut",
-          }
-        : {}),
-      ...withHelp([
-        ...(cut && !full
-          ? [
-              `Run the same command with \`--full\` to write all ${lines.length} matched lines to a file`,
-            ]
-          : []),
-        // A crash in a plain dump is better read as one summary than as its stack rows.
-        ...(crashed
-          ? [
-              runHint(
-                [
-                  "logs",
-                  "crash",
-                  ...(pkg === undefined ? [] : ["--pkg", pkg]),
-                  "--since",
-                  since ?? DEFAULT_SINCE,
-                ],
-                "for the crash with its exception and app frame",
-              ),
-            ]
-          : []),
-      ]),
-    };
   },
 });
 

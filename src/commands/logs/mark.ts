@@ -1,10 +1,7 @@
-import { processTable } from "../../android/app-processes.js";
-import { formatDeviceTime, readDeviceClock } from "../../android/clock.js";
-import { invalidOutput } from "../../android/read.js";
 import { okLine } from "../../core/output.js";
 import { defineCommand } from "../define.js";
-import { assertMarkName, assertMarkVerified, bindTargetMarks, writeMark } from "./marks.js";
-import { PID_LIST_BELOW_API } from "./scope.js";
+import { assertMarkName } from "./marks.js";
+import { recordLogMark } from "./window.js";
 
 export const logsMark = defineCommand({
   path: ["logs", "mark"],
@@ -25,30 +22,14 @@ export const logsMark = defineCommand({
   run: async (context) => {
     const given = context.positionals.name;
     if (given !== undefined) assertMarkName(String(given));
-    const serial = context.device.serial;
-    const options = context.device.reads;
-    const adb = context.device.adb;
-
-    // On API 29 and 30 `logs --pkg` is a pid list, so the mark keeps the app processes
-    // that are running now. They are read before the clock, so the window starts after them.
-    // The same facts carry the boot ID the marks are bound to.
-    const facts = await context.device.facts();
-    if (facts.api === null) throw invalidOutput("reading the Android version", "");
-    const processes =
-      facts.api < PID_LIST_BELOW_API ? await processTable(adb, serial, options) : [];
-
-    const now = await readDeviceClock(adb, serial, options);
-    bindTargetMarks(context, facts.bootId);
-    const shown = formatDeviceTime(now.epochMs, now.utcOffsetMinutes);
-    const name =
-      given === undefined ? `mark-${shown.slice(11, 19).replaceAll(":", "")}` : String(given);
-    assertMarkVerified(serial, name, context.marksVerified !== false);
-    writeMark(serial, context.env, name, {
-      epochMs: now.epochMs,
-      utcOffsetMinutes: now.utcOffsetMinutes,
-      processes,
-      hostEpochMs: Date.now(),
-    });
-    return { ok: okLine("mark", name, `${shown} on ${serial}`) };
+    const { name, shown, marksNote } = await recordLogMark(
+      context.device,
+      given === undefined ? undefined : String(given),
+      context.env,
+    );
+    return {
+      ok: okLine("mark", name, `${shown} on ${context.device.serial}`),
+      ...(marksNote === undefined ? {} : { marks_note: marksNote }),
+    };
   },
 });

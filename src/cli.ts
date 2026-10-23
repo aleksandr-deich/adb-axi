@@ -55,8 +55,7 @@ interface Run {
 
 /** What `resolveContext` hands a handler: output to print as is, or a validated command to run. */
 type Invocation =
-  | { kind: "output"; output: Output }
-  | { kind: "run"; context: CommandContext; execute: () => Promise<Output> };
+  { kind: "output"; output: Output } | { kind: "run"; execute: () => Promise<Output> };
 
 /** Global flags that take a value, for reading flags placed before the command. */
 const VALUE_FLAGS = new Set(["-s", "--device", "--timeout", "--server", "--server-start"]);
@@ -140,15 +139,7 @@ async function produce(invocation: Invocation | undefined): Promise<Output> {
     throw new Error("Command dispatched without a resolved invocation");
   }
   if (invocation.kind === "output") return invocation.output;
-  const context = invocation.context;
-  try {
-    const output = await invocation.execute();
-    return context.marksNote === undefined ? output : { ...output, marks_note: context.marksNote };
-  } catch (error) {
-    if (error instanceof AdbAxiError && context.marksNote !== undefined)
-      error.fields.marks_note = context.marksNote;
-    throw error;
-  }
+  return invocation.execute();
 }
 
 async function runDirect(
@@ -445,13 +436,13 @@ async function leafInvocation(
     isShipped: (path) => isShippedPath(run.registry, path),
   };
   if (spec.device === "none") {
-    return { kind: "run", context, execute: () => spec.run(context) };
+    return { kind: "run", execute: () => spec.run(context) };
   }
   if (target === undefined) {
     throw new AdbAxiError("INTERNAL_ERROR", "the command ran without a resolved device");
   }
   const deviceContext = { ...context, device: openSession(target, adb(), deadline, env) };
-  return { kind: "run", context: deviceContext, execute: () => spec.run(deviceContext) };
+  return { kind: "run", execute: () => spec.run(deviceContext) };
 }
 
 /**
