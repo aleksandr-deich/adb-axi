@@ -2,6 +2,7 @@ import { realpathSync } from "node:fs";
 import { homedir } from "node:os";
 import { findSdkTool } from "../../adb/locate.js";
 import { AdbClient } from "../../adb/run.js";
+import { ignoredServerSelectors, serverEndpoint } from "../../adb/server-endpoint.js";
 import { hostAdbVersionError } from "../../adb/version.js";
 export { parseAdbVersion } from "../../adb/version.js";
 import { AdbAxiError } from "../../core/errors.js";
@@ -15,11 +16,6 @@ export const CHECK_CAP_MS = 5_000;
 
 export function homeDir(env: NodeJS.ProcessEnv): string {
   return env.HOME !== undefined && env.HOME !== "" ? env.HOME : homedir();
-}
-
-export function serverPort(env: NodeJS.ProcessEnv): string {
-  const port = env.ANDROID_ADB_SERVER_PORT;
-  return port !== undefined && /^\d+$/.test(port) ? port : "5037";
 }
 
 /** Whether two paths are the same file, following symlinks (Homebrew links its adb). */
@@ -89,7 +85,15 @@ export interface ServerReading {
 }
 
 export async function checkServer(context: CommandContext): Promise<ServerReading> {
-  const where = `tcp:${serverPort(context.env)}`;
+  const endpoint = serverEndpoint(context.env);
+  const ignored = ignoredServerSelectors(context.env);
+  const where =
+    ignored.length === 0
+      ? endpoint
+      : `${endpoint} (ADB_SERVER_SOCKET overrides ignored ${ignored.join(", ")})`;
+  const stuckServer = [
+    `Check that nothing else holds the adb server port at ${endpoint}, then run \`adb-axi doctor\` again`,
+  ];
   const adb = context.adb();
   let devices: AttachedDevice[] | undefined;
   const result = await settle("server", async () => {
@@ -101,7 +105,7 @@ export async function checkServer(context: CommandContext): Promise<ServerReadin
       });
       const stdout = answer.stdout.toString("utf8");
       if (answer.exitCode !== 0 || !/^List of devices attached/m.test(stdout)) {
-        return failed("server", `${where} answered, but not with a device list`, STUCK_SERVER);
+        return failed("server", `${where} answered, but not with a device list`, stuckServer);
       }
       devices = parseDeviceList(stdout);
       // adb starts a missing server by itself; that works, but it is worth knowing about.
@@ -119,7 +123,7 @@ export async function checkServer(context: CommandContext): Promise<ServerReadin
         return failed(
           "server",
           `${where} is not answering: ${oneLine(error.message)}`,
-          STUCK_SERVER,
+          stuckServer,
         );
       }
       throw error;
@@ -127,10 +131,6 @@ export async function checkServer(context: CommandContext): Promise<ServerReadin
   });
   return { result, devices };
 }
-
-const STUCK_SERVER = [
-  "Check that nothing else holds the adb server port, then run `adb-axi doctor` again",
-];
 
 /** Errors of choosing the device that are findings of the `device` check. */
 const SELECTION_CODES = new Set([
