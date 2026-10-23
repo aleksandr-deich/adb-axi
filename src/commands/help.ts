@@ -1,4 +1,5 @@
-import { flagUsage, formatDuration, GLOBAL_FLAGS, usageLine, type FlagSpec } from "../core/args.js";
+import { flagUsage, GLOBAL_FLAGS, usageLine, type FlagSpec } from "../core/args.js";
+import { formatDuration } from "../core/duration.js";
 import { BIN, commandLine, runHint, type Output } from "../core/output.js";
 import { entryCommands, isVisible, visibleSubcommands } from "./registry.js";
 import type { CommandSpec, GroupSpec, Registry } from "./types.js";
@@ -51,7 +52,7 @@ export function commandHelp(spec: CommandSpec): Output {
     ].map((flag) =>
       flagRow(
         flag.name === "--timeout"
-          ? { ...flag, default: formatDuration(spec.defaultTimeoutMs) }
+          ? { ...flag, default: formatDuration(spec.defaultTimeoutMs, "argument") }
           : flag,
       ),
     ),

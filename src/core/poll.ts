@@ -1,20 +1,61 @@
-import { setTimeout } from "node:timers/promises";
+import { realClock, type Clock } from "./clock.js";
+import { Deadline } from "./deadline.js";
+import { AdbAxiError } from "./errors.js";
+
+export { realClock, type Clock } from "./clock.js";
 
 /** Poll interval bounds for every wait (7.4): never busier than 250 ms, never lazier than 500 ms. */
 export const MIN_INTERVAL_MS = 250;
 export const MAX_INTERVAL_MS = 500;
 export const DEFAULT_INTERVAL_MS = 400;
 
-/** Time source for polling. Tests inject a fake one; production uses the real clock. */
-export interface Clock {
-  now(): number;
-  sleep(ms: number, signal?: AbortSignal): Promise<void>;
+export interface ObserveOptions<T> {
+  deadline: Deadline;
+  read: (deadline: Deadline) => Promise<T>;
+  done: (value: T) => boolean;
+  intervalMs?: number;
+  clock?: Clock;
+  readCapMs?: number;
+  windowMs?: number;
+  requireObservation?: boolean;
 }
 
-export const realClock: Clock = {
-  now: () => performance.now(),
-  sleep: (ms, signal) => setTimeout(ms, undefined, { signal }),
-};
+export function observe<T, TDone extends T>(
+  options: Omit<ObserveOptions<T>, "done"> & { done: (value: T) => value is TDone },
+): Promise<PollResult<TDone, T>>;
+export function observe<T>(options: ObserveOptions<T>): Promise<PollResult<T, T>>;
+// A deadline-edge observation needs its own budget or AdbClient refuses it without reading.
+export async function observe<T>(options: ObserveOptions<T>): Promise<PollResult<T, T>> {
+  const clock = options.clock ?? realClock;
+  let last: T | undefined;
+  return poll({
+    timeoutMs: Math.min(options.windowMs ?? Infinity, options.deadline.remainingMs()),
+    ...(options.intervalMs === undefined ? {} : { intervalMs: options.intervalMs }),
+    clock,
+    check: async () => {
+      const remaining = options.deadline.remainingMs();
+      const deadline =
+        remaining < MAX_INTERVAL_MS
+          ? new Deadline(MAX_INTERVAL_MS, clock)
+          : options.readCapMs === undefined || remaining <= options.readCapMs
+            ? options.deadline
+            : new Deadline(options.readCapMs, clock);
+      let value: T;
+      try {
+        value = await options.read(deadline);
+      } catch (error) {
+        if (
+          !(error instanceof AdbAxiError && error.code === "TIMEOUT") ||
+          (options.requireObservation === true && last === undefined)
+        )
+          throw error;
+        return { done: false, last };
+      }
+      last = value;
+      return options.done(value) ? { done: true, value } : { done: false, last: value };
+    },
+  });
+}
 
 export type Observation<TValue, TLast> =
   { done: true; value: TValue } | { done: false; last: TLast };

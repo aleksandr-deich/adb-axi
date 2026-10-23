@@ -706,7 +706,7 @@ describe("app install", () => {
       expect(toon.exitCode).toBe(1);
       expect(data).toMatchObject({
         code: "WAIT_TIMEOUT",
-        error: "com.example.notes did not report versionCode 57 within 4s",
+        error: "com.example.notes did not report versionCode 57 within 4 s",
         last: { installed: true, version: "1.4.0 (56)" },
       });
     }, 30_000);

@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { poll, type Clock, type Observation } from "../../src/core/poll.js";
+import { observe, poll, type Clock, type Observation } from "../../src/core/poll.js";
+import { Deadline } from "../../src/core/deadline.js";
+import { AdbAxiError } from "../../src/core/errors.js";
 
 /** A clock that advances only when the code under test sleeps (or a check takes time). */
 function fakeClock(): Clock & { sleeps: number[]; advance(ms: number): void } {
@@ -98,6 +100,23 @@ describe("poll", () => {
     await expect(poll({ timeoutMs: 1, intervalMs: 500, check })).resolves.toMatchObject({
       ok: true,
     });
+  });
+
+  it("observes an exit during the final interval with a usable read deadline", async () => {
+    const clock = fakeClock();
+    const deadline = new Deadline(1000, clock);
+    const read = (budget: Deadline): Promise<number[]> => {
+      // AdbClient refuses an exhausted deadline before it can observe the device.
+      if (budget.remainingMs() <= 0) throw new AdbAxiError("TIMEOUT", "read deadline expired");
+      return Promise.resolve(clock.now() >= 1000 ? [] : [8235]);
+    };
+    const result = await observe({
+      deadline,
+      clock,
+      read,
+      done: (pids) => pids.length === 0,
+    });
+    expect(result).toMatchObject({ ok: true, value: [], waitedMs: 1000 });
   });
 
   it("polls with the real clock by default", async () => {

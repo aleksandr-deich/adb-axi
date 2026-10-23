@@ -1,5 +1,5 @@
 import { runShell } from "../../adb/shell.js";
-import { processTable } from "../../android/app-processes.js";
+import { runningProcesses } from "../../android/app-processes.js";
 import { assertPackageName } from "../../android/component.js";
 import { invalidOutput, readShell } from "../../android/read.js";
 import { AdbAxiError } from "../../core/errors.js";
@@ -40,9 +40,9 @@ export const appClear = defineCommand({
     const adb = context.device.adb;
 
     const { info, userId, identity: app } = await requireInstalled(context, pkg);
-    const before = (await processTable(adb, serial, context.device.reads))
-      .filter(({ uid }) => uid === app.uid)
-      .map(({ pid }) => pid);
+    const before = (await runningProcesses(adb, serial, app, context.device.reads)).map(
+      ({ pid }) => pid,
+    );
 
     // `pm clear` waits for the system to report the data cleared, then prints `Success`;
     // a refusal prints `Failed` and exits 1 (AOSP `PackageManagerShellCommand.runClear`).

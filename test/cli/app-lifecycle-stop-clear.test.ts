@@ -130,11 +130,15 @@ describe("app clear", () => {
   });
 
   it("fails with REMOTE_EXIT, never a cleared claim, when the package manager refuses", async () => {
-    const f = device({ [PACKAGE]: INSTALLED, [CLEAR]: { stdout: "Failed\n", exit: 1 } });
+    const f = device({
+      [PACKAGE]: INSTALLED,
+      [PIDOF]: PROBE_STOPPED,
+      [CLEAR]: { stdout: "Failed\n", exit: 1 },
+    });
     const { toon, data } = await both(["app", "clear", "dev.probe"], f);
     expect(toon.exitCode).toBe(1);
     expect(data).toMatchObject({ code: "REMOTE_EXIT", step: "clearing the data of dev.probe" });
-    expect(shellCommands(f)).not.toContain(PIDOF);
+    expectClean(f);
   });
 });
 

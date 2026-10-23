@@ -12,6 +12,7 @@ import { processImportance, type AppIdentity } from "../../android/app-processes
 import { readForeground } from "../../android/foreground.js";
 import { invalidOutput } from "../../android/read.js";
 import { Deadline } from "../../core/deadline.js";
+import { formatDuration } from "../../core/duration.js";
 import { AdbAxiError } from "../../core/errors.js";
 import { okLine, runHint, type Output } from "../../core/output.js";
 import { poll } from "../../core/poll.js";
@@ -20,7 +21,6 @@ import { defineCommand } from "../define.js";
 import type { DeviceContext } from "../types.js";
 import {
   appPids,
-  formatDuration,
   forceStop,
   lifecycleCommand,
   requireInstalled,

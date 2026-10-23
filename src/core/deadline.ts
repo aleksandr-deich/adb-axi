@@ -1,4 +1,4 @@
-import { realClock, type Clock } from "./poll.js";
+import { realClock, type Clock } from "./clock.js";
 
 /**
  * One deadline for a whole command (`--timeout` or the command's default). Every device

@@ -1,4 +1,4 @@
-import { formatDuration } from "../core/args.js";
+import { formatDuration } from "../core/duration.js";
 import { AdbAxiError } from "../core/errors.js";
 import { DEFAULT_MAX_OUTPUT_BYTES } from "../core/exec.js";
 import { runHint, TextBlock, type Output } from "../core/output.js";
@@ -229,7 +229,8 @@ function key(base: string, stream: Stream): string {
 }
 
 function fullHint(serial: string, command: string, timeoutMs: number | undefined): string {
-  const timeout = timeoutMs === undefined ? [] : ["--timeout", formatDuration(timeoutMs)];
+  const timeout =
+    timeoutMs === undefined ? [] : ["--timeout", formatDuration(timeoutMs, "argument")];
   return runHint(
     ["shell", "--device", serial, ...timeout, "--full", "--", command],
     "to write the complete output to a file",

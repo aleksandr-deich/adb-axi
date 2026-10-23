@@ -1,8 +1,8 @@
 import { assertPackageName } from "../../android/component.js";
-import { Deadline } from "../../core/deadline.js";
+import { formatDuration } from "../../core/duration.js";
 import { AdbAxiError } from "../../core/errors.js";
 import { okLine, runHint } from "../../core/output.js";
-import { MAX_INTERVAL_MS, poll } from "../../core/poll.js";
+import { observe } from "../../core/poll.js";
 import { notInstalled } from "../app/process.js";
 import { observeApp, type AppObservation, type AppState } from "../app/state.js";
 import { defineCommand } from "../define.js";
@@ -32,7 +32,6 @@ export const waitApp = defineCommand({
     const wanted = String(context.flags.state) as AppState;
     assertPackageName(pkg);
     const serial = context.device.serial;
-    const options = context.device.reads;
     const adb = context.device.adb;
     const record = await context.device.app(pkg);
     const { userId } = record;
@@ -47,25 +46,14 @@ export const waitApp = defineCommand({
     }
     const app = record.identity;
 
-    let latest: AppObservation | undefined;
-    const result = await poll({
-      timeoutMs: context.deadline.remainingMs(),
-      check: async (remainingMs) => {
-        const reads =
-          remainingMs < MAX_INTERVAL_MS ? { deadline: new Deadline(MAX_INTERVAL_MS) } : options;
-        try {
-          latest = await observeApp(adb, serial, app, userId, wanted === "foreground", reads);
-        } catch (error) {
-          // A read cut off by the deadline ends the wait; the last full observation is the evidence.
-          if (error instanceof AdbAxiError && error.code === "TIMEOUT") {
-            return { done: false, last: latest };
-          }
-          throw error;
-        }
-        return reached(wanted, latest)
-          ? { done: true, value: latest }
-          : { done: false, last: latest };
-      },
+    const result = await observe({
+      deadline: context.deadline,
+      read: (deadline) =>
+        observeApp(adb, serial, app, userId, wanted === "foreground", {
+          ...context.device.reads,
+          deadline,
+        }),
+      done: (latest) => reached(wanted, latest),
     });
 
     if (!result.ok) {
@@ -73,7 +61,7 @@ export const waitApp = defineCommand({
         "WAIT_TIMEOUT",
         `${pkg} did not reach ${wanted} within ${formatDuration(context.timeoutMs)}`,
         {
-          fields: { last: latest ?? { state: "unknown" } },
+          fields: { last: result.last ?? { state: "unknown" } },
           help: [
             runHint(["app", "info", pkg], "for its pid and foreground state"),
             runHint(["app", "current"], "to see what is in front"),
@@ -92,8 +80,4 @@ export const waitApp = defineCommand({
 function reached(wanted: AppState, observation: AppObservation): boolean {
   if (wanted === "running") return observation.state !== "stopped";
   return observation.state === wanted;
-}
-
-function formatDuration(ms: number): string {
-  return ms % 1000 === 0 ? `${ms / 1000} s` : `${ms} ms`;
 }

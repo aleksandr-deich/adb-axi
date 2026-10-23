@@ -7,11 +7,10 @@ import { assertPackageName } from "../../android/component.js";
 import type { PackageInfo } from "../../android/packages.js";
 import { parsePmFailure } from "../../android/pm-result.js";
 import { invalidOutput, readShell, type ReadOptions } from "../../android/read.js";
-import { formatDuration } from "../../core/args.js";
-import { Deadline } from "../../core/deadline.js";
+import { formatDuration } from "../../core/duration.js";
 import { AdbAxiError } from "../../core/errors.js";
 import { noop, okLine, runHint, shellWords, type Output } from "../../core/output.js";
-import { MAX_INTERVAL_MS, poll } from "../../core/poll.js";
+import { observe } from "../../core/poll.js";
 import { isErrno } from "../../core/state.js";
 import { defineCommand } from "../define.js";
 import type { DeviceContext } from "../types.js";
@@ -400,27 +399,14 @@ function failureContext(
  */
 async function waitForVersion(context: DeviceContext, info: ApkInfo): Promise<PackageInfo> {
   assertPackageName(info.package);
-  let latest: PackageInfo | null | undefined;
-  const result = await poll({
-    timeoutMs: context.deadline.remainingMs(),
-    check: async (remainingMs) => {
-      const reads =
-        remainingMs < MAX_INTERVAL_MS ? { deadline: new Deadline(MAX_INTERVAL_MS) } : undefined;
-      try {
-        latest = (await context.device.app(info.package, reads)).info;
-      } catch (error) {
-        // A read cut off by the deadline ends the wait; the last full read is the evidence.
-        if (error instanceof AdbAxiError && error.code === "TIMEOUT") {
-          return { done: false, last: latest };
-        }
-        throw error;
-      }
-      return latest?.installed === true && latest.versionCode === info.versionCode
-        ? { done: true, value: latest }
-        : { done: false, last: latest };
-    },
+  const result = await observe({
+    deadline: context.deadline,
+    read: async (deadline) => (await context.device.app(info.package, { deadline })).info,
+    done: (latest): latest is PackageInfo =>
+      latest?.installed === true && latest.versionCode === info.versionCode,
   });
   if (result.ok) return result.value;
+  const latest = result.last;
   throw new AdbAxiError(
     "WAIT_TIMEOUT",
     `${info.package} did not report versionCode ${info.versionCode} within ${formatDuration(context.timeoutMs)}`,
