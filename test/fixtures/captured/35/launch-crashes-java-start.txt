@@ -1,0 +1,8 @@
+--------- beginning of events
+         1792780427.137   536   580 I am_proc_start: [0,3347,10207,dev.probe,next-top-activity,{dev.probe/dev.probe.MainActivity}]
+         1792780428.439   536   580 I am_proc_start: [0,3399,10146,com.android.chrome,broadcast,{com.android.chrome/com.google.android.apps.chrome.rlz.RevenueStatsConfigurationUpdateReceiver}]
+         1792780428.534   536   580 I am_proc_start: [0,3435,10144,com.google.android.gms.ui,content provider,{com.google.android.gms/com.google.android.gms.app.search.GmsSearchIndexablesProvider}]
+         1792780428.582   536   580 I am_proc_start: [0,3465,10168,com.google.android.marvin.talkback,content provider,{com.google.android.marvin.talkback/com.google.android.accessibility.talkback.preference.search.TalkBackSearchIndexablesProvider}]
+         1792780428.776   536  3050 I am_proc_died: [0,2405,com.google.android.onetimeinitializer,999,19]
+         1792780429.762   536  3050 I am_crash: [3347,0,dev.probe,552091206,java.lang.IllegalStateException,probe crash requested,MainActivity.kt,78,0]
+         1792780429.916   536  1498 I am_proc_died: [0,3347,dev.probe,0,2]

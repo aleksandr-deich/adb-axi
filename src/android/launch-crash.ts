@@ -1,8 +1,10 @@
 import type { AdbClient } from "../adb/run.js";
 import { parseCrashes } from "./crash.js";
 import { parseLogcat, type LogLine } from "./logcat.js";
-import type { ProcessRecord } from "./app-processes.js";
+import { userIdFromUid, type ProcessRecord } from "./app-processes.js";
 import { invalidOutput, readShell, type ReadOptions } from "./read.js";
+
+export type LaunchProcess = Pick<ProcessRecord, "pid" | "uid" | "process">;
 
 export const LAUNCH_CRASH_COMMAND =
   "logcat -d -b events,crash -v epoch -s am_crash am_proc_start am_proc_died DEBUG:F";
@@ -20,10 +22,9 @@ function crashKey(line: LogLine): string {
 }
 
 export function parseLaunchCrashes(
-  stdout: string,
-  prelaunch: readonly ProcessRecord[] = [],
+  lines: LogLine[],
+  prelaunch: readonly LaunchProcess[] = [],
 ): LaunchCrash[] {
-  const { lines } = parseLogcat(stdout);
   const native = parseCrashes(lines).flatMap((crash) => {
     if (crash.kind !== "native" || crash.pid === null) return [];
     const uids = crash.trace.flatMap((message) => /^uid: (\d+)\s*$/.exec(message)?.[1] ?? []);
@@ -34,7 +35,7 @@ export function parseLaunchCrashes(
         return false;
       const fields = /^\[(\d+),(\d+),([^,\]]+)(?:,|\])/.exec(line.message);
       return (
-        Number(fields?.[1]) === Math.floor(uid / 100000) &&
+        Number(fields?.[1]) === userIdFromUid(uid) &&
         Number(fields?.[2]) === crash.pid &&
         fields?.[3] === crash.process &&
         !lines.some((start) => {
@@ -59,7 +60,7 @@ export function parseLaunchCrashes(
       const fields = /^\[(\d+),(\d+),(\d+),([^,]+),/.exec(line.message);
       if (fields?.[2] !== undefined && fields[3] !== undefined && fields[4] !== undefined) {
         const uid = Number(fields[3]);
-        if (Math.floor(uid / 100000) === Number(fields[1]))
+        if (userIdFromUid(uid) === Number(fields[1]))
           starts.set(Number(fields[2]), { uid, process: fields[4] });
       }
       return [];
@@ -87,7 +88,7 @@ export function parseLaunchCrashes(
         {
           key: crashKey(line),
           pid: crash.pid,
-          userId: Math.floor(crash.uid / 100000),
+          userId: userIdFromUid(crash.uid),
           uid: crash.uid,
           process,
         },
@@ -98,9 +99,7 @@ export function parseLaunchCrashes(
     const userId = Number(fields[2]);
     const started = starts.get(pid);
     const uid =
-      started?.process === process && Math.floor(started.uid / 100000) === userId
-        ? started.uid
-        : null;
+      started?.process === process && userIdFromUid(started.uid) === userId ? started.uid : null;
     return [{ key: crashKey(line), pid, userId, uid, process }];
   });
 }
@@ -109,7 +108,7 @@ export async function readLaunchCrashes(
   adb: AdbClient,
   serial: string,
   options: ReadOptions,
-  prelaunch: readonly ProcessRecord[] = [],
+  prelaunch: readonly LaunchProcess[] = [],
 ): Promise<{ keys: string[]; crashes: LaunchCrash[] }> {
   const step = "reading launch crashes";
   const result = await readShell(adb, serial, LAUNCH_CRASH_COMMAND, step, options);
@@ -117,6 +116,6 @@ export async function readLaunchCrashes(
   if (unparsed !== 0) throw invalidOutput(step, result.stdout);
   return {
     keys: lines.filter((line) => line.tag === "am_crash" && line.level === "I").map(crashKey),
-    crashes: parseLaunchCrashes(result.stdout, prelaunch),
+    crashes: parseLaunchCrashes(lines, prelaunch),
   };
 }

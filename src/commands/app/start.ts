@@ -1,22 +1,13 @@
-import type { AdbClient } from "../../adb/run.js";
-import { runShell } from "../../adb/shell.js";
 import {
   declaredActivities,
   resolveLauncherActivity,
   parseActivityFilters,
-  readActivityProcessName,
 } from "../../android/activities.js";
-import { parseAmStart, wasRecreated, type AmStart } from "../../android/amstart.js";
-import { assertPackageName, type ActivityRecord, type Component } from "../../android/component.js";
-import { processImportance, type AppIdentity } from "../../android/app-processes.js";
-import { readForeground } from "../../android/foreground.js";
-import { invalidOutput } from "../../android/read.js";
-import { Deadline } from "../../core/deadline.js";
-import { formatDuration } from "../../core/duration.js";
+import { wasRecreated, type AmStart } from "../../android/amstart.js";
+import { assertPackageName } from "../../android/component.js";
+import type { Seen } from "../../android/launch.js";
 import { AdbAxiError } from "../../core/errors.js";
 import { okLine, runHint, type Output } from "../../core/output.js";
-import { poll } from "../../core/poll.js";
-import { logsCrash } from "../logs/crash.js";
 import { defineCommand } from "../define.js";
 import type { DeviceContext } from "../types.js";
 import {
@@ -27,14 +18,7 @@ import {
   stopFailed,
   waitForExit,
 } from "./process.js";
-import { UNKNOWN } from "./shared.js";
-import { LaunchWatch } from "./launch-watch.js";
-
-/**
- * How long a started app gets to be seen in front with a live process. `am start -W` has
- * already waited for the launch, so this only covers a crash or a redirect just after it.
- */
-const SETTLE_MS = 2000;
+import { activityNotFound, launchApp } from "./launch.js";
 
 /**
  * Activity class names as `am start -n` takes them: `.MainActivity`, a full class name, or
@@ -79,7 +63,8 @@ export const appStart = defineCommand({
       requested === null ? pkg : `${pkg}/${requested}`,
       ...(fresh ? ["--fresh"] : []),
     ]);
-    const { dump, userId, identity: app } = await requireInstalled(context, pkg);
+    const installed = await requireInstalled(context, pkg);
+    const { dump, userId, identity: app } = installed;
     const filters = parseActivityFilters(dump);
     const activity =
       requested ?? (await resolveLauncherActivity(adb, serial, pkg, userId, context.device.reads));
@@ -100,14 +85,11 @@ export const appStart = defineCommand({
       }
     }
 
-    const { start, settled } = await launchActivity(
+    const { start, settled } = await launchApp(
       context,
+      installed,
       { package: pkg, activity, component: `${pkg}/${activity}` },
-      userId,
-      app,
-      command,
-      () => declaredActivities(filters, pkg),
-      (launched, processName, last) => diedOnStart(context, launched, processName, last, command),
+      { operation: "start", command },
     );
     return report(context, pkg, activity, fresh, start, settled, command);
   },
@@ -147,183 +129,6 @@ function startTarget(context: DeviceContext): { pkg: string; activity: string | 
     });
   }
   return { pkg, activity };
-}
-
-/**
- * `am start -W -n <pkg>/<activity>`, read from its text. A start that outlives the
- * deadline, or that am itself reports as `Status: timeout` (with exit 0), is `WAIT_TIMEOUT`.
- */
-export async function amStart(
-  context: DeviceContext,
-  adb: AdbClient,
-  serial: string,
-  pkg: string,
-  activity: string,
-  userId: number,
-  command: string[],
-  activities: () => string[],
-  signal?: AbortSignal,
-): Promise<AmStart> {
-  const component = `${pkg}/${activity}`;
-  const step = `starting ${component}`;
-  let output: string;
-  let exitCode: number;
-  try {
-    // Single quotes keep a nested class's `$` away from the device shell.
-    const result = await runShell(adb, serial, `am start --user ${userId} -W -n '${component}'`, {
-      deadline: context.deadline,
-      step,
-      ...(signal === undefined ? {} : { signal }),
-    });
-    output = `${result.stdout}\n${result.stderr}`;
-    exitCode = result.exitCode;
-  } catch (error) {
-    if (error instanceof AdbAxiError && error.code === "TIMEOUT") {
-      throw startTimeout(context, pkg, { status: "no answer", activity }, command);
-    }
-    throw error;
-  }
-
-  const start = parseAmStart(output);
-  if (start.error?.classNotFound === true) {
-    throw activityNotFound(context, pkg, activity, activities());
-  }
-  if (start.error !== null || exitCode !== 0) {
-    throw new AdbAxiError("REMOTE_EXIT", `${step} failed: the activity manager refused it`, {
-      fields: {
-        step,
-        exit: exitCode,
-        detail: start.error?.detail ?? output.trim().slice(0, 200),
-      },
-      help: [runHint(lifecycleCommand(context, ["app", "info", pkg]), "to check the package")],
-    });
-  }
-  if (start.status === null) throw invalidOutput(step, output);
-  if (start.status === "timeout") {
-    throw startTimeout(
-      context,
-      pkg,
-      {
-        status: "timeout",
-        activity: start.activity?.activity ?? activity,
-      },
-      command,
-    );
-  }
-  // am can report a permission dialog instead of the requested app's activity.
-  return { ...start, activity: start.activity?.package === pkg ? start.activity : null };
-}
-
-/** One look at the started app: its pid and the activity in front. */
-export interface Seen {
-  state: "foreground" | "running" | "stopped" | "crashed";
-  pid: number | "-";
-  /** The resumed activity, whichever app it belongs to. */
-  front: ActivityRecord | null;
-}
-
-export async function launchActivity(
-  context: DeviceContext,
-  component: Component,
-  userId: number,
-  app: AppIdentity,
-  command: string[],
-  activities: () => string[],
-  died: (activity: Component, processName: string, last: Seen) => AdbAxiError,
-): Promise<{ start: AmStart; launched: Component; processName: string; settled: Seen }> {
-  const adb = context.device.adb;
-  const serial = context.device.serial;
-  const watch = await LaunchWatch.open(adb, serial, app, userId, context.device.reads);
-  const start = await watch.during(
-    (signal) =>
-      amStart(
-        context,
-        adb,
-        serial,
-        component.package,
-        component.activity,
-        userId,
-        command,
-        activities,
-        signal,
-      ),
-    async (crash, signal) => {
-      const processName = await readActivityProcessName(adb, serial, component, userId, {
-        ...context.device.reads,
-        signal,
-      });
-      return crash.process === processName
-        ? died(component, processName, { state: "crashed", pid: crash.pid, front: null })
-        : null;
-    },
-  );
-  const launched = start.activity ?? component;
-  const processName = await readActivityProcessName(
-    adb,
-    serial,
-    launched,
-    userId,
-    context.device.reads,
-  );
-  const settled = await settle(context, adb, serial, launched, app, userId, processName, watch);
-  if (settled.state === "stopped" || settled.state === "crashed")
-    throw died(launched, processName, settled);
-  return { start, launched, processName, settled };
-}
-
-/**
- * The first observation uses the command's deadline so a slow device fails against
- * `--timeout`, not the settle window. Further observations stop at `SETTLE_MS` from
- * settle entry or the command deadline, whichever comes first, returning the last result.
- * Check crash evidence before liveness or foreground: a crash dialog can keep a
- * crashed process alive.
- */
-export async function settle(
-  context: DeviceContext,
-  adb: AdbClient,
-  serial: string,
-  activity: Component,
-  app: AppIdentity,
-  userId: number,
-  processName: string,
-  watch: LaunchWatch,
-): Promise<Seen> {
-  const deadline =
-    context.deadline.remainingMs() <= SETTLE_MS ? context.deadline : new Deadline(SETTLE_MS);
-  let last: Seen | undefined;
-  const result = await poll<Seen, Seen>({
-    timeoutMs: deadline.remainingMs(),
-    check: async () => {
-      if (last !== undefined && deadline.remainingMs() === 0) {
-        return { done: true, value: last };
-      }
-      const reads = { deadline: last === undefined ? context.deadline : deadline };
-      try {
-        const crash = (await watch.check(reads)).find((entry) => entry.process === processName);
-        if (crash !== undefined) {
-          return { done: true, value: { state: "crashed", pid: crash.pid, front: null } };
-        }
-        const processes = await processImportance(adb, serial, app, reads);
-        if (last !== undefined && deadline.remainingMs() === 0) {
-          return { done: true, value: last };
-        }
-        const front = await readForeground(adb, serial, { ...reads, userId });
-        const pid = processes.find((process) => process.process === processName)?.pid ?? UNKNOWN;
-        const inFront = front?.package === activity.package;
-        const state = pid === UNKNOWN ? "stopped" : inFront ? "foreground" : "running";
-        const seen: Seen = { state, pid, front };
-        last = seen;
-        return state === "running" ? { done: false, last: seen } : { done: true, value: seen };
-      } catch (error) {
-        if (error instanceof AdbAxiError && error.code === "TIMEOUT" && last !== undefined) {
-          return { done: true, value: last };
-        }
-        throw error;
-      }
-    },
-  });
-  // A poll always observes once, so a timed-out one has a last observation.
-  return result.ok ? result.value : (result.last as Seen);
 }
 
 function report(
@@ -376,92 +181,4 @@ function how(start: AmStart, recreated: boolean): string {
   if (start.launch === "cold") return "cold start";
   if (start.launch === "warm") return "warm start";
   return "started";
-}
-
-function activityNotFound(
-  context: DeviceContext,
-  pkg: string,
-  activity: string | null,
-  activities: readonly string[],
-): AdbAxiError {
-  const message =
-    activity === null ? `${pkg} has no launcher activity` : `${pkg} has no activity ${activity}`;
-  const first = activities[0];
-  return new AdbAxiError("ACTIVITY_NOT_FOUND", message, {
-    fields: { activities: [...activities] },
-    help: [
-      first === undefined
-        ? runHint(
-            lifecycleCommand(context, ["app", "start", `${pkg}/<activity>`]),
-            "naming an activity of the app",
-          )
-        : runHint(
-            lifecycleCommand(context, ["app", "start", `${pkg}/${first}`]),
-            "to start a listed activity",
-          ),
-    ],
-  });
-}
-
-function startTimeout(
-  context: DeviceContext,
-  pkg: string,
-  last: { status: string; activity: string },
-  command: string[],
-): AdbAxiError {
-  return new AdbAxiError(
-    "WAIT_TIMEOUT",
-    `${pkg} did not finish launching within ${formatDuration(context.timeoutMs)}`,
-    {
-      fields: { last },
-      help: [
-        runHint(
-          lifecycleCommand(context, ["app", "current"]),
-          "to see what is in front (on a physical phone a system dialog such as Play Protect or a permission request can block the launch)",
-        ),
-        runHint([...command, "--timeout", "30s"], "to give it longer"),
-      ],
-    },
-  );
-}
-
-function diedOnStart(
-  context: DeviceContext,
-  activity: Component,
-  processName: string,
-  last: Seen,
-  command: string[],
-): AdbAxiError {
-  return new AdbAxiError(
-    "APP_DIED_ON_START",
-    last.state === "crashed"
-      ? `the ${processName} process of ${activity.component} crashed during its start`
-      : `the ${processName} process of ${activity.component} is gone right after its start`,
-    {
-      fields: {
-        last: { state: last.state, pid: last.pid, foreground: last.front?.package ?? UNKNOWN },
-      },
-      help: [
-        ...(logsCrash.shipped
-          ? [
-              runHint(
-                lifecycleCommand(context, [
-                  "logs",
-                  "crash",
-                  "--pkg",
-                  activity.package,
-                  "--since",
-                  "1m",
-                ]),
-                "for the crash",
-              ),
-            ]
-          : []),
-        runHint(
-          context.flags.fresh === true ? command : [...command, "--fresh"],
-          "to try a cold start",
-        ),
-      ],
-    },
-  );
 }

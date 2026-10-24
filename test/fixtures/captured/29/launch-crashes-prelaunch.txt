@@ -1,0 +1,54 @@
+ACTIVITY MANAGER RUNNING PROCESSES (dumpsys activity processes)
+  All known processes:
+  *APP* UID 10116 ProcessRecord{a2d03b2 2201:dev.probe/u0a116}
+    user #0 uid=10116 gids={50116, 20116, 9997}
+    mRequiredAbi=arm64-v8a instructionSet=arm64
+    dir=/data/app/dev.probe-qCtUUgaE-mBXIhdrS9dP7Q==/base.apk publicDir=/data/app/dev.probe-qCtUUgaE-mBXIhdrS9dP7Q==/base.apk data=/data/user/0/dev.probe
+    packageList={dev.probe}
+    compat={420dpi}
+    thread=android.app.IApplicationThread$Stub$Proxy@9f6ff03
+    pid=2201 starting=false
+    lastActivityTime=-587ms lastPssTime=-626ms pssStatType=0 nextPssTime=+9s413ms
+    adjSeq=522 lruSeq=243 lastPss=0.00 lastSwapPss=0.00 lastCachedPss=0.00 lastCachedSwapPss=0.00
+    procStateMemTracker: best=4 () / pending state=1 highest=1 1.0x
+    cached=false empty=false
+    oom: max=1001 curRaw=0 setRaw=0 cur=0 set=0
+    lastCompactTime=0 lastCompactAction=0    mCurSchedGroup=3 setSchedGroup=3 systemNoUi=false trimMemoryLevel=0
+    curProcState=2 mRepProcState=2 pssProcState=21 setProcState=2 lastStateTime=-587ms
+    hasShownUi=true pendingUiClean=true hasAboveClient=false treatLikeActivity=false
+    reportedInteraction=true time=-587ms
+    hasClientActivities=false foregroundActivities=true (rep=true)
+    startSeq=44
+    mountMode=DEFAULT
+    lastRequestedGc=-600ms lastLowMemory=-600ms reportLowMemory=false
+    Activities:
+      - ActivityRecord{b0265a8 u0 dev.probe/.MainActivity t6}
+    Recent Tasks:
+      - TaskRecord{f2fae80 #6 A=dev.probe U=0 StackId=1 sz=1}
+     Configuration={1.0 310mcc260mnc [en_US] ldltr sw411dp w411dp h707dp 420dpi nrml long port finger qwerty/v/v dpad/v winConfig={ mBounds=Rect(0, 0 - 1080, 1920) mAppBounds=Rect(0, 0 - 1080, 1920) mWindowingMode=fullscreen mDisplayWindowingMode=fullscreen mActivityType=undefined mAlwaysOnTop=undefined mRotation=ROTATION_0} s.6}
+     OverrideConfiguration={0.0 ?mcc?mnc ?localeList ?layoutDir ?swdp ?wdp ?hdp ?density ?lsize ?long ?ldr ?wideColorGamut ?orien ?uimode ?night ?touch ?keyb/?/? ?nav/? winConfig={ mBounds=Rect(0, 0 - 0, 0) mAppBounds=null mWindowingMode=undefined mDisplayWindowingMode=undefined mActivityType=undefined mAlwaysOnTop=undefined mRotation=undefined}}
+     mLastReportedConfiguration={0.0 ?mcc?mnc ?localeList ?layoutDir ?swdp ?wdp ?hdp ?density ?lsize ?long ?ldr ?wideColorGamut ?orien ?uimode ?night ?touch ?keyb/?/? ?nav/? winConfig={ mBounds=Rect(0, 0 - 0, 0) mAppBounds=null mWindowingMode=undefined mDisplayWindowingMode=undefined mActivityType=undefined mAlwaysOnTop=undefined mRotation=undefined}}
+    Published Providers:
+      - androidx.startup.InitializationProvider
+        -> ContentProviderRecord{5787cb9 u0 dev.probe/androidx.startup.InitializationProvider}
+    Connected Providers:
+      - a63a8fe/com.android.providers.settings/.SettingsProvider->2201:dev.probe/u0a116 s1/1 u0/0 +495ms
+
+  Process LRU list (sorted by oom_adj, 31 total, non-act at 2, non-svc at 2):
+    Proc # 0: fore   T/A/TOP  trm: 0 2201:dev.probe/u0a116 (top-activity)
+
+  PID mappings:
+    PID #2201: ProcessRecord{a2d03b2 2201:dev.probe/u0a116}
+  mPreviousProcessVisibleTime: 0
+  mDeviceIdleWhitelist=[2000, 10055, 10060]
+  mDeviceIdleExceptIdleWhitelist=[2000, 10049, 10055, 10060, 10061, 10065]
+  mDeviceIdleTempWhitelist=[10065]
+  Mem watch processes:
+
+    com.android.launcher3/u0a102: 250MB, report to com.android.launcher3
+  mMemWatchDumpProcName=null
+  mMemWatchDumpFile=null
+  mMemWatchDumpPid=0
+  mMemWatchDumpUid=0
+  mMemWatchIsUserInitiated=false
+  mForceBackgroundCheck=false

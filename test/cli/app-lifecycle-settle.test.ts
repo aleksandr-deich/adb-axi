@@ -9,7 +9,7 @@ import {
   SHORT_START_DELAY_MS,
   TIMING_MARGIN_MS,
   CURRENT_USER,
-  PROCESSES,
+  KERNEL_UIDS as PROCESSES,
   PACKAGE,
   FOREGROUND,
   PIDOF,
@@ -19,7 +19,6 @@ import {
   METADATA,
   activityInfo,
   INSTALLED,
-  PROBE_STOPPED,
   AM_START,
   shell,
   both,
@@ -41,7 +40,7 @@ const { device, deviceWithRules } = lifecycleDevices((value) => {
 
 describe("app start settle deadlines", () => {
   const ui: Response = {
-    stdout: "  *APP* UID 10213 ProcessRecord{abc 8123:dev.probe:ui/u0a213}\n",
+    stdout: "  PID UID NAME\n 8123 10213 dev.probe:ui\n",
   };
 
   const permission: Response = {
@@ -68,10 +67,10 @@ describe("app start settle deadlines", () => {
           delayMs: SHORT_START_DELAY_MS,
         },
         [FORCE_STOP.replace("--user 0", `--user ${userId}`)]: {},
-        [PIDOF]: PROBE_STOPPED,
+        [PIDOF]: { stdout: "8123\n" },
         [metadataOf(".MainActivity", userId)]: activityInfo(".MainActivity", process),
         [PROCESSES]: {
-          stdout: `  *APP* UID ${userId * 100000 + 10213} ProcessRecord{abc 8123:${process}/u${userId}a213}\n  *APP* UID ${userId * 100000 + 10213} ProcessRecord{def 8111:dev.probe:sync/u${userId}a213}\n  *APP* UID ${other * 100000 + 10213} ProcessRecord{fed 9001:${process}/u${other}a213}\n`,
+          stdout: `  PID UID NAME\n 8123 ${userId * 100000 + 10213} ${process}\n 8111 ${userId * 100000 + 10213} dev.probe:sync\n 9001 ${other * 100000 + 10213} ${process}\n`,
         },
         [FOREGROUND]: {
           stdout: `  ResumedActivity: ActivityRecord{abc u${userId} com.android.permissioncontroller/.Grant t8}\n`,
@@ -233,7 +232,7 @@ describe("app start settle deadlines", () => {
       f,
     );
     expect(toon.exitCode).toBe(1);
-    expect(data).toMatchObject({ code: "REMOTE_EXIT", step: "reading the processes of dev.probe" });
+    expect(data).toMatchObject({ code: "REMOTE_EXIT", step: "reading package process names" });
     expect(data).not.toHaveProperty("app");
     expectClean(f);
   });
@@ -252,7 +251,7 @@ describe("app start settle deadlines", () => {
       {
         match: shell(PROCESSES),
         when: { observation: "later" },
-        respond: { stdout: "  *APP* UID 10213 ProcessRecord{def 8111:dev.probe:sync/u0a213}\n" },
+        respond: { stdout: "  PID UID NAME\n 8111 10213 dev.probe:sync\n" },
       },
       { match: shell(FOREGROUND), respond: permission },
     ]);
@@ -280,7 +279,7 @@ describe("app start settle deadlines", () => {
       {
         match: shell(PROCESSES),
         when: { observation: "later" },
-        respond: { stdout: "  *APP* UID 10213 ProcessRecord{def 9123:dev.probe:ui/u0a213}\n" },
+        respond: { stdout: "  PID UID NAME\n 9123 10213 dev.probe:ui\n" },
       },
       { match: shell(FOREGROUND), respond: permission },
     ]);
