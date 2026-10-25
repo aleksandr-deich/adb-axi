@@ -107,6 +107,10 @@ export function createFakeAdb(scenario: Scenario | string, options: FakeAdbOptio
     ANDROID_HOME: undefined,
     ANDROID_SDK_ROOT: undefined,
     ANDROID_SERIAL: undefined,
+    // Native selectors belong to the host, not this fake. Explicit test overrides win.
+    ADB_SERVER_SOCKET: undefined,
+    ANDROID_ADB_SERVER_ADDRESS: undefined,
+    ANDROID_ADB_SERVER_PORT: undefined,
     ...options.env,
   };
   const env: NodeJS.ProcessEnv = {};

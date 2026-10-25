@@ -1,5 +1,8 @@
 import { decode } from "@toon-format/toon";
-import { afterEach, describe, expect, it } from "vitest";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { extractJsonFlag, main } from "../../src/cli.js";
 import { defineCommand, defineGroup } from "../../src/commands/define.js";
 import type { Registry } from "../../src/commands/types.js";
@@ -64,10 +67,21 @@ const registry: Registry = {
   },
 };
 
+let stateHome: string;
+beforeEach(() => {
+  stateHome = mkdtempSync(join(tmpdir(), "adb-axi-dispatch-"));
+});
+
 async function run(argv: string[]): Promise<{ out: string; exit: number }> {
   let out = "";
   process.exitCode = undefined;
-  await main({ argv, registry, stdout: { write: (chunk: string) => (out += chunk) } });
+  await main({
+    argv,
+    registry,
+    // These device-free dispatch tests have no host server selection or saved state.
+    env: { ADB_AXI_HOME: stateHome },
+    stdout: { write: (chunk: string) => (out += chunk) },
+  });
   const exit = typeof process.exitCode === "number" ? process.exitCode : 0;
   process.exitCode = undefined;
   return { out, exit };
@@ -75,6 +89,7 @@ async function run(argv: string[]): Promise<{ out: string; exit: number }> {
 
 afterEach(() => {
   process.exitCode = undefined;
+  rmSync(stateHome, { recursive: true, force: true });
 });
 
 describe("extractJsonFlag", () => {
