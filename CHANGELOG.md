@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.2.4](https://github.com/aleksandr-deich/adb-axi/compare/v0.2.3...v0.2.4) (2026-10-25)
+
+
+### Features
+
+* **adb:** add explicit server selection and startup policies ([#75](https://github.com/aleksandr-deich/adb-axi/issues/75)) ([55e7365](https://github.com/aleksandr-deich/adb-axi/commit/55e7365eb1ad14ab851359df2297bf7d90e5eeab))
+
+
+### Bug Fixes
+
+* **adb:** report the selected server endpoint accurately ([#72](https://github.com/aleksandr-deich/adb-axi/issues/72)) ([49975b1](https://github.com/aleksandr-deich/adb-axi/commit/49975b12b95302b19cf9a19424091a63283f2e5b))
+* consistently scope app commands to the current Android user ([#70](https://github.com/aleksandr-deich/adb-axi/issues/70)) ([5d8099f](https://github.com/aleksandr-deich/adb-axi/commit/5d8099fe487bffdb3bc4b78717e027c701c4453b))
+* preserve final observations in state and app-exit waits ([#78](https://github.com/aleksandr-deich/adb-axi/issues/78)) ([381cec6](https://github.com/aleksandr-deich/adb-axi/commit/381cec6f320fc8082475f0500a33bdfb2b1737d6))
+* scope package crash history to the resolved Android user with shared log windows ([#77](https://github.com/aleksandr-deich/adb-axi/issues/77)) ([9722825](https://github.com/aleksandr-deich/adb-axi/commit/9722825c32bb2f311bf707308eab6fe1eaecd5f9))
+
 ## [0.2.3](https://github.com/aleksandr-deich/adb-axi/compare/v0.2.2...v0.2.3) (2026-10-22)
 
 
