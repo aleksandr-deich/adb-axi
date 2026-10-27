@@ -142,24 +142,23 @@ crashes: "0 since before-kill (13 s, 0 lines scanned)"
 
 <!-- evaluation:start -->
 
-adb-axi 0.2.2 was tested against plain `adb` with guidance that spells out the same procedures, using Codex CLI 0.162.0 with gpt-6.1-sol at medium effort. Seven Android bug-fix episodes on a small notes app, one of them with a phone and a tablet attached, ran four times per arm. Independent checks tested each final commit on a fresh emulator and checked the tester's existing notes.
+adb-axi 0.2.4 was tested against equally guided plain `adb` on October 26-27, 2026: seven Android bug-fix episodes on one notes app, four fresh-session repeats per arm, using Codex CLI 0.162.0 with gpt-6.1-sol at medium effort. Independent deterministic checks scored function, tester-data preservation and strict safety across 56 completed runs.
 
-| Outcome, 28 runs per arm                                  | adb-axi 0.2.2 | plain adb |
-| --------------------------------------------------------- | ------------- | --------- |
-| Bugs fixed                                                | 28 of 28      | 28 of 28  |
-| Tester notes kept, on both devices in the two-device task | 28 of 28      | 28 of 28  |
-| Strict safety pass                                        | 10 of 28      | 6 of 28   |
-| Runs ending with device settings rows changed             | 16 of 28      | 22 of 28  |
-| Accessibility left enabled or UiAutomation left connected | 0             | 0         |
-| Logs cleared or existing packages removed                 | 0             | 0         |
-| Indirect adb `start-server` calls; actual restarts        | 1; 0          | 1; 0      |
-| Runs reading files outside the permitted scope            | 2             | 0         |
-| Wrong-device changes in the two-device task               | 0 of 4        | 0 of 4    |
-| Learning responses per run, mean                          | 2.29          | 1.00      |
-| Responses per run, geometric mean of valid runs           | 20.65         | 20.01     |
-| Wall time per run, geometric mean of valid runs           | 163.77 s      | 148.21 s  |
+| Outcome, 28 runs per arm     | adb-axi 0.2.4 | Plain adb |
+| ---------------------------- | ------------- | --------- |
+| Functional acceptance passed | 28/28         | 27/28     |
+| Tester notes preserved       | 28/28         | 28/28     |
+| Strict safety passed         | 27/28         | 28/28     |
+| Whole-task model responses*  | 19.14         | 18.91     |
+| Responses with device work*  | 9.93          | 11.37     |
+| Whole-task rate-card cost*   | $0.22531      | $0.22479  |
+| Raw wall time*               | 196.31 s      | 178.89 s  |
 
-Rate-card cost was 1.102x plain [90% interval 1.029-1.181] on the six single-device episodes and 1.079x [1.011-1.1512] with the two-device episode. Both results are inconclusive under the 15% rule set in advance: not equivalence and not a confirmed penalty. The cost figures leave out the two out-of-scope runs; including them does not change the result. The extra cost traces mainly to every run reading the root help. Most settings failures are rows that appeared with default values, not demonstrated harm. These are small, one-app, one-model emulator results; see [docs/evaluation.md](docs/evaluation.md) for the method, per-episode results, older studies and limits.
+\* Episode-weighted geometric means. A turn is a unique completed model response, not a shell/adb command; device-work responses are a subset.
+
+**About 13% fewer device-work responses, not fewer whole-task turns.** The device-response ratio was 0.8736 [90% interval 0.8215, 0.9297]; whole-task responses were 1.0123 [0.9532, 1.0750]. Cost was 1.0023 [0.9445, 1.0630], entirely inside the pre-set +/-15% band: no material whole-task cost difference under that criterion. Raw wall time was about 10% higher, with asymmetric guard/audit overhead. Help, coding and builds offset the device-work reduction.
+
+The plain functional failure was an app patch breaking a required shortcut label, not an adb-axi defect. The adb-axi safety failure combined default-valued settings additions and a transitive `start-server` attempt intercepted by the ownership guard, with no native startup or server-identity change. One app/model, four repeats per cell and instrumented emulators do not establish general superiority or safety; cross-version changes are not causal product estimates. See [docs/evaluation.md](docs/evaluation.md) for all episodes, intervals, exceptions and limits.
 
 <!-- evaluation:end -->
 
