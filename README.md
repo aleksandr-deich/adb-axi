@@ -144,21 +144,24 @@ crashes: "0 since before-kill (13 s, 0 lines scanned)"
 
 adb-axi 0.2.4 was tested against equally guided plain `adb` on October 26-27, 2026: seven Android bug-fix episodes on one notes app, four fresh-session repeats per arm, using Codex CLI 0.162.0 with gpt-6.1-sol at medium effort. Independent deterministic checks scored function, tester-data preservation and strict safety across 56 completed runs.
 
+**adb-axi used fewer device-work turns; plain adb was faster in this guarded workflow. Neither had a demonstrated whole-task turn or material cost advantage.**
+
+| Measure           | adb-axi 0.2.4 versus equally guided plain adb         |
+| ----------------- | ----------------------------------------------------- |
+| Device-work turns | adb-axi wins on this measure: about 13% fewer         |
+| Whole-task turns  | No clear winner; no demonstrated saving with adb-axi  |
+| Whole-task cost   | No material difference within the pre-set +/-15% band |
+| Raw workflow time | Plain adb faster; adb-axi took about 10% longer       |
+
+A turn is a unique completed model response, not a shell/adb command. Device-work turns are only a subset: help, coding and builds offset that reduction. Timing includes asymmetric guard/audit overhead, not intrinsic CLI speed.
+
 | Outcome, 28 runs per arm     | adb-axi 0.2.4 | Plain adb |
 | ---------------------------- | ------------- | --------- |
 | Functional acceptance passed | 28/28         | 27/28     |
 | Tester notes preserved       | 28/28         | 28/28     |
 | Strict safety passed         | 27/28         | 28/28     |
-| Whole-task model responses*  | 19.14         | 18.91     |
-| Responses with device work*  | 9.93          | 11.37     |
-| Whole-task rate-card cost*   | $0.22531      | $0.22479  |
-| Raw wall time*               | 196.31 s      | 178.89 s  |
 
-\* Episode-weighted geometric means. A turn is a unique completed model response, not a shell/adb command; device-work responses are a subset.
-
-**About 13% fewer device-work responses, not fewer whole-task turns.** The device-response ratio was 0.8736 [90% interval 0.8215, 0.9297]; whole-task responses were 1.0123 [0.9532, 1.0750]. Cost was 1.0023 [0.9445, 1.0630], entirely inside the pre-set +/-15% band: no material whole-task cost difference under that criterion. Raw wall time was about 10% higher, with asymmetric guard/audit overhead. Help, coding and builds offset the device-work reduction.
-
-The plain functional failure was an app patch breaking a required shortcut label, not an adb-axi defect. The adb-axi safety failure combined default-valued settings additions and a transitive `start-server` attempt intercepted by the ownership guard, with no native startup or server-identity change. One app/model, four repeats per cell and instrumented emulators do not establish general superiority or safety; cross-version changes are not causal product estimates. See [docs/evaluation.md](docs/evaluation.md) for all episodes, intervals, exceptions and limits.
+The plain functional failure was an app patch breaking a required shortcut label, not an adb-axi defect. The adb-axi safety failure combined default-valued settings additions and a transitive `start-server` attempt intercepted by the ownership guard, with no native startup or server-identity change. One app/model, four repeats per cell and instrumented emulators do not establish general superiority or safety; cross-version changes are not causal product estimates. See [docs/evaluation.md](docs/evaluation.md) for numeric estimates, intervals, all episodes, exceptions and limits.
 
 <!-- evaluation:end -->
 
