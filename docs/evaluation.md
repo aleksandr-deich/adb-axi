@@ -13,7 +13,7 @@ Every study so far is small: one app or one probe app, one model per study, and 
 
 | Study                                                                          | Kind       | Date             | Version | Agent runs | Verdict                                                                                   |
 | ------------------------------------------------------------------------------ | ---------- | ---------------- | ------- | ---------- | ----------------------------------------------------------------------------------------- |
-| [Equally guided bug-fix episodes, 0.2.4](#equally-guided-bug-fix-episodes-024) | Realistic  | 2026-10-26 to 27 | 0.2.4   | 56         | 13% fewer device-work responses; no whole-task response/cost saving; higher raw wall time |
+| [Equally guided bug-fix episodes, 0.2.4](#equally-guided-bug-fix-episodes-024) | Realistic  | 2026-10-26 to 27 | 0.2.4   | 56         | No demonstrated whole-task saving; device count misses starts/polls; higher raw wall time |
 | [Equally guided bug-fix episodes](#equally-guided-bug-fix-episodes)            | Realistic  | 2026-10-18       | 0.2.2   | 56         | Same fixes and tester data; cost 1.08x, inconclusive; extra cost mostly help reading      |
 | [Device bug-fix episodes](#device-bug-fix-episodes)                            | Realistic  | 2026-10-10       | 0.2.1   | 30         | No reliability or effort difference; three workflow strengths; one side effect to mind    |
 | [App-build repeats](#app-build-repeats)                                        | Realistic  | 2026-10-09       | 0.2.0   | 8          | No whole-run difference at 5 runs per arm; process death takes fewer turns                |
@@ -35,26 +35,34 @@ Independent deterministic checks built/tested final commits for functional accep
 
 ### Key numbers
 
-**About 13% fewer responses with device work, not 13% fewer total turns.** A turn is one unique completed `response_id`, including tool-calling and final model responses, not a shell command or adb invocation. Device-work responses are a subset of whole-task responses. Whole-task measurement includes skill/help, source diagnosis, patching, builds and verification, but excludes common setup and independent scoring.
+**No demonstrated whole-task response saving or material whole-task cost difference.** A turn is one unique completed `response_id`, including tool-calling and final model responses, not a shell command or adb invocation. Whole-task measurement includes skill/help, source diagnosis, patching, builds and verification, but excludes common setup and independent scoring. The registered device-specific subset labels command completions, not every response initiating or polling device work; see the [methodological correction](#methodological-correction) below.
 
 Episode-weighted geometric means; all ratios are adb-axi/plain with stratified 90% intervals:
 
 | Measure                             | adb-axi 0.2.4 | Plain adb | Ratio [90% interval]    |
 | ----------------------------------- | ------------- | --------- | ----------------------- |
 | Whole-task model responses          | 19.14         | 18.91     | 1.0123 [0.9532, 1.0750] |
-| Responses with device work          | 9.93          | 11.37     | 0.8736 [0.8215, 0.9297] |
+| Device-completion responses         | 9.93          | 11.37     | 0.8736 [0.8215, 0.9297] |
 | Whole-task rate-card cost, USD      | $0.22531      | $0.22479  | 1.0023 [0.9445, 1.0630] |
 | Raw subject wall time, seconds      | 196.31        | 178.89    | 1.0973 [1.0255, 1.1766] |
 | Audit-subtracted wall time, seconds | 180.33        | 169.82    | 1.0619 [0.9914, 1.1396] |
 
 - **Cost decision:** the entire cost interval is inside the pre-set [0.85, 1.15] band: no material whole-task cost difference under that criterion. Cheaper required a ratio at most 0.85 with the interval below 1; more expensive required at least 1.15 with the interval above 1; otherwise the result was inconclusive. This is not a claim of exact equality or general equivalence.
 - **Estimator and rate card:** equal episode weighting of arm mean-log-cost differences, exponentiated, with 20,000 within-cell bootstrap draws. Exact tokens were priced at $2 per million uncached input, $0.10 per million cached input and $10 per million output; cached input is a subset, not counted twice. Rate-card accounting is not an invoice.
-- **Raw counts are a different aggregation:** 551 versus 541 whole-task responses (arithmetic means 19.68/19.32), and 285 versus 332 device-work responses. They are not the geometric means in the table.
-- **Help and other work offset the device-work reduction:** exclusive skill/help responses averaged 2.25/1.21 per subject; responses containing any help averaged 4.00/1.54 and could also contain source, build or device work. Root help was read in 10/28 adb-axi sessions versus none for plain. Mixed buckets and batched commands cannot isolate causal effort.
+- **Raw counts are a different aggregation:** 551 versus 541 whole-task responses (arithmetic means 19.68/19.32), and 285 versus 332 completion-labelled device responses. They are not the geometric means in the table. The ten-response whole-task difference does not establish a regression: its registered ratio interval crosses equality.
+- **Help overlaps other work:** exclusive skill/help responses averaged 2.25/1.21 per subject; responses containing any help averaged 4.00/1.54 and could also contain source, build or device work. Root help was read in 10/28 adb-axi sessions versus none for plain. Mixed buckets and batched commands cannot isolate causal effort.
 - **Timing is environment-specific:** mandatory ownership checks and the audit logger add per-call overhead, disproportionately affecting the CLI's larger native-call count. The adjustment subtracts logged audit-call accounting, including concurrent collectors, but not all guard cost. It is not a causal latency correction or intrinsic CLI-speed measurement. Raw workflow time was about 10% higher in this environment.
 - **Sensitivities:** the original six episodes give cost 1.0082 [0.9451, 1.0751]; excluding A2 gives 1.0507 [0.9771, 1.1276]. Both remain inside the materiality band. Total-token ratio is 1.0668 [0.9891, 1.1492]; uncached-input ratio is 1.0514 [0.9672, 1.1395].
 
-Every episode, including adverse directions (four subjects per arm per episode):
+### Methodological correction
+
+The earlier claim of 47 fewer device-interaction responses (about 13% under the registered weighting) was unsupported. The frozen analysis assigns completed shell batches to the latest model response. An asynchronous command can return a session ID before completing: its starting response and intermediate polling responses can fall outside the device bucket, even while doing device work. Only the response receiving the completion may get the device label. The table retains the original metric and interval; neither the classifier, primary estimator, raw totals nor scores have been changed.
+
+The complements of the registered device counts are **266 versus 209 responses**, a difference of 57 that offsets the device-labelled difference of -47 to give +10 overall. **50 of those 57 net additional responses had no completed shell command**, so they are not 57 extra coding turns. A descriptive trace review associated **64 adb-axi versus 18 plain responses outside the device bucket with starting or polling device-containing batches**. These are mixed workflows, not a new definitive device-turn count or a causal estimate of removable effort. More help discovery and varying coding/build work also count toward the whole task; the completion-based subset cannot establish a device-interaction winner.
+
+A future comparison would need to define how starts, polls and completions are associated before running subjects. This correction changes the interpretation of the existing subset, not the study's whole-task results.
+
+Every episode, including adverse directions (four subjects per arm per episode; the device-response column uses the same completion-based definition):
 
 | Episode | Cost ratio [90% interval] | Whole-response ratio | Device-response ratio |
 | ------- | ------------------------- | -------------------- | --------------------- |
@@ -66,7 +74,7 @@ Every episode, including adverse directions (four subjects per arm per episode):
 | H4      | 0.8685 [0.7268, 1.0252]   | 1.026                | 0.794                 |
 | D1      | 0.9675 [0.8373, 1.0994]   | 1.119                | 0.890                 |
 
-A1 and H2 cost more with adb-axi; A2 cost less but used more device-work responses; H4 cost less but used slightly more whole-task responses. Per-episode intervals are small-sample, descriptive and unadjusted, not seven separate winners.
+A1 and H2 cost more with adb-axi; A2 cost less but used more completion-labelled device responses; H4 cost less but used slightly more whole-task responses. Per-episode intervals are small-sample, descriptive and unadjusted, not seven separate winners.
 
 | Outcome                                                       | adb-axi 0.2.4 | Plain adb |
 | ------------------------------------------------------------- | ------------- | --------- |
@@ -86,7 +94,9 @@ A1 and H2 cost more with adb-axi; A2 cost less but used more device-work respons
 
 ### Verdict
 
-Fewer device-work model responses, no demonstrated whole-task response saving, no material whole-task cost difference within the pre-set +/-15% band, and higher raw workflow time under this guard. Help, coding and build overhead prevent the localized device-work reduction from becoming a total-turn saving. The one-run functional and safety differences do not establish reliability or safety superiority. No genuine adb-axi product defect was established.
+No demonstrated whole-task response saving, no material whole-task cost difference within the pre-set +/-15% band, and higher raw workflow time under this guard. The completion-based device subset does not establish fewer device interactions. The small whole-response difference and one-run functional and safety differences do not establish a product regression or reliability/safety superiority. No genuine adb-axi CLI defect was established.
+
+Trace review did identify one narrow guidance opportunity: an expected nonzero `app start` can stop an `&&` chain before its marked crash read. Other subjects collected the crash in the same batch by running that diagnostic after the attempted launch. Clarifying this boundary can make crash evidence available together; it is not a measured turn saving or an explanation of the aggregate ten-response difference.
 
 ### Limitations
 
