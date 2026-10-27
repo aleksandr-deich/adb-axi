@@ -50,5 +50,16 @@ These short examples illustrate patterns; confirm current usage with live help w
 - Put flags after the complete command: `npx -y adb-axi app start com.example.notes --device emulator-5554`.
 - Trust `app start`'s observed foreground evidence when it reports the app in front; do not immediately repeat it with `app current`. A launch alone is not foreground proof.
 - Only when you need the schema, query a single database directly: `npx -y adb-axi data db com.example.notes 'SELECT name, sql FROM sqlite_master WHERE type = "table"'`. No listing first is needed; with several databases the CLI names them and asks for `--db`.
-- Chain known sequential operations and their checks in one shell turn with `&&` when no result-dependent decision is needed, for example `npx -y adb-axi logs mark before-run --device emulator-5554 && npx -y adb-axi app start com.example.notes --device emulator-5554 && npx -y adb-axi logs crash --since before-run --pkg com.example.notes --device emulator-5554`. Do not parallelize marks on the same device.
+- Chain known sequential operations with `&&` when each next step requires success. When reproducing a launch crash, `app start` returns nonzero if it detects the crash: collect the marked crash evidence after the attempted launch, even on failure, in the same batch where possible. This subshell requires a successful mark, keeps every command's output visible, and exits nonzero if launch or diagnosis fails. Keep all three commands on the same device; do not parallelize marks.
+
+  ```sh
+  (
+    npx -y adb-axi logs mark before-repro --device emulator-5554 || exit $?
+    start_status=0
+    npx -y adb-axi app start com.example.notes --device emulator-5554 || start_status=$?
+    npx -y adb-axi logs crash --since before-repro --pkg com.example.notes --device emulator-5554 || exit $?
+    exit "$start_status"
+  )
+  ```
+
 - When changing settings, capture the original value before changing it, install an EXIT trap before the mutation, then change, verify and restore in that same sequential turn. Use a subshell, preserve failing exit codes, and make cleanup failures nonzero too. Cleanup must run even if a check fails; do not put restoration only at the end of an `&&` chain.
