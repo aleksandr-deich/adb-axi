@@ -65,7 +65,6 @@ describe("wait app", () => {
       exit(PACKAGE),
       exit("package:/data/app/probe/base.apk\n"),
       exit(PS_HEADER),
-      pidofExit(""),
       exit(`${PS_HEADER} 8235 10213 dev.probe\n`),
       pidofExit("8235\n"),
     ]);
@@ -99,13 +98,12 @@ describe("wait app", () => {
       waited_ms: waited,
     });
     // The first read saw it stopped; the second, taken once the command deadline had passed, sees it running.
-    expect(adb.answeredWithMs[6]).toBeLessThanOrEqual(0);
+    expect(adb.answeredWithMs.at(-1)).toBeLessThanOrEqual(0);
     expect(adb.calls).toEqual([
       ["-s", SERIAL, "shell", "am get-current-user"],
       ["-s", SERIAL, "shell", "dumpsys package dev.probe"],
       ["-s", SERIAL, "shell", "pm path --user 0 dev.probe"],
       ["-s", SERIAL, "shell", "ps -A -o PID,UID,NAME"],
-      ["-s", SERIAL, "shell", "pidof 'dev.probe'"],
       ["-s", SERIAL, "shell", "ps -A -o PID,UID,NAME"],
       ["-s", SERIAL, "shell", "pidof 'dev.probe'"],
     ]);

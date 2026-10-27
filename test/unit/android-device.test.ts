@@ -46,14 +46,14 @@ async function failure(promise: Promise<unknown>): Promise<Record<string, unknow
 }
 
 const PS = "ps -A -o PID,UID,NAME";
-const PS_HEADER = { stdout: "  PID   UID NAME\n" };
+const PS_CANDIDATE = { stdout: "  PID   UID NAME\n 8235 10213 dev.probe\n" };
 
 const running = (adb: AdbClient, pkg: string) =>
   runningProcesses(adb, SERIAL, { pkg, uid: 10213 }, options());
 
 describe("pidof", () => {
   it("never reads an inconsistent answer as not running", async () => {
-    const { adb } = device({ [PS]: PS_HEADER, "pidof 'dev.probe'": { stdout: "", exit: 0 } });
+    const { adb } = device({ [PS]: PS_CANDIDATE, "pidof 'dev.probe'": { stdout: "", exit: 0 } });
     expect(await failure(running(adb, "dev.probe"))).toMatchObject({
       code: "INVALID_OUTPUT",
       step: "reading the pid of dev.probe",
@@ -62,7 +62,7 @@ describe("pidof", () => {
 
   it("reports a failed pidof as REMOTE_EXIT with its stderr", async () => {
     const { adb } = device({
-      [PS]: PS_HEADER,
+      [PS]: PS_CANDIDATE,
       "pidof 'dev.probe'": { stderr: "/system/bin/sh: pidof: inaccessible\n", exit: 126 },
     });
     expect(await failure(running(adb, "dev.probe"))).toEqual({
