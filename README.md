@@ -144,16 +144,18 @@ crashes: "0 since before-kill (13 s, 0 lines scanned)"
 
 adb-axi 0.2.4 was tested against equally guided plain `adb` on October 26-27, 2026: seven Android bug-fix episodes on one notes app, four fresh-session repeats per arm, using Codex CLI 0.162.0 with gpt-6.1-sol at medium effort. Independent deterministic checks scored function, tester-data preservation and strict safety across 56 completed runs.
 
-**adb-axi used fewer device-work turns; plain adb was faster in this guarded workflow. Neither had a demonstrated whole-task turn or material cost advantage.**
+**adb-axi needed 47 fewer AI-agent responses involving device interaction, but 10 more responses overall. Plain adb finished faster; task cost had no material difference. There is no overall winner.**
 
-| Measure           | adb-axi 0.2.4 versus equally guided plain adb         |
-| ----------------- | ----------------------------------------------------- |
-| Device-work turns | adb-axi wins on this measure: about 13% fewer         |
-| Whole-task turns  | No clear winner; no demonstrated saving with adb-axi  |
-| Whole-task cost   | No material difference within the pre-set +/-15% band |
-| Raw workflow time | Plain adb faster; adb-axi took about 10% longer       |
+A **turn** is one completed AI-agent response, which can execute several commands. Device interaction means work such as installing an app, reading logs or checking a database. The totals below cover **28 tasks per option**; fewer turns is better.
 
-A turn is a unique completed model response, not a shell/adb command. Device-work turns are only a subset: help, coding and builds offset that reduction. Timing includes asymmetric guard/audit overhead, not intrinsic CLI speed.
+| Turns across all 28 tasks               | adb-axi 0.2.4 | Plain adb | Difference        |
+| --------------------------------------- | ------------- | --------- | ----------------- |
+| Responses containing device interaction | 285           | 332       | adb-axi: 47 fewer |
+| All responses to finish the tasks       | 551           | 541       | adb-axi: 10 more  |
+
+The second row **includes the first row**, plus help, coding, builds and other work: do not add the rows. A response can mix device interaction with other work. Fewer device-interaction responses did not translate into fewer responses overall; the small overall difference does not establish a clear winner.
+
+**Cost:** no material difference within the pre-set +/-15% band. **Time:** plain adb was faster in this lab; adb-axi took about 10% longer. Timing includes asymmetric ownership-guard and audit overhead, so it does not measure intrinsic CLI speed.
 
 | Outcome, 28 runs per arm     | adb-axi 0.2.4 | Plain adb |
 | ---------------------------- | ------------- | --------- |
