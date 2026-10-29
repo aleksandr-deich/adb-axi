@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.5](https://github.com/aleksandr-deich/adb-axi/compare/v0.2.4...v0.2.5) (2026-10-29)
+
+
+### Performance Improvements
+
+* skip unused pidof reads for empty process candidates ([#86](https://github.com/aleksandr-deich/adb-axi/issues/86)) ([ee99c43](https://github.com/aleksandr-deich/adb-axi/commit/ee99c439a105b23fd8ef7f7a73dcd43ff1f99b6c))
+
 ## [0.2.4](https://github.com/aleksandr-deich/adb-axi/compare/v0.2.3...v0.2.4) (2026-10-25)
 
 
