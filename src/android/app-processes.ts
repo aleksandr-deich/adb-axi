@@ -130,7 +130,9 @@ export async function runningProcesses(
   const table = await readShell(adb, serial, PS_COMMAND, PS_STEP, options);
   const candidates = psCandidates(table.stdout, app);
   const running = new Map<string, number[]>();
-  for (const name of candidates.keys()) {
+  for (const [name, known] of candidates) {
+    // An empty ps set cannot confirm any pidof result, even if a process starts meanwhile.
+    if (known.size === 0) continue;
     running.set(name, await readPidof(adb, serial, name, options));
   }
   return confirmRunning(candidates, running);
