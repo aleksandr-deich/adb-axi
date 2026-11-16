@@ -12,7 +12,7 @@ This includes device discovery, boot waits, installed packages, app lifecycle, p
 
 Do not use it for UI input (taps, typing, swipes) or for reading what is on screen; use a UI tool for those. A UI-automation holder left connected can leave accessibility showing as enabled and block instrumented tests. Before instrumented tests or handoff, finish active UI commands and inspect the holder. Use `doctor ui --fix` only for observed leftover state that your session owns. Repair can stop instrumentation and app processes. Do not run repair as automatic preflight, and do not evict a live or unowned holder. Final check: leave the device as found, or say what changed.
 
-Use `npx -y adb-axi config get [<key>]` and `config set <key> <value>` for animations, night, font_scale, density and size. These commands return raw rows (`present`, `text`), an effective value and a pasteable `value`. An absent row is `present:false,text:null`; a literal string `"null"` is present. `unset` deletes rows; density/size `reset` restores a present-empty default row. Other settings still use `shell`.
+Use `npx -y adb-axi config get [<key>]` and `config set <key> <value>` for animations, night, font_scale, density and size. Other settings still use `shell`. See [Temporary device configuration](../../README.md#temporary-device-configuration) for the output contract and supported values; consult live `config set --help` for the installed version's constraints.
 
 ## Current guidance lives in the CLI
 
@@ -27,7 +27,7 @@ Output is short and the first line is the verdict. Do not pipe it through `tail`
 
 `adb-axi shell` returns structured output, not raw remote stdout. For a value that another command will use, request `--json` and parse its `stdout` field. Check the command's `exit` status and validate the parsed value before changing state. Do not extract a value with `head`, `tail`, or removal of a printed field label.
 
-For supported settings, restore with the `before.value` printed by `config set`, including a per-row animations value such as `window=unset,transition=1,animator=0.5`. A null restore value means unsupported raw state: stop without changing it. This includes original sizes outside the supported per-axis bounds and numeric density/size rows equal to physical defaults, which `wm` normalizes to empty rows. Set validates before writing and checks readback; a failure can include partially changed state and the original `before`. Animation `effective` values are row-derived estimates, not verified live scales; absent rows assume default 1. Values above 20 are null because clamping is platform-dependent: Android 15 clamps to 20, while older releases may not. Animation `unset` requests default 1 before deleting rows; live scales are normally 1 afterwards but are not verified. Font values use Android's float text and preserve the `system_locales` companion row; a noncanonical original font row is refused for mutation. No baseline file or automatic rollback exists.
+For supported settings, restore with the `before.value` printed by `config set`, using the [temporary settings recipe](#temporary-settings-recipe). Stop if the original restore value is null. A failed set may have partially applied: inspect its before/after evidence and run cleanup even if checks fail. Consult `config set --help` for unsupported originals, user restrictions and the limits of verification, especially animation estimates and live-unverified `unset`.
 
 For other settings, record row presence separately from raw text. An absent settings key commonly prints `null`; restore confirmed absence with `settings delete`, not `settings put`. If presence or parsing is unknown, stop without changing state.
 
@@ -102,5 +102,3 @@ Run the mutation, checks and restoration in one sequential turn. This Bash examp
   # Run checks here; exit nonzero if a check fails.
 )
 ```
-
-`config set night` refuses nonzero resolved Android users before any write because the platform command applies to user 0 only. `config set night yes` can fail with `CONFIG_MISMATCH` on a device that locks night mode. Inspect the error's before/after instead of treating a successful shell exit as proof.
