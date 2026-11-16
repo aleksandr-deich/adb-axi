@@ -1,6 +1,6 @@
-import { AdbAxiError } from "../../core/errors.js";
+import { AdbAxiError, errorObject } from "../../core/errors.js";
 import { defineCommand, defineGroup } from "../define.js";
-import { snapshot, verify, writeConfig } from "./state.js";
+import { preflightConfig, snapshot, verify, writeConfig } from "./state.js";
 import { KEYS, configKey, configValues } from "./values.js";
 
 const help = [
@@ -8,6 +8,9 @@ const help = [
   'Each row includes present and raw text: absent is present:false,text:null; the literal string null is present:true,text:"null"',
   "before.value is a pasteable restore value; null means an unsupported raw state, which set refuses to change",
   "animations accepts a non-negative scale for all rows or window=<scale|unset>,transition=<scale|unset>,animator=<scale|unset>",
+  "Absent animation rows report default 1; live scales can differ if another tool deleted rows without resetting them. unset writes 1 before deleting",
+  "font_scale uses Android's float text; noncanonical original font rows are readable but refused for mutation so raw text cannot be lost",
+  "size is validated against the active density and platform bounds (200 pixels minimum, twice each physical dimension maximum) before writing",
   "night: yes/no/auto; font_scale: positive scale; density: integer >=72; size: WxH with optional dp suffix on either dimension",
   "Night writes require resolved user 0: the platform command applies night mode to user 0 only; other users are refused before any write",
   "unset deletes rows; density/size reset leaves present-empty rows. Neither is a saved baseline or reset command",
@@ -64,18 +67,25 @@ const set = defineCommand({
         "Original raw config cannot be restored with this command; no write attempted",
         { fields: { key, user, before } },
       );
+    await preflightConfig(context, key, values, user);
     try {
       await writeConfig(context, key, values, user);
       const after = await snapshot(context, key, user);
       await verify(context, key, values, before, after, user);
       return { key, user, before, after };
     } catch (error) {
-      if (error instanceof AdbAxiError && error.fields.before === undefined) {
+      if (error instanceof AdbAxiError && error.fields.after === undefined) {
+        let observed: Record<string, unknown>;
+        try {
+          observed = { after: await snapshot(context, key, user) };
+        } catch (readError) {
+          observed = { after_error: errorObject(readError) };
+        }
         throw new AdbAxiError(error.code, error.message, {
-          fields: { key, user, before, ...error.fields },
+          fields: { key, user, before, ...error.fields, ...observed },
           help: [
             ...error.help,
-            "A write may have partially applied; restore using before.value on this device",
+            "A write may have partially applied; restore using before.value on this device only while the original Android user is current",
           ],
           cause: error,
         });

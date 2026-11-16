@@ -74,7 +74,7 @@ async function readRows(context: DeviceContext, specs: RowSpec[], user: number):
 }
 async function nightMode(context: DeviceContext): Promise<string> {
   const output = await shell(context, "cmd uimode night");
-  const value = /^Night mode: (yes|no|auto|custom)\s*$/.exec(output)?.[1];
+  const value = /^Night mode: (yes|no|auto|custom(?:_schedule|_bedtime)?)\s*$/.exec(output)?.[1];
   if (value === undefined) throw invalidOutput("reading night mode", output);
   return value;
 }
@@ -119,7 +119,8 @@ export async function snapshot(
   const tokens = rows.map((item): string | null => {
     if (!item.present) return key === "night" && effective !== "no" ? null : "unset";
     const text = item.text;
-    if (text === null) return null;
+    if (text === null || text === "unset" || text === "reset") return null;
+    if (key === "font_scale" && text !== effective) return null;
     if (key === "night") return NIGHT[text] ?? null;
     if ((key === "density" || key === "size") && text === "") return "reset";
     const token = key === "size" ? text.replace(",", "x") : text;
@@ -162,42 +163,88 @@ async function putRow(
       : `put ${row.namespace} ${row.name} ${shellWords([text])}`;
   await shell(context, `settings ${selector(row, user)}${command}`);
 }
-async function writeNight(context: DeviceContext, value: string, user: number): Promise<void> {
-  const companions = await readRows(context, NIGHT_COMPANIONS, user);
+async function preserveRows(
+  context: DeviceContext,
+  specs: RowSpec[],
+  user: number,
+  write: () => Promise<void>,
+): Promise<void> {
+  const companions = await readRows(context, specs, user);
   let writeError: Error | undefined;
   try {
-    const desired = value === "unset" ? "no" : value;
-    await shell(context, `cmd uimode night ${desired}`);
-    // A locked device can silently refuse the command; do not make its settings claim otherwise.
-    if ((await nightMode(context)) === desired && value !== "unset") {
-      const code = Object.entries(NIGHT).find(([, name]) => name === value)?.[0];
-      if (code !== undefined) await putRow(context, ROWS.night[0] as RowSpec, user, code);
-    }
+    await write();
   } catch (error) {
     writeError =
       error instanceof Error
         ? error
-        : new AdbAxiError("INTERNAL_ERROR", "Night-mode write failed", {
+        : new AdbAxiError("INTERNAL_ERROR", "Configuration write failed", {
             fields: { detail: String(error) },
           });
   }
-  const changed = await readRows(context, NIGHT_COMPANIONS, user);
+  const changed = await readRows(context, specs, user);
   for (const [index, row] of companions.entries()) {
     if (changed[index]?.present !== row.present || changed[index].text !== row.text)
       await putRow(context, row, user, row.text);
   }
-  const restored = await readRows(context, NIGHT_COMPANIONS, user);
+  const restored = await readRows(context, specs, user);
   if (
     restored.some(
       (row, index) =>
         row.present !== companions[index]?.present || row.text !== companions[index].text,
     )
   ) {
-    throw new AdbAxiError("CONFIG_MISMATCH", "Night-mode companion rows could not be preserved", {
-      fields: { companions_before: companions, companions_after: restored },
-    });
+    throw new AdbAxiError(
+      "CONFIG_MISMATCH",
+      "Configuration companion rows could not be preserved",
+      {
+        fields: { companions_before: companions, companions_after: restored },
+      },
+    );
   }
   if (writeError !== undefined) throw writeError;
+}
+export async function preflightConfig(
+  context: DeviceContext,
+  key: ConfigKey,
+  values: string[],
+  user: number,
+): Promise<void> {
+  if (key === "size" && !["unset", "reset"].includes(values[0] ?? "")) {
+    const physical = (await display(context, "size")).physical.split("x").map(Number);
+    const limits = physical.map((dimension) => 2 * dimension);
+    const dimensions = (await pixelSize(context, values[0] ?? "")).split("x").map(Number);
+    if (
+      dimensions.some((dimension, index) => dimension < 200 || dimension > (limits[index] ?? 0))
+    ) {
+      throw new AdbAxiError(
+        "VALIDATION_ERROR",
+        `Size dimensions must resolve to at least 200 pixels and at most twice each physical dimension (${limits.join("x")}); no write attempted`,
+      );
+    }
+  }
+  // wm uses the foreground user implicitly; refuse a switch rather than target another user.
+  const current = (await shell(context, "am get-current-user")).trim();
+  if (current !== String(user))
+    throw new AdbAxiError("VALIDATION_ERROR", "Android user changed; no write attempted", {
+      fields: { user, current },
+    });
+}
+async function pixelSize(context: DeviceContext, value: string): Promise<string> {
+  const density = value.includes("dp")
+    ? Number((await display(context, "density")).effective)
+    : 160;
+  return value
+    .split("x")
+    .map((part) => {
+      const number = Number.parseInt(part, 10);
+      if (part.endsWith("dp") && number * density > 2147483647)
+        throw new AdbAxiError(
+          "VALIDATION_ERROR",
+          "Size dp conversion overflows the platform integer; no write attempted",
+        );
+      return part.endsWith("dp") ? Math.trunc((number * density) / 160) : number;
+    })
+    .join("x");
 }
 export async function writeConfig(
   context: DeviceContext,
@@ -205,33 +252,81 @@ export async function writeConfig(
   values: string[],
   user: number,
 ): Promise<void> {
-  // wm uses the foreground user implicitly; refuse a switch rather than target another user.
-  const current = (await shell(context, "am get-current-user")).trim();
-  if (current !== String(user))
-    throw new AdbAxiError("CONFIG_MISMATCH", "Android user changed before the config write", {
-      fields: { user, current },
-    });
   const value = values[0] ?? "";
-  if (key === "night") await writeNight(context, value, user);
+  if (key === "night")
+    await preserveRows(context, NIGHT_COMPANIONS, user, async () => {
+      const desired = value === "unset" ? "no" : value;
+      await shell(context, `cmd uimode night ${desired}`);
+      // A locked device can silently refuse the command; do not change its row on refusal.
+      if ((await nightMode(context)) === desired) {
+        const code = Object.entries(NIGHT).find(([, name]) => name === value)?.[0];
+        if (value === "unset" || code !== undefined)
+          await putRow(context, ROWS.night[0] as RowSpec, user, code ?? null);
+      }
+    });
   if (key === "density" || key === "size")
     await shell(context, `wm ${key} ${value === "unset" ? "reset" : value}`);
   if (key === "font_scale") {
-    // Android rewrites font_scale after a configuration change; settle the default before deleting its row.
-    const desired = value === "unset" ? "1" : value;
-    await putRow(context, ROWS.font_scale[0] as RowSpec, user, desired);
-    const settled = await observe({
-      deadline: context.deadline,
-      windowMs: 5000,
-      read: async () => fontScale(context),
-      done: (effective) => Math.fround(Number(effective)) === Math.fround(Number(desired)),
-    });
-    if (!settled.ok)
-      throw new AdbAxiError("CONFIG_MISMATCH", "Requested font scale did not take effect");
+    await preserveRows(
+      context,
+      [{ name: "system_locales", namespace: "system", alias: "locales" }],
+      user,
+      async () => {
+        const desired = value === "unset" ? "1.0" : value;
+        await putRow(context, ROWS.font_scale[0] as RowSpec, user, desired);
+        let stable = 0;
+        const settled = await observe({
+          deadline: context.deadline,
+          windowMs: 5000,
+          read: async () => fontScale(context),
+          done: (effective) => {
+            stable =
+              Math.fround(Number(effective)) === Math.fround(Number(desired)) ? stable + 1 : 0;
+            return stable >= 2;
+          },
+        });
+        if (!settled.ok)
+          throw new AdbAxiError("CONFIG_MISMATCH", "Requested font scale did not take effect");
+        // Configuration.toString supplies Android's own Float.toString, not a host approximation.
+        await putRow(
+          context,
+          ROWS.font_scale[0] as RowSpec,
+          user,
+          value === "unset" ? null : settled.value,
+        );
+        let stableRows = 0;
+        const rowsSettled = await observe({
+          deadline: context.deadline,
+          windowMs: 5000,
+          read: async () => readRows(context, ROWS.font_scale, user),
+          done: (rows) => {
+            stableRows = (
+              value === "unset" ? rows[0]?.present === false : rows[0]?.text === settled.value
+            )
+              ? stableRows + 1
+              : 0;
+            return stableRows >= 2;
+          },
+        });
+        if (!rowsSettled.ok)
+          throw new AdbAxiError(
+            "CONFIG_MISMATCH",
+            "Font-scale row did not remain in the requested state",
+          );
+      },
+    );
   }
   for (const [index, row] of ROWS[key].entries()) {
     const item = values[index] ?? "";
-    if (item === "unset") await putRow(context, row, user, null);
-    else if (key === "animations") await putRow(context, row, user, item);
+    if (key === "animations") {
+      if (item === "unset") {
+        // Deletion alone retains WindowManager's previous in-memory scale.
+        await putRow(context, row, user, "1");
+        await readRows(context, [row], user);
+      }
+      await putRow(context, row, user, item === "unset" ? null : item);
+    } else if (item === "unset" && (key === "density" || key === "size"))
+      await putRow(context, row, user, null);
   }
 }
 export async function verify(
@@ -249,7 +344,12 @@ export async function verify(
     if (key === "night") return row.present && NIGHT[row.text ?? ""] === desired;
     if (desired === "reset") return row.present && row.text === "";
     if (key === "size") return row.present;
-    if (key === "density") return row.present && Number(row.text) === Number(desired);
+    if (key === "density" || key === "font_scale")
+      return (
+        row.present &&
+        ((row.text === "" && key === "density") ||
+          Math.fround(Number(row.text)) === Math.fround(Number(desired)))
+      );
     return row.present && row.text === desired;
   });
   if (key === "font_scale")
@@ -260,26 +360,11 @@ export async function verify(
     const state = await display(context, key);
     if (["unset", "reset"].includes(value)) matches &&= after.effective === state.physical;
     else {
-      let expected =
-        key === "density"
-          ? String(Number(value))
-          : value
-              .split("x")
-              .map((part) => String(Number(part)))
-              .join("x");
-      if (key === "size" && value.includes("dp")) {
-        const density = await display(context, "density");
-        expected = value
-          .split("x")
-          .map((part) =>
-            part.endsWith("dp")
-              ? Math.trunc((Number.parseInt(part, 10) * Number(density.physical)) / 160)
-              : Number(part),
-          )
-          .join("x");
-      }
+      const expected = key === "density" ? String(Number(value)) : await pixelSize(context, value);
       matches &&= after.effective === expected;
-      if (key === "size") matches &&= after.rows[0]?.text === expected.replace("x", ",");
+      const rawExpected =
+        expected === state.physical ? "" : key === "size" ? expected.replace("x", ",") : expected;
+      matches &&= after.rows[0]?.text === rawExpected;
     }
   }
   if (!matches) {

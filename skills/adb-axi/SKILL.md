@@ -27,7 +27,7 @@ Output is short and the first line is the verdict. Do not pipe it through `tail`
 
 `adb-axi shell` returns structured output, not raw remote stdout. For a value that another command will use, request `--json` and parse its `stdout` field. Check the command's `exit` status and validate the parsed value before changing state. Do not extract a value with `head`, `tail`, or removal of a printed field label.
 
-For supported settings, restore with the `before.value` printed by `config set`, including a per-row animations value such as `window=unset,transition=1,animator=0.5`. A null restore value means unsupported raw state: stop without changing it. Set validates before writing and checks readback; a failure can include partially changed state and the original `before`. No baseline file or automatic rollback exists.
+For supported settings, restore with the `before.value` printed by `config set`, including a per-row animations value such as `window=unset,transition=1,animator=0.5`. A null restore value means unsupported raw state: stop without changing it. Set validates before writing and checks readback; a failure can include partially changed state and the original `before`. Absent animation rows report default 1; another tool's raw deletion can leave a different live scale. Animation `unset` writes 1 before deleting. Font values use Android's float text and preserve the `system_locales` companion row; a noncanonical original font row is refused for mutation. No baseline file or automatic rollback exists.
 
 For other settings, record row presence separately from raw text. An absent settings key commonly prints `null`; restore confirmed absence with `settings delete`, not `settings put`. If presence or parsing is unknown, stop without changing state.
 

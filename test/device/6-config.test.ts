@@ -17,7 +17,7 @@ async function get(key: Key): Promise<State> {
 }
 async function independent(): Promise<string> {
   return axi.sh(
-    "for ns in global secure system; do echo @$ns; settings --user $(am get-current-user) list $ns | grep -E '^(window_animation_scale|transition_animation_scale|animator_duration_scale|ui_night_mode|dark_theme_custom_start_time|dark_theme_custom_end_time|ui_night_mode_custom_type|ui_night_mode_override_on|ui_night_mode_override_off|font_scale|display_density_forced|display_size_forced)=' | sort; done; wm density; wm size; cmd uimode night",
+    "for ns in global secure system; do echo @$ns; settings --user $(am get-current-user) list $ns | grep -E '^(window_animation_scale|transition_animation_scale|animator_duration_scale|ui_night_mode[^=]*|dark_theme_[^=]*|font_scale|system_locales|display_density_forced|display_size_forced)=' | sort; done; wm density; wm size; cmd uimode night",
   );
 }
 async function restore(key: Key, value: string | null): Promise<void> {
@@ -67,6 +67,51 @@ test("all keys report raw rows; each set restores its printed before and identic
     }
     expect(await independent()).toBe(rawBefore);
   }
+  for (const [value, expected] of [
+    ["2", "2.0"],
+    ["1", "1.0"],
+    [".5", "0.5"],
+    ["1.50", "1.5"],
+    ["1e0", "1.0"],
+  ]) {
+    const original = await get("font_scale");
+    try {
+      const changed = await axi.ok(["config", "set", "font_scale", value ?? ""]);
+      expect((changed.after as State).rows[0]?.text).toBe(expected);
+      expect(await axi.sh("settings --user $(am get-current-user) get system font_scale")).toBe(
+        expected,
+      );
+    } finally {
+      await restore("font_scale", original.value);
+    }
+    expect(await independent()).toBe(initial);
+  }
+  const density = await get("density");
+  const size = await get("size");
+  try {
+    for (const key of ["density", "size"] as const) {
+      const physical = new RegExp(`^Physical ${key}: (.+)$`, "m").exec(await independent())?.[1];
+      if (physical === undefined) throw new Error(`No physical ${key}`);
+      const changed = await axi.ok(["config", "set", key, physical]);
+      expect((changed.after as State).effective).toBe(physical);
+      expect((changed.after as State).rows[0]?.text).toBe("");
+    }
+    await axi.ok(["config", "set", "density", "320"]);
+    const changed = await axi.ok(["config", "set", "size", "400dpx800dp"]);
+    expect((changed.after as State).effective).toBe("800x1600");
+    expect(await axi.sh("wm size")).toContain("Override size: 800x1600");
+  } finally {
+    await restore("size", size.value);
+    await restore("density", density.value);
+  }
+  if (api >= 30) {
+    const night = await get("night");
+    try {
+      await axi.ok(["config", "set", "night", "auto"]);
+    } finally {
+      await restore("night", night.value);
+    }
+  }
   expect(await independent()).toBe(initial);
 });
 
@@ -92,6 +137,13 @@ test("absent animator row differs from a present literal null, and unset restore
       present: true,
       text: "null",
     });
+    await axi.sh("settings put global animator_duration_scale unset");
+    expect((await get("animations")).value).toBeNull();
+    const beforeRefusal = await independent();
+    const refused = await axi.run(["config", "set", "animations", "0"]);
+    expect(refused.exitCode).toBe(1);
+    expect(refused.json.code).toBe("INVALID_OUTPUT");
+    expect(await independent()).toBe(beforeRefusal);
   } finally {
     await axi.sh("settings delete global animator_duration_scale");
     await restore("animations", original.value);
@@ -129,7 +181,13 @@ test("invalid key values fail with usage errors without changing settings", asyn
     ["density", "320;echo bad"],
     ["size", "0x100"],
     ["size", "wide"],
+    ["size", "1x1"],
+    ["size", "10000x10000"],
+    ["size", "2147483647dpx1"],
   ];
+  const physical = /^Physical size: (\d+)x(\d+)$/m.exec(initial);
+  if (physical === null) throw new Error("No physical size");
+  invalid.push(["size", `${Number(physical[1]) * 2 + 1}x${physical[2]}`]);
   for (const [key, value] of invalid) {
     const result = await axi.run(["config", "set", key, value]);
     expect(result.exitCode, result.stdout).toBe(2);
