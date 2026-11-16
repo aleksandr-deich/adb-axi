@@ -39,8 +39,11 @@ export function parsePreferences(xml: string): PreferenceRow[] {
   const parser = new SaxesParser({ xmlns: false });
   // Android serializes C0 controls as numeric references even though XML 1.0 forbids them.
   // Named entities return those code points without XML 1.1's newline normalization.
-  let prefix = "adbAxiControl";
-  while (xml.includes(prefix)) prefix += "x";
+  const namespaces = new Set<string>();
+  for (const match of xml.matchAll(/adbAxiControl[0-9]+_/g)) namespaces.add(match[0]);
+  let namespace = 0;
+  while (namespaces.has(`adbAxiControl${namespace}_`)) namespace++;
+  const prefix = `adbAxiControl${namespace}_`;
   const input = xml.replace(
     /<!\[CDATA\[[\s\S]*?\]\]>|<!--[\s\S]*?-->|&#(?:x[0-9a-fA-F]+|[0-9]+);/g,
     (reference) => {
