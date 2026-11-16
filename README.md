@@ -8,7 +8,7 @@ What it adds over plain `adb`:
 - **No hangs:** every command has a time limit, so a stuck device cannot block the agent.
 - **Honest results:** a command succeeds only when the requested state is actually true, and every error names the next step.
 
-Use it to check which devices are attached and healthy; install, start, stop and kill apps, including testing that an app survives process death; read the logs and crashes of one test run; and query a debuggable app's database. It does not read the screen or tap and type: use `android layout` or a UI tool such as agent-device for that.
+Use it to check which devices are attached and healthy; install, start, stop and kill apps, including testing that an app survives process death; read the logs and crashes of one test run; and read a debuggable app's databases and SharedPreferences. It does not read the screen or tap and type: use `android layout` or a UI tool such as agent-device for that.
 
 Screen-reading tools can leave a helper connected that keeps Android reporting accessibility as enabled and blocks instrumented tests. Before handing a device back or running instrumented tests, run `adb-axi doctor ui --fix --device <serial>`. It removes stale helpers, which can stop a running instrumentation and its app, and leaves helpers still in use alone.
 
