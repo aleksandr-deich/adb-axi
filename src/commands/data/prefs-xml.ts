@@ -44,19 +44,36 @@ export function parsePreferences(xml: string): PreferenceRow[] {
   let namespace = 0;
   while (namespaces.has(`adbAxiControl${namespace}_`)) namespace++;
   const prefix = `adbAxiControl${namespace}_`;
-  const input = xml.replace(
-    /<!\[CDATA\[[\s\S]*?\]\]>|<!--[\s\S]*?-->|&#(?:x[0-9a-fA-F]+|[0-9]+);/g,
-    (reference) => {
-      if (!reference.startsWith("&#")) return reference;
-      const code = reference.startsWith("&#x")
-        ? Number.parseInt(reference.slice(3, -1), 16)
-        : Number(reference.slice(2, -1));
-      if (code < 0 || code > 31 || [9, 10, 13].includes(code)) return reference;
-      const entity = `${prefix}${code}`;
-      parser.ENTITIES[entity] = String.fromCharCode(code);
-      return `&${entity};`;
-    },
-  );
+  const parts: string[] = [];
+  const numericReference = /&#(?:x[0-9a-fA-F]+|[0-9]+);/y;
+  let copiedUntil = 0;
+  for (let position = 0; position < xml.length;) {
+    const cdata = xml.startsWith("<![CDATA[", position);
+    if (cdata || xml.startsWith("<!--", position)) {
+      const end = xml.indexOf(cdata ? "]]>" : "-->", position + (cdata ? 9 : 4));
+      if (end === -1) invalid();
+      position = end + 3;
+      continue;
+    }
+    numericReference.lastIndex = position;
+    const reference = xml.startsWith("&#", position) ? numericReference.exec(xml)?.[0] : undefined;
+    if (reference === undefined) {
+      position++;
+      continue;
+    }
+    const start = position;
+    position += reference.length;
+    const code = reference.startsWith("&#x")
+      ? Number.parseInt(reference.slice(3, -1), 16)
+      : Number(reference.slice(2, -1));
+    if (code < 0 || code > 31 || [9, 10, 13].includes(code)) continue;
+    const entity = `${prefix}${code}`;
+    parser.ENTITIES[entity] = String.fromCharCode(code);
+    parts.push(xml.slice(copiedUntil, start), `&${entity};`);
+    copiedUntil = position;
+  }
+  parts.push(xml.slice(copiedUntil));
+  const input = parts.join("");
   parser.on("error", invalid);
   parser.on("doctype", invalid);
   parser.on("processinginstruction", invalid);
