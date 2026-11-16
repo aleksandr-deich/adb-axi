@@ -8,7 +8,6 @@ export const V02_PATTERNS = [
   /adb-axi config\b/,
   /adb-axi fwd\b/,
   /adb-axi rev\b/,
-  /adb-axi data prefs\b/,
   /adb-axi doctor --fix\b/,
   /adb-axi setup\b/,
 ];

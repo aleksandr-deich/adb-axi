@@ -220,14 +220,15 @@ async function copyDatabase(
   if (database.walSize !== null) {
     const wal = await pull(context, pkg, `${database.name}-wal`, plan.userId);
     if (wal.length > 0) {
-      if (!isWal(wal)) throw notSqlite(context, pkg, `${database.name}-wal`, wal, "a WAL file");
+      if (!isWal(wal))
+        throw notSqlite(context, pkg, `${database.name}-wal`, wal, "a WAL file", plan.userId);
       writeFileSync(join(dir, "db-wal"), wal);
       walCopied = true;
     }
   }
   const main = await pull(context, pkg, database.name, plan.userId);
   if (main.length === 0 || !main.subarray(0, SQLITE_HEADER.length).equals(SQLITE_HEADER)) {
-    throw notSqlite(context, pkg, database.name, main, "a SQLite database");
+    throw notSqlite(context, pkg, database.name, main, "a SQLite database", plan.userId);
   }
   writeFileSync(join(dir, "db"), main);
   return walCopied;
@@ -261,9 +262,10 @@ function notSqlite(
   name: string,
   bytes: Buffer,
   expected: string,
+  userId: number,
 ): AdbAxiError {
   const sample = bytes.subarray(0, 200).toString("utf8").trim();
-  const refusal = runAsRefusal(context, pkg, sample);
+  const refusal = runAsRefusal(context, pkg, sample, userId);
   if (refusal !== undefined) return refusal;
   const printable = /^[\x20-\x7e\r\n\t]*$/.test(sample);
   return new AdbAxiError(

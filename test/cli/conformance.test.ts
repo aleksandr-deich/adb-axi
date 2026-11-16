@@ -52,6 +52,7 @@ const CASES: Case[] = [
   { args: ["logs", "mark", "before-save"] },
   { args: ["logs", "crash"] },
   { args: ["data", "db", PKG] },
+  { args: ["data", "prefs", PKG] },
   { args: ["shell", "--", "id"] },
   { args: ["update"] },
 ];
@@ -78,6 +79,7 @@ const HELP_CONTRACTS: Record<string, { fragments: string[]; summary?: string }> 
   "wait app": { fragments: ["--state <foreground|running|stopped> (required)"] },
   "wait boot": { fragments: ['"--timeout <dur>",120s'] },
   "data db": { fragments: ["64 MB result limit"] },
+  "data prefs": { fragments: ["--file <name>", "--full"] },
   shell: { fragments: ["--full", "adb-axi shell -- 'getprop ro.build.version.sdk'"] },
 };
 

@@ -32,19 +32,14 @@ const V01_CODES = [
   "MARK_NOT_FOUND",
   "APP_NOT_DEBUGGABLE",
   "DB_NOT_FOUND",
+  "PREFS_NOT_FOUND",
   "INVALID_OUTPUT",
   "SQL_ERROR",
 ];
-const V02_CODES = [
-  "DEVICE_IN_USE",
-  "LEASE_STALE",
-  "PREFS_NOT_FOUND",
-  "CONFIG_NOT_APPLIED",
-  "PORT_IN_USE",
-];
+const V02_CODES = ["DEVICE_IN_USE", "LEASE_STALE", "CONFIG_NOT_APPLIED", "PORT_IN_USE"];
 
 describe("error catalogue", () => {
-  it("has every v0.1 code and no v0.2 code", () => {
+  it("has every shipped code and no unshipped v0.2 code", () => {
     for (const code of V01_CODES) expect(Object.keys(ERROR_CATALOGUE)).toContain(code);
     for (const code of V02_CODES) expect(isErrorCode(code)).toBe(false);
   });

@@ -46,7 +46,7 @@ export async function listDatabases(
   } catch (error) {
     if (error instanceof AdbAxiError && error.code === "REMOTE_EXIT") {
       const stderr = typeof error.fields.stderr === "string" ? error.fields.stderr : "";
-      const refusal = runAsRefusal(context, pkg, stderr);
+      const refusal = runAsRefusal(context, pkg, stderr, userId);
       if (refusal !== undefined) throw refusal;
       if (/No such file or directory/.test(stderr)) return [];
     }
@@ -71,6 +71,7 @@ export function runAsRefusal(
   context: DeviceContext,
   pkg: string,
   text: string,
+  userId?: number,
 ): AdbAxiError | undefined {
   const line = text.trim().split(/\r?\n/)[0] ?? "";
   if (!line.startsWith("run-as:")) return undefined;
@@ -78,6 +79,18 @@ export function runAsRefusal(
     return new AdbAxiError("APP_NOT_INSTALLED", `${pkg} is not installed`, {
       help: [runHint(lifecycleCommand(context, ["app", "list"]), "to see the installed packages")],
     });
+  }
+  if (!/not debuggable/i.test(line)) {
+    return new AdbAxiError(
+      "APP_DATA_UNREADABLE",
+      `${pkg}'s private files cannot be read${userId === undefined ? "" : ` for Android user ${userId}`}`,
+      {
+        fields: { detail: line, ...(userId === undefined ? {} : { user: userId }) },
+        help: [
+          `Check that the app's data is available${userId === undefined ? "" : ` for Android user ${userId}`} and that run-as can access it; a debuggable build alone does not grant access`,
+        ],
+      },
+    );
   }
   return new AdbAxiError(
     "APP_NOT_DEBUGGABLE",

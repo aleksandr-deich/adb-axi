@@ -1,6 +1,6 @@
 ---
 name: adb-axi
-description: "Read and manage Android device and app state through the adb-axi CLI - attached devices and their health, the foreground app, installed packages, app install, start, stop, clear, kill and restore, process-death checks, run-scoped logs, crashes and ANRs, read-only queries on a debuggable app's databases, UiAutomation holder diagnosis, and one device shell command with its real exit code. Use instead of raw `adb` whenever a task needs Android device or app state, including `adb devices`, `am start`/`force-stop`/`kill`, `pidof`, `getprop`, `dumpsys`, `settings`, and `wm` state checks, even one-line checks during lesson or code review. This covers checking attached devices, boot waits, app lifecycle and process death, logs and crashes, app data, and UiAutomation holder diagnosis. Not for UI input or reading the screen; use a UI tool for that."
+description: "Read and manage Android device and app state through the adb-axi CLI - attached devices and their health, the foreground app, installed packages, app install, start, stop, clear, kill and restore, process-death checks, run-scoped logs, crashes and ANRs, read-only queries on a debuggable app's databases and SharedPreferences, UiAutomation holder diagnosis, and one device shell command with its real exit code. Use instead of raw `adb` whenever a task needs Android device or app state, including `adb devices`, `am start`/`force-stop`/`kill`, `pidof`, `getprop`, `dumpsys`, `settings`, and `wm` state checks, even one-line checks during lesson or code review. This covers checking attached devices, boot waits, app lifecycle and process death, logs and crashes, app data, and UiAutomation holder diagnosis. Not for UI input or reading the screen; use a UI tool for that."
 user-invocable: false
 ---
 
@@ -8,7 +8,7 @@ user-invocable: false
 
 Agent ergonomic wrapper around adb. Use adb-axi for Android device and app state, not raw `adb`.
 
-This includes device discovery, boot waits, installed packages, app lifecycle, process-death checks, logs, databases, settings, properties, and `dumpsys` queries. Use named commands when they match the operation. Use `shell` for other device-shell state commands. Keep UI input, screen reading, emulator management, builds, and connected-test orchestration in their existing tools.
+This includes device discovery, boot waits, installed packages, app lifecycle, process-death checks, logs, databases, SharedPreferences, settings, properties, and `dumpsys` queries. Use named commands when they match the operation. Use `shell` for other device-shell state commands. Keep UI input, screen reading, emulator management, builds, and connected-test orchestration in their existing tools.
 
 Do not use it for UI input (taps, typing, swipes) or for reading what is on screen; use a UI tool for those. A UI-automation holder left connected can leave accessibility showing as enabled and block instrumented tests. Before instrumented tests or handoff, finish active UI commands and inspect the holder. Use `doctor ui --fix` only for observed leftover state that your session owns. Repair can stop instrumentation and app processes. Do not run repair as automatic preflight, and do not evict a live or unowned holder. Final check: leave the device as found, or say what changed.
 
@@ -43,6 +43,7 @@ Typical usages (flags go after the command; confirm details with `--help`):
 - `npx -y adb-axi app start <pkg>`, `npx -y adb-axi app stop <pkg>` and `npx -y adb-axi app clear <pkg>`.
 - `npx -y adb-axi app death <pkg>` kills and restores the app in one call, with before and after evidence. It sends HOME itself, so run it with the app in front and do not press HOME or sleep first.
 - `npx -y adb-axi data db <pkg> '<sql>'` runs one read-only query on a debuggable app's database.
+- `npx -y adb-axi data prefs <pkg>` reads typed SharedPreferences rows; with several XML files, use `--file <name>` from the listed names. Long values are decimal strings; DataStore is not supported.
 
 ## Fewer turns, same checks
 

@@ -305,8 +305,8 @@ describe("data db on real app databases", () => {
     expect(file.rows.at(-1)).toEqual({ id: 120, v: "row 120" });
     const scratch = mkdtempSync(join(tmpdir(), "adb-axi-device-mode-"));
     try {
-      writeFileSync(join(scratch, "plain"), "");
-      mkdirSync(join(scratch, "dir"));
+      writeFileSync(join(scratch, "plain"), "", { mode: 0o600 });
+      mkdirSync(join(scratch, "dir"), { mode: 0o700 });
       expect(statSync(path).mode & 0o777).toBe(statSync(join(scratch, "plain")).mode & 0o777);
       expect(statSync(dirname(path)).mode & 0o777).toBe(
         statSync(join(scratch, "dir")).mode & 0o777,
