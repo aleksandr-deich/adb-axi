@@ -12,7 +12,7 @@ This includes device discovery, boot waits, installed packages, app lifecycle, p
 
 Do not use it for UI input (taps, typing, swipes) or for reading what is on screen; use a UI tool for those. A UI-automation holder left connected can leave accessibility showing as enabled and block instrumented tests. Before instrumented tests or handoff, finish active UI commands and inspect the holder. Use `doctor ui --fix` only for observed leftover state that your session owns. Repair can stop instrumentation and app processes. Do not run repair as automatic preflight, and do not evict a live or unowned holder. Final check: leave the device as found, or say what changed.
 
-For device configuration such as dark mode or display density, run the setting command through `npx -y adb-axi shell`.
+Use `npx -y adb-axi config get [<key>]` and `config set <key> <value>` for animations, night, font_scale, density and size. These commands return raw rows (`present`, `text`), an effective value and a pasteable `value`. An absent row is `present:false,text:null`; a literal string `"null"` is present. `unset` deletes rows; density/size `reset` restores a present-empty default row. Other settings still use `shell`.
 
 ## Current guidance lives in the CLI
 
@@ -27,7 +27,9 @@ Output is short and the first line is the verdict. Do not pipe it through `tail`
 
 `adb-axi shell` returns structured output, not raw remote stdout. For a value that another command will use, request `--json` and parse its `stdout` field. Check the command's `exit` status and validate the parsed value before changing state. Do not extract a value with `head`, `tail`, or removal of a printed field label.
 
-Record the original setting's value and whether its key exists. An absent settings key commonly prints `null`; do not store that marker as a value. Restore a confirmed absent key with `settings delete`, not `settings put`. If the original state is unknown or parsing fails, do not change the setting.
+For supported settings, restore with the `before.value` printed by `config set`, including a per-row animations value such as `window=unset,transition=1,animator=0.5`. A null restore value means unsupported raw state: stop without changing it. Set validates before writing and checks readback; a failure can include partially changed state and the original `before`. No baseline file or automatic rollback exists.
+
+For other settings, record row presence separately from raw text. An absent settings key commonly prints `null`; restore confirmed absence with `settings delete`, not `settings put`. If presence or parsing is unknown, stop without changing state.
 
 ## Select the device
 
@@ -67,4 +69,38 @@ These short examples illustrate patterns; confirm current usage with live help w
   )
   ```
 
-- When changing settings, capture the original value before changing it, install an EXIT trap before the mutation, then change, verify and restore in that same sequential turn. Use a subshell, preserve failing exit codes, and make cleanup failures nonzero too. Cleanup must run even if a check fails; do not put restoration only at the end of an `&&` chain.
+## Temporary settings recipe
+
+Run the mutation, checks and restoration in one sequential turn. This Bash example installs cleanup before mutation, uses the set result's `before.value`, and preserves both check failures and cleanup failures. The pre-read is a fallback if the mutation loses its transport before it can print `before`. Keep the device's current Android user unchanged throughout.
+
+```bash
+(
+  device=emulator-5554
+  key=animations
+  value=0
+  restore=$(npx -y adb-axi config get "$key" --device "$device" --json | node --input-type=module -e '
+    let s=""; for await (const c of process.stdin) s+=c;
+    const v=JSON.parse(s).config?.[0]?.value;
+    if (typeof v!=="string") process.exit(1); process.stdout.write(v);
+  ') || exit $?
+  cleanup() {
+    result=$?
+    trap - EXIT
+    npx -y adb-axi config set "$key" "$restore" --device "$device" || result=1
+    exit "$result"
+  }
+  trap cleanup EXIT
+  status=0
+  changed=$(npx -y adb-axi config set "$key" "$value" --device "$device" --json) || status=$?
+  printf '%s\n' "$changed"
+  original=$(printf '%s' "$changed" | node --input-type=module -e '
+    let s=""; for await (const c of process.stdin) s+=c;
+    const v=JSON.parse(s).before?.value;
+    if (typeof v!=="string") process.exit(1); process.stdout.write(v);
+  ') && restore=$original
+  [ "$status" -eq 0 ] || exit "$status"
+  # Run checks here; exit nonzero if a check fails.
+)
+```
+
+`config set night` refuses nonzero resolved Android users before any write because the platform command applies to user 0 only. `config set night yes` can fail with `CONFIG_MISMATCH` on a device that locks night mode. Inspect the error's before/after instead of treating a successful shell exit as proof.

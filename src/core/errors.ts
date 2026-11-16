@@ -21,6 +21,7 @@ export const ERROR_CATALOGUE = {
   WAIT_TIMEOUT: "A wait passed its deadline; the last observation is included",
   TIMEOUT: "A step passed its deadline; the running step is named",
   REMOTE_EXIT: "The remote shell command exited non-zero",
+  CONFIG_MISMATCH: "Device configuration readback differs from the requested state",
   HOLDER_PROTECTED: "A live UiAutomation holder was not touched",
   APP_NOT_INSTALLED: "The package is not installed",
   ACTIVITY_NOT_FOUND: "The activity does not exist; existing ones are listed",
