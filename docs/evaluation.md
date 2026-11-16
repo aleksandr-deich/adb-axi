@@ -337,9 +337,11 @@ No detectable difference at one run per arm: device turns 1.14x and device-tool 
 
 ## Scripted benchmark, second run
 
+The scripted benchmark was retired; its harness and supporting files live at tag [`bench-final`](https://github.com/aleksandr-deich/adb-axi/tree/bench-final/bench).
+
 - **Date:** 2026-10-07.
 - **Tested version:** adb-axi 0.1.3, harness at [`38783d2`](https://github.com/aleksandr-deich/adb-axi/commit/38783d26a858f88917611f15fea7bb9415127856).
-- **Design:** the repeatable benchmark in [`bench/`](../bench/README.md): 8 small device-state tasks on a probe app (install and start, process death, crash cause, database read and release-build refusal, night-mode change and restore, UiAutomation holder, two devices, emulator recovery), each checked by a script. The baseline arm has the Android CLI skill and raw `adb`; the adb-axi arm adds the adb-axi skill and command.
+- **Design:** the retired eight-task benchmark: 8 small device-state tasks on a probe app (install and start, process death, crash cause, database read and release-build refusal, night-mode change and restore, UiAutomation holder, two devices, emulator recovery), each checked by a script. The baseline arm has the Android CLI skill and raw `adb`; the adb-axi arm adds the adb-axi skill and command.
 - **Agent/model:** Pi 1.0.4, openai-codex/gpt-6.1-sol, medium effort.
 - **Sample size:** 80 runs: 8 tasks x 5 repeats x 2 arms.
 
