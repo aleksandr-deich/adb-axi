@@ -1,16 +1,16 @@
 ---
 name: adb-axi
-description: "Read and manage Android device and app state through the adb-axi CLI - attached devices and their health, the foreground app, installed packages, app install, start, stop, clear, kill and restore, process-death checks, run-scoped logs, crashes and ANRs, read-only queries on a debuggable app's databases, UiAutomation holder diagnosis, and one device shell command with its real exit code. Use instead of raw `adb` whenever a task needs Android emulator or device state: checking what is attached or booted, launching or force-stopping an app, testing that an app survives process death, reading logcat or crashes for a run, inspecting app data, finding what holds UiAutomation, or picking one device when several are attached. Not for UI input or reading the screen; use a UI tool for that."
+description: "Read and manage Android device and app state through the adb-axi CLI - attached devices and their health, the foreground app, installed packages, app install, start, stop, clear, kill and restore, process-death checks, run-scoped logs, crashes and ANRs, read-only queries on a debuggable app's databases, UiAutomation holder diagnosis, and one device shell command with its real exit code. Use instead of raw `adb` whenever a task needs Android device or app state, including `adb devices`, `am start`/`force-stop`/`kill`, `pidof`, `getprop`, `dumpsys`, `settings`, and `wm` state checks, even one-line checks during lesson or code review. This covers checking attached devices, boot waits, app lifecycle and process death, logs and crashes, app data, and UiAutomation holder diagnosis. Not for UI input or reading the screen; use a UI tool for that."
 user-invocable: false
 ---
 
 # adb-axi
 
-Agent ergonomic wrapper around adb. Prefer this over raw `adb` for Android device and app state.
+Agent ergonomic wrapper around adb. Use adb-axi for Android device and app state, not raw `adb`.
 
-Use adb-axi for device state and health, the app lifecycle including process-death checks, logs and crashes, debuggable app databases, UiAutomation holder diagnosis, and choosing one device when several are attached.
+This includes device discovery, boot waits, installed packages, app lifecycle, process-death checks, logs, databases, settings, properties, and `dumpsys` queries. Use named commands when they match the operation. Use `shell` for other device-shell state commands. Keep UI input, screen reading, emulator management, builds, and connected-test orchestration in their existing tools.
 
-Do not use it for UI input (taps, typing, swipes) or for reading what is on screen; use a UI tool for those. A UI-automation holder left connected can leave accessibility showing as enabled and block instrumented tests. Before handing the device back or running instrumented tests, finish active UI commands, then run `npx -y adb-axi doctor ui --fix --device <serial>` to clear resident, leaked or wedged holders; live holders are protected. This can stop instrumentation runners and their target app processes; it is not a restoration of the user's own accessibility services. Final check: leave the device as found, or say what changed.
+Do not use it for UI input (taps, typing, swipes) or for reading what is on screen; use a UI tool for those. A UI-automation holder left connected can leave accessibility showing as enabled and block instrumented tests. Before instrumented tests or handoff, finish active UI commands and inspect the holder. Use `doctor ui --fix` only for observed leftover state that your session owns. Repair can stop instrumentation and app processes. Do not run repair as automatic preflight, and do not evict a live or unowned holder. Final check: leave the device as found, or say what changed.
 
 For device configuration such as dark mode or display density, run the setting command through `npx -y adb-axi shell`.
 
@@ -24,6 +24,10 @@ Output is short and the first line is the verdict. Do not pipe it through `tail`
 - Read `npx -y adb-axi --help` only when you need the command index to choose a command.
 - Batch independent help requests in one shell turn: `npx -y adb-axi app start --help && npx -y adb-axi logs crash --help`.
 - `npx -y adb-axi` with no command reads live state; it is not a prerequisite for help or a known operation.
+
+`adb-axi shell` returns structured output, not raw remote stdout. For a value that another command will use, request `--json` and parse its `stdout` field. Check the command's `exit` status and validate the parsed value before changing state. Do not extract a value with `head`, `tail`, or removal of a printed field label.
+
+Record the original setting's value and whether its key exists. An absent settings key commonly prints `null`; do not store that marker as a value. Restore a confirmed absent key with `settings delete`, not `settings put`. If the original state is unknown or parsing fails, do not change the setting.
 
 ## Select the device
 
