@@ -18,6 +18,7 @@ The checks drive adb-axi installed from a packed tarball against one emulator, u
 | `2-app-crash-on-launch` | a crash in `onCreate` is `APP_DIED_ON_START` for start and restore, with Android's crash dialogs shown and hidden (restored after)                                                                                                                                                                                                                                                                                             |
 | `2-app-start`           | `app start` on the app in front is not recreated; `--fresh` is a cold start; named, nested, `:ui` and alias activities, other apps in front and start refusals                                                                                                                                                                                                                                                                 |
 | `3-data-db`             | a row still only in `probe.db-wal` comes back from `data db`; the release build gives `APP_NOT_DEBUGGABLE`; several databases with their companions, a lock file, a text file and a corrupt SQLite file, every cell type, row caps with `--full`, SQLite's own errors and a query past `--timeout`                                                                                                                             |
+| `3-data-prefs`          | SharedPreferences types, string sets and empty values match probe writes without changing XML bytes; zero/multiple file selection, missing names and non-debuggable refusal                                                                                                                                                                                                                                                    |
 | `4-doctor`              | every `doctor` check against its own device or host fact; changed animation scales, a missing or empty console token, an unattached serial and a fresh adb server port                                                                                                                                                                                                                                                         |
 | `4-doctor-ui`           | `doctor ui` reports UiAutomation free and exits 0; a live `adb shell` or `adb exec-out` uiautomator reader is named, protected from `--fix`, and gone once it ends                                                                                                                                                                                                                                                             |
 | `5-logs`                | marks on the device clock, each API level's app scope, default and duration windows, a late buffer start, a burst of probe lines with folded repeats, cut long lines and `--full` files, and `wait log`                                                                                                                                                                                                                        |
@@ -80,22 +81,23 @@ adb-axi app current --device <second-serial>          # second emulator's foregr
 adb -s <serial> shell am start -n dev.probe/.MainActivity --es probe <action>
 ```
 
-| Action         | Effect                                                                                                                     |
-| -------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `inc`          | adds 1 to `saved` (`rememberSaveable`, survives process death) and `volatile` (`remember`)                                 |
-| `state`        | logs the current state                                                                                                     |
-| `write`        | inserts a row into the Room database `probe.db` (WAL); the row stays in `probe.db-wal`                                     |
-| `finish`       | finishes the activity and leaves the process alive, so the next start is warm                                              |
-| `crash`        | throws on the main thread (Java crash)                                                                                     |
-| `native`       | sends itself SIGSEGV (native crash with a tombstone)                                                                       |
-| `anr`          | blocks the main thread for 30 s; input sent meanwhile ends in an ANR                                                       |
-| `armcrash`     | makes the next `MainActivity` create throw, so a start or restore dies on launch                                           |
-| `finishremove` | `finishAndRemoveTask`: the process stays, its task leaves recents                                                          |
-| `crashchain`   | throws a wrapped exception with a cause chain and a long message (`--ei length N`)                                         |
-| `alias`        | enables (`--ez on true`) or disables the second launcher entry `.Alias`; the shell may not                                 |
-| `log`          | logs `--ei count N` lines of `--es text T` (`--es level`, `--es tag`, `--ez numbered`)                                     |
-| `file`         | writes `--es name N` into `files/` or, with `--es where databases`, the databases folder (`--es text T` or `--ei bytes B`) |
-| `sql`          | runs `--es stmt S` on `--es db NAME` (`--ez wal true`), kept open for the life of the process                              |
+| Action         | Effect                                                                                                                           |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `inc`          | adds 1 to `saved` (`rememberSaveable`, survives process death) and `volatile` (`remember`)                                       |
+| `state`        | logs the current state                                                                                                           |
+| `write`        | inserts a row into the Room database `probe.db` (WAL); the row stays in `probe.db-wal`                                           |
+| `finish`       | finishes the activity and leaves the process alive, so the next start is warm                                                    |
+| `crash`        | throws on the main thread (Java crash)                                                                                           |
+| `native`       | sends itself SIGSEGV (native crash with a tombstone)                                                                             |
+| `anr`          | blocks the main thread for 30 s; input sent meanwhile ends in an ANR                                                             |
+| `armcrash`     | makes the next `MainActivity` create throw, so a start or restore dies on launch                                                 |
+| `finishremove` | `finishAndRemoveTask`: the process stays, its task leaves recents                                                                |
+| `crashchain`   | throws a wrapped exception with a cause chain and a long message (`--ei length N`)                                               |
+| `alias`        | enables (`--ez on true`) or disables the second launcher entry `.Alias`; the shell may not                                       |
+| `log`          | logs `--ei count N` lines of `--es text T` (`--es level`, `--es tag`, `--ez numbered`)                                           |
+| `file`         | writes `--es name N` into `files/` or, with `--es where databases`, the databases folder (`--es text T` or `--ei bytes B`)       |
+| `prefs`        | commits known values of every SharedPreferences type to `--es name N` (default settings), with `--es owner T` for user isolation |
+| `sql`          | runs `--es stmt S` on `--es db NAME` (`--ez wal true`), kept open for the life of the process                                    |
 
 `MainActivity` is `singleTop`, so an action sent while it is on top reaches `onNewIntent`. Other activities: `.UiActivity` runs in the `:ui` process, `.BounceActivity` opens Settings over itself, `.PermActivity` asks for the camera permission, `.PrivateActivity` is not exported and `.Outer$Inner` is a nested class. Every state change logs one line with tag `ProbeState`, the oracle the checks read from logcat:
 

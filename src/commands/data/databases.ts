@@ -79,6 +79,7 @@ export function runAsRefusal(
       help: [runHint(lifecycleCommand(context, ["app", "list"]), "to see the installed packages")],
     });
   }
+  if (!/not debuggable/i.test(line)) return undefined;
   return new AdbAxiError(
     "APP_NOT_DEBUGGABLE",
     `${pkg} is not debuggable, so its private files cannot be read`,

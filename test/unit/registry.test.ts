@@ -28,6 +28,7 @@ const V01_COMMANDS = [
   "logs",
   "logs crash",
   "data db",
+  "data prefs",
   "shell",
   "update",
 ];
@@ -45,23 +46,23 @@ function helpStrings(command: CommandSpec): string[] {
 }
 
 describe("command registry", () => {
-  it("registers every v0.1 command exactly once", () => {
+  it("registers every shipped command exactly once", () => {
     expect([...paths()].sort()).toEqual([...V01_COMMANDS].sort());
   });
 
-  it("registers no v0.2 command", () => {
+  it("registers prefs but no other unshipped v0.2 command", () => {
     for (const name of ["lease", "config", "fwd", "rev", "setup"]) {
       expect(REGISTRY.entries[name]).toBeUndefined();
     }
     const data = REGISTRY.entries.data as GroupSpec;
-    expect(data.subcommands.map((c) => c.path[1])).toEqual(["db"]);
+    expect(data.subcommands.map((c) => c.path[1])).toEqual(["db", "prefs"]);
     const doctorUi = allCommands(REGISTRY).find((c) => c.path.join(" ") === "doctor ui");
     const doctor = allCommands(REGISTRY).find((c) => c.path.join(" ") === "doctor");
     expect(doctor?.flags.map((f) => f.name)).toEqual([]);
     expect(doctorUi?.flags.map((f) => f.name)).toEqual(["--fix"]);
   });
 
-  it("names no v0.2 command in any help string", () => {
+  it("names no unshipped command in any help string", () => {
     const strings = [
       ...allCommands(REGISTRY).flatMap(helpStrings),
       ...helpStrings(REGISTRY.home),

@@ -36,6 +36,7 @@ export const ERROR_CATALOGUE = {
   MARK_UNVERIFIED: "The current boot could not be verified for a log mark",
   APP_NOT_DEBUGGABLE: "run-as refused, so private app files cannot be read",
   DB_NOT_FOUND: "No such database; existing ones are listed",
+  PREFS_NOT_FOUND: "No such SharedPreferences file; existing names are listed",
   INVALID_OUTPUT: "Unexpected or unreadable output, or a collection limit was exceeded",
   SQL_ERROR: "SQLite rejected the query",
   NODE_TOO_OLD: "This Node.js is older than the command needs; the required version is named",

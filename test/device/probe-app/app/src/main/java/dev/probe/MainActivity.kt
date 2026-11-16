@@ -105,6 +105,7 @@ class MainActivity : ComponentActivity() {
             "log" -> logBurst(intent)
             "file" -> writeFile(intent)
             "sql" -> runSql(intent)
+            "prefs" -> writePrefs(intent)
             // SIGSEGV to itself: debuggerd writes a native crash tombstone without any NDK code.
             "native" -> Process.sendSignal(Process.myPid(), SIGSEGV)
             // Blocks the main thread; any input sent meanwhile times out into an ANR.
@@ -115,6 +116,22 @@ class MainActivity : ComponentActivity() {
             "inc", "state", "write" -> actions.trySend(action)
             else -> Log.w(TAG, "event=unknown action=$action pid=${Process.myPid()}")
         }
+    }
+
+    private fun writePrefs(intent: Intent) {
+        val name = intent.getStringExtra("name") ?: "settings"
+        val ok = getSharedPreferences(name, Context.MODE_PRIVATE).edit().clear()
+            .putBoolean("enabled", true)
+            .putInt("count", -42)
+            .putLong("large", 9007199254740993L)
+            .putFloat("scale", 1.25f)
+            .putString("text", "a<&>\" 🚀")
+            .putString("empty", "")
+            .putStringSet("tags", setOf("one", "two<&>", ""))
+            .putStringSet("emptyset", emptySet())
+            .putString("owner", intent.getStringExtra("owner") ?: "primary")
+            .commit()
+        Log.i(TAG, "event=prefs name=$name ok=$ok pid=${Process.myPid()}")
     }
 
     /**

@@ -69,7 +69,12 @@ beforeAll(async () => {
   expect((await axi.adb(["install", "-t", DEBUG_APK])).exitCode).toBe(0);
   expect(await axi.sh(`pm list packages --user ${n} ${PKG}`)).toContain(`package:${PKG}`);
   probeAppId = await appIdOf(PKG);
-  await axi.sh(`am start --user 0 -W -n ${PKG}/.MainActivity`);
+  await axi.sh(
+    `am start --user 0 -W -n ${PKG}/.MainActivity --es probe prefs --es name isolation --es owner primary`,
+  );
+  expect(await raw(`run-as ${PKG} cat shared_prefs/isolation.xml`)).toContain(
+    'name="owner">primary</string>',
+  );
   await axi.sh(`am start --user 0 -W -n ${PKG}/.UiActivity`);
   await axi.sh(`am switch-user ${n}`);
   await until(`user ${n} to unlock`, async () =>
@@ -132,6 +137,13 @@ describe("a second Android user in front, with the probe running only for user 0
     const since = await axi.mark("second-user");
     expect(since).not.toBe("");
     const api = Number((await axi.sh("getprop ro.build.version.sdk")).trim());
+    const prefs = await axi.run(["data", "prefs", PKG, "--file", "isolation.xml"]);
+    expect(prefs.exitCode).toBe(1);
+    expect(["PREFS_NOT_FOUND", "REMOTE_EXIT"]).toContain(prefs.json.code);
+    if (prefs.json.code === "REMOTE_EXIT")
+      expect(prefs.json.stderr).toMatch(/run-as:|Permission denied/);
+    expect(prefs.json.rows).toBeUndefined();
+
     const scoped = await axi.ok(["logs", "--pkg", PKG, "--since", "second-user"]);
     expect(scoped.scope).toBe(api >= 31 ? `${PKG} (uid ${current})` : `${PKG} (pids -)`);
   });
@@ -142,7 +154,19 @@ describe("the probe started for the second user too", () => {
     const n = user ?? 0;
     const owner = uidOf(0, probeAppId);
     const current = uidOf(n, probeAppId);
-    await axi.sh(`am start --user ${n} -W -n ${PKG}/.MainActivity`);
+    await axi.sh(
+      `am start --user ${n} -W -n ${PKG}/.MainActivity --es probe prefs --es name isolation --es owner secondary`,
+    );
+    const prefs = await axi.run(["data", "prefs", PKG, "--file", "isolation.xml"]);
+    if (prefs.exitCode === 0) {
+      expect(prefs.json.rows).toContainEqual({ key: "owner", type: "string", value: "secondary" });
+      expect(await raw(`run-as ${PKG} cat shared_prefs/isolation.xml`)).toContain(
+        'name="owner">primary</string>',
+      );
+    } else {
+      expect(prefs.json.code).toBe("REMOTE_EXIT");
+      expect(prefs.json.stderr).toMatch(/run-as:|Permission denied/);
+    }
     await axi.sh(`am start --user ${n} -W -n ${PKG}/.UiActivity`);
     const ownerPids = [...(await pidsUnder(owner, PKG)), ...(await pidsUnder(owner, `${PKG}:ui`))];
     const [main] = await pidsUnder(current, PKG);
