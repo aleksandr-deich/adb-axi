@@ -12,7 +12,7 @@ This includes device discovery, boot waits, installed packages, app lifecycle, p
 
 Do not use it for UI input (taps, typing, swipes) or for reading what is on screen; use a UI tool for those. A UI-automation holder left connected can leave accessibility showing as enabled and block instrumented tests. Before instrumented tests or handoff, finish active UI commands and inspect the holder. Use `doctor ui --fix` only for observed leftover state that your session owns. Repair can stop instrumentation and app processes. Do not run repair as automatic preflight, and do not evict a live or unowned holder. Final check: leave the device as found, or say what changed.
 
-Use `npx -y adb-axi config get [<key>]` and `config set <key> <value>` for animations, night, font_scale, density and size. Other settings still use `shell`. See [Temporary device configuration](../../README.md#temporary-device-configuration) for the output contract and supported values; consult live `config set --help` for the installed version's constraints.
+Use `npx -y adb-axi config get [<key>]` and `config set <key> <value>` for animations, night, font_scale, density and size. Other settings still use `shell`. Consult live `config get --help` and `config set --help` for the output contract, supported values and constraints.
 
 ## Current guidance lives in the CLI
 
@@ -27,7 +27,7 @@ Output is short and the first line is the verdict. Do not pipe it through `tail`
 
 `adb-axi shell` returns structured output, not raw remote stdout. For a value that another command will use, request `--json` and parse its `stdout` field. Check the command's `exit` status and validate the parsed value before changing state. Do not extract a value with `head`, `tail`, or removal of a printed field label.
 
-For supported settings, restore with the `before.value` printed by `config set`, using the [temporary settings recipe](#temporary-settings-recipe). Stop if the original restore value is null. A failed set may have partially applied: inspect its before/after evidence and run cleanup even if checks fail. Consult `config set --help` for unsupported originals, user restrictions and the limits of verification, especially animation estimates and live-unverified `unset`.
+For supported settings, `config set` prints `before.value`; install a cleanup trap before mutation and restore that value in the same turn, even if checks fail. Consult live `config get --help` and `config set --help` for restore restrictions and verification limits.
 
 For other settings, record row presence separately from raw text. An absent settings key commonly prints `null`; restore confirmed absence with `settings delete`, not `settings put`. If presence or parsing is unknown, stop without changing state.
 
@@ -68,37 +68,3 @@ These short examples illustrate patterns; confirm current usage with live help w
     exit "$start_status"
   )
   ```
-
-## Temporary settings recipe
-
-Run the mutation, checks and restoration in one sequential turn. This Bash example installs cleanup before mutation, uses the set result's `before.value`, and preserves both check failures and cleanup failures. The pre-read is a fallback if the mutation loses its transport before it can print `before`. Keep the device's current Android user unchanged throughout.
-
-```bash
-(
-  device=emulator-5554
-  key=animations
-  value=0
-  restore=$(npx -y adb-axi config get "$key" --device "$device" --json | node --input-type=module -e '
-    let s=""; for await (const c of process.stdin) s+=c;
-    const v=JSON.parse(s).config?.[0]?.value;
-    if (typeof v!=="string") process.exit(1); process.stdout.write(v);
-  ') || exit $?
-  cleanup() {
-    result=$?
-    trap - EXIT
-    npx -y adb-axi config set "$key" "$restore" --device "$device" || result=1
-    exit "$result"
-  }
-  trap cleanup EXIT
-  status=0
-  changed=$(npx -y adb-axi config set "$key" "$value" --device "$device" --json) || status=$?
-  printf '%s\n' "$changed"
-  original=$(printf '%s' "$changed" | node --input-type=module -e '
-    let s=""; for await (const c of process.stdin) s+=c;
-    const v=JSON.parse(s).before?.value;
-    if (typeof v!=="string") process.exit(1); process.stdout.write(v);
-  ') && restore=$original
-  [ "$status" -eq 0 ] || exit "$status"
-  # Run checks here; exit nonzero if a check fails.
-)
-```

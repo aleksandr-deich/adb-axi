@@ -98,7 +98,7 @@ adb-axi keeps log marks, install records and cached AVD names under `~/.adb-axi/
 
 ### Temporary device configuration
 
-`config get` lists five keys: `animations` (all three scale rows), `night`, `font_scale`, `density` and `size`. Rows distinguish absence (`present: false, text: null`) from a literal string `"null"` (`present: true`). Per-user settings use the resolved current Android user, printed as `user`. Night writes require user 0: the platform command applies to user 0 only, so other resolved users are refused before any write. Night's known companion rows and font scale's `system_locales` row retain their prior presence/text within each set call. Animation `effective` values are row-derived estimates, not verified live scales; absent rows assume default 1. Values above 20 are null because clamping is platform-dependent: Android 15 clamps to 20, while older releases may not. Animation `unset` requests default 1 before deleting rows; live scales are normally 1 afterwards but are not verified.
+`config get` reads `animations`, `night`, `font_scale`, `density` and `size`, distinguishing absent rows (`present: false, text: null`) from literal `"null"` text (`present: true`). Install cleanup before mutation and restore the `before.value` printed by `config set` in the same turn. Night writes refuse users other than user 0. See live `config get --help` and `config set --help` for value rules and verification limits.
 
 ```sh
 adb-axi config get animations --device emulator-5554 --json
@@ -106,10 +106,6 @@ adb-axi config set animations 0 --device emulator-5554 --json
 # In the same turn, restore the value printed as before.value, for example:
 adb-axi config set animations window=1,transition=1,animator=unset --device emulator-5554
 ```
-
-`animations` accepts a non-negative finite scale or the three named values above; `night` accepts `yes/no/auto`; `font_scale` accepts a positive finite scale; `density` accepts an integer >=72; `size` accepts `WxH` with optional `dp` suffixes, converted with the current density and checked against device bounds before writing. Each dimension must resolve to at least 200 pixels and no more than twice its physical dimension. Font values use Android's float text; a noncanonical original font row is readable but refused for mutation to preserve its exact raw text. `unset` deletes settings rows. For density/size, `reset` leaves present-empty default rows, distinct from absence.
-
-Set reads back the change and returns `before` and `after`, each with raw `rows`, `effective` and a pasteable `value`. A null restore value means unsupported raw state; set refuses to change it. This includes original sizes outside the supported per-axis bounds and numeric density/size rows equal to physical defaults, which `wm` normalizes to empty rows. Readback mismatches are typed `CONFIG_MISMATCH` errors, including locked night mode. A failed write may have partially applied; errors preserve `before` when available. Install cleanup before mutation and restore even if checks fail, using the skill's [self-contained trap recipe](skills/adb-axi/SKILL.md#temporary-settings-recipe). Keep the Android user unchanged during this temporary operation. There is no baseline file, reset command or automatic rollback. Use `shell` for other settings.
 
 ## Example: does an app survive process death?
 

@@ -15,7 +15,9 @@ const help = [
   "night: yes/no/auto; font_scale: positive scale; density: integer >=72; size: WxH with optional dp suffix on either dimension",
   "Night writes require resolved user 0: the platform command applies night mode to user 0 only; other users are refused before any write",
   "unset deletes rows; density/size reset leaves present-empty rows. Neither is a saved baseline or reset command",
-  "Set writes then reads back; CONFIG_MISMATCH is failure, with before/after evidence. Restore before.value in the same turn; no automatic rollback",
+  "Night's known companion rows and font_scale's system_locales row retain their prior presence/text within each set call",
+  "Set writes then reads back and returns before/after snapshots with rows, effective and value; CONFIG_MISMATCH is failure, including locked night mode. Failed writes may have partially applied",
+  "Install cleanup before mutation and restore before.value in the same turn even if checks fail, keeping the Android user unchanged; no automatic rollback",
 ];
 const get = defineCommand({
   path: ["config", "get"],
