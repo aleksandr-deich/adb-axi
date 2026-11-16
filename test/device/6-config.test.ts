@@ -44,7 +44,8 @@ test("all keys report raw rows; each set restores its printed before and identic
     night: "yes",
     font_scale: "1.15",
     density: "320",
-    size: "800x1200",
+    // Fits the default CI display (320x640) within the per-axis 2x bounds.
+    size: "400x800",
   };
   for (const key of keys) {
     const original = await get(key);
@@ -66,7 +67,7 @@ test("all keys report raw rows; each set restores its printed before and identic
         if (key === "night") expect(raw).toContain("ui_night_mode=2");
         if (key === "font_scale") expect(raw).toContain("font_scale=1.15");
         if (key === "density") expect(raw).toContain("Override density: 320");
-        if (key === "size") expect(raw).toContain("Override size: 800x1200");
+        if (key === "size") expect(raw).toContain("Override size: 400x800");
       }
     } finally {
       await restore(key, original.value);
@@ -103,9 +104,9 @@ test("all keys report raw rows; each set restores its printed before and identic
       expect((changed.after as State).rows[0]?.text).toBe("");
     }
     await axi.ok(["config", "set", "density", "320"]);
-    const changed = await axi.ok(["config", "set", "size", "400dpx800dp"]);
-    expect((changed.after as State).effective).toBe("800x1600");
-    expect(await axi.sh("wm size")).toContain("Override size: 800x1600");
+    const changed = await axi.ok(["config", "set", "size", "200dpx400dp"]);
+    expect((changed.after as State).effective).toBe("400x800");
+    expect(await axi.sh("wm size")).toContain("Override size: 400x800");
   } finally {
     await restore("size", size.value);
     await restore("density", density.value);
