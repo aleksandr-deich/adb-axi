@@ -17,7 +17,8 @@ export interface Row extends RowSpec {
 }
 export interface Snapshot {
   rows: Row[];
-  effective: string | Record<string, number>;
+  effective: string | Record<string, number | null>;
+  effective_note?: string;
   value: string | null;
 }
 const ROWS: Record<ConfigKey, RowSpec[]> = {
@@ -106,16 +107,21 @@ export async function snapshot(
 ): Promise<Snapshot> {
   const rows = await readRows(context, ROWS[key], user);
   let effective: Snapshot["effective"];
+  const displayState = key === "density" || key === "size" ? await display(context, key) : null;
   if (key === "animations") {
     effective = Object.fromEntries(
       rows.map((item) => [
         item.alias,
-        item.text !== null && isScale(item.text, false) ? Math.fround(Number(item.text)) : 1,
+        !item.present
+          ? 1
+          : item.text !== null && isScale(item.text, false) && Number(item.text) <= 20
+            ? Math.fround(Number(item.text))
+            : null,
       ]),
     );
   } else if (key === "font_scale") effective = await fontScale(context);
   else if (key === "night") effective = await nightMode(context);
-  else effective = (await display(context, key)).effective;
+  else effective = displayState!.effective;
   const tokens = rows.map((item): string | null => {
     if (!item.present) return key === "night" && effective !== "no" ? null : "unset";
     const text = item.text;
@@ -136,6 +142,8 @@ export async function snapshot(
       return null;
     try {
       configValues(key, token);
+      if (displayState !== null && token === displayState.physical) return null;
+      if (key === "size" && !sizeWithinBounds(token, displayState!.physical)) return null;
       return token;
     } catch {
       return null;
@@ -144,6 +152,12 @@ export async function snapshot(
   return {
     rows,
     effective,
+    ...(key === "animations"
+      ? {
+          effective_note:
+            "Row-derived estimates, not verified live scales; absent rows assume default 1. Null means unknown, including scales above 20 whose clamping is platform-dependent (Android 15 clamps to 20; older releases may not). unset requests default 1 before deleting rows; live scales are normally 1 afterwards but are not verified",
+        }
+      : {}),
     value: tokens.some((token) => token === null)
       ? null
       : key === "animations"
@@ -203,6 +217,14 @@ async function preserveRows(
   }
   if (writeError !== undefined) throw writeError;
 }
+function sizeWithinBounds(value: string, physical: string): boolean {
+  const limits = physical.split("x").map((dimension) => 2 * Number(dimension));
+  return value
+    .split("x")
+    .every(
+      (dimension, index) => Number(dimension) >= 200 && Number(dimension) <= (limits[index] ?? 0),
+    );
+}
 export async function preflightConfig(
   context: DeviceContext,
   key: ConfigKey,
@@ -210,15 +232,15 @@ export async function preflightConfig(
   user: number,
 ): Promise<void> {
   if (key === "size" && !["unset", "reset"].includes(values[0] ?? "")) {
-    const physical = (await display(context, "size")).physical.split("x").map(Number);
-    const limits = physical.map((dimension) => 2 * dimension);
-    const dimensions = (await pixelSize(context, values[0] ?? "")).split("x").map(Number);
-    if (
-      dimensions.some((dimension, index) => dimension < 200 || dimension > (limits[index] ?? 0))
-    ) {
+    const physical = (await display(context, "size")).physical;
+    const dimensions = await pixelSize(context, values[0] ?? "");
+    if (!sizeWithinBounds(dimensions, physical)) {
       throw new AdbAxiError(
         "VALIDATION_ERROR",
-        `Size dimensions must resolve to at least 200 pixels and at most twice each physical dimension (${limits.join("x")}); no write attempted`,
+        `Size dimensions must resolve to at least 200 pixels and at most twice each physical dimension (${physical
+          .split("x")
+          .map((dimension) => 2 * Number(dimension))
+          .join("x")}); no write attempted`,
       );
     }
   }
