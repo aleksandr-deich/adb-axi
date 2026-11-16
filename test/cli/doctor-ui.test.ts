@@ -205,6 +205,8 @@ const shellCalls = (f: FakeAdb): string[] =>
     .map((call) => call.argv[3] ?? "");
 
 describe("doctor ui", () => {
+  // Report and fix each run in TOON and JSON, spawning fresh fake-adb processes.
+  // This bounded four-command scenario takes over 11s under CPU contention.
   it("explains resident-helper test and accessibility consequences and clears it with --fix", async () => {
     const f = scenario({
       state: { helper: "present" },
@@ -233,7 +235,7 @@ describe("doctor ui", () => {
     expect(fixed.exitCode).toBe(0);
     expect(fixed.data.ok).toContain("uiautomation free (1 cleared)");
     expectAddressed(f);
-  });
+  }, 20_000);
   describe("report", () => {
     it("reports a live agent-device session, names what releases it, and exits 0", async () => {
       const f = scenario({ dumpsys: dumpsys({ component: AGENT_DEVICE, pid: 8120 }) });
