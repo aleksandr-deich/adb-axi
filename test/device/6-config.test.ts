@@ -8,12 +8,18 @@ interface State {
   rows: { name: string; present: boolean; text: string | null }[];
   value: string | null;
   effective: unknown;
+  effective_note?: string;
 }
 async function get(key: Key): Promise<State> {
   const result = await axi.ok(["config", "get", key]);
   const state = (result.config as State[])[0];
   if (state === undefined) throw new Error("config get returned no state");
-  return { rows: state.rows, value: state.value, effective: state.effective };
+  return {
+    rows: state.rows,
+    value: state.value,
+    effective: state.effective,
+    ...(state.effective_note === undefined ? {} : { effective_note: state.effective_note }),
+  };
 }
 async function independent(): Promise<string> {
   return axi.sh(
