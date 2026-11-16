@@ -121,7 +121,8 @@ export async function snapshot(
     );
   } else if (key === "font_scale") effective = await fontScale(context);
   else if (key === "night") effective = await nightMode(context);
-  else effective = displayState!.effective;
+  else if (displayState !== null) effective = displayState.effective;
+  else throw invalidOutput("reading display configuration", key);
   const tokens = rows.map((item): string | null => {
     if (!item.present) return key === "night" && effective !== "no" ? null : "unset";
     const text = item.text;
@@ -143,7 +144,8 @@ export async function snapshot(
     try {
       configValues(key, token);
       if (displayState !== null && token === displayState.physical) return null;
-      if (key === "size" && !sizeWithinBounds(token, displayState!.physical)) return null;
+      if (displayState !== null && key === "size" && !sizeWithinBounds(token, displayState.physical))
+        return null;
       return token;
     } catch {
       return null;
