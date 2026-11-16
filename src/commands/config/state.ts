@@ -144,7 +144,11 @@ export async function snapshot(
     try {
       configValues(key, token);
       if (displayState !== null && token === displayState.physical) return null;
-      if (displayState !== null && key === "size" && !sizeWithinBounds(token, displayState.physical))
+      if (
+        displayState !== null &&
+        key === "size" &&
+        !sizeWithinBounds(token, displayState.physical)
+      )
         return null;
       return token;
     } catch {
