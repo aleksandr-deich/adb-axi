@@ -1,13 +1,19 @@
 import { assertPackageName } from "../../android/component.js";
 import { readShell } from "../../android/read.js";
 import { AdbAxiError } from "../../core/errors.js";
-import { render, runHint, shellWords, type Output } from "../../core/output.js";
-import { truncateField, writeFullOutput } from "../../core/truncate.js";
+import { runHint, shellWords } from "../../core/output.js";
 import { lifecycleCommand } from "../app/process.js";
 import { defineCommand } from "../define.js";
 import type { DeviceContext } from "../types.js";
 import { runAsRefusal } from "./databases.js";
 import { assertPrefsFile, MAX_PREFS_BYTES, parsePreferences } from "./prefs-xml.js";
+import {
+  PREFS_LIST_SCRIPT,
+  prefsInventory,
+  prefsReadScript,
+  prefsSnapshot,
+} from "./prefs-files.js";
+import { presentPreferences } from "./prefs-output.js";
 
 export const dataPrefs = defineCommand({
   path: ["data", "prefs"],
@@ -30,6 +36,8 @@ export const dataPrefs = defineCommand({
     "Reads the current Android user's files without changing them; concurrent app writes are not an atomic snapshot",
     "XML is limited to 4 MiB; DTDs and custom entities are refused. Long values are decimal strings; sets are string arrays",
     "Shows up to 50 rows with bounded fields; --full uses the existing private output directory",
+    "Float NaN, Infinity, -Infinity and -0.0 are strings; other floats are numbers",
+    "Backup files participate in selection; when present, the backup is read as Android would restore it, and source names it",
   ],
   examples: [
     "adb-axi data prefs com.example.notes",
@@ -48,24 +56,14 @@ export const dataPrefs = defineCommand({
         `${pkg} is not installed for Android user ${app.userId}`,
       );
     }
-    const { stdout } = await prefsRead(
+    const listing = await prefsRead(
       context,
       pkg,
       app.userId,
-      "if [ ! -e shared_prefs ]; then exit 0; fi; if [ -L shared_prefs ] || [ ! -d shared_prefs ]; then exit 1; fi; find shared_prefs -maxdepth 1 -type f -name '*.xml' -print0",
+      PREFS_LIST_SCRIPT,
       `listing the SharedPreferences of ${pkg}`,
     );
-    const files = stdout
-      .split("\0")
-      .filter(Boolean)
-      .map((path) => {
-        if (!path.startsWith("shared_prefs/"))
-          throw new AdbAxiError("INVALID_OUTPUT", "Unexpected SharedPreferences file listing");
-        const name = path.slice("shared_prefs/".length);
-        assertPrefsFile(name);
-        return name;
-      })
-      .sort();
+    const files = prefsInventory(listing.stdoutBytes);
     const file = requested ?? (files.length === 1 ? files[0] : undefined);
     if (file === undefined || !files.includes(file)) {
       const ambiguous = requested === undefined && files.length > 1;
@@ -85,37 +83,35 @@ export const dataPrefs = defineCommand({
         },
       );
     }
-    const path = shellWords([`shared_prefs/${file}`]);
     const read = await prefsRead(
       context,
       pkg,
       app.userId,
-      `if [ -L shared_prefs ] || [ -L ${path} ] || [ ! -f ${path} ]; then exit 1; fi; head -c ${MAX_PREFS_BYTES + 1} ${path}`,
+      prefsReadScript(file),
       `reading SharedPreferences of ${pkg}`,
       MAX_PREFS_BYTES + 65536,
     );
-    const rows = parsePreferences(read.stdout);
-    let cut = rows.length > 50;
-    const shown = rows.slice(0, 50).map((row) => {
-      const key = truncateField(row.key);
-      let value = row.value;
-      if (typeof value === "string") value = truncateField(value);
-      else if (Array.isArray(value)) {
-        const preview = truncateField(JSON.stringify(value));
-        if (preview !== JSON.stringify(value)) value = preview;
+    try {
+      const { source, xml } = prefsSnapshot(read.stdoutBytes, file);
+      return presentPreferences(
+        file,
+        source,
+        parsePreferences(xml),
+        context.mode,
+        pkg,
+        context.flags.full === true,
+      );
+    } catch (error) {
+      if (error instanceof AdbAxiError && error.code === "INVALID_OUTPUT") {
+        throw new AdbAxiError(error.code, error.message, {
+          fields: error.fields,
+          help: [
+            "The app may be writing this file; run again when its preference writes have finished",
+          ],
+        });
       }
-      if (key !== row.key || value !== row.value) cut = true;
-      return { ...row, key, value };
-    });
-    const out: Output = { file, count: `${rows.length} preferences`, rows: shown };
-    if (cut) {
-      out.shown = `${shown.length} of ${rows.length} rows; long fields truncated`;
-      if (context.flags.full === true)
-        out.full = writeFullOutput(`prefs-${pkg}`, `${render({ file, rows }, context.mode)}\n`);
-      else
-        out.help = ["Run the same command with `--full` to write complete rows to a private file"];
+      throw error;
     }
-    return out;
   },
 });
 
@@ -138,7 +134,7 @@ async function prefsRead(
   } catch (error) {
     if (error instanceof AdbAxiError && error.code === "REMOTE_EXIT") {
       const stderr = typeof error.fields.stderr === "string" ? error.fields.stderr : "";
-      const refusal = runAsRefusal(context, pkg, stderr);
+      const refusal = runAsRefusal(context, pkg, stderr, user);
       if (refusal !== undefined) throw refusal;
     }
     throw error;

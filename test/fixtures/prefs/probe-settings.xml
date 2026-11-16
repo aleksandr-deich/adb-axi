@@ -1,0 +1,16 @@
+<?xml version='1.0' encoding='utf-8' standalone='yes' ?>
+<map>
+    <string name="owner">primary</string>
+    <long name="large" value="9007199254740993" />
+    <int name="count" value="-42" />
+    <float name="scale" value="1.25" />
+    <string name="text">a&lt;&amp;&gt;&quot; 🚀</string>
+    <set name="emptyset" />
+    <boolean name="enabled" value="true" />
+    <string name="empty"></string>
+    <set name="tags">
+        <string></string>
+        <string>one</string>
+        <string>two&lt;&amp;&gt;</string>
+    </set>
+</map>

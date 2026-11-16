@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest";
+import { render } from "../../src/core/output.js";
 import {
   assertPrefsFile,
   MAX_PREFS_BYTES,
@@ -25,6 +26,27 @@ describe("untrusted SharedPreferences XML", () => {
       { key: "i", type: "int", value: -2147483648 },
       { key: "f", type: "float", value: 1.25 },
     ]);
+  });
+
+  test("reads Android's C0 numeric references without changing CDATA or XML 1.0 newlines", () => {
+    expect(
+      parsePreferences(
+        '<map><string name="k&#0;">a&#1;b&#0;&#x1b;\u0085\u2028</string><set name="s"><string>&#27;</string></set><string name="literal"><![CDATA[&#1;adbAxiControl0]]></string></map>',
+      ),
+    ).toEqual([
+      { key: "k\u0000", type: "string", value: "a\u0001b\u0000\u001b\u0085\u2028" },
+      { key: "s", type: "set", value: ["\u001b"] },
+      { key: "literal", type: "string", value: "&#1;adbAxiControl0" },
+    ]);
+  });
+
+  test("preserves special float values through rendering", () => {
+    const rows = parsePreferences(
+      '<map><float name="zero" value="-0.0"/><float name="nan" value="NaN"/><float name="inf" value="Infinity"/><float name="minus" value="-Infinity"/><float name="ordinary" value="1.25"/></map>',
+    );
+    expect(rows.map((row) => row.value)).toEqual(["-0.0", "NaN", "Infinity", "-Infinity", 1.25]);
+    expect(JSON.parse(render({ rows }, "json"))).toEqual({ rows });
+    expect(render({ rows }, "toon")).toContain('"-0.0"');
   });
 
   test.each([

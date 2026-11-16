@@ -37,6 +37,23 @@ export function parsePreferences(xml: string): PreferenceRow[] {
   const keys = new Set<string>();
   const stack: { tag: string; attrs: Record<string, string>; text: string; items: string[] }[] = [];
   const parser = new SaxesParser({ xmlns: false });
+  // Android serializes C0 controls as numeric references even though XML 1.0 forbids them.
+  // Named entities return those code points without XML 1.1's newline normalization.
+  let prefix = "adbAxiControl";
+  while (xml.includes(prefix)) prefix += "x";
+  const input = xml.replace(
+    /<!\[CDATA\[[\s\S]*?\]\]>|<!--[\s\S]*?-->|&#(?:x[0-9a-fA-F]+|[0-9]+);/g,
+    (reference) => {
+      if (!reference.startsWith("&#")) return reference;
+      const code = reference.startsWith("&#x")
+        ? Number.parseInt(reference.slice(3, -1), 16)
+        : Number(reference.slice(2, -1));
+      if (code < 0 || code > 31 || [9, 10, 13].includes(code)) return reference;
+      const entity = `${prefix}${code}`;
+      parser.ENTITIES[entity] = String.fromCharCode(code);
+      return `&${entity};`;
+    },
+  );
   parser.on("error", invalid);
   parser.on("doctype", invalid);
   parser.on("processinginstruction", invalid);
@@ -112,14 +129,14 @@ export function parsePreferences(xml: string): PreferenceRow[] {
             !Number.isFinite(Number(raw))
           )
             invalid();
-          value = Number(raw);
+          value = Object.is(Number(raw), -0) ? "-0.0" : Number(raw);
         }
         break;
     }
     rows.push({ key, type, value });
   });
   try {
-    parser.write(xml).close();
+    parser.write(input).close();
   } catch {
     invalid();
   }

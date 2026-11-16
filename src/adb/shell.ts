@@ -2,6 +2,7 @@ import type { AdbCallOptions, AdbClient } from "./run.js";
 
 export interface ShellResult {
   stdout: string;
+  stdoutBytes: Buffer;
   stderr: string;
   /** The remote command's own exit code. */
   exitCode: number;
@@ -31,6 +32,7 @@ export async function runShell(
   });
   return {
     stdout: result.stdout.toString("utf8"),
+    stdoutBytes: result.stdout,
     stderr: result.stderr.toString("utf8"),
     exitCode: result.exitCode,
     durationMs: result.durationMs,
