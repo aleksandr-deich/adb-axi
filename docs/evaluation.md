@@ -7,7 +7,7 @@ How adb-axi has been measured against plain `adb` when a coding agent does the d
 Two kinds of evidence are kept apart:
 
 - **Realistic task evidence**: an agent does a whole job (fix a reported bug on a device, build an app slice) and independent checks score the result. This is the evidence to use for "does adb-axi help an agent".
-- **Regression signal**: a fixed set of small scripted tasks, run the same way for each release. It shows whether a release moved turns, tokens or time. Its tasks are too small, and its checks too literal, to rank the two arms.
+- **Regression signal**: a fixed set of small scripted tasks used in the [retired benchmark](#scripted-benchmark-second-run) to compare releases on turns, tokens or time. Its tasks are too small, and its checks too literal, to rank the two arms.
 
 Every study so far is small: one app or one probe app, one model per study, and one to five repeats per arm. The two newest studies report 90% intervals and use pre-set cost bands: 0.2.4 found no material whole-task cost difference within its +/-15% band; 0.2.2 was inconclusive. Neither establishes general superiority. Version, environment and hosted-runtime differences prevent attributing cross-study changes solely to the product.
 
@@ -337,9 +337,11 @@ No detectable difference at one run per arm: device turns 1.14x and device-tool 
 
 ## Scripted benchmark, second run
 
+The scripted benchmark was retired; its harness and supporting files live at tag [`bench-final`](https://github.com/aleksandr-deich/adb-axi/tree/bench-final/bench).
+
 - **Date:** 2026-10-07.
 - **Tested version:** adb-axi 0.1.3, harness at [`38783d2`](https://github.com/aleksandr-deich/adb-axi/commit/38783d26a858f88917611f15fea7bb9415127856).
-- **Design:** the repeatable benchmark in [`bench/`](../bench/README.md): 8 small device-state tasks on a probe app (install and start, process death, crash cause, database read and release-build refusal, night-mode change and restore, UiAutomation holder, two devices, emulator recovery), each checked by a script. The baseline arm has the Android CLI skill and raw `adb`; the adb-axi arm adds the adb-axi skill and command.
+- **Design:** the retired eight-task benchmark: 8 small device-state tasks on a probe app (install and start, process death, crash cause, database read and release-build refusal, night-mode change and restore, UiAutomation holder, two devices, emulator recovery), each checked by a script. The baseline arm has the Android CLI skill and raw `adb`; the adb-axi arm adds the adb-axi skill and command.
 - **Agent/model:** Pi 1.0.4, openai-codex/gpt-6.1-sol, medium effort.
 - **Sample size:** 80 runs: 8 tasks x 5 repeats x 2 arms.
 
