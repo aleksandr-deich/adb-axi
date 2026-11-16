@@ -103,6 +103,35 @@ afterAll(async () => {
 }, 300_000);
 
 describe("a second Android user in front, with the probe running only for user 0", () => {
+  test("config per-user writes and restoration leave the owner's rows unchanged", async () => {
+    if (user === undefined) throw new Error("Second user was not created");
+    const n = user;
+    const rows = (id: number) =>
+      axi.sh(
+        `settings --user ${id} list system | grep '^font_scale=' || true; settings --user ${id} list secure | grep -E '^(ui_night_mode[^=]*|dark_theme_custom_[^=]*)=' | sort; cmd uimode night`,
+      );
+    const ownerBefore = await rows(0);
+    const secondaryBefore = await rows(n);
+    const read = await axi.ok(["config", "get", "font_scale"]);
+    expect(read.user).toBe(n);
+    const before = (read.config as { value: string }[])[0]?.value;
+    if (before === undefined) throw new Error("No restore value for font_scale");
+    try {
+      const changed = await axi.ok(["config", "set", "font_scale", "1.2"]);
+      expect(changed.user).toBe(n);
+      expect((changed.before as { value: string }).value).toBe(before);
+      expect(await rows(0)).toBe(ownerBefore);
+    } finally {
+      await axi.ok(["config", "set", "font_scale", before]);
+    }
+    expect(await rows(n)).toBe(secondaryBefore);
+    const refused = await axi.run(["config", "set", "night", "yes"]);
+    expect(refused.exitCode).toBe(2);
+    expect(refused.json).toMatchObject({ code: "VALIDATION_ERROR", user: n });
+    expect(refused.json.error).toMatch(/user 0 only/);
+    expect(await rows(0)).toBe(ownerBefore);
+    expect(await rows(n)).toBe(secondaryBefore);
+  });
   test("process reads follow the current user's processes, not the owner's", async () => {
     const n = user ?? 0;
     const owner = uidOf(0, probeAppId);

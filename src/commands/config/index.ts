@@ -1,0 +1,104 @@
+import { AdbAxiError, errorObject } from "../../core/errors.js";
+import { defineCommand, defineGroup } from "../define.js";
+import { preflightConfig, snapshot, verify, writeConfig } from "./state.js";
+import { KEYS, configKey, configValues } from "./values.js";
+
+const help = [
+  "Keys: animations, night, font_scale, density, size. Per-user rows use the resolved current Android user, printed as user",
+  'Each row includes present and raw text: absent is present:false,text:null; the literal string null is present:true,text:"null"',
+  "before.value is a pasteable restore value; null means an unsupported raw state, which set refuses to change",
+  "animations accepts a non-negative scale for all rows or window=<scale|unset>,transition=<scale|unset>,animator=<scale|unset>",
+  "Animation effective values are row-derived estimates, not verified live scales; absent rows assume default 1. Values above 20 are null because clamping is platform-dependent (Android 15 clamps to 20; older releases may not)",
+  "Animation unset requests default 1 before deleting rows; live scales are normally 1 afterwards but are not verified",
+  "font_scale uses Android's float text; noncanonical original font rows are readable but refused for mutation so raw text cannot be lost",
+  "size is validated against the active density and platform bounds (200 pixels minimum, twice each physical dimension maximum) before writing; unsupported originals and numeric density/size rows equal to physical defaults have value:null",
+  "night: yes/no/auto; font_scale: positive scale; density: integer >=72; size: WxH with optional dp suffix on either dimension",
+  "Night writes require resolved user 0: the platform command applies night mode to user 0 only; other users are refused before any write",
+  "unset deletes rows; density/size reset leaves present-empty rows. Neither is a saved baseline or reset command",
+  "Night's known companion rows and font_scale's system_locales row retain their prior presence/text within each set call",
+  "Set writes then reads back and returns before/after snapshots with rows, effective and value; CONFIG_MISMATCH is failure, including locked night mode. Failed writes may have partially applied",
+  "Install cleanup before mutation and restore before.value in the same turn even if checks fail, keeping the Android user unchanged; no automatic rollback",
+];
+const get = defineCommand({
+  path: ["config", "get"],
+  summary: "Read raw device settings rows and their effective values",
+  positionals: [{ name: "key", description: "Config key; omit to read all five", required: false }],
+  help,
+  examples: ["adb-axi config get --device emulator-5554", "adb-axi config get animations --json"],
+  shipped: true,
+  run: async (context) => {
+    const keys =
+      typeof context.positionals.key === "string" ? [configKey(context.positionals.key)] : KEYS;
+    const user = await context.device.user();
+    const config = [];
+    for (const key of keys) config.push({ key, ...(await snapshot(context, key, user)) });
+    return { user, config };
+  },
+});
+const set = defineCommand({
+  path: ["config", "set"],
+  summary: "Validate, write and verify device settings, with an exact restore value",
+  positionals: [
+    { name: "key", description: "animations, night, font_scale, density or size", required: true },
+    {
+      name: "value",
+      description: "Validated key value or unset (density/size also accept reset)",
+      required: true,
+    },
+  ],
+  help,
+  examples: [
+    "adb-axi config set animations 0 --device emulator-5554",
+    "adb-axi config set animations window=unset,transition=1,animator=0.5",
+    "adb-axi config set density unset",
+  ],
+  shipped: true,
+  run: async (context) => {
+    const key = configKey(String(context.positionals.key));
+    const values = configValues(key, String(context.positionals.value));
+    const user = await context.device.user();
+    if (key === "night" && user !== 0)
+      throw new AdbAxiError(
+        "VALIDATION_ERROR",
+        "The platform applies night mode to user 0 only; config set night refuses other resolved users before any write",
+        { fields: { key, user } },
+      );
+    const before = await snapshot(context, key, user);
+    if (before.value === null)
+      throw new AdbAxiError(
+        "INVALID_OUTPUT",
+        "Original raw config cannot be restored with this command; no write attempted",
+        { fields: { key, user, before } },
+      );
+    await preflightConfig(context, key, values, user);
+    try {
+      await writeConfig(context, key, values, user);
+      const after = await snapshot(context, key, user);
+      await verify(context, key, values, before, after, user);
+      return { key, user, before, after };
+    } catch (error) {
+      if (error instanceof AdbAxiError && error.fields.after === undefined) {
+        let observed: Record<string, unknown>;
+        try {
+          observed = { after: await snapshot(context, key, user) };
+        } catch (readError) {
+          observed = { after_error: errorObject(readError) };
+        }
+        throw new AdbAxiError(error.code, error.message, {
+          fields: { key, user, before, ...error.fields, ...observed },
+          help: [
+            ...error.help,
+            "A write may have partially applied; restore using before.value on this device only while the original Android user is current",
+          ],
+          cause: error,
+        });
+      }
+      throw error;
+    }
+  },
+});
+export const config = defineGroup({
+  name: "config",
+  summary: "Read and temporarily change a small set of device settings",
+  subcommands: [get, set],
+});

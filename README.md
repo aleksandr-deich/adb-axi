@@ -66,35 +66,46 @@ adb-axi keeps log marks, install records and cached AVD names under `~/.adb-axi/
 
 ## Commands
 
-| Command                                                   | What it answers                                                                  |
-| --------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| `adb-axi`                                                 | Devices, the resolved target, its foreground app and recent crashes              |
-| `devices [--all] [--fields <list>]`                       | Every attached device with its AVD name, state, API level and form               |
-| `doctor`                                                  | Host, adb server and target checks for things that break a run                   |
-| `doctor ui [--fix]`                                       | What holds UiAutomation, and clearing resident, leaked or wedged holders         |
-| `wait boot`                                               | Waits until the device is online, booted, and able to install and launch apps    |
-| `wait app <pkg> --state <foreground\|running\|stopped>`   | Waits until an app reaches a state                                               |
-| `wait log <regex> [--since <mark\|dur>]`                  | Waits until a log line matches                                                   |
-| `app current`                                             | The foreground app: package, activity and pid                                    |
-| `app list [--all] [--grep <re>]`                          | Packages installed for the current Android user, with a count                    |
-| `app info <pkg>`                                          | One package: installed, version, debuggable, pid, foreground, data size          |
-| `app install <apk> [--clean-data] [--if-changed]`         | Installs and waits until the new version is live, keeping app data by default    |
-| `app uninstall <pkg> [--keep-data]`                       | Uninstalls a package for the current Android user                                |
-| `app start <pkg> [--fresh] [--activity <name>]`           | Starts an app and reports what is in front and how it launched                   |
-| `app stop <pkg>`                                          | Force-stops an app and verifies its process is gone                              |
-| `app clear <pkg> [--full]`                                | Clears the app's data and verifies it                                            |
-| `app kill <pkg>`                                          | Kills the process the way the system does, keeping its task in recents           |
-| `app restore <pkg>`                                       | Reopens the app's task from recents so its saved state is restored               |
-| `app death <pkg> [--compare]`                             | `app kill` then `app restore` in one call, with the evidence of both             |
-| `logs mark [<name>]`                                      | Records the device clock under a name, to scope later reads                      |
-| `logs [--since] [--pkg] [--level] [--grep] [--full]`      | One bounded log dump for a window, with level counts and repeats collapsed       |
-| `logs crash [--pkg <pkg>] [--since <mark\|dur>] [--full]` | Java crashes, ANRs and native crashes in a window                                |
-| `data db <pkg> [<sql>] [--db <name>] [--full]`            | An app's databases, or one read-only query on a copy that includes the WAL       |
-| `data prefs <pkg> [--file <name>] [--full]`               | Read SharedPreferences XML as typed rows, including string sets and empty values |
-| `shell -- <cmd>`                                          | One device shell command with its real exit code                                 |
-| `update [--check]`                                        | Upgrades adb-axi from npm, or compares against the latest version with --check   |
+| Command                                                   | What it answers                                                                                 |
+| --------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `adb-axi`                                                 | Devices, the resolved target, its foreground app and recent crashes                             |
+| `devices [--all] [--fields <list>]`                       | Every attached device with its AVD name, state, API level and form                              |
+| `doctor`                                                  | Host, adb server and target checks for things that break a run                                  |
+| `doctor ui [--fix]`                                       | What holds UiAutomation, and clearing resident, leaked or wedged holders                        |
+| `wait boot`                                               | Waits until the device is online, booted, and able to install and launch apps                   |
+| `wait app <pkg> --state <foreground\|running\|stopped>`   | Waits until an app reaches a state                                                              |
+| `wait log <regex> [--since <mark\|dur>]`                  | Waits until a log line matches                                                                  |
+| `app current`                                             | The foreground app: package, activity and pid                                                   |
+| `app list [--all] [--grep <re>]`                          | Packages installed for the current Android user, with a count                                   |
+| `app info <pkg>`                                          | One package: installed, version, debuggable, pid, foreground, data size                         |
+| `app install <apk> [--clean-data] [--if-changed]`         | Installs and waits until the new version is live, keeping app data by default                   |
+| `app uninstall <pkg> [--keep-data]`                       | Uninstalls a package for the current Android user                                               |
+| `app start <pkg> [--fresh] [--activity <name>]`           | Starts an app and reports what is in front and how it launched                                  |
+| `app stop <pkg>`                                          | Force-stops an app and verifies its process is gone                                             |
+| `app clear <pkg> [--full]`                                | Clears the app's data and verifies it                                                           |
+| `app kill <pkg>`                                          | Kills the process the way the system does, keeping its task in recents                          |
+| `app restore <pkg>`                                       | Reopens the app's task from recents so its saved state is restored                              |
+| `app death <pkg> [--compare]`                             | `app kill` then `app restore` in one call, with the evidence of both                            |
+| `logs mark [<name>]`                                      | Records the device clock under a name, to scope later reads                                     |
+| `logs [--since] [--pkg] [--level] [--grep] [--full]`      | One bounded log dump for a window, with level counts and repeats collapsed                      |
+| `logs crash [--pkg <pkg>] [--since <mark\|dur>] [--full]` | Java crashes, ANRs and native crashes in a window                                               |
+| `data db <pkg> [<sql>] [--db <name>] [--full]`            | An app's databases, or one read-only query on a copy that includes the WAL                      |
+| `data prefs <pkg> [--file <name>] [--full]`               | Read SharedPreferences XML as typed rows, including string sets and empty values                |
+| `config get [<key>]`                                      | Read raw presence/text and effective values for animations, night, font_scale, density and size |
+| `config set <key> <value>`                                | Validate, write and verify settings; print before/after and a pasteable restore value           |
+| `shell -- <cmd>`                                          | One device shell command with its real exit code                                                |
+| `update [--check]`                                        | Upgrades adb-axi from npm, or compares against the latest version with --check                  |
 
-Device settings such as dark mode and display density have no command of their own; change them with `shell`.
+### Temporary device configuration
+
+`config get` reads `animations`, `night`, `font_scale`, `density` and `size`, distinguishing absent rows (`present: false, text: null`) from literal `"null"` text (`present: true`). Install cleanup before mutation and restore the `before.value` printed by `config set` in the same turn. Night writes refuse users other than user 0. See live `config get --help` and `config set --help` for value rules and verification limits.
+
+```sh
+adb-axi config get animations --device emulator-5554 --json
+adb-axi config set animations 0 --device emulator-5554 --json
+# In the same turn, restore the value printed as before.value, for example:
+adb-axi config set animations window=1,transition=1,animator=unset --device emulator-5554
+```
 
 ## Example: does an app survive process death?
 

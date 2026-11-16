@@ -5,7 +5,6 @@ import { GLOBAL_FLAGS } from "../../src/core/args.js";
 /** v0.2 verbs that no help line may name before v0.2 ships them (6.3). */
 export const V02_PATTERNS = [
   /adb-axi lease\b/,
-  /adb-axi config\b/,
   /adb-axi fwd\b/,
   /adb-axi rev\b/,
   /adb-axi doctor --fix\b/,

@@ -29,6 +29,8 @@ const V01_COMMANDS = [
   "logs crash",
   "data db",
   "data prefs",
+  "config get",
+  "config set",
   "shell",
   "update",
 ];
@@ -50,8 +52,8 @@ describe("command registry", () => {
     expect([...paths()].sort()).toEqual([...V01_COMMANDS].sort());
   });
 
-  it("registers prefs but no other unshipped v0.2 command", () => {
-    for (const name of ["lease", "config", "fwd", "rev", "setup"]) {
+  it("registers no unshipped v0.2 command", () => {
+    for (const name of ["lease", "fwd", "rev", "setup"]) {
       expect(REGISTRY.entries[name]).toBeUndefined();
     }
     const data = REGISTRY.entries.data as GroupSpec;

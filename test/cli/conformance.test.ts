@@ -53,6 +53,8 @@ const CASES: Case[] = [
   { args: ["logs", "crash"] },
   { args: ["data", "db", PKG] },
   { args: ["data", "prefs", PKG] },
+  { args: ["config", "get"] },
+  { args: ["config", "set", "animations", "0"] },
   { args: ["shell", "--", "id"] },
   { args: ["update"] },
 ];
@@ -211,7 +213,7 @@ describe("conformance sweep", () => {
     expect((top.data.commands as { command: string }[]).map((c) => c.command).sort()).toEqual(
       ["adb-axi", ...covered.map((command) => `adb-axi ${command}`)].sort(),
     );
-    for (const group of ["app", "wait", "data", "logs", "doctor"]) {
+    for (const group of ["app", "wait", "data", "logs", "doctor", "config"]) {
       const help = await both([group, "--help"], f);
       expect(help.toon.exitCode).toBe(0);
       expect((help.data.subcommands as { command: string }[]).map((c) => c.command).sort()).toEqual(

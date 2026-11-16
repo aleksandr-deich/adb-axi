@@ -1,5 +1,6 @@
 import { app } from "./app/index.js";
 import { data } from "./data/index.js";
+import { config } from "./config/index.js";
 import { devices } from "./devices.js";
 import { doctor } from "./doctor/index.js";
 import { home } from "./home.js";
@@ -12,7 +13,7 @@ import { wait } from "./wait/index.js";
 /** The single registry of every v0.1 command. Help and suggestions list only shipped ones. */
 export const REGISTRY: Registry = {
   home,
-  entries: { devices, doctor, wait, app, logs, data, shell, update },
+  entries: { devices, doctor, wait, app, logs, data, config, shell, update },
 };
 
 /** Every command in a registry entry, including a group's default command. */
