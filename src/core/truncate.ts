@@ -184,9 +184,9 @@ export class FullOutputFile {
   private open(): number {
     if (this.fd !== undefined) return this.fd;
     const dir = join(adbAxiHome(), "out");
-    mkdirSync(dir, { recursive: true });
+    mkdirSync(dir, { recursive: true, mode: 0o700 });
     const tmp = join(dir, `.full-${process.pid}-${randomBytes(6).toString("hex")}.tmp`);
-    this.fd = openSync(tmp, "wx");
+    this.fd = openSync(tmp, "wx", 0o600);
     this.tmp = tmp;
     return this.fd;
   }
