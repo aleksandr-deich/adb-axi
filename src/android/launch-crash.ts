@@ -27,9 +27,8 @@ export function parseLaunchCrashes(
 ): LaunchCrash[] {
   const native = parseCrashes(lines).flatMap((crash) => {
     if (crash.kind !== "native" || crash.pid === null) return [];
-    const uids = crash.trace.flatMap((message) => /^uid: (\d+)\s*$/.exec(message)?.[1] ?? []);
-    if (uids.length !== 1) return [];
-    const uid = Number(uids[0]);
+    const uid = crash.uid;
+    if (uid === undefined) return [];
     const died = lines.some((line) => {
       if (line.tag !== "am_proc_died" || line.level !== "I" || line.epochMs < crash.epochMs)
         return false;

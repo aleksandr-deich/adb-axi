@@ -1,6 +1,16 @@
 import { randomBytes } from "node:crypto";
-import { closeSync, fsyncSync, linkSync, mkdirSync, openSync, rmSync, writeSync } from "node:fs";
+import {
+  closeSync,
+  fsyncSync,
+  linkSync,
+  mkdirSync,
+  openSync,
+  readSync,
+  rmSync,
+  writeSync,
+} from "node:fs";
 import { dirname, join } from "node:path";
+import { onInterrupt } from "./interrupt.js";
 import { adbAxiHome, isErrno } from "./state.js";
 
 /** Default caps for `logs` and `shell` output. */
@@ -87,9 +97,15 @@ export function splitLines(text: string): string[] {
  * `first chars... (truncated, 412 chars total)`. Short values pass through unchanged.
  */
 export function truncateField(value: string, maxChars = MAX_FIELD_CHARS): string {
-  const chars = Array.from(graphemes.segment(value), (part) => part.segment);
-  if (chars.length <= maxChars) return value;
-  return `${chars.slice(0, maxChars).join("")}... (truncated, ${chars.length} chars total)`;
+  if (value.length <= maxChars) return value;
+  let count = 0;
+  let prefix = "";
+  for (const { segment } of graphemes.segment(value)) {
+    if (count < maxChars) prefix += segment;
+    count++;
+  }
+  if (count <= maxChars) return value;
+  return `${prefix}... (truncated, ${count} chars total)`;
 }
 
 const graphemes = new Intl.Segmenter(undefined, { granularity: "grapheme" });
@@ -131,8 +147,14 @@ export class FullOutputFile {
   private readonly stem: string;
   private tmp: string | undefined;
   private fd: number | undefined;
+  private stopInterrupt: (() => void) | undefined;
   /** The first write failure; `keep` throws it. */
   private failure: Error | undefined;
+  private length = 0;
+
+  get size(): number {
+    return this.length;
+  }
 
   constructor(stem: string) {
     this.stem = stem.replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^[.-]+/, "") || "output";
@@ -145,10 +167,44 @@ export class FullOutputFile {
       const fd = this.open();
       const bytes = typeof chunk === "string" ? Buffer.from(chunk, "utf8") : chunk;
       for (let offset = 0; offset < bytes.length;) {
-        offset += writeSync(fd, bytes, offset);
+        offset += writeSync(fd, bytes, offset, bytes.length - offset, this.length + offset);
       }
+      this.length += bytes.length;
     } catch (error) {
       this.failure = error instanceof Error ? error : new Error(String(error));
+    }
+  }
+
+  writeAt(position: number, bytes: Uint8Array): void {
+    if (this.failure !== undefined) throw this.failure;
+    const fd = this.open();
+    for (let offset = 0; offset < bytes.length;)
+      offset += writeSync(fd, bytes, offset, bytes.length - offset, position + offset);
+  }
+
+  readAt(position: number, size: number): Buffer {
+    if (this.failure !== undefined) throw this.failure;
+    const buffer = Buffer.alloc(size);
+    const fd = this.open();
+    let offset = 0;
+    while (offset < size) {
+      const read = readSync(fd, buffer, offset, size - offset, position + offset);
+      if (read === 0) throw new Error("Unexpected end of output spool");
+      offset += read;
+    }
+    return buffer;
+  }
+
+  *chunks(): Iterable<Buffer> {
+    if (this.failure !== undefined) throw this.failure;
+    const fd = this.open();
+    const buffer = Buffer.alloc(64 * 1024);
+    let position = 0;
+    for (;;) {
+      const size = readSync(fd, buffer, 0, buffer.length, position);
+      if (size === 0) break;
+      position += size;
+      yield buffer.subarray(0, size);
     }
   }
 
@@ -176,9 +232,12 @@ export class FullOutputFile {
 
   /** Remove the temporary file; a kept file stays under its final name. */
   discard(): void {
+    this.stopInterrupt?.();
+    this.stopInterrupt = undefined;
     this.close();
     if (this.tmp !== undefined) rmSync(this.tmp, { force: true });
     this.tmp = undefined;
+    this.length = 0;
   }
 
   private open(): number {
@@ -186,8 +245,11 @@ export class FullOutputFile {
     const dir = join(adbAxiHome(), "out");
     mkdirSync(dir, { recursive: true, mode: 0o700 });
     const tmp = join(dir, `.full-${process.pid}-${randomBytes(6).toString("hex")}.tmp`);
-    this.fd = openSync(tmp, "wx", 0o600);
+    this.fd = openSync(tmp, "wx+", 0o600);
     this.tmp = tmp;
+    this.stopInterrupt = onInterrupt(() => {
+      this.discard();
+    });
     return this.fd;
   }
 

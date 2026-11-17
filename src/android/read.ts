@@ -11,6 +11,7 @@ export interface ReadOptions {
   /** A read that needs another output limit than the default (see `AdbCallOptions`). */
   maxOutputBytes?: number;
   limitHelp?: readonly string[];
+  sink?: (stream: "stdout" | "stderr", chunk: Buffer) => void;
 }
 
 /**
@@ -33,6 +34,7 @@ export async function readShell(
     ...(options.capMs === undefined ? {} : { capMs: options.capMs }),
     ...(options.maxOutputBytes === undefined ? {} : { maxOutputBytes: options.maxOutputBytes }),
     ...(options.limitHelp === undefined ? {} : { limitHelp: options.limitHelp }),
+    ...(options.sink === undefined ? {} : { sink: options.sink }),
   });
   if (!okExits.includes(result.exitCode)) {
     throw new AdbAxiError(

@@ -1,3 +1,16 @@
+import { StringDecoder } from "node:string_decoder";
+import { AdbAxiError } from "../core/errors.js";
+
+export const LOG_LIMIT_HELP = [
+  "Read a shorter window: a later mark (`adb-axi logs mark <name>`) or a shorter `--since` such as `--since 1m`",
+];
+
+export const LOG_READ_HELP = [
+  "Log windows are read incrementally; device buffers may already have dropped older lines",
+  "Oversized individual lines, crash ownership events, PID sets or stderr can still fail with INVALID_OUTPUT; use a later mark or shorter --since",
+  "Scans may spool temporary files under ADB_AXI_HOME/out/ even without --full; completion, failure and handled interrupts remove temporary spools, while retained --full files stay",
+];
+
 /** logcat priorities, lowest first. `S` (silent) never appears on a line. */
 export const LOG_LEVELS = ["V", "D", "I", "W", "E", "F"] as const;
 export type LogLevel = (typeof LOG_LEVELS)[number];
@@ -73,6 +86,65 @@ export function parseLogcat(stdout: string): ParsedLog {
     else lines.push(line);
   }
   return { lines, unparsed };
+}
+
+export function logcatStream(consume: (line: LogLine) => void): {
+  add(chunk: Buffer): void;
+  finish(): { parsed: number; unparsed: number };
+} {
+  const decoder = new StringDecoder("utf8");
+  let pending = "";
+  let buffer: string | null = null;
+  let parsed = 0;
+  let unparsed = 0;
+  const line = (raw: string): void => {
+    if (raw.trim() === "") return;
+    const marker = BUFFER_MARKER.exec(raw);
+    if (marker?.[1] !== undefined) {
+      buffer = marker[1];
+      return;
+    }
+    const value = parseLogLine(raw.replace(/\r$/, ""), buffer);
+    if (value === null) unparsed++;
+    else {
+      parsed++;
+      consume(value);
+    }
+  };
+  const text = (value: string): void => {
+    pending += value;
+    let start = 0;
+    for (;;) {
+      const end = pending.indexOf("\n", start);
+      if (end < 0) break;
+      if (Buffer.byteLength(pending.slice(start, end)) > 16 * 1024 * 1024)
+        throw new AdbAxiError(
+          "INVALID_OUTPUT",
+          "one log line exceeds the 16 MiB retained-state limit",
+          { help: LOG_LIMIT_HELP },
+        );
+      line(pending.slice(start, end));
+      start = end + 1;
+    }
+    pending = pending.slice(start);
+    if (Buffer.byteLength(pending) > 16 * 1024 * 1024)
+      throw new AdbAxiError(
+        "INVALID_OUTPUT",
+        "one log line exceeds the 16 MiB retained-state limit",
+        { help: LOG_LIMIT_HELP },
+      );
+  };
+  return {
+    add(chunk) {
+      text(decoder.write(chunk));
+    },
+    finish() {
+      text(decoder.end());
+      if (pending !== "") line(pending);
+      pending = "";
+      return { parsed, unparsed };
+    },
+  };
 }
 
 /** Whether `level` is at or above `minimum`, as `logcat *:<minimum>` filters. */

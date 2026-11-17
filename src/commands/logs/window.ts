@@ -1,17 +1,18 @@
 import type { AdbClient } from "../../adb/run.js";
-import { processTable } from "../../android/app-processes.js";
+import { processTable, userIdFromUid } from "../../android/app-processes.js";
 import {
   formatDeviceTime,
   logcatTime,
   readDeviceClock,
   type DeviceTime,
 } from "../../android/clock.js";
-import { crashBelongsTo, parseCrashes, type Crash } from "../../android/crash.js";
-import { parseLogcat, type LogLine } from "../../android/logcat.js";
+import { crashBelongsTo, createCrashParser, type Crash } from "../../android/crash.js";
+import { LOG_LIMIT_HELP, logcatStream, parseLogcat, type LogLine } from "../../android/logcat.js";
 import { invalidOutput, readShell, type ReadOptions } from "../../android/read.js";
 import { parseDuration } from "../../core/args.js";
 import { AdbAxiError } from "../../core/errors.js";
 import type { Output } from "../../core/output.js";
+import { FullOutputFile } from "../../core/truncate.js";
 import type { DeviceSession } from "../../device/session.js";
 import {
   assertMarkVerified,
@@ -21,7 +22,8 @@ import {
   writeMark,
   type Mark,
 } from "./marks.js";
-import { PID_LIST_BELOW_API, resolveScope, type Scope } from "./scope.js";
+import { CrashSpool } from "./crash-spool.js";
+import { PID_LIST_BELOW_API, resolveScope, startedPids, type Scope } from "./scope.js";
 
 export interface LogWindow {
   startMs: number;
@@ -32,16 +34,24 @@ export interface LogWindow {
 export interface OpenLogWindow extends LogWindow {
   now: DeviceTime;
   marksNote: string | undefined;
-  readLines(reads?: ReadOptions): Promise<LogLine[]>;
-  readLogs(pkg?: string): Promise<{
-    lines: LogLine[];
+  readLines(consume: (line: LogLine) => void, reads?: ReadOptions): Promise<void>;
+  readLogs(
+    consume: (line: LogLine) => void,
+    pkg?: string,
+  ): Promise<{
+    scanned: number;
     firstLine: LogLine | undefined;
     scope: Scope | undefined;
   }>;
-  readCrashes(pkg?: string): Promise<{
+  readCrashes(
+    pkg?: string,
+    full?: { file: FullOutputFile; header(crash: Crash): string },
+  ): Promise<{
     crashes: Crash[];
-    scanned: LogLine[];
+    count: number;
+    scanned: number;
     unverified: number;
+    note: string | undefined;
   }>;
 }
 
@@ -77,46 +87,139 @@ export async function openLogWindow(
       ...window,
       now,
       marksNote: binding.note,
-      readLines: (options = reads) => readWindowLines(adb, serial, window, options),
-      async readLogs(pkg) {
+      readLines: (consume, options = reads) => streamWindow(adb, serial, window, options, consume),
+      async readLogs(consume, pkg) {
         const scope = pkg === undefined ? undefined : await resolveScope(device, pkg, window);
-        const lines = await readWindowLines(
-          adb,
-          serial,
-          window,
-          reads,
-          scope?.kind === "uid" ? scope.uid : undefined,
-        );
-        // A uid scan starts at the app's first line, not necessarily the buffer's first line.
-        const firstLine =
-          scope?.kind === "uid" ? await readFirstWindowLine(adb, serial, window, reads) : lines[0];
-        return { lines, firstLine, scope };
+        let scanned = 0;
+        let firstLine: LogLine | undefined;
+        const spool = scope?.kind === "pids" ? new FullOutputFile("log-scan") : undefined;
+        let spoolBuffer: string | null = null;
+        const pids = new Set(scope?.kind === "pids" ? [...scope.current, ...scope.marked] : []);
+        try {
+          await streamWindow(
+            adb,
+            serial,
+            window,
+            reads,
+            (line) => {
+              scanned++;
+              firstLine ??= line;
+              if (scope?.kind === "pids" && spool !== undefined) {
+                for (const pid of startedPids([line], scope.uid)) pids.add(pid);
+                if (pids.size > 65536)
+                  throw new AdbAxiError(
+                    "INVALID_OUTPUT",
+                    "log scope exceeds the 65536 pid retained-state limit",
+                    { help: LOG_LIMIT_HELP },
+                  );
+                if (line.buffer !== null && line.buffer !== spoolBuffer) {
+                  spool.write(`--------- beginning of ${line.buffer}\n`);
+                  spoolBuffer = line.buffer;
+                }
+                spool.write(
+                  `${line.time} ${line.pid} ${line.tid} ${line.level} ${line.tag}: ${line.message}\n`,
+                );
+              } else consume(line);
+            },
+            scope?.kind === "uid" ? scope.uid : undefined,
+          );
+          if (scope?.kind === "pids" && spool !== undefined) {
+            scope.current = [...pids];
+            const replay = logcatStream((line) => {
+              if (pids.has(line.pid)) consume(line);
+            });
+            for (const chunk of spool.chunks()) {
+              if (reads.deadline.remainingMs() === 0)
+                throw new AdbAxiError(
+                  "TIMEOUT",
+                  "reading the log did not finish before the deadline",
+                  { fields: { step: "reading the log" } },
+                );
+              replay.add(chunk);
+            }
+            replay.finish();
+          }
+          // A uid scan starts at the app's first line, not necessarily the buffer's first line.
+          if (scope?.kind === "uid")
+            firstLine = await readFirstWindowLine(adb, serial, window, reads);
+          return { scanned, firstLine, scope };
+        } finally {
+          spool?.discard();
+        }
       },
-      async readCrashes(pkg) {
+      async readCrashes(pkg, full) {
         const userId = pkg === undefined ? undefined : await device.user();
-        // ANRs and tombstones are written by other processes, so never narrow this scan by uid or pid.
-        const lines = await readWindowLines(adb, serial, window, reads, undefined, true);
-        const reports = parseCrashes(lines);
-        const matching = reports.filter(
-          (crash) =>
-            crash.epochMs >= window.startMs && (pkg === undefined || crashBelongsTo(crash, pkg)),
-        );
-        const events =
-          userId !== undefined && matching.some((crash) => crash.kind !== "native")
-            ? await readCrashEvents(device, window)
-            : [];
-        let unverified = 0;
-        const crashes = matching.filter((crash) => {
-          if (userId === undefined) return true;
-          const owner = crashUser(crash, events, reports);
-          if (owner === undefined) unverified++;
-          return owner === userId;
+        const spool = new CrashSpool(full !== undefined);
+        const matches = (crash: Crash): boolean =>
+          crash.epochMs >= window.startMs && (pkg === undefined || crashBelongsTo(crash, pkg));
+        const needsEvents = { value: false };
+        const parser = createCrashParser({
+          retain: false,
+          onTrace(order, message) {
+            spool.line(order, message);
+          },
+          onReport(order, crash) {
+            if (crash !== null && matches(crash) && crash.kind !== "native")
+              needsEvents.value = true;
+            spool.report(order, crash);
+          },
         });
-        return {
-          crashes,
-          scanned: lines.filter((line) => line.epochMs >= window.startMs),
-          unverified,
-        };
+        let scanned = 0;
+        try {
+          await streamWindow(
+            adb,
+            serial,
+            window,
+            reads,
+            (line) => {
+              if (line.epochMs >= window.startMs) scanned++;
+              parser.add(line);
+            },
+            undefined,
+            true,
+          );
+          parser.finish();
+          const events =
+            userId !== undefined && needsEvents.value ? await readCrashEvents(device, window) : [];
+          const candidates = events.map((event) => ({ event, reports: 0 }));
+          if (candidates.length > 0) {
+            for (const { crash } of spool.reports()) {
+              for (const candidate of candidates)
+                if (eventMatchesCrash(candidate.event, crash, events) !== undefined)
+                  candidate.reports++;
+            }
+          }
+          let count = 0;
+          let unverified = 0;
+          const crashes: Crash[] = [];
+          for (const entry of spool.reports()) {
+            const { crash } = entry;
+            if (!matches(crash)) continue;
+            if (userId !== undefined) {
+              const owner = crashUser(crash, events, candidates);
+              if (owner === undefined) unverified++;
+              if (owner !== userId) continue;
+            }
+            count++;
+            if (crashes.length < 5) crashes.push(crash);
+            if (full !== undefined) {
+              full.file.write(`${full.header(crash)}\n`);
+              spool.writeTrace(entry, full.file);
+              full.file.write("\n");
+            }
+          }
+          return {
+            crashes,
+            count,
+            scanned,
+            unverified,
+            note: parser.degraded
+              ? "Crash details exceeded retained-state limits; summaries may be truncated. Use --full for complete traces."
+              : undefined,
+          };
+        } finally {
+          spool.discard();
+        }
       },
     };
   } catch (error) {
@@ -196,9 +299,6 @@ export function logcatCommand(startMs: number, uid?: number): string {
   return uid === undefined ? base : `${base} --uid ${uid}`;
 }
 
-// A default 2 MiB buffer can expand to near 40 MB across main, system and crash.
-const MAX_WINDOW_BYTES = 64 * 1024 * 1024;
-
 // Reports and their fatal signals or user events can be separated by slow crash/ANR handling.
 const CRASH_LEAD_IN_MS = 60_000;
 
@@ -211,64 +311,75 @@ async function readCrashEvents(device: DeviceSession, window: LogWindow): Promis
   );
 }
 
+function eventMatchesCrash(
+  line: LogLine,
+  crash: Crash,
+  events: readonly LogLine[],
+): number | undefined {
+  if (line.level !== "I") return undefined;
+  const fields =
+    crash.kind === "java" && line.tag === "am_crash"
+      ? /^\[(\d+),(\d+),([^,\]]+),[^,]+,([^,\]]+),/.exec(line.message)
+      : crash.kind === "anr" && line.tag === "am_anr"
+        ? /^\[(\d+),(\d+),([^,\]]+),/.exec(line.message)
+        : null;
+  if (fields === null || fields[3] !== crash.process || fields[4] === "Native crash")
+    return undefined;
+  const pid = Number(fields[crash.kind === "java" ? 1 : 2]);
+  const userId = Number(fields[crash.kind === "java" ? 2 : 1]);
+  if (
+    !Number.isSafeInteger(pid) ||
+    !Number.isSafeInteger(userId) ||
+    crash.pid !== pid ||
+    (crash.kind === "java" && line.epochMs < crash.epochMs) ||
+    (crash.kind === "anr" && line.epochMs > crash.epochMs) ||
+    Math.abs(line.epochMs - crash.epochMs) > CRASH_LEAD_IN_MS
+  )
+    return undefined;
+  const start = Math.min(line.epochMs, crash.epochMs);
+  const end = Math.max(line.epochMs, crash.epochMs);
+  if (
+    events.some(
+      (event) =>
+        event.epochMs > start &&
+        event.epochMs < end &&
+        event.level === "I" &&
+        (event.tag === "am_proc_start" || event.tag === "am_proc_died") &&
+        Number(/^\[\d+,(\d+),/.exec(event.message)?.[1]) === pid,
+    )
+  )
+    return undefined;
+  return userId;
+}
+
 function crashUser(
   crash: Crash,
   events: readonly LogLine[],
-  reports: readonly Crash[],
+  candidates: readonly { event: LogLine; reports: number }[],
 ): number | undefined {
-  if (crash.kind === "native") {
-    const uids = crash.trace.flatMap((message) => /^uid: (\d+)\s*$/.exec(message)?.[1] ?? []);
-    const uid = uids.length === 1 ? Number(uids[0]) : NaN;
-    return Number.isSafeInteger(uid) ? Math.floor(uid / 100000) : undefined;
-  }
-  const matches = events.flatMap((line) => {
-    if (line.level !== "I") return [];
-    const fields =
-      crash.kind === "java" && line.tag === "am_crash"
-        ? /^\[(\d+),(\d+),([^,\]]+),[^,]+,([^,\]]+),/.exec(line.message)
-        : crash.kind === "anr" && line.tag === "am_anr"
-          ? /^\[(\d+),(\d+),([^,\]]+),/.exec(line.message)
-          : null;
-    if (fields === null || fields[3] !== crash.process || fields[4] === "Native crash") return [];
-    const pid = Number(fields[crash.kind === "java" ? 1 : 2]);
-    const userId = Number(fields[crash.kind === "java" ? 2 : 1]);
-    if (!Number.isSafeInteger(pid) || !Number.isSafeInteger(userId)) return [];
-    const matchesReport = (report: Crash): boolean => {
-      if (
-        report.kind !== crash.kind ||
-        report.pid !== pid ||
-        report.process !== crash.process ||
-        (crash.kind === "java" && line.epochMs < report.epochMs) ||
-        (crash.kind === "anr" && line.epochMs > report.epochMs) ||
-        Math.abs(line.epochMs - report.epochMs) > CRASH_LEAD_IN_MS
-      )
-        return false;
-      const start = Math.min(line.epochMs, report.epochMs);
-      const end = Math.max(line.epochMs, report.epochMs);
-      // A reused pid is not evidence that two reports belong to the same Android user.
-      return !events.some((event) => {
-        if (event.epochMs <= start || event.epochMs >= end || event.level !== "I") return false;
-        if (event.tag !== "am_proc_start" && event.tag !== "am_proc_died") return false;
-        return Number(/^\[\d+,(\d+),/.exec(event.message)?.[1]) === pid;
-      });
-    };
-    // Ambiguous reports stay unverified, rather than lending one event to multiple crashes.
-    return matchesReport(crash) && reports.filter(matchesReport).length === 1 ? [userId] : [];
+  if (crash.kind === "native")
+    return crash.uid === undefined ? undefined : userIdFromUid(crash.uid);
+  const matches = candidates.flatMap(({ event, reports }) => {
+    if (reports !== 1) return [];
+    const owner = eventMatchesCrash(event, crash, events);
+    return owner === undefined ? [] : [owner];
   });
   return matches.length === 1 ? matches[0] : undefined;
 }
 
-async function readWindowLines(
+async function streamWindow(
   adb: AdbClient,
   serial: string,
   window: LogWindow,
   options: ReadOptions,
+  consume: (line: LogLine) => void,
   uid?: number,
   includeLeadIn = false,
-): Promise<LogLine[]> {
+): Promise<void> {
   const command = logcatCommand(window.startMs - (includeLeadIn ? CRASH_LEAD_IN_MS : 0), uid);
-  const lines = await readLogLines(adb, serial, command, options);
-  return includeLeadIn ? lines : lines.filter((line) => line.epochMs >= window.startMs);
+  await streamLogLines(adb, serial, command, options, (line) => {
+    if (includeLeadIn || line.epochMs >= window.startMs) consume(line);
+  });
 }
 
 async function readLogLines(
@@ -277,18 +388,72 @@ async function readLogLines(
   command: string,
   options: ReadOptions,
 ): Promise<LogLine[]> {
-  const step = "reading the log";
-  const result = await readShell(adb, serial, command, step, {
-    ...options,
-    maxOutputBytes: MAX_WINDOW_BYTES,
-    limitHelp: [
-      "Read a shorter window: a later mark (`adb-axi logs mark <name>`) or a shorter `--since` such as `--since 1m`",
-    ],
+  const lines: LogLine[] = [];
+  let bytes = 0;
+  await streamLogLines(adb, serial, command, options, (line) => {
+    bytes += Buffer.byteLength(line.message) + Buffer.byteLength(line.tag) + 128;
+    if (bytes > 16 * 1024 * 1024)
+      throw new AdbAxiError(
+        "INVALID_OUTPUT",
+        "crash ownership events exceed the 16 MiB retained-state limit",
+        { help: LOG_LIMIT_HELP },
+      );
+    lines.push(line);
   });
-  const parsed = parseLogcat(result.stdout);
-  // Text that is no log line at all is never passed off as an empty log.
-  if (parsed.lines.length === 0 && parsed.unparsed > 0) throw invalidOutput(step, result.stdout);
-  return parsed.lines;
+  return lines;
+}
+
+async function streamLogLines(
+  adb: AdbClient,
+  serial: string,
+  command: string,
+  options: ReadOptions,
+  consume: (line: LogLine) => void,
+): Promise<void> {
+  const parser = logcatStream(consume);
+  let failure: Error | undefined;
+  const controller = new AbortController();
+  const stderr: Buffer[] = [];
+  let stderrBytes = 0;
+  let result;
+  try {
+    result = await readShell(adb, serial, command, "reading the log", {
+      ...options,
+      signal:
+        options.signal === undefined
+          ? controller.signal
+          : AbortSignal.any([options.signal, controller.signal]),
+      maxOutputBytes: 4096,
+      sink(stream, chunk) {
+        if (failure !== undefined) return;
+        try {
+          if (stream === "stdout") parser.add(chunk);
+          else {
+            stderrBytes += chunk.length;
+            if (stderrBytes > 16 * 1024 * 1024)
+              throw new AdbAxiError(
+                "INVALID_OUTPUT",
+                "logcat stderr exceeds the 16 MiB retained-state limit",
+                { help: LOG_LIMIT_HELP },
+              );
+            stderr.push(chunk);
+          }
+        } catch (error) {
+          failure = error instanceof Error ? error : new Error(String(error));
+          controller.abort();
+        }
+      },
+    });
+  } catch (error) {
+    if (failure !== undefined) throw failure;
+    if (error instanceof AdbAxiError && error.code === "REMOTE_EXIT")
+      error.fields.stderr = Buffer.concat(stderr).toString("utf8").trim();
+    throw error;
+  }
+  if (failure !== undefined) throw failure;
+  const parsed = parser.finish();
+  if (parsed.parsed === 0 && parsed.unparsed > 0)
+    throw invalidOutput("reading the log", result.stdout);
 }
 
 async function readFirstWindowLine(

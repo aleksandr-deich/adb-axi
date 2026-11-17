@@ -1,16 +1,23 @@
 import { assertPackageName } from "../../android/component.js";
-import { LOG_LEVELS, atLeast, type LogLevel, type LogLine } from "../../android/logcat.js";
+import {
+  LOG_LEVELS,
+  LOG_READ_HELP,
+  atLeast,
+  type LogLevel,
+  type LogLine,
+} from "../../android/logcat.js";
 import {
   capLines,
   MAX_FIELD_CHARS,
   truncateField,
-  writeFullOutput,
+  FullOutputFile,
+  MAX_LINES,
   type LineWindow,
 } from "../../core/truncate.js";
-import { parseCrashes } from "../../android/crash.js";
+import { createCrashSeen } from "../../android/crash.js";
 import { runHint } from "../../core/output.js";
 import { defineCommand } from "../define.js";
-import { describeScope, scopePids, type Scope } from "./scope.js";
+import { describeScope } from "./scope.js";
 import { clockTime, compileRegex, openLogWindow, withMarksNote } from "./window.js";
 
 /** The window of `logs` without `--since`, counted back from the device's now. */
@@ -19,6 +26,7 @@ export const DEFAULT_SINCE = "15m";
 export const logsDump = defineCommand({
   path: ["logs"],
   summary: "A bounded log dump for one window, with level counts and repeats collapsed",
+  help: LOG_READ_HELP,
   flags: [
     {
       name: "--since",
@@ -68,93 +76,137 @@ export const logsDump = defineCommand({
     const window = await openLogWindow(context.device, since ?? DEFAULT_SINCE, context.env);
     return withMarksNote(window.marksNote, async () => {
       const { now } = window;
-      const { lines: scanned, scope, firstLine } = await window.readLogs(pkg);
-      const lines = select(scanned, { scope, level, grep });
-      const rows = collapse(lines, now.utcOffsetMinutes);
-      const shown = capLines(
-        rows.map((row) => formatRow(row)),
-        { keep: "tail" },
-      );
-      const visible = rows.slice(rows.length - shown.lines.length);
-      const displayed = visible.map((row) => {
-        const capped = shown.cut === undefined ? undefined : shown.lines[0];
-        const tagStart = `${row.time},${row.level},`.length;
-        const messageStart = tagStart + row.tag.length + 1;
-        const tag = capped === undefined ? row.tag : capped.slice(tagStart, messageStart - 1);
-        return {
-          time: row.time,
-          level: row.level,
-          tag:
-            capped !== undefined && capped.length < messageStart
-              ? Array.from(tag).slice(0, -1).join("")
-              : tag,
-          message: capped === undefined ? displayMessage(row) : capped.slice(messageStart),
-        };
-      });
-      const seconds = Math.max(0, Math.round((now.epochMs - window.startMs) / 1000));
       const full = context.flags.full === true;
-      const counts = countLevels(lines);
-      // A row cut at the byte cap is measured as printed, with its tag and message.
-      const cutRow = displayed[0];
-      const printed =
-        shown.cut === undefined || cutRow === undefined
-          ? shown
-          : {
-              ...shown,
-              cut: {
-                ...shown.cut,
-                shownBytes: Buffer.byteLength(
-                  `${cutRow.time},${cutRow.level},${cutRow.tag},${cutRow.message}`,
-                ),
-              },
-            };
-      const accounting = account(lines.length, rows, visible, printed);
-      const cut = accounting.lossy;
-      const crashed = parseCrashes(lines).length > 0;
-      return {
-        window: `${window.label} -> now (${seconds} s), ${scanned.length} lines scanned`,
-        ...(firstLine !== undefined && firstLine.epochMs - window.startMs > 2000
-          ? {
-              note: `first log line in this window is at ${clockTime(firstLine.epochMs, now.utcOffsetMinutes)}, after the window start; the device log buffer may have dropped earlier lines`,
-            }
-          : {}),
-        ...(scope === undefined ? {} : { scope: describeScope(scope, scanned) }),
-        counts,
-        lines: displayed,
-        ...(accounting.shown === undefined ? {} : { shown: accounting.shown }),
-        ...(full
-          ? {
-              full: cut
-                ? writeFullOutput(
-                    `logs-${window.label}-${clockTime(now.epochMs, now.utcOffsetMinutes).slice(0, 8).replaceAll(":", "")}`,
-                    lines.map((line) => `${formatFullLine(line, now.utcOffsetMinutes)}\n`).join(""),
-                  )
-                : "not written: nothing was cut",
-            }
-          : {}),
-        ...withHelp([
-          ...(cut && !full
-            ? [
-                `Run the same command with \`--full\` to write all ${lines.length} matched lines to a file`,
-              ]
-            : []),
-          // A crash in a plain dump is better read as one summary than as its stack rows.
-          ...(crashed
-            ? [
-                runHint(
-                  [
-                    "logs",
-                    "crash",
-                    ...(pkg === undefined ? [] : ["--pkg", pkg]),
-                    "--since",
-                    since ?? DEFAULT_SINCE,
-                  ],
-                  "for the crash with its exception and app frame",
-                ),
-              ]
-            : []),
-        ]),
-      };
+      const spool = full
+        ? new FullOutputFile(
+            `logs-${window.label}-${clockTime(now.epochMs, now.utcOffsetMinutes).slice(0, 8).replaceAll(":", "")}`,
+          )
+        : undefined;
+      try {
+        const rows: Row[] = [];
+        let rowCount = 0;
+        let lastMessage: string | undefined;
+        let matched = 0;
+        const levels: Partial<Record<LogLevel, number>> = {};
+        const crashes = createCrashSeen();
+        const { scanned, scope, firstLine } = await window.readLogs((line) => {
+          if (
+            (level !== undefined && !atLeast(line.level, level)) ||
+            (grep !== undefined && !grep.test(line.message))
+          )
+            return;
+          matched++;
+          levels[line.level] = (levels[line.level] ?? 0) + 1;
+          crashes.add(line);
+          spool?.write(`${formatFullLine(line, now.utcOffsetMinutes)}\n`);
+          const last = rows.at(-1);
+          if (last?.level === line.level && last.tag === line.tag && lastMessage === line.message)
+            last.repeats++;
+          else {
+            rowCount++;
+            const message = truncateField(line.message);
+            rows.push({
+              time: clockTime(line.epochMs, now.utcOffsetMinutes),
+              level: line.level,
+              tag: line.tag,
+              message,
+              long: message !== line.message,
+              repeats: 1,
+            });
+            if (rows.length > MAX_LINES) rows.shift();
+          }
+          lastMessage = line.message;
+        }, pkg);
+        const shown = capLines(
+          rows.map((row) => formatRow(row)),
+          { keep: "tail" },
+        );
+        const visible = rows.slice(rows.length - shown.lines.length);
+        const displayed = visible.map((row) => {
+          const capped = shown.cut === undefined ? undefined : shown.lines[0];
+          const tagStart = `${row.time},${row.level},`.length;
+          const messageStart = tagStart + row.tag.length + 1;
+          const tag = capped === undefined ? row.tag : capped.slice(tagStart, messageStart - 1);
+          return {
+            time: row.time,
+            level: row.level,
+            tag:
+              capped !== undefined && capped.length < messageStart
+                ? Array.from(tag).slice(0, -1).join("")
+                : tag,
+            message: capped === undefined ? displayMessage(row) : capped.slice(messageStart),
+          };
+        });
+        const seconds = Math.max(0, Math.round((now.epochMs - window.startMs) / 1000));
+        const counts =
+          matched === 0
+            ? { matched: 0 }
+            : Object.fromEntries(
+                [...LOG_LEVELS]
+                  .reverse()
+                  .flatMap((level) =>
+                    levels[level] === undefined ? [] : [[level, levels[level]]],
+                  ),
+              );
+        // A row cut at the byte cap is measured as printed, with its tag and message.
+        const cutRow = displayed[0];
+        const printed =
+          shown.cut === undefined || cutRow === undefined
+            ? shown
+            : {
+                ...shown,
+                cut: {
+                  ...shown.cut,
+                  shownBytes: Buffer.byteLength(
+                    `${cutRow.time},${cutRow.level},${cutRow.tag},${cutRow.message}`,
+                  ),
+                },
+              };
+        const accounting = account(matched, rowCount, visible, printed);
+        const cut = accounting.lossy;
+        const crashed = crashes.found;
+        return {
+          window: `${window.label} -> now (${seconds} s), ${scanned} lines scanned`,
+          ...(firstLine !== undefined && firstLine.epochMs - window.startMs > 2000
+            ? {
+                note: `first log line in this window is at ${clockTime(firstLine.epochMs, now.utcOffsetMinutes)}, after the window start; the device log buffer may have dropped earlier lines`,
+              }
+            : {}),
+          ...(scope === undefined ? {} : { scope: describeScope(scope, []) }),
+          counts,
+          lines: displayed,
+          ...(accounting.shown === undefined ? {} : { shown: accounting.shown }),
+          ...(full
+            ? {
+                full: cut ? spool?.keep() : "not written: nothing was cut",
+              }
+            : {}),
+          ...withHelp([
+            ...(cut && !full
+              ? [
+                  `Run the same command with \`--full\` to write all ${matched} matched lines to a file`,
+                ]
+              : []),
+            // A crash in a plain dump is better read as one summary than as its stack rows.
+            ...(crashed
+              ? [
+                  runHint(
+                    [
+                      "logs",
+                      "crash",
+                      ...(pkg === undefined ? [] : ["--pkg", pkg]),
+                      "--since",
+                      since ?? DEFAULT_SINCE,
+                    ],
+                    "for the crash with its exception and app frame",
+                  ),
+                ]
+              : []),
+          ]),
+        };
+      } finally {
+        spool?.discard();
+      }
     });
   },
 });
@@ -172,17 +224,14 @@ interface Accounting {
  */
 function account(
   matched: number,
-  rows: readonly Row[],
+  rows: number,
   visible: readonly Row[],
   window: LineWindow,
 ): Accounting {
-  const omitted = rows.length - visible.length;
-  const folded = matched - rows.length;
+  const omitted = rows - visible.length;
+  const folded = matched - rows;
   // A row cut at the byte cap is the only row, and its message is not cut on its own.
-  const longMessages =
-    window.cut === undefined
-      ? visible.filter((row) => truncateField(row.message) !== row.message).length
-      : 0;
+  const longMessages = window.cut === undefined ? visible.filter((row) => row.long).length : 0;
   const parts = [
     ...(longMessages > 0
       ? [
@@ -199,7 +248,7 @@ function account(
   }
   return {
     shown: {
-      rows: `${visible.length} of ${rows.length}${omitted > 0 ? `, the oldest ${omitted} left out` : ""}`,
+      rows: `${visible.length} of ${rows}${omitted > 0 ? `, the oldest ${omitted} left out` : ""}`,
       lines: `${matched} matched${folded > 0 ? `, ${folded} folded into repeated rows` : ""}`,
       ...(cut === undefined ? {} : { cut }),
     },
@@ -211,34 +260,6 @@ function withHelp(help: readonly string[]): { help?: string[] } {
   return help.length > 0 ? { help: [...help] } : {};
 }
 
-interface Filters {
-  scope: Scope | undefined;
-  level: LogLevel | undefined;
-  grep: RegExp | undefined;
-}
-
-/** The window's lines that pass `--pkg`, `--level` and `--grep`. */
-function select(lines: readonly LogLine[], filters: Filters): LogLine[] {
-  const pids =
-    filters.scope?.kind === "pids" ? new Set(scopePids(filters.scope, lines)) : undefined;
-  return lines.filter(
-    (line) =>
-      (pids === undefined || pids.has(line.pid)) &&
-      (filters.level === undefined || atLeast(line.level, filters.level)) &&
-      (filters.grep === undefined || filters.grep.test(line.message)),
-  );
-}
-
-/** Line counts by level, most severe first; levels without lines are left out. */
-function countLevels(lines: readonly LogLine[]): Record<string, number> {
-  const counts: Record<string, number> = {};
-  for (const level of [...LOG_LEVELS].reverse()) {
-    const n = lines.filter((line) => line.level === level).length;
-    if (n > 0) counts[level] = n;
-  }
-  return lines.length === 0 ? { matched: 0 } : counts;
-}
-
 /** One line, or a run of identical consecutive lines, as shown in the table. */
 interface Row {
   time: string;
@@ -246,31 +267,11 @@ interface Row {
   tag: string;
   message: string;
   repeats: number;
-}
-
-/** Collapse runs of consecutive lines that differ only in time, pid and tid. */
-function collapse(lines: readonly LogLine[], utcOffsetMinutes: number | null): Row[] {
-  const rows: Row[] = [];
-  for (const line of lines) {
-    const last = rows.at(-1);
-    if (last?.level === line.level && last.tag === line.tag && last.message === line.message) {
-      last.repeats++;
-      continue;
-    }
-    rows.push({
-      time: clockTime(line.epochMs, utcOffsetMinutes),
-      level: line.level,
-      tag: line.tag,
-      message: line.message,
-      repeats: 1,
-    });
-  }
-  return rows;
+  long: boolean;
 }
 
 function displayMessage(row: Row): string {
-  const message = truncateField(row.message);
-  return row.repeats > 1 ? `${message} (repeated ${row.repeats}x)` : message;
+  return row.repeats > 1 ? `${row.message} (repeated ${row.repeats}x)` : row.message;
 }
 
 /** A row as it counts against the output caps: what the table prints for it. */

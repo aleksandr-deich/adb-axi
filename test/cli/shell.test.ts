@@ -102,7 +102,7 @@ describe("shell", () => {
         {
           match: ["-s", "emulator-5554", "shell", "sleep 30"],
           set: { state: "offline" },
-          respond: { stderr: "error: closed\n", exit: 1 },
+          respond: { stdout: "x".repeat(100000), stderr: "error: closed\n", exit: 1 },
         },
       ],
     });
@@ -111,6 +111,9 @@ describe("shell", () => {
       code: "DEVICE_OFFLINE",
       error: "emulator-5554 went offline while running the command",
     });
+    fake.resetVars();
+    const streamed = await runCli(["shell", "--full", "--json", "--", "sleep 30"], fake.env);
+    expect(JSON.parse(streamed.stdout)).toMatchObject({ code: "DEVICE_OFFLINE" });
   });
 
   it("fails an offline device at once without sending the command", async () => {

@@ -1,4 +1,4 @@
-import type { LogLine } from "../../android/logcat.js";
+import { LOG_READ_HELP, type LogLine } from "../../android/logcat.js";
 import { formatDuration } from "../../core/duration.js";
 import { AdbAxiError } from "../../core/errors.js";
 import { okLine, runHint } from "../../core/output.js";
@@ -10,7 +10,10 @@ import { clockTime, compileRegex, openLogWindow, withMarksNote } from "../logs/w
 
 export const waitLog = defineCommand({
   path: ["wait", "log"],
-  help: ["adbd service-request echoes of shell commands do not count as log matches"],
+  help: [
+    "adbd service-request echoes of shell commands do not count as log matches",
+    ...LOG_READ_HELP,
+  ],
   summary: "Wait until a log line after the window start matches a regex",
   positionals: [
     { name: "regex", description: "Regex matched against log messages", required: true },
@@ -39,18 +42,27 @@ export const waitLog = defineCommand({
       const result = await observe({
         deadline: context.deadline,
         read: async (deadline) => {
-          const lines = await window.readLines({ ...context.device.reads, deadline });
+          let count = 0;
+          let found: LogLine | undefined;
+          let newest: LogLine | undefined;
+          await window.readLines(
+            (line) => {
+              count++;
+              newest = line;
+              if (
+                found === undefined &&
+                !(line.tag === "adbd" && line.message.startsWith("adbd service requested '")) &&
+                regex.test(line.message)
+              )
+                found = line;
+            },
+            { ...context.device.reads, deadline },
+          );
           // adbd echoes our shell commands, including this poll, into the next dump.
           // Keep those lines in `logs` for diagnostics, but never use them as wait evidence.
-          const found = lines.find(
-            (line) =>
-              !(line.tag === "adbd" && line.message.startsWith("adbd service requested '")) &&
-              regex.test(line.message),
-          );
-          const newest = lines.at(-1);
           return {
             summary: {
-              lines_scanned: lines.length,
+              lines_scanned: count,
               newest: newest === undefined ? UNKNOWN : describe(newest, now.utcOffsetMinutes),
             },
             found,
