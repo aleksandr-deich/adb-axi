@@ -5,6 +5,12 @@ export const LOG_LIMIT_HELP = [
   "Read a shorter window: a later mark (`adb-axi logs mark <name>`) or a shorter `--since` such as `--since 1m`",
 ];
 
+export const LOG_READ_HELP = [
+  "Log windows are read incrementally; device buffers may already have dropped older lines",
+  "Oversized individual lines, crash ownership events, PID sets or stderr can still fail with INVALID_OUTPUT; use a later mark or shorter --since",
+  "Scans may spool temporary files under ADB_AXI_HOME/out/ even without --full; completion, failure and handled interrupts remove temporary spools, while retained --full files stay",
+];
+
 /** logcat priorities, lowest first. `S` (silent) never appears on a line. */
 export const LOG_LEVELS = ["V", "D", "I", "W", "E", "F"] as const;
 export type LogLevel = (typeof LOG_LEVELS)[number];

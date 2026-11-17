@@ -1,5 +1,11 @@
 import { assertPackageName } from "../../android/component.js";
-import { LOG_LEVELS, atLeast, type LogLevel, type LogLine } from "../../android/logcat.js";
+import {
+  LOG_LEVELS,
+  LOG_READ_HELP,
+  atLeast,
+  type LogLevel,
+  type LogLine,
+} from "../../android/logcat.js";
 import {
   capLines,
   MAX_FIELD_CHARS,
@@ -20,6 +26,7 @@ export const DEFAULT_SINCE = "15m";
 export const logsDump = defineCommand({
   path: ["logs"],
   summary: "A bounded log dump for one window, with level counts and repeats collapsed",
+  help: LOG_READ_HELP,
   flags: [
     {
       name: "--since",

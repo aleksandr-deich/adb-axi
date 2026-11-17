@@ -1,6 +1,7 @@
 import { formatDeviceTime } from "../../android/clock.js";
 import { assertPackageName } from "../../android/component.js";
 import type { Crash } from "../../android/crash.js";
+import { LOG_READ_HELP } from "../../android/logcat.js";
 import { FullOutputFile, truncateField } from "../../core/truncate.js";
 import { UNKNOWN } from "../app/shared.js";
 import { defineCommand } from "../define.js";
@@ -10,6 +11,10 @@ import { clockTime, openLogWindow, withMarksNote } from "./window.js";
 export const logsCrash = defineCommand({
   path: ["logs", "crash"],
   summary: "Java crashes, ANRs and native crashes in one window",
+  help: [
+    "Counts matching reports and shows the first five summaries; retained-state limits can truncate summary details, reported in a note; --full preserves complete matching traces",
+    ...LOG_READ_HELP,
+  ],
   flags: [
     {
       name: "--pkg",

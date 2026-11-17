@@ -1,4 +1,4 @@
-import type { LogLine } from "../../android/logcat.js";
+import { LOG_READ_HELP, type LogLine } from "../../android/logcat.js";
 import { formatDuration } from "../../core/duration.js";
 import { AdbAxiError } from "../../core/errors.js";
 import { okLine, runHint } from "../../core/output.js";
@@ -10,7 +10,10 @@ import { clockTime, compileRegex, openLogWindow, withMarksNote } from "../logs/w
 
 export const waitLog = defineCommand({
   path: ["wait", "log"],
-  help: ["adbd service-request echoes of shell commands do not count as log matches"],
+  help: [
+    "adbd service-request echoes of shell commands do not count as log matches",
+    ...LOG_READ_HELP,
+  ],
   summary: "Wait until a log line after the window start matches a regex",
   positionals: [
     { name: "regex", description: "Regex matched against log messages", required: true },

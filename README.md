@@ -62,9 +62,9 @@ Without `--server`, `--server-start` or a saved selection, adb-axi inherits adb'
 - **Deadlines:** commands share one deadline across their device calls; state waits may finish a final bounded observation just past it to check for a state reached during the last polling interval. `--help` shows each command's default and `--timeout` overrides it.
 - **Long output:** `logs`, `shell`, `data db` and `data prefs` print a bounded view and say how much of it was shown; `--full` writes the complete output to a file.
 
-Log windows are parsed incrementally, without a total-window byte cap, for `logs`, `logs crash`, `wait log` and the home crash count. `logs` keeps level counts and a folded tail; `logs crash` counts matching reports and shows the first five summaries. Retained-state limits can truncate crash details, reported in a `note`; `logs crash --full` writes complete matching traces independently of those summary limits. Oversized individual lines, ownership-event collections, PID sets or stderr can still fail with `INVALID_OUTPUT` and shorter-window guidance. Device log buffers may already have dropped older lines.
+Log windows are read incrementally, so large windows work; `--full` writes the complete output to a file.
 
-adb-axi keeps log marks, install records and cached AVD names under `~/.adb-axi/`; set `ADB_AXI_HOME` to use another directory. Log scans may use temporary disk spools under its `out/` directory, even without `--full`. Spools are removed on completion, failure or a handled interrupt; retained `--full` files remain there.
+adb-axi keeps log marks, install records and cached AVD names under `~/.adb-axi/`; set `ADB_AXI_HOME` to use another directory. Log scans may spool temporary files under `out/`.
 
 ## Commands
 
