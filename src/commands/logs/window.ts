@@ -152,12 +152,15 @@ export async function openLogWindow(
         const spool = new CrashSpool(full !== undefined);
         const matches = (crash: Crash): boolean =>
           crash.epochMs >= window.startMs && (pkg === undefined || crashBelongsTo(crash, pkg));
-        let needsEvents = false;
+        const needsEvents = { value: false };
         const parser = createCrashParser({
           retain: false,
-          onTrace: (order, message) => spool.line(order, message),
+          onTrace(order, message) {
+            spool.line(order, message);
+          },
           onReport(order, crash) {
-            if (crash !== null && matches(crash) && crash.kind !== "native") needsEvents = true;
+            if (crash !== null && matches(crash) && crash.kind !== "native")
+              needsEvents.value = true;
             spool.report(order, crash);
           },
         });
@@ -177,7 +180,7 @@ export async function openLogWindow(
           );
           parser.finish();
           const events =
-            userId !== undefined && needsEvents ? await readCrashEvents(device, window) : [];
+            userId !== undefined && needsEvents.value ? await readCrashEvents(device, window) : [];
           const candidates = events.map((event) => ({ event, reports: 0 }));
           if (candidates.length > 0) {
             for (const { crash } of spool.reports()) {
