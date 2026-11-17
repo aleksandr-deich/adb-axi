@@ -1,4 +1,5 @@
 import type { LogLine } from "./logcat.js";
+import { AdbAxiError } from "../core/errors.js";
 
 export type CrashKind = "java" | "anr" | "native";
 
@@ -43,6 +44,22 @@ const mainPackage = (process: string): string => process.split(":")[0] ?? proces
  * time when available, otherwise its tombstone header time.
  */
 export function parseCrashes(lines: readonly LogLine[]): Crash[] {
+  const parser = createCrashParser();
+  for (const line of lines) parser.add(line);
+  return parser.finish();
+}
+
+export function createCrashParser(): { add(line: LogLine): void; finish(): Crash[] } {
+  let retainedBytes = 0;
+  const retain = (message: string): void => {
+    retainedBytes += Buffer.byteLength(message) + 128;
+    if (retainedBytes > 16 * 1024 * 1024) {
+      throw new AdbAxiError(
+        "INVALID_OUTPUT",
+        "crash reports exceed the 16 MiB retained-state limit",
+      );
+    }
+  };
   const found: { order: number; crash: Crash }[] = [];
   let order = 0;
   const java = new Map<number, Block>();
@@ -70,12 +87,14 @@ export function parseCrashes(lines: readonly LogLine[]): Crash[] {
     if (crash !== null) found.push({ order: block.order, crash });
   };
 
-  for (const line of lines) {
+  const add = (line: LogLine): void => {
     if (line.tag === "AndroidRuntime" && line.level === "E") {
       if (FATAL.test(line.message)) {
         closeJava(line.pid);
+        retain(line.message);
         java.set(line.pid, { order: order++, start: line, rest: [] });
       } else {
+        if (java.has(line.pid)) retain(line.message);
         java.get(line.pid)?.rest.push(line.message);
       }
     } else if (line.tag === "ActivityManager") {
@@ -93,6 +112,7 @@ export function parseCrashes(lines: readonly LogLine[]): Crash[] {
       if (line.level === "E") {
         if (ANR_START.test(line.message)) {
           closeAnr(key);
+          retain(line.message);
           anr.set(key, { order: order++, start: line, rest: [] });
         } else {
           const report = anr.get(key);
@@ -112,6 +132,7 @@ export function parseCrashes(lines: readonly LogLine[]): Crash[] {
             if (repeated || !partOfReport) {
               closeAnr(key);
             } else {
+              retain(message);
               report.rest.push(message);
               if (
                 /^\s*\d+(?:\.\d+)?% TOTAL:/.test(message) &&
@@ -125,8 +146,10 @@ export function parseCrashes(lines: readonly LogLine[]): Crash[] {
     } else if (line.tag === "DEBUG" && line.level === "F") {
       if (TOMBSTONE_START.test(line.message)) {
         closeNative(line.pid);
+        retain(line.message);
         native.set(line.pid, { order: order++, start: line, rest: [] });
       } else {
+        if (native.has(line.pid)) retain(line.message);
         native.get(line.pid)?.rest.push(line.message);
       }
     } else if (line.tag === "libc" && line.level === "F") {
@@ -134,6 +157,7 @@ export function parseCrashes(lines: readonly LogLine[]): Crash[] {
       if (raised?.[1] !== undefined && raised[2] !== undefined && raised[3] !== undefined) {
         const pending = signals.findIndex((entry) => entry.pid === Number(raised[2]));
         if (pending >= 0) signals.splice(pending, 1);
+        retain(line.message);
         signals.push({
           pid: Number(raised[2]),
           process: raised[3],
@@ -142,13 +166,16 @@ export function parseCrashes(lines: readonly LogLine[]): Crash[] {
         });
       }
     }
-  }
-  for (const pid of [...java.keys()]) closeJava(pid);
-  for (const key of [...anr.keys()]) closeAnr(key);
-  for (const pid of [...native.keys()]) closeNative(pid);
-  return found
-    .sort((a, b) => a.crash.epochMs - b.crash.epochMs || a.order - b.order)
-    .map((entry) => entry.crash);
+  };
+  const finish = (): Crash[] => {
+    for (const pid of [...java.keys()]) closeJava(pid);
+    for (const key of [...anr.keys()]) closeAnr(key);
+    for (const pid of [...native.keys()]) closeNative(pid);
+    return found
+      .sort((a, b) => a.crash.epochMs - b.crash.epochMs || a.order - b.order)
+      .map((entry) => entry.crash);
+  };
+  return { add, finish };
 }
 
 /** Whether a process belongs to a package: the main process or a `<pkg>:<name>` one. */

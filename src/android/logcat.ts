@@ -1,3 +1,6 @@
+import { StringDecoder } from "node:string_decoder";
+import { AdbAxiError } from "../core/errors.js";
+
 /** logcat priorities, lowest first. `S` (silent) never appears on a line. */
 export const LOG_LEVELS = ["V", "D", "I", "W", "E", "F"] as const;
 export type LogLevel = (typeof LOG_LEVELS)[number];
@@ -73,6 +76,63 @@ export function parseLogcat(stdout: string): ParsedLog {
     else lines.push(line);
   }
   return { lines, unparsed };
+}
+
+export function logcatStream(consume: (line: LogLine) => void): {
+  add(chunk: Buffer): void;
+  finish(): { parsed: number; unparsed: number };
+} {
+  const decoder = new StringDecoder("utf8");
+  let pending = "";
+  let buffer: string | null = null;
+  let parsed = 0;
+  let unparsed = 0;
+  const line = (raw: string): void => {
+    if (raw.trim() === "") return;
+    const marker = BUFFER_MARKER.exec(raw);
+    if (marker?.[1] !== undefined) {
+      buffer = marker[1];
+      return;
+    }
+    const value = parseLogLine(raw.replace(/\r$/, ""), buffer);
+    if (value === null) unparsed++;
+    else {
+      parsed++;
+      consume(value);
+    }
+  };
+  const text = (value: string): void => {
+    pending += value;
+    let start = 0;
+    for (;;) {
+      const end = pending.indexOf("\n", start);
+      if (end < 0) break;
+      if (Buffer.byteLength(pending.slice(start, end)) > 16 * 1024 * 1024)
+        throw new AdbAxiError(
+          "INVALID_OUTPUT",
+          "one log line exceeds the 16 MiB retained-state limit",
+        );
+      line(pending.slice(start, end));
+      start = end + 1;
+    }
+    pending = pending.slice(start);
+    if (Buffer.byteLength(pending) > 16 * 1024 * 1024)
+      throw new AdbAxiError(
+        "INVALID_OUTPUT",
+        "one log line exceeds the 16 MiB retained-state limit",
+      );
+  };
+  return {
+    add(chunk) {
+      text(decoder.write(chunk));
+    },
+    finish() {
+      text(decoder.end());
+      if (pending !== "") line(pending);
+      pending = "";
+      return { parsed, unparsed };
+    },
+  };
 }
 
 /** Whether `level` is at or above `minimum`, as `logcat *:<minimum>` filters. */

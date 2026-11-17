@@ -39,18 +39,27 @@ export const waitLog = defineCommand({
       const result = await observe({
         deadline: context.deadline,
         read: async (deadline) => {
-          const lines = await window.readLines({ ...context.device.reads, deadline });
+          let count = 0;
+          let found: LogLine | undefined;
+          let newest: LogLine | undefined;
+          await window.readLines(
+            (line) => {
+              count++;
+              newest = line;
+              if (
+                found === undefined &&
+                !(line.tag === "adbd" && line.message.startsWith("adbd service requested '")) &&
+                regex.test(line.message)
+              )
+                found = line;
+            },
+            { ...context.device.reads, deadline },
+          );
           // adbd echoes our shell commands, including this poll, into the next dump.
           // Keep those lines in `logs` for diagnostics, but never use them as wait evidence.
-          const found = lines.find(
-            (line) =>
-              !(line.tag === "adbd" && line.message.startsWith("adbd service requested '")) &&
-              regex.test(line.message),
-          );
-          const newest = lines.at(-1);
           return {
             summary: {
-              lines_scanned: lines.length,
+              lines_scanned: count,
               newest: newest === undefined ? UNKNOWN : describe(newest, now.utcOffsetMinutes),
             },
             found,

@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { parseLogcat } from "../../src/android/logcat.js";
-import { belongsTo } from "../../src/android/crash.js";
+import { logcatStream, parseLogcat, type LogLine } from "../../src/android/logcat.js";
+import { belongsTo, createCrashParser } from "../../src/android/crash.js";
 import { assertMarkName } from "../../src/commands/logs/marks.js";
 import { startedPids } from "../../src/commands/logs/scope.js";
 import { logcatCommand } from "../../src/commands/logs/window.js";
@@ -63,6 +63,43 @@ describe("timeoutWindow", () => {
     expect(timeoutWindow(59_000)).toBe("1m");
     expect(timeoutWindow(60_000)).toBe("2m");
     expect(timeoutWindow(70_000)).toBe("2m");
+  });
+});
+
+describe("logcat streaming", () => {
+  it("preserves captured lines across byte boundaries, CRLF, markers and a final partial line", () => {
+    const text =
+      readFileSync(join(FIXTURES_DIR, "captured/35/logcat-crash-java.txt"), "utf8").replaceAll(
+        "\n",
+        "\r\n",
+      ) + "--------- switch to main\r\n         1790834330.000  1  1 I Unicode : café 🐈";
+    const expected = parseLogcat(text);
+    const input = Buffer.from(text);
+    for (const size of [1, 7, 65536]) {
+      const lines: LogLine[] = [];
+      const parser = logcatStream((line) => lines.push(line));
+      for (let offset = 0; offset < input.length; offset += size)
+        parser.add(input.subarray(offset, offset + size));
+      expect(parser.finish()).toEqual({
+        parsed: expected.lines.length,
+        unparsed: expected.unparsed,
+      });
+      expect(lines).toEqual(expected.lines);
+    }
+  });
+
+  it("rejects an oversized retained line and oversized crash blocks with typed errors", () => {
+    const parser = logcatStream(() => {});
+    expect(() => {
+      parser.add(Buffer.alloc(16 * 1024 * 1024 + 1, 120));
+    }).toThrow(AdbAxiError);
+    const crashes = createCrashParser();
+    const line = parseLogcat("1790834111.000 1 1 E AndroidRuntime: FATAL EXCEPTION: main").lines[0];
+    if (line === undefined) throw new Error("missing line");
+    crashes.add(line);
+    expect(() => {
+      crashes.add({ ...line, message: "x".repeat(16 * 1024 * 1024) });
+    }).toThrow(AdbAxiError);
   });
 });
 

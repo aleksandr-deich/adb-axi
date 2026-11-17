@@ -57,7 +57,7 @@ export const logsCrash = defineCommand({
       const includeCause = shown.some((crash) => crash.rootCause !== undefined);
       const rows = shown.map((crash) => describe(crash, now.utcOffsetMinutes, includeCause));
       return {
-        crashes: `${crashes.length} since ${window.label} (${seconds} s, ${scanned.length} lines scanned)`,
+        crashes: `${crashes.length} since ${window.label} (${seconds} s, ${scanned} lines scanned)`,
         ...(unverified === 0
           ? {}
           : { omitted: `${unverified} matching crash reports without a verified Android user` }),

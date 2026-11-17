@@ -1,5 +1,14 @@
 import { randomBytes } from "node:crypto";
-import { closeSync, fsyncSync, linkSync, mkdirSync, openSync, rmSync, writeSync } from "node:fs";
+import {
+  closeSync,
+  fsyncSync,
+  linkSync,
+  mkdirSync,
+  openSync,
+  readSync,
+  rmSync,
+  writeSync,
+} from "node:fs";
 import { dirname, join } from "node:path";
 import { adbAxiHome, isErrno } from "./state.js";
 
@@ -152,6 +161,19 @@ export class FullOutputFile {
     }
   }
 
+  *chunks(): Iterable<Buffer> {
+    if (this.failure !== undefined) throw this.failure;
+    const fd = this.open();
+    const buffer = Buffer.alloc(64 * 1024);
+    let position = 0;
+    for (;;) {
+      const size = readSync(fd, buffer, 0, buffer.length, position);
+      if (size === 0) break;
+      position += size;
+      yield buffer.subarray(0, size);
+    }
+  }
+
   /** Flush the file to disk and give it its final name, which is returned. */
   keep(): string {
     if (this.failure !== undefined) throw this.failure;
@@ -186,7 +208,7 @@ export class FullOutputFile {
     const dir = join(adbAxiHome(), "out");
     mkdirSync(dir, { recursive: true, mode: 0o700 });
     const tmp = join(dir, `.full-${process.pid}-${randomBytes(6).toString("hex")}.tmp`);
-    this.fd = openSync(tmp, "wx", 0o600);
+    this.fd = openSync(tmp, "wx+", 0o600);
     this.tmp = tmp;
     return this.fd;
   }

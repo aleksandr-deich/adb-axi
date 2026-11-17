@@ -1,10 +1,17 @@
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import {
+  appendFileSync,
+  existsSync,
+  readFileSync,
+  statSync,
+  writeFileSync,
+  readdirSync,
+} from "node:fs";
+import { join, relative } from "node:path";
 import { decode } from "@toon-format/toon";
 import { afterEach, describe, expect, it } from "vitest";
 import { bindMarks, writeMark } from "../../src/commands/logs/marks.js";
 import {} from "../../src/android/logcat.js";
-import { createFakeAdb, type FakeAdb } from "../fake-adb/harness.js";
+import { createFakeAdb, FIXTURES_DIR, type FakeAdb } from "../fake-adb/harness.js";
 import type { Response, Rule } from "../fake-adb/scenario.js";
 import { runCli, type CliRun } from "../helpers/run.js";
 import { sharedWithToon } from "../helpers/json.js";
@@ -204,6 +211,90 @@ function logcatFor(start: string, uid?: number): string {
 }
 
 describe("logs", () => {
+  it("streams an oversized window with exact folded counts and complete full output", async () => {
+    const f = devices({
+      serial: A,
+      api: 35,
+      shell: {
+        [logcatFor("1790834100.000")]: { stdoutFile: "" },
+      },
+    });
+    const path = join(f.dir, "large-log.txt");
+    const line = `${logLine(1790834111000, 123, "I", "Spam", "x".repeat(1000))}\n`;
+    const chunk = line.repeat(1000);
+    for (let i = 0; i < 110; i++) appendFileSync(path, chunk);
+    const scenarioPath = join(f.dir, "scenario.json");
+    const scenario = JSON.parse(readFileSync(scenarioPath, "utf8")) as { rules: Rule[] };
+    const rule = scenario.rules.find((entry) => entry.respond.stdoutFile === "");
+    if (rule === undefined) throw new Error("missing log response");
+    rule.respond.stdoutFile = relative(FIXTURES_DIR, path);
+    writeFileSync(scenarioPath, JSON.stringify(scenario));
+    const result = await runCli(["logs", "--since", "40s", "--full", "--json"], f.env);
+    expect(result.exitCode, result.stdout).toBe(0);
+    const data = JSON.parse(result.stdout) as Record<string, unknown>;
+    expect(data.counts).toEqual({ I: 110000 });
+    expect(data.window).toBe("40s ago -> now (40 s), 110000 lines scanned");
+    expect(rowsOf(data)).toHaveLength(1);
+    expect(rowsOf(data)[0]?.message).toContain("(repeated 110000x)");
+    const full = String(data.full);
+    expect(statSync(full).size).toBe(
+      Buffer.byteLength(`03:15:11.000 I Spam: ${"x".repeat(1000)}\n`) * 110000,
+    );
+    // Preserve the captured Java report, shifting only its clock into this synthetic window.
+    appendFileSync(
+      path,
+      readFileSync(join(FIXTURES_DIR, "captured/35/logcat-crash-java.txt"), "utf8").replaceAll(
+        "1790834324.594",
+        "1790834112.000",
+      ),
+    );
+    rule.match = ["-s", A, "shell", { re: "^logcat -d -v epoch -T [0-9]+\\.[0-9]{3}$" }];
+    scenario.rules.push(
+      {
+        match: ["-s", A, "shell", "dumpsys activity activities"],
+        respond: fixture("captured/35/dumpsys-activity-activities-probe-front.txt"),
+      },
+      { match: ["-s", A, "emu", "avd", "name"], respond: { stdout: "LogStreamTest\nOK\n" } },
+    );
+    writeFileSync(scenarioPath, JSON.stringify(scenario));
+    const crash = await runCli(["logs", "crash", "--since", "40s", "--json"], f.env);
+    expect(crash.exitCode, crash.stdout).toBe(0);
+    expect(crash.stdout).toContain("1 since 40s ago (40 s, 110025 lines scanned)");
+    expect(crash.stdout).toContain("java.lang.IllegalStateException");
+    expect(crash.stdout).toContain("probe crash requested");
+    const wait = await runCli(
+      ["wait", "log", "probe crash requested", "--since", "40s", "--json"],
+      f.env,
+    );
+    expect(wait.exitCode, wait.stdout).toBe(0);
+    expect(JSON.parse(wait.stdout)).toMatchObject({
+      match: {
+        tag: "AndroidRuntime",
+        message: "java.lang.IllegalStateException: probe crash requested",
+      },
+    });
+    const filtered = await runCli(
+      ["logs", "--since", "40s", "--level", "E", "--grep", "probe crash requested", "--json"],
+      f.env,
+    );
+    expect(filtered.exitCode, filtered.stdout).toBe(0);
+    expect(JSON.parse(filtered.stdout)).toMatchObject({ counts: { E: 1 } });
+    const home = await runCli(["--json"], f.env);
+    expect(home.exitCode, home.stdout).toBe(0);
+    expect(JSON.parse(home.stdout)).toMatchObject({
+      crashes: "1 in the last 15m (no log mark yet)",
+    });
+    const timeout = await runCli(
+      ["wait", "log", "NEVERMATCH", "--since", "40s", "--timeout", "2s", "--json"],
+      f.env,
+    );
+    expect(timeout.exitCode).toBe(1);
+    expect(JSON.parse(timeout.stdout)).toMatchObject({
+      code: "WAIT_TIMEOUT",
+      last: { lines_scanned: 110025 },
+    });
+    expectClean(f);
+  }, 30000);
   it.each([true])(
     "notes a late buffer start for an API 31+ uid scope from every app's first line (early other line: %s)",
     async (earlyOtherLine) => {
@@ -345,12 +436,53 @@ describe("logs", () => {
       api: 35,
       clocks: ["1790835000.000000000 +0000\n"],
       shell: {
-        [logcatFor("1790834100.000")]: { stderr: "logcat: Unable to open log device", exit: 1 },
+        [logcatFor("1790834100.000")]: {
+          stdout: `${logLine(1790834111000, 1, "I", "Probe", "x".repeat(5000))}\n`,
+          stderr: "logcat: Unable to open log device",
+          exit: 1,
+        },
       },
     });
     const { toon, data } = await both(["logs"], f);
     expect(toon.exitCode).toBe(1);
     expect(data).toMatchObject({ code: "REMOTE_EXIT", exit: 1 });
+    const full = await runCli(["logs", "--full", "--json"], f.env);
+    expect(JSON.parse(full.stdout)).toMatchObject({
+      code: "REMOTE_EXIT",
+      stderr: "logcat: Unable to open log device",
+    });
+    expect(readdirSync(join(f.home, "out"))).toEqual([]);
+  });
+
+  it("discards the full spool on timeout and reports a spool write failure", async () => {
+    const f = devices({
+      serial: A,
+      api: 35,
+      shell: {
+        [logcatFor("1790834100.000")]: {
+          stdout: `${logLine(1790834111000, 1, "I", "Probe", "x".repeat(5000))}\n`,
+          hang: true,
+        },
+      },
+    });
+    const timeout = await runCli(
+      ["logs", "--since", "40s", "--full", "--timeout", "2s", "--json"],
+      f.env,
+    );
+    expect(JSON.parse(timeout.stdout)).toMatchObject({ code: "TIMEOUT" });
+    expect(readdirSync(join(f.home, "out"))).toEqual([]);
+    const scenarioPath = join(f.dir, "scenario.json");
+    const scenario = JSON.parse(readFileSync(scenarioPath, "utf8")) as { rules: Rule[] };
+    const rule = scenario.rules.find((rule) => rule.respond.hang);
+    if (rule === undefined) throw new Error("missing hang response");
+    delete rule.respond.hang;
+    writeFileSync(scenarioPath, JSON.stringify(scenario));
+    const { rmSync } = await import("node:fs");
+    rmSync(join(f.home, "out"), { recursive: true });
+    writeFileSync(join(f.home, "out"), "not a directory");
+    const failure = await runCli(["logs", "--since", "40s", "--full", "--json"], f.env);
+    expect(failure.exitCode).toBe(1);
+    expect(JSON.parse(failure.stdout)).toMatchObject({ code: "INTERNAL_ERROR" });
   });
 });
 
