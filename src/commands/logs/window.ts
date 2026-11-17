@@ -1,5 +1,5 @@
 import type { AdbClient } from "../../adb/run.js";
-import { processTable } from "../../android/app-processes.js";
+import { processTable, userIdFromUid } from "../../android/app-processes.js";
 import {
   formatDeviceTime,
   logcatTime,
@@ -22,6 +22,7 @@ import {
   writeMark,
   type Mark,
 } from "./marks.js";
+import { CrashSpool } from "./crash-spool.js";
 import { PID_LIST_BELOW_API, resolveScope, startedPids, type Scope } from "./scope.js";
 
 export interface LogWindow {
@@ -42,7 +43,10 @@ export interface OpenLogWindow extends LogWindow {
     firstLine: LogLine | undefined;
     scope: Scope | undefined;
   }>;
-  readCrashes(pkg?: string): Promise<{
+  readCrashes(
+    pkg?: string,
+    full?: { file: FullOutputFile; header(crash: Crash): string },
+  ): Promise<{
     crashes: Crash[];
     count: number;
     scanned: number;
@@ -143,52 +147,76 @@ export async function openLogWindow(
           spool?.discard();
         }
       },
-      async readCrashes(pkg) {
+      async readCrashes(pkg, full) {
         const userId = pkg === undefined ? undefined : await device.user();
-        // ANRs and tombstones are written by other processes, so never narrow this scan by uid or pid.
-        let overflow = 0;
-        const parser = createCrashParser((crash) => {
-          if (crash.epochMs >= window.startMs && (pkg === undefined || crashBelongsTo(crash, pkg)))
-            overflow++;
+        const spool = new CrashSpool(full !== undefined);
+        const matches = (crash: Crash): boolean =>
+          crash.epochMs >= window.startMs && (pkg === undefined || crashBelongsTo(crash, pkg));
+        let needsEvents = false;
+        const parser = createCrashParser({
+          retain: false,
+          onTrace: (order, message) => spool.line(order, message),
+          onReport(order, crash) {
+            if (crash !== null && matches(crash) && crash.kind !== "native") needsEvents = true;
+            spool.report(order, crash);
+          },
         });
         let scanned = 0;
-        await streamWindow(
-          adb,
-          serial,
-          window,
-          reads,
-          (line) => {
-            if (line.epochMs >= window.startMs) scanned++;
-            parser.add(line);
-          },
-          undefined,
-          true,
-        );
-        const reports = parser.finish();
-        const matching = reports.filter(
-          (crash) =>
-            crash.epochMs >= window.startMs && (pkg === undefined || crashBelongsTo(crash, pkg)),
-        );
-        const events =
-          userId !== undefined && matching.some((crash) => crash.kind !== "native")
-            ? await readCrashEvents(device, window)
-            : [];
-        let unverified = userId === undefined ? 0 : overflow;
-        const crashes = matching.filter((crash) => {
-          if (userId === undefined) return true;
-          const owner = crashUser(crash, events, reports);
-          if (owner === undefined) unverified++;
-          return owner === userId;
-        });
-        return {
-          crashes,
-          count: crashes.length + (userId === undefined ? overflow : 0),
-          scanned,
-          unverified,
-          note: parser.degraded
-            ? "Crash details exceeded retained-state limits; traces may be truncated and extra summaries omitted. Read a shorter window with a later mark or shorter --since for complete details."
-            : undefined,
-        };
+        try {
+          await streamWindow(
+            adb,
+            serial,
+            window,
+            reads,
+            (line) => {
+              if (line.epochMs >= window.startMs) scanned++;
+              parser.add(line);
+            },
+            undefined,
+            true,
+          );
+          parser.finish();
+          const events =
+            userId !== undefined && needsEvents ? await readCrashEvents(device, window) : [];
+          const candidates = events.map((event) => ({ event, reports: 0 }));
+          if (candidates.length > 0) {
+            for (const { crash } of spool.reports()) {
+              for (const candidate of candidates)
+                if (eventMatchesCrash(candidate.event, crash, events) !== undefined)
+                  candidate.reports++;
+            }
+          }
+          let count = 0;
+          let unverified = 0;
+          const crashes: Crash[] = [];
+          for (const entry of spool.reports()) {
+            const { crash } = entry;
+            if (!matches(crash)) continue;
+            if (userId !== undefined) {
+              const owner = crashUser(crash, events, candidates);
+              if (owner === undefined) unverified++;
+              if (owner !== userId) continue;
+            }
+            count++;
+            if (crashes.length < 5) crashes.push(crash);
+            if (full !== undefined) {
+              full.file.write(`${full.header(crash)}\n`);
+              spool.writeTrace(entry, full.file);
+              full.file.write("\n");
+            }
+          }
+          return {
+            crashes,
+            count,
+            scanned,
+            unverified,
+            note: parser.degraded
+              ? "Crash details exceeded retained-state limits; summaries may be truncated. Use --full for complete traces."
+              : undefined,
+          };
+        } finally {
+          spool.discard();
+        }
       },
     };
   } catch (error) {
@@ -280,49 +308,58 @@ async function readCrashEvents(device: DeviceSession, window: LogWindow): Promis
   );
 }
 
+function eventMatchesCrash(
+  line: LogLine,
+  crash: Crash,
+  events: readonly LogLine[],
+): number | undefined {
+  if (line.level !== "I") return undefined;
+  const fields =
+    crash.kind === "java" && line.tag === "am_crash"
+      ? /^\[(\d+),(\d+),([^,\]]+),[^,]+,([^,\]]+),/.exec(line.message)
+      : crash.kind === "anr" && line.tag === "am_anr"
+        ? /^\[(\d+),(\d+),([^,\]]+),/.exec(line.message)
+        : null;
+  if (fields === null || fields[3] !== crash.process || fields[4] === "Native crash")
+    return undefined;
+  const pid = Number(fields[crash.kind === "java" ? 1 : 2]);
+  const userId = Number(fields[crash.kind === "java" ? 2 : 1]);
+  if (
+    !Number.isSafeInteger(pid) ||
+    !Number.isSafeInteger(userId) ||
+    crash.pid !== pid ||
+    (crash.kind === "java" && line.epochMs < crash.epochMs) ||
+    (crash.kind === "anr" && line.epochMs > crash.epochMs) ||
+    Math.abs(line.epochMs - crash.epochMs) > CRASH_LEAD_IN_MS
+  )
+    return undefined;
+  const start = Math.min(line.epochMs, crash.epochMs);
+  const end = Math.max(line.epochMs, crash.epochMs);
+  if (
+    events.some(
+      (event) =>
+        event.epochMs > start &&
+        event.epochMs < end &&
+        event.level === "I" &&
+        (event.tag === "am_proc_start" || event.tag === "am_proc_died") &&
+        Number(/^\[\d+,(\d+),/.exec(event.message)?.[1]) === pid,
+    )
+  )
+    return undefined;
+  return userId;
+}
+
 function crashUser(
   crash: Crash,
   events: readonly LogLine[],
-  reports: readonly Crash[],
+  candidates: readonly { event: LogLine; reports: number }[],
 ): number | undefined {
-  if (crash.kind === "native") {
-    const uids = crash.trace.flatMap((message) => /^uid: (\d+)\s*$/.exec(message)?.[1] ?? []);
-    const uid = uids.length === 1 ? Number(uids[0]) : NaN;
-    return Number.isSafeInteger(uid) ? Math.floor(uid / 100000) : undefined;
-  }
-  const matches = events.flatMap((line) => {
-    if (line.level !== "I") return [];
-    const fields =
-      crash.kind === "java" && line.tag === "am_crash"
-        ? /^\[(\d+),(\d+),([^,\]]+),[^,]+,([^,\]]+),/.exec(line.message)
-        : crash.kind === "anr" && line.tag === "am_anr"
-          ? /^\[(\d+),(\d+),([^,\]]+),/.exec(line.message)
-          : null;
-    if (fields === null || fields[3] !== crash.process || fields[4] === "Native crash") return [];
-    const pid = Number(fields[crash.kind === "java" ? 1 : 2]);
-    const userId = Number(fields[crash.kind === "java" ? 2 : 1]);
-    if (!Number.isSafeInteger(pid) || !Number.isSafeInteger(userId)) return [];
-    const matchesReport = (report: Crash): boolean => {
-      if (
-        report.kind !== crash.kind ||
-        report.pid !== pid ||
-        report.process !== crash.process ||
-        (crash.kind === "java" && line.epochMs < report.epochMs) ||
-        (crash.kind === "anr" && line.epochMs > report.epochMs) ||
-        Math.abs(line.epochMs - report.epochMs) > CRASH_LEAD_IN_MS
-      )
-        return false;
-      const start = Math.min(line.epochMs, report.epochMs);
-      const end = Math.max(line.epochMs, report.epochMs);
-      // A reused pid is not evidence that two reports belong to the same Android user.
-      return !events.some((event) => {
-        if (event.epochMs <= start || event.epochMs >= end || event.level !== "I") return false;
-        if (event.tag !== "am_proc_start" && event.tag !== "am_proc_died") return false;
-        return Number(/^\[\d+,(\d+),/.exec(event.message)?.[1]) === pid;
-      });
-    };
-    // Ambiguous reports stay unverified, rather than lending one event to multiple crashes.
-    return matchesReport(crash) && reports.filter(matchesReport).length === 1 ? [userId] : [];
+  if (crash.kind === "native")
+    return crash.uid === undefined ? undefined : userIdFromUid(crash.uid);
+  const matches = candidates.flatMap(({ event, reports }) => {
+    if (reports !== 1) return [];
+    const owner = eventMatchesCrash(event, crash, events);
+    return owner === undefined ? [] : [owner];
   });
   return matches.length === 1 ? matches[0] : undefined;
 }

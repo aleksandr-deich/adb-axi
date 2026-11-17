@@ -1,14 +1,11 @@
 import { formatDeviceTime } from "../../android/clock.js";
 import { assertPackageName } from "../../android/component.js";
 import type { Crash } from "../../android/crash.js";
-import { truncateField, writeFullOutput } from "../../core/truncate.js";
+import { FullOutputFile, truncateField } from "../../core/truncate.js";
 import { UNKNOWN } from "../app/shared.js";
 import { defineCommand } from "../define.js";
 import { DEFAULT_SINCE } from "./dump.js";
 import { clockTime, openLogWindow, withMarksNote } from "./window.js";
-
-/** How many crashes one answer describes; a crash loop prints its first few and counts the rest. */
-const MAX_CRASHES = 5;
 
 export const logsCrash = defineCommand({
   path: ["logs", "crash"],
@@ -49,34 +46,43 @@ export const logsCrash = defineCommand({
     const window = await openLogWindow(context.device, since, context.env);
     return withMarksNote(window.marksNote, async () => {
       const { now } = window;
-      const { crashes, count, scanned, unverified, note } = await window.readCrashes(pkg);
-
-      const seconds = Math.max(0, Math.round((now.epochMs - window.startMs) / 1000));
       const full = context.flags.full === true;
-      const shown = crashes.slice(0, MAX_CRASHES);
-      const includeCause = shown.some((crash) => crash.rootCause !== undefined);
-      const rows = shown.map((crash) => describe(crash, now.utcOffsetMinutes, includeCause));
-      return {
-        crashes: `${count} since ${window.label} (${seconds} s, ${scanned} lines scanned)`,
-        ...(note === undefined ? {} : { note }),
-        ...(unverified === 0
-          ? {}
-          : { omitted: `${unverified} matching crash reports without a verified Android user` }),
-        // One crash prints as a block, several as a table.
-        ...(rows.length === 1 ? { crash: rows[0] } : rows.length > 1 ? { crash: rows } : {}),
-        ...(count > shown.length ? { shown: `${shown.length} of ${count} crashes` } : {}),
-        ...(full
-          ? {
-              full: writeFullOutput(
-                `crash-${window.label}-${clockTime(now.epochMs, now.utcOffsetMinutes).slice(0, 8).replaceAll(":", "")}`,
-                crashes.map((crash) => traceText(crash, now.utcOffsetMinutes)).join(""),
-              ),
-            }
-          : {}),
-        ...(crashes.length > 0 && !full
-          ? { help: ["Run the same command with `--full` to write the whole trace to a file"] }
-          : {}),
-      };
+      const file = full
+        ? new FullOutputFile(
+            `crash-${window.label}-${clockTime(now.epochMs, now.utcOffsetMinutes).slice(0, 8).replaceAll(":", "")}`,
+          )
+        : undefined;
+      try {
+        const { crashes, count, scanned, unverified, note } = await window.readCrashes(
+          pkg,
+          file === undefined
+            ? undefined
+            : {
+                file,
+                header: (crash) => traceHeader(crash, now.utcOffsetMinutes),
+              },
+        );
+
+        const seconds = Math.max(0, Math.round((now.epochMs - window.startMs) / 1000));
+        const includeCause = crashes.some((crash) => crash.rootCause !== undefined);
+        const rows = crashes.map((crash) => describe(crash, now.utcOffsetMinutes, includeCause));
+        return {
+          crashes: `${count} since ${window.label} (${seconds} s, ${scanned} lines scanned)`,
+          ...(note === undefined ? {} : { note }),
+          ...(unverified === 0
+            ? {}
+            : { omitted: `${unverified} matching crash reports without a verified Android user` }),
+          // One crash prints as a block, several as a table.
+          ...(rows.length === 1 ? { crash: rows[0] } : rows.length > 1 ? { crash: rows } : {}),
+          ...(count > crashes.length ? { shown: `${crashes.length} of ${count} crashes` } : {}),
+          ...(file === undefined ? {} : { full: file.keep() }),
+          ...(crashes.length > 0 && !full
+            ? { help: ["Run the same command with `--full` to write the whole trace to a file"] }
+            : {}),
+        };
+      } finally {
+        file?.discard();
+      }
     });
   },
 });
@@ -104,9 +110,7 @@ function describe(
   };
 }
 
-/** One crash for the `--full` file: a header line, then every line of its block. */
-function traceText(crash: Crash, utcOffsetMinutes: number | null): string {
+function traceHeader(crash: Crash, utcOffsetMinutes: number | null): string {
   const pid = crash.pid === null ? "" : ` (pid ${crash.pid})`;
-  const header = `== ${crash.kind} at ${formatDeviceTime(crash.epochMs, utcOffsetMinutes)} in ${crash.process}${pid}`;
-  return `${[header, ...crash.trace].join("\n")}\n\n`;
+  return `== ${crash.kind} at ${formatDeviceTime(crash.epochMs, utcOffsetMinutes)} in ${crash.process}${pid}`;
 }

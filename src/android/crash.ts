@@ -21,6 +21,7 @@ export interface Crash {
   frames: number;
   /** The whole block as the device printed it, without the log prefixes. */
   trace: string[];
+  uid?: number;
 }
 
 /** The `Process:` name without its `:<name>` suffix: the package that owns the process. */
@@ -48,7 +49,13 @@ export function parseCrashes(lines: readonly LogLine[]): Crash[] {
   return parser.finish();
 }
 
-export function createCrashParser(onOverflow?: (crash: Crash) => void): {
+export function createCrashParser(
+  options: {
+    onReport?: (order: number, crash: Crash | null) => void;
+    onTrace?: (order: number, message: string) => void;
+    retain?: boolean;
+  } = {},
+): {
   add(line: LogLine): void;
   finish(): Crash[];
   readonly degraded: boolean;
@@ -58,17 +65,48 @@ export function createCrashParser(onOverflow?: (crash: Crash) => void): {
   let degraded = false;
   const found: { order: number; crash: Crash }[] = [];
   const save = (order: number, crash: Crash): void => {
+    options.onReport?.(order, crash);
+    if (options.retain === false) return;
     const size = Buffer.byteLength(JSON.stringify({ ...crash, trace: [] }));
     if (summaryBytes + size > 16 * 1024 * 1024 || found.length >= 65536) {
       degraded = true;
-      onOverflow?.(crash);
       return;
     }
     summaryBytes += size;
     found.push({ order, crash });
   };
-  const append = (block: Block | undefined, message: string): void => {
-    if (block === undefined || block.cut) return;
+  const append = (block: Block | undefined, message: string, raw: string): void => {
+    if (block === undefined) return;
+    options.onTrace?.(block.order, raw);
+    if (block.start.tag === "AndroidRuntime" && block.lines++ === 0) {
+      const named = /^Process: ([^,\s]+)(?:, PID: (\d+))?/.exec(message);
+      if (named?.[1] !== undefined) block.fields.set("process", named[1]);
+      if (named?.[2] !== undefined) block.fields.set("pid", named[2]);
+    }
+    if (block.start.tag === "ActivityManager") {
+      const field = /^(PID|Reason|Parent|ErrorId|Frozen|Load):/.exec(message)?.[1];
+      if (field !== undefined) block.fields.set(field, message);
+      if (message.startsWith("CPU usage from ")) block.cpu++;
+    }
+    if (block.start.tag === "DEBUG") {
+      const field = TOMBSTONE_PID.test(message)
+        ? "pid:"
+        : TOMBSTONE_CMDLINE.test(message)
+          ? "Cmdline:"
+          : TOMBSTONE_SIGNAL.test(message)
+            ? "signal "
+            : /^Abort message:/.test(message)
+              ? "Abort message:"
+              : undefined;
+      if (field !== undefined && (field !== "signal " || !block.fields.has(field)))
+        block.fields.set(field, message);
+      const uid = /^uid: (\d+)\s*$/.exec(message)?.[1];
+      if (uid !== undefined) {
+        block.uids++;
+        block.uid = Number(uid);
+      }
+    }
+    if (block.cut) return;
     const bytes = Buffer.byteLength(message) + 128;
     if ((block.bytes ?? 0) + bytes > 256 * 1024 || retainedBytes + bytes > 16 * 1024 * 1024) {
       block.cut = true;
@@ -104,6 +142,7 @@ export function createCrashParser(onOverflow?: (crash: Crash) => void): {
     native.delete(pid);
     const crash = buildNative(block, signals);
     if (crash !== null) save(block.order, crash);
+    else options.onReport?.(block.order, null);
   };
 
   const add = (input: LogLine): void => {
@@ -141,12 +180,25 @@ export function createCrashParser(onOverflow?: (crash: Crash) => void): {
       signals.shift();
       degraded = true;
     }
+    const start = (): Block => {
+      const block: Block = {
+        order: order++,
+        start: header(),
+        rest: [],
+        fields: new Map(),
+        lines: 0,
+        cpu: 0,
+        uids: 0,
+      };
+      options.onTrace?.(block.order, input.message);
+      return block;
+    };
     if (line.tag === "AndroidRuntime" && line.level === "E") {
       if (FATAL.test(line.message)) {
         closeJava(line.pid);
-        java.set(line.pid, { order: order++, start: header(), rest: [] });
+        java.set(line.pid, start());
       } else {
-        append(java.get(line.pid), line.message);
+        append(java.get(line.pid), line.message, input.message);
       }
     } else if (line.tag === "ActivityManager") {
       const started = /^Start proc (\d+):/.exec(line.message);
@@ -163,15 +215,14 @@ export function createCrashParser(onOverflow?: (crash: Crash) => void): {
       if (line.level === "E") {
         if (ANR_START.test(line.message)) {
           closeAnr(key);
-          anr.set(key, { order: order++, start: header(), rest: [] });
+          anr.set(key, start());
         } else {
           const report = anr.get(key);
           if (report !== undefined) {
             const message = line.message;
-            const inCpu = report.rest.some((part) => part.startsWith("CPU usage from "));
+            const inCpu = report.cpu > 0;
             const field = /^(PID|Reason|Parent|ErrorId|Frozen|Load):/.exec(message)?.[1];
-            const repeated =
-              field !== undefined && report.rest.some((part) => part.startsWith(`${field}:`));
+            const repeated = field !== undefined && report.fields.has(field);
             const partOfReport = inCpu
               ? /^(?:CPU usage from |\s*\d+(?:\.\d+)?% )/.test(message)
               : field !== undefined ||
@@ -182,12 +233,8 @@ export function createCrashParser(onOverflow?: (crash: Crash) => void): {
             if (repeated || !partOfReport) {
               closeAnr(key);
             } else {
-              append(report, message);
-              if (
-                /^\s*\d+(?:\.\d+)?% TOTAL:/.test(message) &&
-                report.rest.filter((part) => part.startsWith("CPU usage from ")).length >= 2
-              )
-                closeAnr(key);
+              append(report, message, input.message);
+              if (/^\s*\d+(?:\.\d+)?% TOTAL:/.test(message) && report.cpu >= 2) closeAnr(key);
             }
           }
         }
@@ -195,9 +242,9 @@ export function createCrashParser(onOverflow?: (crash: Crash) => void): {
     } else if (line.tag === "DEBUG" && line.level === "F") {
       if (TOMBSTONE_START.test(line.message)) {
         closeNative(line.pid);
-        native.set(line.pid, { order: order++, start: header(), rest: [] });
+        native.set(line.pid, start());
       } else {
-        append(native.get(line.pid), line.message);
+        append(native.get(line.pid), line.message, input.message);
       }
     } else if (line.tag === "libc" && line.level === "F") {
       const raised = FATAL_SIGNAL.exec(line.message);
@@ -279,6 +326,11 @@ interface Block {
   rest: string[];
   bytes?: number;
   cut?: boolean;
+  fields: Map<string, string>;
+  lines: number;
+  cpu: number;
+  uids: number;
+  uid?: number;
 }
 
 const FATAL = /^FATAL EXCEPTION(?: IN SYSTEM PROCESS)?:/;
@@ -291,14 +343,12 @@ const PLATFORM_FRAME =
 
 function buildJava(block: Block): Crash {
   const body = [...block.rest];
-  let process = block.start.message.includes("IN SYSTEM PROCESS") ? "system_server" : "-";
-  let pid: number | null = block.start.pid;
-  const named = /^Process: ([^,\s]+)(?:, PID: (\d+))?/.exec(body[0] ?? "");
-  if (named?.[1] !== undefined) {
-    process = named[1];
-    if (named[2] !== undefined) pid = Number(named[2]);
-    body.shift();
-  }
+  const process =
+    block.fields.get("process") ??
+    (block.start.message.includes("IN SYSTEM PROCESS") ? "system_server" : "-");
+  const knownPid = block.fields.get("pid");
+  const pid = knownPid === undefined ? block.start.pid : Number(knownPid);
+  if (/^Process: [^,\s]+/.test(body[0] ?? "")) body.shift();
   const header = /^([A-Za-z_$][\w$.]*)(?::\s?(.*))?$/.exec(body[0] ?? "");
   const messageLines = header === null ? [] : [header[2] ?? ""];
   let next = 1;
@@ -356,8 +406,8 @@ const ANR_START = /^ANR in \S/;
 
 function buildAnr(block: Block): Crash {
   const named = /^ANR in (\S+)/.exec(block.start.message);
-  const pid = block.rest.map((message) => /^PID: (\d+)/.exec(message)?.[1]).find(Boolean);
-  const reason = block.rest.map((message) => /^Reason: (.*)$/.exec(message)?.[1]).find(Boolean);
+  const pid = /^PID: (\d+)/.exec(block.fields.get("PID") ?? "")?.[1];
+  const reason = /^Reason: (.*)$/.exec(block.fields.get("Reason") ?? "")?.[1];
   return {
     kind: "anr",
     epochMs: block.start.epochMs,
@@ -391,7 +441,7 @@ function buildNative(
   let signalName = "-";
   let abort: string | undefined;
   const frames: { path: string; pc: string; symbol: string | undefined }[] = [];
-  for (const message of messages) {
+  for (const message of [...messages, ...block.fields.values()]) {
     const owner = TOMBSTONE_PID.exec(message);
     if (owner?.[1] !== undefined && owner[2] !== undefined) {
       pid = Number(owner[1]);
@@ -438,6 +488,7 @@ function buildNative(
           ? `${file(app.path)} pc ${app.pc}`
           : `${app.symbol} (${file(app.path)})`,
     frames: frames.length,
+    ...(block.uids === 1 && Number.isSafeInteger(block.uid) ? { uid: block.uid } : {}),
     trace: messages,
   };
 }

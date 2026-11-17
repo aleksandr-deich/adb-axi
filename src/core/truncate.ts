@@ -150,6 +150,11 @@ export class FullOutputFile {
   private stopInterrupt: (() => void) | undefined;
   /** The first write failure; `keep` throws it. */
   private failure: Error | undefined;
+  private length = 0;
+
+  get size(): number {
+    return this.length;
+  }
 
   constructor(stem: string) {
     this.stem = stem.replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^[.-]+/, "") || "output";
@@ -162,11 +167,32 @@ export class FullOutputFile {
       const fd = this.open();
       const bytes = typeof chunk === "string" ? Buffer.from(chunk, "utf8") : chunk;
       for (let offset = 0; offset < bytes.length;) {
-        offset += writeSync(fd, bytes, offset);
+        offset += writeSync(fd, bytes, offset, bytes.length - offset, this.length + offset);
       }
+      this.length += bytes.length;
     } catch (error) {
       this.failure = error instanceof Error ? error : new Error(String(error));
     }
+  }
+
+  writeAt(position: number, bytes: Uint8Array): void {
+    if (this.failure !== undefined) throw this.failure;
+    const fd = this.open();
+    for (let offset = 0; offset < bytes.length;)
+      offset += writeSync(fd, bytes, offset, bytes.length - offset, position + offset);
+  }
+
+  readAt(position: number, size: number): Buffer {
+    if (this.failure !== undefined) throw this.failure;
+    const buffer = Buffer.alloc(size);
+    const fd = this.open();
+    let offset = 0;
+    while (offset < size) {
+      const read = readSync(fd, buffer, offset, size - offset, position + offset);
+      if (read === 0) throw new Error("Unexpected end of output spool");
+      offset += read;
+    }
+    return buffer;
   }
 
   *chunks(): Iterable<Buffer> {
@@ -211,6 +237,7 @@ export class FullOutputFile {
     this.close();
     if (this.tmp !== undefined) rmSync(this.tmp, { force: true });
     this.tmp = undefined;
+    this.length = 0;
   }
 
   private open(): number {

@@ -358,22 +358,35 @@ describe("logs crash", () => {
   });
 
   describe("truncation and --full", () => {
-    it("keeps unrelated system-server activity out of an ANR's full trace", async () => {
+    it("keeps complete oversized traces and excludes unrelated ANR activity", async () => {
+      const java = [
+        "FATAL EXCEPTION: main",
+        "Process: dev.probe, PID: 123",
+        "java.lang.IllegalStateException: boom",
+        ...Array<string>(5).fill(`\tat dev.probe.Main.run(Main.kt:1)${" ".repeat(62000)}`),
+      ];
+      const javaWindow =
+        java
+          .map((message) => logLine(1790834311000, 123, "E", "AndroidRuntime", message))
+          .join("\n") + "\n";
       const f = device({
         window: {
-          stdout: [
-            logLine(1790834310000, 552, "E", "ActivityManager", "ANR in dev.probe"),
-            logLine(1790834310000, 552, "E", "ActivityManager", "PID: 123"),
-            logLine(1790834310000, 552, "E", "ActivityManager", "Reason: blocked"),
-            logLine(
-              1790834310000,
-              552,
-              "E",
-              "ActivityManager",
-              "CPU usage from 100ms to -1ms ago:",
-            ),
-            logLine(1790834310000, 552, "E", "ActivityManager", "Reason: unrelated"),
-          ].join("\n"),
+          stdout:
+            [
+              logLine(1790834310000, 552, "E", "ActivityManager", "ANR in dev.probe"),
+              logLine(1790834310000, 552, "E", "ActivityManager", "PID: 123"),
+              logLine(1790834310000, 552, "E", "ActivityManager", "Reason: blocked"),
+              logLine(
+                1790834310000,
+                552,
+                "E",
+                "ActivityManager",
+                "CPU usage from 100ms to -1ms ago:",
+              ),
+              logLine(1790834310000, 552, "E", "ActivityManager", "Reason: unrelated"),
+            ].join("\n") +
+            "\n" +
+            javaWindow.repeat(70),
         },
       });
       await runCli(["logs", "mark", "before-run"], f.env);
@@ -382,9 +395,22 @@ describe("logs crash", () => {
         f.env,
       );
       const data = JSON.parse(run.stdout) as Record<string, unknown>;
-      expect(data.crash).toMatchObject({ message: "blocked" });
-      expect(readFileSync(data.full as string, "utf8")).toContain("Reason: blocked");
-      expect(readFileSync(data.full as string, "utf8")).not.toContain("Reason: unrelated");
+      expect(run.exitCode, run.stdout).toBe(0);
+      expect(data.crashes).toBe("71 since before-run (40 s, 565 lines scanned)");
+      const content = readFileSync(data.full as string, "utf8");
+      const anr =
+        [
+          "== anr at 2026-10-01 07:58:30.000 in dev.probe (pid 123)",
+          "ANR in dev.probe",
+          "PID: 123",
+          "Reason: blocked",
+          "CPU usage from 100ms to -1ms ago:",
+        ].join("\n") + "\n\n";
+      const javaTrace =
+        ["== java at 2026-10-01 07:58:31.000 in dev.probe (pid 123)", ...java].join("\n") + "\n\n";
+      expect(Buffer.byteLength(javaTrace)).toBeGreaterThan(256 * 1024);
+      expect(Buffer.byteLength(content)).toBeGreaterThan(16 * 1024 * 1024);
+      expect(content).toBe(anr + javaTrace.repeat(70));
     });
   });
 
