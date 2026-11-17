@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.6](https://github.com/aleksandr-deich/adb-axi/compare/v0.2.5...v0.2.6) (2026-11-17)
+
+
+### Bug Fixes
+
+* stream log windows with bounded memory ([#93](https://github.com/aleksandr-deich/adb-axi/issues/93)) ([a4b707b](https://github.com/aleksandr-deich/adb-axi/commit/a4b707b1643ef953ca75546a9dbf32c07e3cf7f6))
+
 ## [0.2.5](https://github.com/aleksandr-deich/adb-axi/compare/v0.2.4...v0.2.5) (2026-11-16)
 
 
