@@ -31,7 +31,7 @@ adb is found on `PATH`, then in `$ANDROID_HOME`, `$ANDROID_SDK_ROOT` or `~/Libra
 npx skills add aleksandr-deich/adb-axi --skill adb-axi -g
 ```
 
-The [skill](skills/adb-axi/SKILL.md) tells agents when to use adb-axi; command details come from the live CLI help. `-g` installs it for all projects. With the skill, agents can run `npx -y adb-axi <command>` without a global install.
+The [skill](skills/adb-axi/SKILL.md) tells agents when to use adb-axi; command details come from the live CLI help. `-g` installs it for all projects. With the skill, agents run `adb-axi <command>` from `PATH` and fall back to `npx -y adb-axi <command>` when it is not installed.
 
 ## Start here
 
