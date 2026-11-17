@@ -49,7 +49,7 @@ export const logsCrash = defineCommand({
     const window = await openLogWindow(context.device, since, context.env);
     return withMarksNote(window.marksNote, async () => {
       const { now } = window;
-      const { crashes, scanned, unverified } = await window.readCrashes(pkg);
+      const { crashes, count, scanned, unverified, note } = await window.readCrashes(pkg);
 
       const seconds = Math.max(0, Math.round((now.epochMs - window.startMs) / 1000));
       const full = context.flags.full === true;
@@ -57,15 +57,14 @@ export const logsCrash = defineCommand({
       const includeCause = shown.some((crash) => crash.rootCause !== undefined);
       const rows = shown.map((crash) => describe(crash, now.utcOffsetMinutes, includeCause));
       return {
-        crashes: `${crashes.length} since ${window.label} (${seconds} s, ${scanned} lines scanned)`,
+        crashes: `${count} since ${window.label} (${seconds} s, ${scanned} lines scanned)`,
+        ...(note === undefined ? {} : { note }),
         ...(unverified === 0
           ? {}
           : { omitted: `${unverified} matching crash reports without a verified Android user` }),
         // One crash prints as a block, several as a table.
         ...(rows.length === 1 ? { crash: rows[0] } : rows.length > 1 ? { crash: rows } : {}),
-        ...(crashes.length > shown.length
-          ? { shown: `${shown.length} of ${crashes.length} crashes` }
-          : {}),
+        ...(count > shown.length ? { shown: `${shown.length} of ${count} crashes` } : {}),
         ...(full
           ? {
               full: writeFullOutput(

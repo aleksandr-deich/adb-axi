@@ -10,6 +10,7 @@ import {
   writeSync,
 } from "node:fs";
 import { dirname, join } from "node:path";
+import { onInterrupt } from "./interrupt.js";
 import { adbAxiHome, isErrno } from "./state.js";
 
 /** Default caps for `logs` and `shell` output. */
@@ -96,9 +97,15 @@ export function splitLines(text: string): string[] {
  * `first chars... (truncated, 412 chars total)`. Short values pass through unchanged.
  */
 export function truncateField(value: string, maxChars = MAX_FIELD_CHARS): string {
-  const chars = Array.from(graphemes.segment(value), (part) => part.segment);
-  if (chars.length <= maxChars) return value;
-  return `${chars.slice(0, maxChars).join("")}... (truncated, ${chars.length} chars total)`;
+  if (value.length <= maxChars) return value;
+  let count = 0;
+  let prefix = "";
+  for (const { segment } of graphemes.segment(value)) {
+    if (count < maxChars) prefix += segment;
+    count++;
+  }
+  if (count <= maxChars) return value;
+  return `${prefix}... (truncated, ${count} chars total)`;
 }
 
 const graphemes = new Intl.Segmenter(undefined, { granularity: "grapheme" });
@@ -140,6 +147,7 @@ export class FullOutputFile {
   private readonly stem: string;
   private tmp: string | undefined;
   private fd: number | undefined;
+  private stopInterrupt: (() => void) | undefined;
   /** The first write failure; `keep` throws it. */
   private failure: Error | undefined;
 
@@ -198,6 +206,8 @@ export class FullOutputFile {
 
   /** Remove the temporary file; a kept file stays under its final name. */
   discard(): void {
+    this.stopInterrupt?.();
+    this.stopInterrupt = undefined;
     this.close();
     if (this.tmp !== undefined) rmSync(this.tmp, { force: true });
     this.tmp = undefined;
@@ -210,6 +220,9 @@ export class FullOutputFile {
     const tmp = join(dir, `.full-${process.pid}-${randomBytes(6).toString("hex")}.tmp`);
     this.fd = openSync(tmp, "wx+", 0o600);
     this.tmp = tmp;
+    this.stopInterrupt = onInterrupt(() => {
+      this.discard();
+    });
     return this.fd;
   }
 

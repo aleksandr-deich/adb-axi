@@ -163,8 +163,7 @@ async function readTargetState(
       marksNote = window.marksNote;
       const { now } = window;
       const mark = window.mark === undefined ? undefined : window.label;
-      const { crashes } = await window.readCrashes();
-      const count = crashes.length;
+      const { count } = await window.readCrashes();
       // The age is by the host's clock, so a stale mark shows even when the device clock is off.
       const hostEpochMs = window.mark?.hostEpochMs;
       const age =

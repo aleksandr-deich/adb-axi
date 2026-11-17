@@ -1,5 +1,4 @@
 import type { LogLine } from "./logcat.js";
-import { AdbAxiError } from "../core/errors.js";
 
 export type CrashKind = "java" | "anr" | "native";
 
@@ -49,18 +48,38 @@ export function parseCrashes(lines: readonly LogLine[]): Crash[] {
   return parser.finish();
 }
 
-export function createCrashParser(): { add(line: LogLine): void; finish(): Crash[] } {
+export function createCrashParser(onOverflow?: (crash: Crash) => void): {
+  add(line: LogLine): void;
+  finish(): Crash[];
+  readonly degraded: boolean;
+} {
   let retainedBytes = 0;
-  const retain = (message: string): void => {
-    retainedBytes += Buffer.byteLength(message) + 128;
-    if (retainedBytes > 16 * 1024 * 1024) {
-      throw new AdbAxiError(
-        "INVALID_OUTPUT",
-        "crash reports exceed the 16 MiB retained-state limit",
-      );
-    }
-  };
+  let summaryBytes = 0;
+  let degraded = false;
   const found: { order: number; crash: Crash }[] = [];
+  const save = (order: number, crash: Crash): void => {
+    const size = Buffer.byteLength(JSON.stringify({ ...crash, trace: [] }));
+    if (summaryBytes + size > 16 * 1024 * 1024 || found.length >= 65536) {
+      degraded = true;
+      onOverflow?.(crash);
+      return;
+    }
+    summaryBytes += size;
+    found.push({ order, crash });
+  };
+  const append = (block: Block | undefined, message: string): void => {
+    if (block === undefined || block.cut) return;
+    const bytes = Buffer.byteLength(message) + 128;
+    if ((block.bytes ?? 0) + bytes > 256 * 1024 || retainedBytes + bytes > 16 * 1024 * 1024) {
+      block.cut = true;
+      degraded = true;
+      block.rest.push("[trace truncated: retained-state limit]");
+      return;
+    }
+    block.bytes = (block.bytes ?? 0) + bytes;
+    retainedBytes += bytes;
+    block.rest.push(message);
+  };
   let order = 0;
   const java = new Map<number, Block>();
   const anr = new Map<string, Block>();
@@ -71,31 +90,63 @@ export function createCrashParser(): { add(line: LogLine): void; finish(): Crash
     const block = java.get(pid);
     if (block === undefined) return;
     java.delete(pid);
-    found.push({ order: block.order, crash: buildJava(block) });
+    save(block.order, buildJava(block));
   };
   const closeAnr = (key: string): void => {
     const block = anr.get(key);
     if (block === undefined) return;
     anr.delete(key);
-    found.push({ order: block.order, crash: buildAnr(block) });
+    save(block.order, buildAnr(block));
   };
   const closeNative = (pid: number): void => {
     const block = native.get(pid);
     if (block === undefined) return;
     native.delete(pid);
     const crash = buildNative(block, signals);
-    if (crash !== null) found.push({ order: block.order, crash });
+    if (crash !== null) save(block.order, crash);
   };
 
-  const add = (line: LogLine): void => {
+  const add = (input: LogLine): void => {
+    if (
+      input.tag !== "AndroidRuntime" &&
+      input.tag !== "ActivityManager" &&
+      input.tag !== "DEBUG" &&
+      input.tag !== "libc"
+    )
+      return;
+    const line =
+      input.message.length > 64000
+        ? { ...input, message: input.message.slice(0, 64000) + " [trace truncated: long line]" }
+        : input;
+    if (line !== input) degraded = true;
+    // Pending report headers and unmatched signals must not grow with an adversarial window.
+    if (java.size >= 4096) {
+      closeJava(java.keys().next().value ?? line.pid);
+      degraded = true;
+    }
+    if (anr.size >= 4096) {
+      closeAnr(anr.keys().next().value ?? "");
+      degraded = true;
+    }
+    if (native.size >= 4096) {
+      closeNative(native.keys().next().value ?? line.pid);
+      degraded = true;
+    }
+    const header = (): LogLine => {
+      if (line.message.length <= 4096) return line;
+      degraded = true;
+      return { ...line, message: line.message.slice(0, 4096) };
+    };
+    if (signals.length >= 4096) {
+      signals.shift();
+      degraded = true;
+    }
     if (line.tag === "AndroidRuntime" && line.level === "E") {
       if (FATAL.test(line.message)) {
         closeJava(line.pid);
-        retain(line.message);
-        java.set(line.pid, { order: order++, start: line, rest: [] });
+        java.set(line.pid, { order: order++, start: header(), rest: [] });
       } else {
-        if (java.has(line.pid)) retain(line.message);
-        java.get(line.pid)?.rest.push(line.message);
+        append(java.get(line.pid), line.message);
       }
     } else if (line.tag === "ActivityManager") {
       const started = /^Start proc (\d+):/.exec(line.message);
@@ -112,8 +163,7 @@ export function createCrashParser(): { add(line: LogLine): void; finish(): Crash
       if (line.level === "E") {
         if (ANR_START.test(line.message)) {
           closeAnr(key);
-          retain(line.message);
-          anr.set(key, { order: order++, start: line, rest: [] });
+          anr.set(key, { order: order++, start: header(), rest: [] });
         } else {
           const report = anr.get(key);
           if (report !== undefined) {
@@ -132,8 +182,7 @@ export function createCrashParser(): { add(line: LogLine): void; finish(): Crash
             if (repeated || !partOfReport) {
               closeAnr(key);
             } else {
-              retain(message);
-              report.rest.push(message);
+              append(report, message);
               if (
                 /^\s*\d+(?:\.\d+)?% TOTAL:/.test(message) &&
                 report.rest.filter((part) => part.startsWith("CPU usage from ")).length >= 2
@@ -146,21 +195,18 @@ export function createCrashParser(): { add(line: LogLine): void; finish(): Crash
     } else if (line.tag === "DEBUG" && line.level === "F") {
       if (TOMBSTONE_START.test(line.message)) {
         closeNative(line.pid);
-        retain(line.message);
-        native.set(line.pid, { order: order++, start: line, rest: [] });
+        native.set(line.pid, { order: order++, start: header(), rest: [] });
       } else {
-        if (native.has(line.pid)) retain(line.message);
-        native.get(line.pid)?.rest.push(line.message);
+        append(native.get(line.pid), line.message);
       }
     } else if (line.tag === "libc" && line.level === "F") {
       const raised = FATAL_SIGNAL.exec(line.message);
       if (raised?.[1] !== undefined && raised[2] !== undefined && raised[3] !== undefined) {
         const pending = signals.findIndex((entry) => entry.pid === Number(raised[2]));
         if (pending >= 0) signals.splice(pending, 1);
-        retain(line.message);
         signals.push({
           pid: Number(raised[2]),
-          process: raised[3],
+          process: raised[3].slice(0, 4096),
           signal: raised[1],
           epochMs: line.epochMs,
         });
@@ -175,7 +221,45 @@ export function createCrashParser(): { add(line: LogLine): void; finish(): Crash
       .sort((a, b) => a.crash.epochMs - b.crash.epochMs || a.order - b.order)
       .map((entry) => entry.crash);
   };
-  return { add, finish };
+  return {
+    add,
+    finish,
+    get degraded() {
+      return degraded;
+    },
+  };
+}
+
+export function createCrashSeen(): { add(line: LogLine): void; readonly found: boolean } {
+  let found = false;
+  const native = new Map<number, { owner: boolean; signal: boolean }>();
+  return {
+    get found() {
+      return found;
+    },
+    add(line) {
+      if (found) return;
+      if (
+        (line.tag === "AndroidRuntime" && line.level === "E" && FATAL.test(line.message)) ||
+        (line.tag === "ActivityManager" && line.level === "E" && ANR_START.test(line.message))
+      )
+        found = true;
+      if (line.tag === "DEBUG" && line.level === "F") {
+        if (TOMBSTONE_START.test(line.message)) {
+          if (native.size >= 4096) native.delete(native.keys().next().value ?? line.pid);
+          native.set(line.pid, { owner: false, signal: false });
+        } else {
+          const block = native.get(line.pid);
+          if (block !== undefined) {
+            block.owner ||= TOMBSTONE_PID.test(line.message);
+            block.signal ||= TOMBSTONE_SIGNAL.test(line.message);
+            found = block.owner && block.signal;
+          }
+        }
+      }
+      if (found) native.clear();
+    },
+  };
 }
 
 /** Whether a process belongs to a package: the main process or a `<pkg>:<name>` one. */
@@ -193,6 +277,8 @@ interface Block {
   start: LogLine;
   /** The messages of the block's later lines. */
   rest: string[];
+  bytes?: number;
+  cut?: boolean;
 }
 
 const FATAL = /^FATAL EXCEPTION(?: IN SYSTEM PROCESS)?:/;

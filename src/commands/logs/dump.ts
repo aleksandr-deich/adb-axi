@@ -8,7 +8,7 @@ import {
   MAX_LINES,
   type LineWindow,
 } from "../../core/truncate.js";
-import { createCrashParser } from "../../android/crash.js";
+import { createCrashSeen } from "../../android/crash.js";
 import { runHint } from "../../core/output.js";
 import { defineCommand } from "../define.js";
 import { describeScope } from "./scope.js";
@@ -81,7 +81,7 @@ export const logsDump = defineCommand({
         let lastMessage: string | undefined;
         let matched = 0;
         const levels: Partial<Record<LogLevel, number>> = {};
-        const crashes = createCrashParser();
+        const crashes = createCrashSeen();
         const { scanned, scope, firstLine } = await window.readLogs((line) => {
           if (
             (level !== undefined && !atLeast(line.level, level)) ||
@@ -109,8 +109,6 @@ export const logsDump = defineCommand({
             if (rows.length > MAX_LINES) rows.shift();
           }
           lastMessage = line.message;
-          const keep = capLines(rows.map(formatRow), { keep: "tail" }).lines.length;
-          if (rows.length > keep) rows.splice(0, rows.length - keep);
         }, pkg);
         const shown = capLines(
           rows.map((row) => formatRow(row)),
@@ -159,7 +157,7 @@ export const logsDump = defineCommand({
               };
         const accounting = account(matched, rowCount, visible, printed);
         const cut = accounting.lossy;
-        const crashed = crashes.finish().length > 0;
+        const crashed = crashes.found;
         return {
           window: `${window.label} -> now (${seconds} s), ${scanned} lines scanned`,
           ...(firstLine !== undefined && firstLine.epochMs - window.startMs > 2000

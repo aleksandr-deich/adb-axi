@@ -88,7 +88,7 @@ describe("logcat streaming", () => {
     }
   });
 
-  it("rejects an oversized retained line and oversized crash blocks with typed errors", () => {
+  it("rejects an oversized retained line and degrades oversized crash blocks", () => {
     const parser = logcatStream(() => {});
     expect(() => {
       parser.add(Buffer.alloc(16 * 1024 * 1024 + 1, 120));
@@ -97,9 +97,9 @@ describe("logcat streaming", () => {
     const line = parseLogcat("1790834111.000 1 1 E AndroidRuntime: FATAL EXCEPTION: main").lines[0];
     if (line === undefined) throw new Error("missing line");
     crashes.add(line);
-    expect(() => {
-      crashes.add({ ...line, message: "x".repeat(16 * 1024 * 1024) });
-    }).toThrow(AdbAxiError);
+    for (let i = 0; i < 10; i++) crashes.add({ ...line, message: "x".repeat(64000) });
+    expect(crashes.degraded).toBe(true);
+    expect(crashes.finish()[0]?.trace.at(-1)).toBe("[trace truncated: retained-state limit]");
   });
 });
 

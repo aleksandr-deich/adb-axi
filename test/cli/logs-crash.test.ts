@@ -1,9 +1,9 @@
 import { readFileSync } from "node:fs";
-import {} from "node:path";
+import { join } from "node:path";
 import { decode } from "@toon-format/toon";
 import { afterEach, describe, expect, it } from "vitest";
 import {} from "../../src/android/logcat.js";
-import { createFakeAdb, type FakeAdb } from "../fake-adb/harness.js";
+import { createFakeAdb, FIXTURES_DIR, type FakeAdb } from "../fake-adb/harness.js";
 import type { Response, Rule } from "../fake-adb/scenario.js";
 import { runCli, type CliRun } from "../helpers/run.js";
 
@@ -122,6 +122,20 @@ async function crashSince(f: FakeAdb, ...args: string[]): Promise<Both> {
 }
 
 describe("logs crash", () => {
+  it("keeps counting a 4000-report crash loop and lets plain logs succeed", async () => {
+    const report = readFileSync(join(FIXTURES_DIR, "captured/35/logcat-crash-java.txt"), "utf8");
+    const f = device({ window: { stdout: report.repeat(4000) }, clocks: [LATER_CLOCK] });
+    const result = await runCli(["logs", "crash", "--since", "40s", "--json"], f.env);
+    expect(result.exitCode, result.stdout).toBe(0);
+    const data = JSON.parse(result.stdout) as Record<string, unknown>;
+    expect(data.crashes).toBe("4000 since 40s ago (40 s, 100000 lines scanned)");
+    expect(data.shown).toBe("5 of 4000 crashes");
+    const dump = await runCli(["logs", "--since", "40s", "--json"], f.env);
+    expect(dump.exitCode, dump.stdout).toBe(0);
+    expect(JSON.parse(dump.stdout)).toMatchObject({ counts: { E: 100000 } });
+    expectClean(f);
+  });
+
   it("excludes and counts matching crashes without provable user metadata", async () => {
     const window = [
       ...[

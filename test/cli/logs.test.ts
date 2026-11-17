@@ -7,13 +7,16 @@ import {
   readdirSync,
 } from "node:fs";
 import { join, relative } from "node:path";
+import { spawn } from "node:child_process";
+import { once } from "node:events";
+import { setTimeout as delay } from "node:timers/promises";
 import { decode } from "@toon-format/toon";
 import { afterEach, describe, expect, it } from "vitest";
 import { bindMarks, writeMark } from "../../src/commands/logs/marks.js";
 import {} from "../../src/android/logcat.js";
 import { createFakeAdb, FIXTURES_DIR, type FakeAdb } from "../fake-adb/harness.js";
 import type { Response, Rule } from "../fake-adb/scenario.js";
-import { runCli, type CliRun } from "../helpers/run.js";
+import { BIN_PATH, runCli, type CliRun } from "../helpers/run.js";
 import { sharedWithToon } from "../helpers/json.js";
 
 const A = "emulator-5554";
@@ -452,6 +455,77 @@ describe("logs", () => {
       stderr: "logcat: Unable to open log device",
     });
     expect(readdirSync(join(f.home, "out"))).toEqual([]);
+  });
+
+  it("classifies a device lost after the stdout preview fills as offline", async () => {
+    const f = devices({
+      serial: A,
+      api: 35,
+      shell: {
+        [logcatFor("1790834100.000")]: {
+          stdout: `${logLine(1790834111000, 1, "I", "Probe", "x".repeat(5000))}\n`,
+          stderr: "error: closed\n",
+          exit: 1,
+        },
+      },
+    });
+    const path = join(f.dir, "scenario.json");
+    const scenario = JSON.parse(readFileSync(path, "utf8")) as {
+      state: Record<string, string>;
+      rules: Rule[];
+    };
+    scenario.state = { state: "online" };
+    const listing = scenario.rules[0];
+    if (listing === undefined) throw new Error("missing device listing");
+    listing.when = { state: "online" };
+    const log = scenario.rules.find((rule) => rule.respond.stderr === "error: closed\n");
+    if (log === undefined) throw new Error("missing log response");
+    log.set = { state: "offline" };
+    scenario.rules.unshift({
+      match: ["devices", "-l"],
+      when: { state: "offline" },
+      respond: { stdout: `List of devices attached\n${A} offline\n` },
+    });
+    writeFileSync(path, JSON.stringify(scenario));
+    const result = await runCli(["logs", "--since", "40s", "--json"], f.env);
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      code: "DEVICE_OFFLINE",
+      error: `${A} went offline while reading the log`,
+    });
+  });
+
+  it("removes the full-output temporary spool when interrupted mid-read", async () => {
+    const f = devices({
+      serial: A,
+      api: 35,
+      shell: {
+        [logcatFor("1790834100.000")]: {
+          stdout: `${logLine(1790834111000, 1, "I", "Probe", "x".repeat(5000))}\n`,
+          hang: true,
+        },
+      },
+    });
+    const child = spawn(process.execPath, [BIN_PATH, "logs", "--since", "40s", "--full"], {
+      env: f.env,
+      stdio: "ignore",
+    });
+    const ended = once(child, "exit");
+    try {
+      const dir = join(f.home, "out");
+      const deadline = Date.now() + 10000;
+      while (!existsSync(dir) || readdirSync(dir).length === 0) {
+        if (Date.now() >= deadline) throw new Error("spool was not opened");
+        await delay(20);
+      }
+      child.kill("SIGINT");
+      await ended;
+      expect(readdirSync(dir)).toEqual([]);
+    } finally {
+      if (child.exitCode === null && child.signalCode === null) {
+        child.kill("SIGKILL");
+        await ended;
+      }
+    }
   });
 
   it("discards the full spool on timeout and reports a spool write failure", async () => {

@@ -7,7 +7,7 @@ import {
   type DeviceTime,
 } from "../../android/clock.js";
 import { crashBelongsTo, createCrashParser, type Crash } from "../../android/crash.js";
-import { logcatStream, parseLogcat, type LogLine } from "../../android/logcat.js";
+import { LOG_LIMIT_HELP, logcatStream, parseLogcat, type LogLine } from "../../android/logcat.js";
 import { invalidOutput, readShell, type ReadOptions } from "../../android/read.js";
 import { parseDuration } from "../../core/args.js";
 import { AdbAxiError } from "../../core/errors.js";
@@ -44,8 +44,10 @@ export interface OpenLogWindow extends LogWindow {
   }>;
   readCrashes(pkg?: string): Promise<{
     crashes: Crash[];
+    count: number;
     scanned: number;
     unverified: number;
+    note: string | undefined;
   }>;
 }
 
@@ -87,6 +89,7 @@ export async function openLogWindow(
         let scanned = 0;
         let firstLine: LogLine | undefined;
         const spool = scope?.kind === "pids" ? new FullOutputFile("log-scan") : undefined;
+        let spoolBuffer: string | null = null;
         const pids = new Set(scope?.kind === "pids" ? [...scope.current, ...scope.marked] : []);
         try {
           await streamWindow(
@@ -103,26 +106,34 @@ export async function openLogWindow(
                   throw new AdbAxiError(
                     "INVALID_OUTPUT",
                     "log scope exceeds the 65536 pid retained-state limit",
+                    { help: LOG_LIMIT_HELP },
                   );
-                spool.write(`${JSON.stringify(line)}\n`);
+                if (line.buffer !== null && line.buffer !== spoolBuffer) {
+                  spool.write(`--------- beginning of ${line.buffer}\n`);
+                  spoolBuffer = line.buffer;
+                }
+                spool.write(
+                  `${line.time} ${line.pid} ${line.tid} ${line.level} ${line.tag}: ${line.message}\n`,
+                );
               } else consume(line);
             },
             scope?.kind === "uid" ? scope.uid : undefined,
           );
           if (scope?.kind === "pids" && spool !== undefined) {
             scope.current = [...pids];
-            let pending = "";
+            const replay = logcatStream((line) => {
+              if (pids.has(line.pid)) consume(line);
+            });
             for (const chunk of spool.chunks()) {
-              pending += chunk.toString("latin1");
-              let end: number;
-              while ((end = pending.indexOf("\n")) >= 0) {
-                const line = JSON.parse(
-                  Buffer.from(pending.slice(0, end), "latin1").toString("utf8"),
-                ) as LogLine;
-                if (pids.has(line.pid)) consume(line);
-                pending = pending.slice(end + 1);
-              }
+              if (reads.deadline.remainingMs() === 0)
+                throw new AdbAxiError(
+                  "TIMEOUT",
+                  "reading the log did not finish before the deadline",
+                  { fields: { step: "reading the log" } },
+                );
+              replay.add(chunk);
             }
+            replay.finish();
           }
           // A uid scan starts at the app's first line, not necessarily the buffer's first line.
           if (scope?.kind === "uid")
@@ -135,7 +146,11 @@ export async function openLogWindow(
       async readCrashes(pkg) {
         const userId = pkg === undefined ? undefined : await device.user();
         // ANRs and tombstones are written by other processes, so never narrow this scan by uid or pid.
-        const parser = createCrashParser();
+        let overflow = 0;
+        const parser = createCrashParser((crash) => {
+          if (crash.epochMs >= window.startMs && (pkg === undefined || crashBelongsTo(crash, pkg)))
+            overflow++;
+        });
         let scanned = 0;
         await streamWindow(
           adb,
@@ -158,7 +173,7 @@ export async function openLogWindow(
           userId !== undefined && matching.some((crash) => crash.kind !== "native")
             ? await readCrashEvents(device, window)
             : [];
-        let unverified = 0;
+        let unverified = userId === undefined ? 0 : overflow;
         const crashes = matching.filter((crash) => {
           if (userId === undefined) return true;
           const owner = crashUser(crash, events, reports);
@@ -167,8 +182,12 @@ export async function openLogWindow(
         });
         return {
           crashes,
+          count: crashes.length + (userId === undefined ? overflow : 0),
           scanned,
           unverified,
+          note: parser.degraded
+            ? "Crash details exceeded retained-state limits; traces may be truncated and extra summaries omitted. Read a shorter window with a later mark or shorter --since for complete details."
+            : undefined,
         };
       },
     };
@@ -337,6 +356,7 @@ async function readLogLines(
       throw new AdbAxiError(
         "INVALID_OUTPUT",
         "crash ownership events exceed the 16 MiB retained-state limit",
+        { help: LOG_LIMIT_HELP },
       );
     lines.push(line);
   });
@@ -374,6 +394,7 @@ async function streamLogLines(
               throw new AdbAxiError(
                 "INVALID_OUTPUT",
                 "logcat stderr exceeds the 16 MiB retained-state limit",
+                { help: LOG_LIMIT_HELP },
               );
             stderr.push(chunk);
           }

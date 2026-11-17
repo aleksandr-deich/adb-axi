@@ -1,6 +1,10 @@
 import { StringDecoder } from "node:string_decoder";
 import { AdbAxiError } from "../core/errors.js";
 
+export const LOG_LIMIT_HELP = [
+  "Read a shorter window: a later mark (`adb-axi logs mark <name>`) or a shorter `--since` such as `--since 1m`",
+];
+
 /** logcat priorities, lowest first. `S` (silent) never appears on a line. */
 export const LOG_LEVELS = ["V", "D", "I", "W", "E", "F"] as const;
 export type LogLevel = (typeof LOG_LEVELS)[number];
@@ -111,6 +115,7 @@ export function logcatStream(consume: (line: LogLine) => void): {
         throw new AdbAxiError(
           "INVALID_OUTPUT",
           "one log line exceeds the 16 MiB retained-state limit",
+          { help: LOG_LIMIT_HELP },
         );
       line(pending.slice(start, end));
       start = end + 1;
@@ -120,6 +125,7 @@ export function logcatStream(consume: (line: LogLine) => void): {
       throw new AdbAxiError(
         "INVALID_OUTPUT",
         "one log line exceeds the 16 MiB retained-state limit",
+        { help: LOG_LIMIT_HELP },
       );
   };
   return {

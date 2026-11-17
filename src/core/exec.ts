@@ -26,7 +26,8 @@ export interface ExecOptions {
   maxOutputBytes?: number;
   /**
    * Receives every chunk of output as it arrives. The child then runs on past
-   * `maxOutputBytes`, which only bounds the copy kept in memory: its first bytes. Must not throw.
+   * `maxOutputBytes`, which bounds the stdout head; stderr keeps a separate 64 KiB diagnostic
+   * head for transport error classification. Must not throw.
    */
   sink?: (stream: "stdout" | "stderr", chunk: Buffer) => void;
   signal?: AbortSignal;
@@ -72,6 +73,7 @@ export function exec(options: ExecOptions): Promise<ExecResult> {
     let timedOut = false;
     let outputExceeded = false;
     let outputBytes = 0;
+    let stderrBytes = 0;
     const maxOutputBytes = options.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES;
     let drainTimer: NodeJS.Timeout | undefined;
 
@@ -125,6 +127,13 @@ export function exec(options: ExecOptions): Promise<ExecResult> {
     const collect = (stream: "stdout" | "stderr", chunks: Buffer[], chunk: Buffer): void => {
       if (settled || outputExceeded) return;
       options.sink?.(stream, chunk);
+      // Transport classification needs adb's diagnostics even after a streaming stdout head fills.
+      if (options.sink !== undefined && stream === "stderr") {
+        const kept = chunk.subarray(0, Math.max(0, 64 * 1024 - stderrBytes));
+        if (kept.length > 0) chunks.push(kept);
+        stderrBytes += kept.length;
+        return;
+      }
       if (outputBytes + chunk.length > maxOutputBytes) {
         if (options.sink !== undefined) {
           const room = maxOutputBytes - outputBytes;
