@@ -15,11 +15,11 @@ export interface Crash {
   message: string;
   /** The deepest direct Java cause, excluding suppressed exceptions and their causes. */
   rootCause?: { exception: string; message: string };
-  /** The first stack frame inside the app, or `null` when the trace has none. */
+  /** The first retained stack frame inside the app, or `null` when none is retained. */
   appFrame: string | null;
-  /** How many stack frames the log carries for it. */
+  /** How many stack frames the retained trace carries for it. */
   frames: number;
-  /** The whole block as the device printed it, without the log prefixes. */
+  /** Retained block messages without log prefixes; may contain truncation markers. */
   trace: string[];
   uid?: number;
 }
@@ -41,7 +41,9 @@ const mainPackage = (process: string): string => process.split(":")[0] ?? proces
  *
  * Parse all supplied lines, including any lead-in before the requested window. Callers
  * filter the resulting crashes by epochMs; a native crash uses the matching fatal signal's
- * time when available, otherwise its tombstone header time.
+ * time when available, otherwise its tombstone header time. Retained-state limits can
+ * truncate trace details or omit reports from this array; streaming consumers use
+ * createCrashParser callbacks to spool reports and raw trace messages independently.
  */
 export function parseCrashes(lines: readonly LogLine[]): Crash[] {
   const parser = createCrashParser();
