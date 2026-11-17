@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.2.5](https://github.com/aleksandr-deich/adb-axi/compare/v0.2.4...v0.2.5) (2026-11-16)
+
+
+### Features
+
+* add device configuration get and set commands ([#91](https://github.com/aleksandr-deich/adb-axi/issues/91)) ([d6b087f](https://github.com/aleksandr-deich/adb-axi/commit/d6b087fded656bd25622aa5157c3117754d4e347))
+* add read-only SharedPreferences inspection ([#89](https://github.com/aleksandr-deich/adb-axi/issues/89)) ([33e2f18](https://github.com/aleksandr-deich/adb-axi/commit/33e2f18b03997b0504275ce7596930b8ccee02c0))
+
+
+### Performance Improvements
+
+* skip unused pidof reads for empty process candidates ([#86](https://github.com/aleksandr-deich/adb-axi/issues/86)) ([ee99c43](https://github.com/aleksandr-deich/adb-axi/commit/ee99c439a105b23fd8ef7f7a73dcd43ff1f99b6c))
+
 ## [0.2.4](https://github.com/aleksandr-deich/adb-axi/compare/v0.2.3...v0.2.4) (2026-10-25)
 
 
