@@ -28,7 +28,10 @@ interface Case {
 
 const PKG = "com.example.notes";
 
-/** Every v0.1 command, with arguments that pass validation. `update` talks to npm, not adb. */
+/**
+ * Every v0.1 command, with arguments that pass validation. `update` talks to npm, not adb,
+ * and `feedback` only reads the report it is given.
+ */
 const CASES: Case[] = [
   { args: [] },
   { args: ["devices"] },
@@ -57,6 +60,7 @@ const CASES: Case[] = [
   { args: ["config", "set", "animations", "0"] },
   { args: ["shell", "--", "id"] },
   { args: ["update"] },
+  { args: ["feedback"] },
 ];
 
 const HELP_CONTRACTS: Record<string, { fragments: string[]; summary?: string }> = {
@@ -266,6 +270,19 @@ describe("conformance sweep", () => {
       if (words === "update") {
         expect(flagNames, words).toEqual(
           expect.arrayContaining(["--json", "--debug", "--help", "--check", "--dry-run"]),
+        );
+        expect(flagNames, words).not.toContain("--device");
+        expect(flagNames, words).not.toContain("--timeout");
+      } else if (words === "feedback") {
+        expect(flagNames, words).toEqual(
+          expect.arrayContaining([
+            "--report",
+            "--agent",
+            "--device-kind",
+            "--title",
+            "--json",
+            "--help",
+          ]),
         );
         expect(flagNames, words).not.toContain("--device");
         expect(flagNames, words).not.toContain("--timeout");
