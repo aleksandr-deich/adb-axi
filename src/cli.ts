@@ -7,6 +7,7 @@ import { editDistance, parseArgs } from "./core/args.js";
 import { Deadline } from "./core/deadline.js";
 import { AdbAxiError } from "./core/errors.js";
 import {
+  ADB_FREE_COMMANDS,
   commandLine,
   homeHeader,
   render,
@@ -389,16 +390,13 @@ async function leafInvocation(
   const timeoutMs = typeof timeout === "number" ? timeout : spec.defaultTimeoutMs;
   const debug = parsed.flags.debug === true;
   const deadline = new Deadline(timeoutMs);
-  const selection =
-    spec.path[0] === "update"
-      ? undefined
-      : resolveServerSelection(
-          run.env,
-          typeof parsed.flags.server === "string" ? parsed.flags.server : undefined,
-          typeof parsed.flags["server-start"] === "string"
-            ? parsed.flags["server-start"]
-            : undefined,
-        );
+  const selection = ADB_FREE_COMMANDS.has(spec.path[0] ?? "")
+    ? undefined
+    : resolveServerSelection(
+        run.env,
+        typeof parsed.flags.server === "string" ? parsed.flags.server : undefined,
+        typeof parsed.flags["server-start"] === "string" ? parsed.flags["server-start"] : undefined,
+      );
   if (selection !== undefined) run.server = new ServerSession(selection);
   const env = selection === undefined ? run.env : serverStateEnv(run.env, selection);
   let client: AdbClient | undefined;

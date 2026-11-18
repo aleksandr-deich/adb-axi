@@ -122,8 +122,11 @@ function quoteArg(arg: string): string {
   return `'${arg.replaceAll("'", `'\\''`)}'`;
 }
 
+/** Commands that never call adb, so they select no adb server either. */
+export const ADB_FREE_COMMANDS: ReadonlySet<string> = new Set(["update", "feedback"]);
+
 /** Commands that act on no device, so a suggestion to run one never gets `--device`. */
-const NO_DEVICE_COMMANDS = new Set(["devices", "update"]);
+const NO_DEVICE_COMMANDS: ReadonlySet<string> = new Set(["devices", ...ADB_FREE_COMMANDS]);
 
 /**
  * Add `--device <device>` to every `adb-axi` command line in the output's help that acts
@@ -213,7 +216,7 @@ export function withServerSelection(
           const flags = end === -1 ? words : words.slice(0, end);
           if (
             flags.includes("--help") ||
-            flags[0] === "update" ||
+            ADB_FREE_COMMANDS.has(flags[0] ?? "") ||
             flags.some((word) => word === "--server" || word.startsWith("--server="))
           )
             return whole;

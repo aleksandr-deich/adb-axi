@@ -97,6 +97,7 @@ adb-axi keeps log marks, install records and cached AVD names under `~/.adb-axi/
 | `config set <key> <value>`                                | Validate, write and verify settings; print before/after and a pasteable restore value           |
 | `shell -- <cmd>`                                          | One device shell command with its real exit code                                                |
 | `update [--check]`                                        | Upgrades adb-axi from npm, or compares against the latest version with --check                  |
+| `feedback [--report <file>]`                              | What to put in a session report, or a prefilled GitHub issue link for a written one             |
 
 ### Temporary device configuration
 
@@ -107,6 +108,14 @@ adb-axi config get animations --device emulator-5554 --json
 adb-axi config set animations 0 --device emulator-5554 --json
 # In the same turn, restore the value printed as before.value, for example:
 adb-axi config set animations window=1,transition=1,animator=unset --device emulator-5554
+```
+
+### Session feedback
+
+Ask your agent to run `adb-axi feedback` after a session: it prints what the report should cover, then turns the written report into a prefilled issue link for you to review and submit. It never posts anything itself.
+
+```sh
+adb-axi feedback --agent 'Claude Code with Sonnet' --device-kind emulator --report report.md
 ```
 
 ## Example: does an app survive process death?

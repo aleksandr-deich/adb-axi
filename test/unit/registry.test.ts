@@ -33,6 +33,7 @@ const V01_COMMANDS = [
   "config set",
   "shell",
   "update",
+  "feedback",
 ];
 
 const paths = (): string[] => allCommands(REGISTRY).map((command) => command.path.join(" "));

@@ -6,9 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Most people arrive here with the fields already filled in by their agent's link. If you are filling this in by hand, paste this prompt to your coding agent and copy its answer into the report field:
-
-        > You used adb-axi in this session. Write a short factual report for its author, using only what actually happened; no guessing, no praise. Cover: the task in one line; every adb-axi command you ran and whether it worked, with exact errors; every raw adb command you ran instead and why; anywhere the output or --help was unclear or made you retry; anything on the device neither tool made easy. Leave out source code, file paths, package names and device serials, and keep it under 3,000 characters.
+        Most people arrive here with the fields already filled in by their agent's link. If you are filling this in by hand, ask your coding agent to run `adb-axi feedback` and follow what it prints: it lists what the report should cover, and once the report is written it prints a link that opens this form filled in.
   - type: input
     id: agent
     attributes:
