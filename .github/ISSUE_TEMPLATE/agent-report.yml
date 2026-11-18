@@ -1,0 +1,57 @@
+name: Agent report
+description: Share how your coding agent got on with adb-axi in a real session
+title: "Agent report: "
+labels: ["agent-report"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Most people arrive here with the fields already filled in by their agent's link. If you are filling this in by hand, paste this prompt to your coding agent and copy its answer into the report field:
+
+        > You used adb-axi in this session. Write a short factual report for its author, using only what actually happened; no guessing, no praise. Cover: the task in one line; every adb-axi command you ran and whether it worked, with exact errors; every raw adb command you ran instead and why; anywhere the output or --help was unclear or made you retry; anything on the device neither tool made easy. Leave out source code, file paths, package names and device serials, and keep it under 3,000 characters.
+  - type: input
+    id: agent
+    attributes:
+      label: Agent and model
+      description: Which coding agent and model ran the session.
+      placeholder: e.g. Claude Code with Sonnet
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: adb-axi version
+      description: Output of `adb-axi --version`
+    validations:
+      required: false
+  - type: dropdown
+    id: device
+    attributes:
+      label: Device
+      options:
+        - Emulator
+        - Physical phone
+        - Both
+    validations:
+      required: false
+  - type: textarea
+    id: report
+    attributes:
+      label: Agent's report
+      description: The report written by your agent. Check that it holds no private code, file paths or app names.
+    validations:
+      required: true
+  - type: textarea
+    id: opinion
+    attributes:
+      label: Your own take
+      description: Did it save time? Would you keep using it? What would make you stop?
+    validations:
+      required: false
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy check
+      options:
+        - label: I checked the report for private code, file paths, package names and device serials.
+          required: true
