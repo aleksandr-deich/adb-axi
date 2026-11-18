@@ -102,6 +102,12 @@ export const feedback = defineCommand({
     "Absolute paths and device serials in the report are listed as warnings so they can be removed before sharing",
   ],
   run: (context) => {
+    if (context.flags.device !== undefined) {
+      throw usage(
+        "--device selects an adb target; use --device-kind for feedback instead",
+        "with the kind of device used in the session",
+      );
+    }
     const { report, agent, title } = context.flags;
     const device = context.flags["device-kind"];
     if (report === undefined) {

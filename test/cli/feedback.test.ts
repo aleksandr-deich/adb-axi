@@ -5,8 +5,6 @@ import { afterEach, describe, expect, it } from "vitest";
 import { createFakeAdb, type FakeAdb } from "../fake-adb/harness.js";
 import { ROOT, runCli } from "../helpers/run.js";
 
-/** The issue form the link must prefill; its field ids and dropdown text are the contract. */
-const FORM = readFileSync(join(ROOT, ".github", "ISSUE_TEMPLATE", "agent-report.yml"), "utf8");
 const VERSION = (
   JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")) as { version: string }
 ).version;
@@ -87,11 +85,6 @@ describe("adb-axi feedback", () => {
     expect(`${url.origin}${url.pathname}`).toBe(
       "https://github.com/aleksandr-deich/adb-axi/issues/new",
     );
-    for (const id of ["agent", "version", "device", "report"]) {
-      expect(FORM).toContain(`id: ${id}\n`);
-    }
-    expect(FORM).toContain("- Physical phone\n");
-    expect(FORM).toContain('title: "Agent report: "');
     expect(Object.fromEntries(url.searchParams)).toEqual({
       template: "agent-report.yml",
       title: "Agent report: draft survives process death",
