@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.7](https://github.com/aleksandr-deich/adb-axi/compare/v0.2.6...v0.2.7) (2026-11-18)
+
+
+### Features
+
+* add session feedback command ([#97](https://github.com/aleksandr-deich/adb-axi/issues/97)) ([7377edd](https://github.com/aleksandr-deich/adb-axi/commit/7377eddc5305581cb344f9b2971bda92ecc153d5))
+
 ## [0.2.6](https://github.com/aleksandr-deich/adb-axi/compare/v0.2.5...v0.2.6) (2026-11-17)
 
 
