@@ -134,7 +134,7 @@ describe("logs crash", () => {
     expect(dump.exitCode, dump.stdout).toBe(0);
     expect(JSON.parse(dump.stdout)).toMatchObject({ counts: { E: 100000 } });
     expectClean(f);
-  }, 20_000);
+  });
 
   it("excludes and counts matching crashes without provable user metadata", async () => {
     const window = [
