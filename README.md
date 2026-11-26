@@ -105,6 +105,8 @@ These are correctness differences, not a speed or cost claim: the [evaluation](#
 
 `adb-axi` with no command shows live state: the attached devices, the device a command would target, its foreground app and its recent crashes.
 
+Example output (description omitted; see live `adb-axi --help`):
+
 ```
 $ adb-axi
 bin: ~/.local/bin/adb-axi
