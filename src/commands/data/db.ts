@@ -20,6 +20,7 @@ const MAX_ROWS = 50;
 const MAX_COPY_BYTES = 256 * 1024 * 1024;
 
 const SQLITE_HEADER = Buffer.from("SQLite format 3\0", "latin1");
+const WAL_HEADER_BYTES = 32;
 /** The two magic numbers a WAL file starts with (little-endian and big-endian checksums). */
 const WAL_MAGICS = [0x377f0682, 0x377f0683];
 
@@ -28,10 +29,9 @@ export const dataDb = defineCommand({
   help: [
     "Writes are refused. ATTACH, VACUUM INTO, multiple statements and sqlite3 dot-commands are rejected before copying app data",
     "Queries run on a read-only local copy with host-file access blocked; temporary database copies are removed afterward",
+    "The copy is not atomic: concurrent writes may be missed. If the WAL changes generation or appears or disappears during the copy, the command retries once, then fails if it changes again",
   ],
-  summary:
-    "List an app's databases, or run one read-only query on a copy that includes the WAL. " +
-    "The copy is taken file by file while the app runs, so a write made during it can be missed",
+  summary: "List an app's databases, or run one read-only query on a copy that includes the WAL.",
   positionals: [
     { name: "pkg", description: "Package name of a debuggable app", required: true },
     {
@@ -208,54 +208,113 @@ async function query(context: DeviceContext, plan: QueryPlan): Promise<Output> {
  * with content was copied. Room keeps recent writes only in the log, so the main file alone
  * would miss them. The `-shm` file is not copied: it is an index of the log that SQLite
  * rebuilds from the log itself, and a snapshot taken at another moment than the log's could
- * disagree with it. The log goes first, so the main file is never older than its log.
+ * disagree with it. Copy the WAL first, but recheck its header after the main file read:
+ * if the WAL restarted, its old pages could overwrite newer pages in the main file.
  */
 async function copyDatabase(
   context: DeviceContext,
   plan: QueryPlan,
   dir: string,
 ): Promise<boolean> {
-  const { pkg, database } = plan;
-  let walCopied = false;
-  if (database.walSize !== null) {
-    const wal = await pull(context, pkg, `${database.name}-wal`, plan.userId);
-    if (wal.length > 0) {
-      if (!isWal(wal))
-        throw notSqlite(context, pkg, `${database.name}-wal`, wal, "a WAL file", plan.userId);
-      writeFileSync(join(dir, "db-wal"), wal);
-      walCopied = true;
+  const { pkg, database, userId } = plan;
+  const walName = `${database.name}-wal`;
+  const walPath = join(dir, "db-wal");
+  for (let attempt = 0; attempt < 2; attempt++) {
+    // Trust the listing for initial absence only. A retry must read the WAL afresh.
+    const before =
+      attempt === 0 && database.walSize === null
+        ? null
+        : await copyWal(context, plan, walName, walPath);
+    const main = await pull(context, pkg, database.name, userId);
+    if (!main.subarray(0, SQLITE_HEADER.length).equals(SQLITE_HEADER)) {
+      throw notSqlite(context, pkg, database.name, main, "a SQLite database", userId);
     }
+    const after = await readWal(context, plan, walName, "head");
+    if (before === null ? after !== null : after === null || !before.equals(after)) {
+      rmSync(walPath, { force: true });
+      continue;
+    }
+    writeFileSync(join(dir, "db"), main);
+    return before !== null && before.length > 0;
   }
-  const main = await pull(context, pkg, database.name, plan.userId);
-  if (main.length === 0 || !main.subarray(0, SQLITE_HEADER.length).equals(SQLITE_HEADER)) {
-    throw notSqlite(context, pkg, database.name, main, "a SQLite database", plan.userId);
+  throw new AdbAxiError(
+    "DATABASE_CHANGED_DURING_COPY",
+    `${database.name}'s WAL changed during both copy attempts; retry when the app stops writing to the database`,
+  );
+}
+
+/** Write the WAL to disk and retain just the header before pulling the main file. */
+async function copyWal(
+  context: DeviceContext,
+  plan: QueryPlan,
+  name: string,
+  path: string,
+): Promise<Buffer | null> {
+  const wal = await readWal(context, plan, name, "cat");
+  if (wal === null || wal.length === 0) return wal;
+  writeFileSync(path, wal);
+  return Buffer.from(wal.subarray(0, WAL_HEADER_BYTES));
+}
+
+/** Read the whole WAL or just its header. Absence is distinct from a present, empty WAL. */
+async function readWal(
+  context: DeviceContext,
+  { pkg, userId }: QueryPlan,
+  name: string,
+  command: "cat" | "head",
+): Promise<Buffer | null> {
+  const bytes = await pull(context, pkg, name, userId, command);
+  if (bytes.equals(Buffer.from(`${command}: databases/${name}: No such file or directory\n`))) {
+    return null;
   }
-  writeFileSync(join(dir, "db"), main);
-  return walCopied;
+  if (
+    bytes.length === 0 ||
+    (isWal(bytes) && (command === "cat" || bytes.length === WAL_HEADER_BYTES))
+  ) {
+    return bytes;
+  }
+  throw notSqlite(
+    context,
+    pkg,
+    name,
+    bytes,
+    command === "cat" ? "a WAL file" : "a WAL header",
+    userId,
+  );
 }
 
 /**
- * The bytes of one file in `databases/`. `exec-out` has no stderr and exits 0 whatever
- * the remote command did (S1), so a failure arrives as these bytes: callers validate them.
+ * The bytes of a file or its header in `databases/`. `exec-out` has no stderr and exits 0
+ * whatever the remote command did (S1), so callers must validate the returned bytes.
  */
-function pull(context: DeviceContext, pkg: string, name: string, userId: number): Promise<Buffer> {
+function pull(
+  context: DeviceContext,
+  pkg: string,
+  name: string,
+  userId: number,
+  command: "cat" | "head" = "cat",
+): Promise<Buffer> {
+  const args = command === "cat" ? ["cat"] : ["head", "-c", String(WAL_HEADER_BYTES)];
   return execOut(
     context.device.adb,
     context.device.serial,
-    ["run-as", pkg, "--user", String(userId), "cat", shellWords([`databases/${name}`])],
+    ["run-as", pkg, "--user", String(userId), ...args, shellWords([`databases/${name}`])],
     {
       deadline: context.deadline,
-      step: `copying databases/${name} of ${pkg}`,
-      maxOutputBytes: MAX_COPY_BYTES,
+      step:
+        command === "cat"
+          ? `copying databases/${name} of ${pkg}`
+          : `rechecking databases/${name} of ${pkg}`,
+      maxOutputBytes: command === "cat" ? MAX_COPY_BYTES : 4096,
     },
   );
 }
 
 function isWal(bytes: Buffer): boolean {
-  return bytes.length >= 32 && WAL_MAGICS.includes(bytes.readUInt32BE(0));
+  return bytes.length >= WAL_HEADER_BYTES && WAL_MAGICS.includes(bytes.readUInt32BE(0));
 }
 
-/** What `exec-out` copied is not the file asked for: a `run-as` refusal or the error text of `cat`. */
+/** `exec-out` returned invalid bytes, possibly a `run-as` refusal or a file read error. */
 function notSqlite(
   context: DeviceContext,
   pkg: string,

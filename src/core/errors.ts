@@ -38,6 +38,7 @@ export const ERROR_CATALOGUE = {
   APP_NOT_DEBUGGABLE: "The app is not debuggable, so private app files cannot be read",
   APP_DATA_UNREADABLE: "run-as cannot access the app's private files; the refusal is included",
   DB_NOT_FOUND: "No such database; existing ones are listed",
+  DATABASE_CHANGED_DURING_COPY: "The database WAL changed during both copy attempts",
   PREFS_NOT_FOUND: "No such SharedPreferences file; existing names are listed",
   INVALID_OUTPUT: "Unexpected or unreadable output, or a collection limit was exceeded",
   SQL_ERROR: "SQLite rejected the query",

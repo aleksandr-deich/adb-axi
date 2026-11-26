@@ -166,6 +166,8 @@ adb-axi keeps log marks, install records and cached AVD names under `~/.adb-axi/
 | `update [--check]`                                        | Upgrades adb-axi from npm, or compares against the latest version with --check                  |
 | `feedback`                                                | What to put in a session note and where to post it                                              |
 
+`data db` copies files while the app runs, so concurrent writes can be missed; the copy is not atomic. After copying the main database, it rechecks the WAL header. If the WAL changes generation, appears or disappears, it retries the copy once. A second change fails with `DATABASE_CHANGED_DURING_COPY` and no query rows; retry when the app stops writing to the database.
+
 ### Temporary device configuration
 
 `config get` reads `animations`, `night`, `font_scale`, `density` and `size`, distinguishing absent rows (`present: false, text: null`) from literal `"null"` text (`present: true`). Install cleanup before mutation and restore the `before.value` printed by `config set` in the same turn. Night writes refuse users other than user 0. See live `config get --help` and `config set --help` for value rules and verification limits.
