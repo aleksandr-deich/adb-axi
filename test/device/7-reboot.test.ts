@@ -46,6 +46,7 @@ describe("a real reboot", () => {
 
     const booted = await axi.run(["wait", "boot", "--timeout", "300s"], 330_000);
     expect(booted.exitCode).toBe(0);
+    await axi.acceptCurrentBoot();
     expect(String(booted.json.ok)).toMatch(
       new RegExp(`^wait boot ${axi.serial} -> booted after \\d+ ms$`),
     );

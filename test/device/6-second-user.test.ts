@@ -88,6 +88,7 @@ beforeAll(async () => {
 afterAll(async () => {
   if (user === undefined) return;
   const n = user;
+  await axi.waitForBoot();
   const api = Number((await axi.sh("getprop ro.build.version.sdk")).trim());
   await axi.sh("am switch-user 0");
   // `am get-current-user` names the switch's target at once, but from API 34 `pm remove-user`
