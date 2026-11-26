@@ -66,7 +66,11 @@ export class Axi {
     this.transcript = join(device.transcripts, `${name}.txt`);
     this.failureLog = join(device.transcripts, `${name}.logcat.txt`);
     this.bootIdFile = device.bootIdFile;
-    beforeAll(() => this.checkBoot());
+    beforeAll(async () => {
+      await this.waitForBoot();
+      await this.acceptCurrentBoot();
+    });
+    if (name !== "8-offline") afterAll(() => this.checkBoot());
     beforeEach(({ task, onTestFailed }) => {
       this.freshHome();
       appendFileSync(this.transcript, `# test: ${task.name}\n`);
@@ -94,11 +98,12 @@ export class Axi {
     await this.waitForBoot();
     const bootId = await this.readBootId();
     if (bootId === readFileSync(this.bootIdFile, "utf8")) return;
-    // Files run in sequence. Fail this file, but let the following ones use the new boot.
     writeFileSync(this.bootIdFile, bootId);
     const reason = await this.adb(["shell", "getprop", "sys.boot.reason"]);
     const bootReason = reason.exitCode === 0 ? reason.stdout.trim() || "unknown" : "unavailable";
-    throw new Error(`device rebooted unexpectedly before this file (boot reason: ${bootReason})`);
+    const message = `device rebooted unexpectedly during this file (boot reason: ${bootReason})`;
+    await this.saveDeviceLog(message);
+    throw new Error(message);
   }
 
   /** The `ADB_AXI_HOME` the next call uses. */
