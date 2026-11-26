@@ -215,7 +215,13 @@ export class ServerSession {
           "Reconnect or explicitly start this owned endpoint; no other server is selected",
           runHint(
             this.selection.source === "flag"
-              ? ["doctor", "--server", this.selection.endpoint, "--server-start", this.selection.start]
+              ? [
+                  "doctor",
+                  "--server",
+                  this.selection.endpoint,
+                  "--server-start",
+                  this.selection.start,
+                ]
               : ["doctor"],
             "to check it again",
           ),
