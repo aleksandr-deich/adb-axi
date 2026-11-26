@@ -13,14 +13,14 @@ import {
 
 describe("output", () => {
   it("selected-server-evidence-and-recovery", () => {
-    const selection = { endpoint: "tcp:localhost:6137", start: "never" };
     const evidence = {
-      ...selection,
-      source: "config",
+      endpoint: "tcp:localhost:6137",
+      start: "never",
+      source: "flag",
       peer: "127.0.0.1:6137",
       answered: true,
       startup: "not_observed",
-    };
+    } as const;
     const output = withServerSelection(
       {
         error: "No device",
@@ -30,8 +30,8 @@ describe("output", () => {
           runHint(["doctor"]),
         ],
       },
-      selection,
       evidence,
+      "toon",
     );
     expect(Object.keys(output).slice(0, 3)).toEqual(["error", "code", "server"]);
     expect(output.server).toEqual(evidence);
@@ -40,7 +40,7 @@ describe("output", () => {
       "Run `adb-axi doctor --server tcp:localhost:6137 --server-start never`",
     ]);
     expect(decode(render(output, "toon"))).toEqual(JSON.parse(render(output, "json")));
-    expect(withServerSelection(output, selection, evidence)).toEqual(output);
+    expect(withServerSelection(output, evidence, "toon")).toEqual(output);
   });
 
   it("builds the mutation lead line and no-op state", () => {

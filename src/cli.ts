@@ -75,9 +75,7 @@ export async function main(options: MainOptions = {}): Promise<void> {
   const device = selectedDevice(argv);
   const selected = (output: Output): Output => {
     const scoped =
-      run.server === undefined
-        ? output
-        : withServerSelection(output, run.server.selection, run.server.evidence());
+      run.server === undefined ? output : withServerSelection(output, run.server.evidence(), mode);
     return device === undefined ? scoped : withDeviceSelection(scoped, device);
   };
 

@@ -82,7 +82,7 @@ export const dataDb = defineCommand({
         );
       }
       const userId = await context.device.user();
-      return listing(context, pkg, await listDatabases(context, pkg, userId));
+      return listing(await listDatabases(context, pkg, userId));
     }
 
     assertReadOnlySql(sql);
@@ -94,9 +94,7 @@ export const dataDb = defineCommand({
   },
 });
 
-function listing(context: DeviceContext, pkg: string, databases: DatabaseFile[]): Output {
-  const first = databases[0];
-  const several = databases.length > 1;
+function listing(databases: DatabaseFile[]): Output {
   return {
     count: `${databases.length} ${databases.length === 1 ? "database" : "databases"}`,
     databases: databases.map((database) => ({
@@ -104,22 +102,6 @@ function listing(context: DeviceContext, pkg: string, databases: DatabaseFile[])
       size: formatSize(database.size),
       wal: database.walSize !== null,
     })),
-    ...(first === undefined
-      ? {}
-      : {
-          help: [
-            runHint(
-              lifecycleCommand(context, [
-                "data",
-                "db",
-                pkg,
-                "SELECT name, sql FROM sqlite_master",
-                ...(several ? ["--db", first.name] : []),
-              ]),
-              "to read its schema",
-            ),
-          ],
-        }),
   };
 }
 

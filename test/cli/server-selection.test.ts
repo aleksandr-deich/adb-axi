@@ -181,9 +181,7 @@ test("selection-persists-across-fresh-shells", async () => {
     peer: `127.0.0.1:${a.port}`,
     answered: true,
   });
-  expect(home.data.help).toContainEqual(
-    expect.stringContaining(`--server tcp:localhost:${a.port} --server-start auto`),
-  );
+  expect(home.data.help).not.toContainEqual(expect.stringMatching(/--server(?:-start)?\b/));
   const override = await invoke(env, ["devices", "--server", `tcp:localhost:${b.port}`]);
   expect(override.data.server).toMatchObject({
     source: "flag",

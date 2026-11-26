@@ -70,7 +70,12 @@ export const logsCrash = defineCommand({
 
         const seconds = Math.max(0, Math.round((now.epochMs - window.startMs) / 1000));
         const includeCause = crashes.some((crash) => crash.rootCause !== undefined);
-        const rows = crashes.map((crash) => describe(crash, now.utcOffsetMinutes, includeCause));
+        const summaries = crashes.map((crash) =>
+          describe(crash, now.utcOffsetMinutes, includeCause),
+        );
+        const rows = summaries.map(({ row }) => row);
+        const truncated =
+          note !== undefined || count > rows.length || summaries.some(({ cut }) => cut);
         return {
           crashes: `${count} since ${window.label} (${seconds} s, ${scanned} lines scanned)`,
           ...(note === undefined ? {} : { note }),
@@ -81,7 +86,7 @@ export const logsCrash = defineCommand({
           ...(rows.length === 1 ? { crash: rows[0] } : rows.length > 1 ? { crash: rows } : {}),
           ...(count > crashes.length ? { shown: `${crashes.length} of ${count} crashes` } : {}),
           ...(file === undefined ? {} : { full: file.keep() }),
-          ...(crashes.length > 0 && !full
+          ...(truncated && !full
             ? { help: ["Run the same command with `--full` to write the whole trace to a file"] }
             : {}),
         };
@@ -97,22 +102,29 @@ function describe(
   crash: Crash,
   utcOffsetMinutes: number | null,
   includeCause: boolean,
-): Record<string, unknown> {
-  return {
+): { row: Record<string, unknown>; cut: boolean } {
+  let cut = false;
+  const preview = (value: string): string => {
+    const shown = truncateField(value);
+    if (shown !== value) cut = true;
+    return shown;
+  };
+  const row = {
     kind: crash.kind,
     at: formatDeviceTime(crash.epochMs, utcOffsetMinutes),
     process: crash.process,
     exception: crash.exception,
-    message: truncateField(crash.message),
+    message: preview(crash.message),
     ...(includeCause
       ? {
-          cause: truncateField(crash.rootCause?.exception ?? UNKNOWN),
-          cause_message: truncateField(crash.rootCause?.message ?? UNKNOWN),
+          cause: preview(crash.rootCause?.exception ?? UNKNOWN),
+          cause_message: preview(crash.rootCause?.message ?? UNKNOWN),
         }
       : {}),
     app_frame: crash.appFrame ?? UNKNOWN,
     frames: crash.frames,
   };
+  return { row, cut };
 }
 
 function traceHeader(crash: Crash, utcOffsetMinutes: number | null): string {

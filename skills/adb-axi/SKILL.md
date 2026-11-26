@@ -44,7 +44,7 @@ For other settings, record row presence separately from raw text. An absent sett
 
 Target a known device with `--device <serial|avd>` after the command, or set `ANDROID_SERIAL=<serial>`. Only a lone online emulator is auto-selected; physical devices and multiple online devices require explicit selection. Consult the relevant command's `--help` when you need flag details.
 
-If other tools or agents may share the default adb server, pin your own with `--server tcp:<port>` or a saved selection, and check the `server` field in the output. Consult `adb-axi doctor --help` for saved-selection and server-start policies; this selection routes adb-axi only, not other tools.
+If other tools or agents may share the default adb server, pin your own with `--server tcp:<port>` or a saved selection, and confirm the endpoint on the `server:` line (or in the full block on errors or startup). Consult `adb-axi doctor --help` for saved-selection and server-start policies; this selection routes adb-axi only, not other tools.
 
 ## Fewer turns, same checks
 

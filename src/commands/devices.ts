@@ -171,16 +171,6 @@ function helpFor(
   if (attached === 0) {
     help.push("Start an emulator or connect a device, then run `adb-axi devices` again");
   }
-  // Only a name no other device shares, or following the hint fails with DEVICE_AMBIGUOUS.
-  const named = rows.find(
-    (row) =>
-      row.device.state === ONLINE &&
-      row.facts.avd !== null &&
-      rows.filter((other) => other.facts.avd === row.facts.avd).length === 1,
-  );
-  if (named?.facts.avd) {
-    help.push(runHint(["<command>", "--device", named.facts.avd], "to target one by AVD name"));
-  }
   for (const row of rows) {
     if (row.device.serial.startsWith("emulator-") && row.facts.avd === null) {
       help.push(row.avdUnavailableReason ?? unavailableAvdName(row.device.serial));

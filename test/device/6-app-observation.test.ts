@@ -327,9 +327,7 @@ describe("real observation windows and package state", () => {
     expect(listing.databases).toEqual([
       { name: "probe.db", size: `${Math.round(size / 1024)} KB`, wal: true },
     ]);
-    expect(listing.help).toEqual([
-      `Run \`adb-axi data db ${PKG} 'SELECT name, sql FROM sqlite_master' --device ${axi.serial}\` to read its schema`,
-    ]);
+    expect(listing).not.toHaveProperty("help");
     const query = await parity(["data", "db", PKG, "SELECT id, text FROM notes"]);
     expect(query.rows).toEqual([{ id: 1, text: "probe-1" }]);
     expect(String(query.db)).toMatch(/^probe\.db \(with WAL, copied \d\d:\d\d:\d\d\)$/);

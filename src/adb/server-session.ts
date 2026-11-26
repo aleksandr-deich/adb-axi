@@ -127,7 +127,7 @@ export class ServerSession {
       : `tcp:${host.includes(":") ? `[${host}]` : host}:${this.selection.port}`;
   }
 
-  evidence(): Record<string, unknown> {
+  evidence() {
     return {
       endpoint: this.selection.endpoint,
       source: this.selection.source,
@@ -214,7 +214,15 @@ export class ServerSession {
         help: [
           "Reconnect or explicitly start this owned endpoint; no other server is selected",
           runHint(
-            ["doctor", "--server", this.selection.endpoint, "--server-start", this.selection.start],
+            this.selection.source === "flag"
+              ? [
+                  "doctor",
+                  "--server",
+                  this.selection.endpoint,
+                  "--server-start",
+                  this.selection.start,
+                ]
+              : ["doctor"],
             "to check it again",
           ),
         ],

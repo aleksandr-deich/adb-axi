@@ -1,5 +1,6 @@
 import { homedir } from "node:os";
 import { encode } from "@toon-format/toon";
+import type { ServerSession } from "../adb/server-session.js";
 import { errorObject, exitCodeForError } from "./errors.js";
 
 export const BIN = "adb-axi";
@@ -196,17 +197,23 @@ function splitShellWords(text: string): string[] {
 
 export function withServerSelection(
   output: Output,
-  selection: { endpoint: string; start: string },
-  evidence: Record<string, unknown>,
+  evidence: ReturnType<ServerSession["evidence"]>,
+  mode: OutputMode,
 ): Output {
-  const entries = Object.entries(output);
-  const prefix = entries[0]?.[0] === "error" ? 2 : 1;
+  const entries = Object.entries(output).filter(([key]) => key !== "server");
+  const error = entries[0]?.[0] === "error";
+  const prefix = error ? 2 : 1;
+  const { endpoint, source, start, answered, startup } = evidence;
+  const server =
+    mode === "json" || error || startup !== "not_observed"
+      ? evidence
+      : `${endpoint} (${source}, ${answered ? "answered" : "not answered"})`;
   const scoped = Object.fromEntries([
     ...entries.slice(0, prefix),
-    ["server", evidence],
-    ...entries.slice(prefix).filter(([key]) => key !== "server"),
+    ["server", server],
+    ...entries.slice(prefix),
   ]);
-  if (!Array.isArray(scoped.help)) return scoped;
+  if (source !== "flag" || !Array.isArray(scoped.help)) return scoped;
   scoped.help = scoped.help.map((line: unknown) =>
     typeof line !== "string"
       ? line
@@ -221,7 +228,7 @@ export function withServerSelection(
           )
             return whole;
           const rest = end === -1 ? [] : words.slice(end);
-          return `\`${[BIN, ...flags, "--server", quoteArg(selection.endpoint), "--server-start", selection.start, ...rest].join(" ")}\``;
+          return `\`${[BIN, ...flags, "--server", quoteArg(endpoint), "--server-start", start, ...rest].join(" ")}\``;
         }),
   );
   return scoped;

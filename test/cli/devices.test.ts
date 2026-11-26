@@ -32,8 +32,8 @@ describe("devices", () => {
     expect(toon.stdout).toContain('0123456789ABCDEF,"-",recovery,"-","-"');
     expect(json.count).toBe("5 attached, 2 online");
     expect(json).not.toHaveProperty("other_states");
-    // Only the AVD-name hint and the doctor hint for the offline device; nothing about --all.
-    expect(json.help).toHaveLength(2);
+    // Only the doctor hint for the offline device; nothing about --all.
+    expect(json.help).toEqual([expect.stringContaining("to see why it is offline")]);
     expect(f.unmatched()).toEqual([]);
   });
 
@@ -101,7 +101,7 @@ describe("devices", () => {
     for (const call of f.calls()) expect(isProcessAlive(call.pid)).toBe(false);
   });
 
-  it("suggests only an AVD name that one attached device uses", async () => {
+  it("lists unique and shared AVD names without a generic targeting hint", async () => {
     const facts = (sdk: number, bootId: string) => ({
       stdout: `@sdk\n${sdk}\n@boot_completed\n1\n@boot_id\n${bootId}\n@size\nPhysical size: 1344x2992\n@density\nPhysical density: 480\n`,
     });
@@ -130,9 +130,7 @@ describe("devices", () => {
       ],
     });
     const { json: withUnique } = await both(mixed);
-    expect(withUnique.help).toEqual([
-      "Run `adb-axi <command> --device medium_tablet` to target one by AVD name",
-    ]);
+    expect(withUnique).not.toHaveProperty("help");
     mixed.cleanup();
 
     const onlyShared = withFake({
