@@ -35,7 +35,7 @@ Requirements: Node 24.12 or newer, and Android SDK Platform-Tools 35.0.0 or newe
 
 adb is found on `PATH`, then in `$ANDROID_HOME`, `$ANDROID_SDK_ROOT` or `~/Library/Android/sdk`. An older adb client fails with `HOST_ADB_TOO_OLD`; adb-axi never updates platform-tools itself.
 
-The [skill](skills/adb-axi/SKILL.md) tells agents when to use adb-axi; command details come from the live CLI help. `-g` installs it for all projects. With the skill, agents run `adb-axi <command>` from `PATH` and fall back to `npx -y adb-axi <command>` when it is not installed.
+The [skill](skills/adb-axi/SKILL.md) tells agents when to use adb-axi and includes a quick reference for common commands; live CLI help covers anything not listed. `-g` installs the skill for all projects. See its [Install and run](skills/adb-axi/SKILL.md#install-and-run) section for agent invocation and the quiet npx fallback.
 
 ## Why not plain adb?
 
