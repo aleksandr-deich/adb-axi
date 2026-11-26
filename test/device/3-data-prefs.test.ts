@@ -43,7 +43,13 @@ describe("data prefs", () => {
       { key: "tags", type: "set", value: ["", "one", "two<&>"] },
       { key: "text", type: "string", value: 'a<&>" 🚀' },
     ]);
-    expect((await axi.text(["data", "prefs", PKG])).data).toEqual(result);
+    expect((await axi.text(["data", "prefs", PKG])).data).toEqual({
+      ...result,
+      rows: rows.map((row) => ({
+        ...row,
+        value: Array.isArray(row.value) ? JSON.stringify(row.value) : String(row.value),
+      })),
+    });
     expect(await bytes("settings")).toBe(before);
 
     await writePrefs("other");

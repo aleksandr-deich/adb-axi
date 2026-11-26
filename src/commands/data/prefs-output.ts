@@ -35,13 +35,26 @@ export function presentPreferences(
     file,
     ...(source === file ? {} : { source }),
     count: `${rows.length} preferences`,
-    rows: shown,
+    rows: preferenceRows(shown, mode),
   };
   if (cut) {
     out.shown = `${shown.length} of ${rows.length} rows; long fields truncated`;
     if (full)
-      out.full = writeFullOutput(`prefs-${pkg}`, `${render({ file, source, rows }, mode)}\n`);
+      out.full = writeFullOutput(
+        `prefs-${pkg}`,
+        `${render({ file, source, rows: preferenceRows(rows, mode) }, mode)}\n`,
+      );
     else out.help = ["Run the same command with `--full` to write complete rows to a private file"];
   }
   return out;
+}
+
+function preferenceRows(rows: PreferenceRow[], mode: OutputMode): PreferenceRow[] {
+  if (mode === "json") return rows;
+  // A set's JSON text keeps embedded separators and empty elements unambiguous in one cell.
+  return rows.map(({ key, type, value }) => ({
+    key,
+    type,
+    value: Array.isArray(value) ? JSON.stringify(value) : String(value),
+  }));
 }

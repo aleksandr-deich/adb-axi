@@ -127,7 +127,7 @@ export class ServerSession {
       : `tcp:${host.includes(":") ? `[${host}]` : host}:${this.selection.port}`;
   }
 
-  evidence(): Record<string, unknown> {
+  evidence() {
     return {
       endpoint: this.selection.endpoint,
       source: this.selection.source,
