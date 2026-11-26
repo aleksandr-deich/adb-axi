@@ -30,7 +30,7 @@ const PKG = "com.example.notes";
 
 /**
  * Every v0.1 command, with arguments that pass validation. `update` talks to npm, not adb,
- * and `feedback` only reads the report it is given.
+ * and `feedback` only prints instructions.
  */
 const CASES: Case[] = [
   { args: [] },
@@ -274,16 +274,7 @@ describe("conformance sweep", () => {
         expect(flagNames, words).not.toContain("--device");
         expect(flagNames, words).not.toContain("--timeout");
       } else if (words === "feedback") {
-        expect(flagNames, words).toEqual(
-          expect.arrayContaining([
-            "--report",
-            "--agent",
-            "--device-kind",
-            "--title",
-            "--json",
-            "--help",
-          ]),
-        );
+        expect(flagNames.sort(), words).toEqual(["--help", "--json"]);
         expect(flagNames, words).not.toContain("--device");
         expect(flagNames, words).not.toContain("--timeout");
       } else {
@@ -296,8 +287,12 @@ describe("conformance sweep", () => {
         expect(flag.description.length, `${words} ${flag.flag}`).toBeGreaterThan(0);
       }
       const examples = data.examples as string[];
-      expect(examples.length, words).toBeGreaterThanOrEqual(2);
-      expect(examples.length, words).toBeLessThanOrEqual(3);
+      if (words === "feedback") {
+        expect(examples).toEqual(["adb-axi feedback"]);
+      } else {
+        expect(examples.length, words).toBeGreaterThanOrEqual(2);
+        expect(examples.length, words).toBeLessThanOrEqual(3);
+      }
       const contract = HELP_CONTRACTS[name(c)];
       for (const fragment of contract?.fragments ?? []) {
         expect(toon.stdout, words).toContain(fragment);
