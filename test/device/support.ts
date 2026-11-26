@@ -83,7 +83,7 @@ export class Axi {
     await this.ok(["wait", "boot", "--timeout", "120s"], 150_000);
   }
 
-  /** Accept the deliberate reboot in 7-reboot before the next file runs. */
+  /** Reset the baseline at file entry or after the deliberate reboot in 7-reboot. */
   async acceptCurrentBoot(): Promise<void> {
     writeFileSync(this.bootIdFile, await this.readBootId());
   }
