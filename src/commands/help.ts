@@ -24,7 +24,7 @@ export function topLevelHelp(registry: Registry): Output {
       "Requires Android SDK Platform-Tools 35.0.0 or newer for reliable shell disconnect exit codes; adb-axi never updates it",
       "Only a lone online emulator is auto-selected; physical devices require --device <serial> or ANDROID_SERIAL",
       "Flags go after the command, for example `adb-axi app start <pkg> --device <serial|avd>`",
-      ...SERVER_HELP,
+      runHint(["doctor", "--help"], "for adb server selection and startup policies"),
       runHint(["<command>", "--help"], "for its arguments, flags and examples"),
     ],
   };
@@ -45,17 +45,8 @@ export function commandHelp(spec: CommandSpec): Output {
           })),
         }
       : {}),
-    flags: [
-      ...spec.flags,
-      ...GLOBAL_FLAGS.filter((flag) => !spec.hiddenGlobalFlags?.includes(flag.name)),
-      HELP_FLAG,
-    ].map((flag) =>
-      flagRow(
-        flag.name === "--timeout"
-          ? { ...flag, default: formatDuration(spec.defaultTimeoutMs, "argument") }
-          : flag,
-      ),
-    ),
+    flags: spec.flags.map(flagRow),
+    global_flags: globalFlagSummary(spec),
     examples: [...spec.examples],
     ...(spec.path[0] === "doctor" && spec.path.length === 1
       ? { help: [...(spec.help ?? []), ...SERVER_HELP] }
@@ -75,20 +66,13 @@ export function groupHelp(group: GroupSpec): Output {
     ...base,
     command: commandLine([group.name]),
     summary: group.summary,
-    ...(defaultCommand === undefined
-      ? {}
-      : {
-          usage: familyUsage(defaultCommand),
-          flags: defaultCommand.flags.map(flagRow),
-        }),
+    ...(defaultCommand === undefined ? {} : { usage: familyUsage(defaultCommand) }),
     subcommands: commands.map((command) => ({
       command: commandLine(command.path),
       usage: familyUsage(command),
       summary: command.summary,
     })),
-    global_flags: [...GLOBAL_FLAGS, HELP_FLAG].map((flag) =>
-      flagRow(flag.name === "--timeout" ? { ...flag, default: "per command" } : flag),
-    ),
+    ...(defaultCommand === undefined ? { global_flags: globalFlagSummary() } : {}),
     help: [
       ...(defaultCommand?.help ?? []),
       ...(group.name === "doctor" ? SERVER_HELP : []),
@@ -121,6 +105,17 @@ const SERVER_HELP = [
 ];
 
 const HELP_FLAG: FlagSpec = { name: "--help", type: "boolean", description: "Show this help" };
+
+function globalFlagSummary(spec?: CommandSpec): string {
+  const names = [...GLOBAL_FLAGS, HELP_FLAG]
+    .filter((flag) => !spec?.hiddenGlobalFlags?.includes(flag.name))
+    .map(({ name }) =>
+      name === "--timeout" && spec !== undefined
+        ? `${name} (default: ${formatDuration(spec.defaultTimeoutMs, "argument")})`
+        : name,
+    );
+  return `${names.join(", ")}; see \`${BIN} --help\``;
+}
 
 function flagRow(flag: FlagSpec): { flag: string; default: string; description: string } {
   const usage = flag.alias ? `${flagUsage(flag)}, ${flag.alias}` : flagUsage(flag);
