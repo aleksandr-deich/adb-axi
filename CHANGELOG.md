@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.2.8](https://github.com/aleksandr-deich/adb-axi/compare/v0.2.7...v0.2.8) (2026-11-26)
+
+
+### Features
+
+* **feedback:** guide plain-text impressions to general issues ([#99](https://github.com/aleksandr-deich/adb-axi/issues/99)) ([50ff34d](https://github.com/aleksandr-deich/adb-axi/commit/50ff34d7dee9c3ca9f444b991caadc0460d159c1))
+* **help:** make adb-axi help cheaper to learn ([#107](https://github.com/aleksandr-deich/adb-axi/issues/107)) ([9c9934f](https://github.com/aleksandr-deich/adb-axi/commit/9c9934f9f8e41393fd65362995fefa24364e832e))
+* **output:** trim the per-call server block, success hints and prefs output ([#108](https://github.com/aleksandr-deich/adb-axi/issues/108)) ([2862df0](https://github.com/aleksandr-deich/adb-axi/commit/2862df0e627bac86239f0d0fe2907f13dcaf1817))
+
+
+### Bug Fixes
+
+* **cli:** drop the token-efficiency claim from the help description ([#104](https://github.com/aleksandr-deich/adb-axi/issues/104)) ([89acd3e](https://github.com/aleksandr-deich/adb-axi/commit/89acd3e471ba68eac62e5270c88d3b9621e87f58))
+* **data:** detect WAL changes during database copies ([#106](https://github.com/aleksandr-deich/adb-axi/issues/106)) ([b6cba9b](https://github.com/aleksandr-deich/adb-axi/commit/b6cba9bb7bd7e12e23507b4c7755c9f8860d33ba))
+
 ## [0.2.7](https://github.com/aleksandr-deich/adb-axi/compare/v0.2.6...v0.2.7) (2026-11-18)
 
 
