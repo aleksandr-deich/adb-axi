@@ -1,7 +1,9 @@
 import {} from "node:child_process";
 import {
+  copyFileSync,
   existsSync,
   mkdtempSync,
+  readFileSync,
   readdirSync,
   rmSync,
   statSync,
@@ -24,6 +26,7 @@ vi.setConfig({ testTimeout: 40_000 });
 
 const SERIAL = "emulator-5554";
 const PKG = "dev.probe";
+const MISSING_WAL = "head: databases/app.db-wal: No such file or directory\n";
 const ONE_ONLINE = `List of devices attached\n${SERIAL}          device product:sdk_gphone64_arm64 model:sdk_gphone64_arm64 device:emu64a transport_id:1\n\n`;
 const MARGIN_MS = 1500;
 
@@ -59,6 +62,20 @@ const catCall = (name: string, pkg = PKG, userId = 0): string[] => [
   `databases/${name}`,
 ];
 
+const walHeadCall = (name: string, pkg = PKG, userId = 0): string[] => [
+  "-s",
+  SERIAL,
+  "exec-out",
+  "run-as",
+  pkg,
+  "--user",
+  String(userId),
+  "head",
+  "-c",
+  "32",
+  `databases/${name}-wal`,
+];
+
 /** `ls -l` output as toybox prints it, for files of the given sizes. */
 function lsOutput(files: Record<string, number>): string {
   const lines = Object.entries(files).map(
@@ -90,6 +107,7 @@ it("lists and copies only the resolved current user's database", async () => {
     { match: ["-s", SERIAL, "shell", "am get-current-user"], respond: { stdout: "10\n" } },
     { match: lsCall(PKG, 10), respond: { stdout: lsOutput({ "app.db": statSync(db).size }) } },
     { match: catCall("app.db", PKG, 10), respond: { stdoutFile: db } },
+    { match: walHeadCall("app.db", PKG, 10), respond: { stdout: MISSING_WAL } },
   ]);
   const listed = await runCli(["data", "db", PKG, "--json"], f.env);
   expect(listed.exitCode).toBe(0);
@@ -112,6 +130,7 @@ it("lists and copies only the resolved current user's database", async () => {
     ["-s", SERIAL, "shell", "am get-current-user"],
     lsCall(PKG, 10),
     catCall("app.db", PKG, 10),
+    walHeadCall("app.db", PKG, 10),
   ]);
   expect(f.unmatched()).toEqual([]);
 });
@@ -124,9 +143,18 @@ function deviceWith(
   const sizes = Object.fromEntries(
     Object.entries(files).map(([name, path]) => [name, statSync(path).size]),
   );
+  const wal = files["app.db-wal"];
+  const header = wal === undefined ? undefined : join(scratchDir(), "wal-header");
+  if (wal !== undefined && header !== undefined) {
+    writeFileSync(header, readFileSync(wal).subarray(0, 32));
+  }
   return device(
     [
       { match: lsCall(), respond: { stdout: lsOutput(sizes) } },
+      {
+        match: walHeadCall("app.db"),
+        respond: header === undefined ? { stdout: MISSING_WAL } : { stdoutFile: header },
+      },
       ...Object.entries(files).map(([name, path]): Rule => ({
         match: catCall(name),
         respond: { stdoutFile: path },
@@ -212,6 +240,85 @@ describe("data db: listing", () => {
 });
 
 describe("data db: reading", () => {
+  // Force a checkpoint between file reads with fake adb; a real device cannot
+  // reliably place the checkpoint in that window. SQLite generates all the images.
+  it.each([
+    { changes: 0, expected: "original" },
+    { changes: 1, expected: "current" },
+    { changes: 2, expected: null },
+  ])("handles $changes WAL restarts during the copy", async ({ changes, expected }) => {
+    const dir = scratchDir();
+    const path = join(dir, "app.db");
+    const db = new DatabaseSync(path);
+    function capture(value: string, checkpointBeforeMain: boolean) {
+      const main = join(dir, `${value}.db`);
+      const wal = join(dir, `${value}.wal`);
+      const header = join(dir, `${value}.header`);
+      db.prepare("UPDATE t SET v = ?").run(value);
+      copyFileSync(`${path}-wal`, wal);
+      writeFileSync(header, readFileSync(wal).subarray(0, 32));
+      if (checkpointBeforeMain) db.exec("PRAGMA wal_checkpoint(RESTART);");
+      copyFileSync(path, main);
+      if (!checkpointBeforeMain) db.exec("PRAGMA wal_checkpoint(RESTART);");
+      return { main, wal, header };
+    }
+    const [original, current, later] = (() => {
+      try {
+        db.exec("PRAGMA journal_mode=WAL; CREATE TABLE t(v); INSERT INTO t VALUES ('baseline');");
+        db.exec("PRAGMA wal_checkpoint(TRUNCATE);");
+        return [
+          capture("original", false),
+          capture("current", true),
+          capture("later", true),
+        ] as const;
+      } finally {
+        db.close();
+      }
+    })();
+    const first = changes === 0 ? original : current;
+    const second = changes === 2 ? later : first;
+    const f = device([
+      {
+        match: lsCall(),
+        respond: {
+          stdout: lsOutput({
+            "app.db": statSync(first.main).size,
+            "app.db-wal": statSync(original.wal).size,
+          }),
+        },
+      },
+      {
+        match: catCall("app.db-wal"),
+        respond: { stdoutFile: original.wal },
+        times: 1,
+        then: { stdoutFile: first.wal },
+      },
+      {
+        match: catCall("app.db"),
+        respond: { stdoutFile: first.main },
+        times: 1,
+        then: { stdoutFile: second.main },
+      },
+      {
+        match: walHeadCall("app.db"),
+        respond: { stdoutFile: first.header },
+        times: 1,
+        then: { stdoutFile: second.header },
+      },
+    ]);
+    const run = await runCli(["data", "db", PKG, "SELECT v FROM t", "--json"], f.env);
+    const data = JSON.parse(run.stdout) as Record<string, unknown>;
+    if (expected === null) {
+      expect(run.exitCode).toBe(1);
+      expect(data.code).toBe("DATABASE_CHANGED_DURING_COPY");
+      expect(data.error).toContain("retry when the app stops writing");
+      expect(data).not.toHaveProperty("rows");
+    } else {
+      expect(run.exitCode).toBe(0);
+      expect(data.rows).toEqual([{ v: expected }]);
+    }
+  });
+
   it("reads an R-Tree table from the app database", async () => {
     const db = makeDb(
       "CREATE VIRTUAL TABLE bounds USING rtree(id,minX,maxX); INSERT INTO bounds VALUES (1,2,3);",
