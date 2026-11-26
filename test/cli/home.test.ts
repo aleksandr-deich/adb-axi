@@ -112,7 +112,7 @@ describe("adb-axi (home view)", () => {
     const run = await both(fake);
     expect(run.exitCode).toBe(0);
     expect(body(run)).toMatchInlineSnapshot(`
-      "description: "Truthful, token-efficient adb for agents: devices, app lifecycle, logs and app data"
+      "description: "Device and app state for coding agents on Android: devices, app lifecycle, process death, logs, crashes and app data"
       count: "3 attached, 2 online"
       devices[3]{serial,avd,state,api,form}:
         emulator-5554,Pixel_10_Pro_XL,device,37,phone

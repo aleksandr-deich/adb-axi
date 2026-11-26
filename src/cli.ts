@@ -34,7 +34,7 @@ import { readHostProcesses, type HostProcessList } from "./host/processes.js";
 import { VERSION } from "./version.js";
 
 export const DESCRIPTION =
-  "Truthful, token-efficient adb for agents: devices, app lifecycle, logs and app data";
+  "Device and app state for coding agents on Android: devices, app lifecycle, process death, logs, crashes and app data";
 
 export interface MainOptions {
   argv?: readonly string[];
