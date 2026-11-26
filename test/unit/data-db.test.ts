@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readdirSync, rmSync, watch } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -73,6 +73,38 @@ describe("readRows", () => {
 });
 
 describe("runQuery", () => {
+  it("confines a large sort's spill files to the query directory", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "adb-axi-query-test-"));
+    const database = join(dir, "copy.db");
+    new DatabaseSync(database).close();
+    const seen = new Set<string>();
+    // Install before starting the child: SQLite immediately unlinks spill files,
+    // so discovering this directory via a parent watcher races with their creation.
+    const watcher = watch(dir, (_event, filename) => {
+      if (filename !== null) seen.add(filename);
+    });
+    try {
+      const rows = await runQuery({
+        database,
+        workDir: dir,
+        env: process.env,
+        deadline: new Deadline(20_000),
+        step: "sorting the copy of app.db",
+        label: "app.db",
+        sql:
+          "WITH RECURSIVE c(x) AS (SELECT 1 UNION ALL SELECT x+1 FROM c WHERE x<65536) " +
+          "SELECT count(*) AS n FROM (SELECT printf('%01024d',x) AS v FROM c ORDER BY v DESC)",
+      });
+      // The recursive sequence has exactly 65,536 rows; the wide sort must spill.
+      expect(rows).toEqual([{ n: 65536 }]);
+      expect([...seen].some((name) => name.startsWith("etilqs_"))).toBe(true);
+      expect(readdirSync(dir)).toEqual(["copy.db"]);
+    } finally {
+      watcher.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it("refuses an ATTACH of another host database, even past the statement check", async () => {
     const dir = mkdtempSync(join(tmpdir(), "adb-axi-query-test-"));
     try {
