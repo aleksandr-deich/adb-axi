@@ -4,34 +4,102 @@ adb-axi is a command-line wrapper around Android's `adb`, built for AI coding ag
 
 What it adds over plain `adb`:
 
-- **Short output:** compact [TOON](https://github.com/toon-format/toon), or JSON with `--json`, so agents spend fewer tokens.
+- **Structured output:** compact [TOON](https://github.com/toon-format/toon), or JSON with `--json`, with the verdict on the first line.
 - **No hangs:** every command has a time limit, so a stuck device cannot block the agent.
-- **Honest results:** a command succeeds only when the requested state is actually true, and every error names the next step.
+- **Honest results:** a command succeeds only when the requested state is actually true, and every error names the next step. See [Why not plain adb?](#why-not-plain-adb) for examples.
 
 Use it to check which devices are attached and healthy; install, start, stop and kill apps, including testing that an app survives process death; read the logs and crashes of one test run; and read a debuggable app's databases and SharedPreferences. It does not read the screen or tap and type: use `android layout` or a UI tool such as agent-device for that.
+
+**Works well with:** the [Android CLI](https://developer.android.com/tools/agents/android-cli) for builds and emulators, and [agent-device](https://github.com/callstack/agent-device) or `android layout` for the UI. adb-axi is the device and app state layer between them, not a replacement for either.
+
+**Let your agent review adb-axi:** after a session, ask your agent to run `adb-axi feedback` and post its note on the [issues page](https://github.com/aleksandr-deich/adb-axi/issues). See [Session feedback](#session-feedback).
 
 Screen-reading tools can leave a helper connected that keeps Android reporting accessibility as enabled and blocks instrumented tests. Before handing a device back or running instrumented tests, run `adb-axi doctor ui --fix --device <serial>`. It removes stale helpers, which can stop a running instrumentation and its app, and leaves helpers still in use alone.
 
 adb-axi follows the [AXI](https://github.com/kunchenguid/axi) (Agent eXperience Interface) conventions for agent-facing command-line tools.
 
-## Install
-
-Requirements: Node 24.12 or newer, and Android SDK Platform-Tools 35.0.0 or newer. Devices must run Android 10 (API 29) or newer; emulators and physical phones are both supported.
+## Get started
 
 ```sh
-npm install --global adb-axi
-adb-axi --version
-```
-
-adb is found on `PATH`, then in `$ANDROID_HOME`, `$ANDROID_SDK_ROOT` or `~/Library/Android/sdk`. An older adb client fails with `HOST_ADB_TOO_OLD`; adb-axi never updates platform-tools itself.
-
-## Agent skill
-
-```sh
+npm install -g adb-axi
 npx skills add aleksandr-deich/adb-axi --skill adb-axi -g
 ```
 
+Add to your `AGENTS.md` or `CLAUDE.md`:
+
+```
+Use `adb-axi` instead of raw `adb` for Android device and app state.
+```
+
+Requirements: Node 24.12 or newer, and Android SDK Platform-Tools 35.0.0 or newer. Devices must run Android 10 (API 29) or newer; emulators and physical phones are both supported. Check the install with `adb-axi --version`.
+
+adb is found on `PATH`, then in `$ANDROID_HOME`, `$ANDROID_SDK_ROOT` or `~/Library/Android/sdk`. An older adb client fails with `HOST_ADB_TOO_OLD`; adb-axi never updates platform-tools itself.
+
 The [skill](skills/adb-axi/SKILL.md) tells agents when to use adb-axi; command details come from the live CLI help. `-g` installs it for all projects. With the skill, agents run `adb-axi <command>` from `PATH` and fall back to `npx -y adb-axi <command>` when it is not installed.
+
+## Why not plain adb?
+
+Plain `adb` often reports success when nothing happened. Each pair below was recorded on an API 35 emulator with adb 37.0.1 and adb-axi 0.2.7, using the [probe test app](test/device/probe-app). Output is trimmed; adb-axi errors also name the next command to run.
+
+**A mistyped package name succeeds.** `am force-stop` exits 0 for a package that is not installed:
+
+```
+$ adb shell am force-stop dev.probee; echo "exit $?"
+exit 0
+
+$ adb-axi app stop dev.probee
+error: dev.probee is not installed on this device
+code: APP_NOT_INSTALLED
+```
+
+**`am kill` leaves an app in front running.** It exits 0 and the process keeps its pid:
+
+```
+$ adb shell pidof dev.probe
+6293
+$ adb shell am kill dev.probe; echo "exit $?"
+exit 0
+$ adb shell pidof dev.probe
+6293
+
+$ adb-axi app kill dev.probe
+ok: "kill dev.probe -> process gone, task kept in recents"
+kill:
+  pid_before: 6293
+  pid_after: null
+  backgrounded_first: true
+```
+
+**A crash on launch looks like a start.** `am start` exits 0 while the app dies in `onCreate`:
+
+```
+$ adb shell am start -n dev.probe/.MainActivity; echo "exit $?"
+Starting: Intent { cmp=dev.probe/.MainActivity }
+exit 0
+$ adb shell pidof dev.probe; echo "exit $?"
+exit 1
+
+$ adb-axi app start dev.probe
+error: the dev.probe process of dev.probe/.MainActivity crashed during its start
+code: APP_DIED_ON_START
+last:
+  state: crashed
+```
+
+**A missing device blocks forever.** `adb wait-for-device` has no deadline:
+
+```
+$ adb -s emulator-5999 wait-for-device
+# still waiting after 60 s, when it was killed
+
+$ adb-axi wait boot --device emulator-5999 --timeout 10s
+error: emulator-5999 had not finished booting after 10 s
+code: WAIT_TIMEOUT
+last:
+  state: not attached
+```
+
+These are correctness differences, not a speed or cost claim: the [evaluation](#evaluation) found no overall turn or cost advantage over plain adb.
 
 ## Start here
 
@@ -40,7 +108,6 @@ The [skill](skills/adb-axi/SKILL.md) tells agents when to use adb-axi; command d
 ```
 $ adb-axi
 bin: ~/.local/bin/adb-axi
-description: "Truthful, token-efficient adb for agents: devices, app lifecycle, logs and app data"
 count: "1 attached, 1 online"
 devices[1]{serial,avd,state,api,form}:
   emulator-5554,Pixel_10_Pro_XL,device,35,phone

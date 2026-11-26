@@ -1,17 +1,25 @@
 {
   "name": "adb-axi",
   "version": "0.2.7",
-  "description": "Truthful, token-efficient adb for agents: devices, app lifecycle, logs and app data",
+  "description": "Device and app state for coding agents on Android: devices, app lifecycle, process death, logs, crashes and app data. Follows the AXI conventions.",
   "keywords": [
     "adb",
     "android",
     "axi",
     "agent",
     "cli",
-    "toon"
+    "toon",
+    "claude-code",
+    "codex",
+    "coding-agent",
+    "agent-skill",
+    "emulator",
+    "logcat",
+    "process-death"
   ],
   "license": "MIT",
   "author": "Aleksandr Deich",
+  "homepage": "https://github.com/aleksandr-deich/adb-axi#readme",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/aleksandr-deich/adb-axi.git"
