@@ -264,7 +264,10 @@ describe("data db: reading", () => {
       const run = await runCli(["data", "db", PKG, sql, "--json"], f.env);
       expect(run.exitCode).toBe(0);
       expect(JSON.parse(run.stdout)).toMatchObject({ rows: [{ n: 65536 }] });
-      expect([...seen].some((name) => /[/\\]etilqs_/.test(name))).toBe(true);
+      // A spill file inside the private directory. SQLite names it `etilqs_...`, except on
+      // Linux since SQLite 3.54, where it is an anonymous O_TMPFILE: the kernel then names
+      // it `#<inode>` in the events for writes to it, and no `etilqs_` file is ever created.
+      expect([...seen].some((name) => /[/\\](?:etilqs_|#\d+$)/.test(name))).toBe(true);
       expect([...seen].every((name) => /^adb-axi-db-[^/\\]+(?:[/\\]|$)/.test(name))).toBe(true);
       expect([...modes]).toEqual([0o700]);
       expect(readdirSync(tmp)).toEqual([]);
