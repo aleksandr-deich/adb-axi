@@ -88,15 +88,8 @@ beforeAll(async () => {
 afterAll(async () => {
   if (user === undefined) return;
   const n = user;
-  const sdkCommand = "getprop ro.build.version.sdk";
-  let sdk = await axi.run(["shell", sdkCommand]);
-  if (sdk.json.code === "DEVICE_OFFLINE") {
-    await axi.waitForBoot();
-    sdk = await axi.run(["shell", sdkCommand]);
-  }
-  expect(sdk.exitCode, `adb-axi ${sdk.args.join(" ")}\n${sdk.stdout}${sdk.stderr}`).toBe(0);
-  expect(sdk.json.exit, sdkCommand).toBe(0);
-  const api = Number(String(sdk.json.stdout).trim());
+  await axi.waitForBoot();
+  const api = Number((await axi.sh("getprop ro.build.version.sdk")).trim());
   await axi.sh("am switch-user 0");
   // `am get-current-user` names the switch's target at once, but from API 34 `pm remove-user`
   // refuses the user the switch has not yet moved away from: "Current user cannot be removed".
