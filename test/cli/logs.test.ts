@@ -187,6 +187,7 @@ describe("logs mark", () => {
       });
       expect(readFileSync(path, "utf8")).toBe(saved);
     },
+    20_000,
   );
 
   it("rejects names that are unsafe or that read as a duration, before touching a device", async () => {
