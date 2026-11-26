@@ -1,5 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { createFakeAdb, type FakeAdb } from "../fake-adb/harness.js";
@@ -10,104 +9,41 @@ const VERSION = (
 ).version;
 
 let fake: FakeAdb | undefined;
-let dir: string | undefined;
 afterEach(() => {
   fake?.cleanup();
   fake = undefined;
-  if (dir !== undefined) rmSync(dir, { recursive: true, force: true });
-  dir = undefined;
 });
 
-function host(): FakeAdb {
-  fake = createFakeAdb("devices-empty.json");
-  return fake;
-}
-
-function reportFile(text: string): string {
-  dir = mkdtempSync(join(tmpdir(), "adb-axi-feedback-"));
-  const path = join(dir, "report.md");
-  writeFileSync(path, text);
-  return path;
-}
-
 describe("adb-axi feedback", () => {
-  it("prints the report questions with no arguments", async () => {
-    const f = host();
-    const run = await runCli(["feedback", "--json"], f.env);
+  it("prints the plain-text note brief and issues link without reading a device", async () => {
+    fake = createFakeAdb("devices-empty.json");
+    const run = await runCli(["feedback", "--json"], fake.env);
     expect(run.exitCode).toBe(0);
-    const data = JSON.parse(run.stdout) as Record<string, unknown>;
-    const text = [data.brief, ...(data.cover as string[]), data.leave_out].join("\n");
-    for (const phrase of [
-      "Write a short factual report for its author, using only what actually happened; no guessing, no praise.",
-      "the task in one line",
-      "every adb-axi command you ran and whether it worked, with exact errors",
-      "every raw adb command you ran instead and why",
-      "anywhere the output or --help was unclear or made you retry",
-      "anything on the device neither tool made easy",
-      "Leave out source code, file paths, package names and device serials, and keep it under 3,000 characters.",
-    ]) {
-      expect(text).toContain(phrase);
-    }
-    expect((data.help as string[]).join("\n")).toContain("adb-axi feedback --agent");
-    expect(f.calls()).toEqual([]);
-  });
-
-  it("turns a multi-line markdown report into a link that fills every form field", async () => {
-    const f = host();
-    const report = [
-      "## Task",
-      "Check that an app keeps its draft after process death.",
-      "",
-      "## Commands",
-      "- `adb-axi app death` worked: restored -> foreground",
-      '- `adb-axi logs crash` printed "0 crashes" & exit 0 (100% clean)',
-      "",
-      "## Unclear",
-      "Nothing; the --help was enough. Ünïcode – ok? #1 +plus",
-    ].join("\n");
-    const run = await runCli(
-      [
-        "feedback",
-        "--agent",
-        "Claude Code with Opus 5.5",
-        "--device-kind",
-        "phone",
-        "--title",
-        "draft survives process death",
-        "--report",
-        reportFile(report),
-        "--json",
+    expect(JSON.parse(run.stdout)).toEqual({
+      brief:
+        "You used adb-axi in this session. Write a short, honest plain-text note for its author about what it was like to use: your own impression, not a log of the session. Say it plainly if you did not like it.",
+      cover: [
+        "the coding agent and model you are, and the adb-axi version below",
+        "did you like using adb-axi, or would you rather have used raw adb, and why",
+        "what felt good or saved you effort",
+        "what was annoying or confusing, or made you go back to raw adb",
+        "would you reach for it again next time",
       ],
-      f.env,
-    );
-    expect(run.exitCode).toBe(0);
-    const url = new URL((JSON.parse(run.stdout) as { url: string }).url);
-    expect(`${url.origin}${url.pathname}`).toBe(
-      "https://github.com/aleksandr-deich/adb-axi/issues/new",
-    );
-    expect(Object.fromEntries(url.searchParams)).toEqual({
-      template: "agent-report.yml",
-      title: "Agent report: draft survives process death",
-      agent: "Claude Code with Opus 5.5",
+      leave_out:
+        "Leave out source code, file paths, package names and device serials, and keep it under 3,000 characters.",
       version: VERSION,
-      device: "Physical phone",
-      report,
+      issues: "https://github.com/aleksandr-deich/adb-axi/issues",
+      help: [
+        "Give your user the note and the issues link; they open a new issue there, paste the note, check it and submit. adb-axi posts nothing",
+      ],
     });
-    expect(f.calls()).toEqual([]);
+    expect(run.stdout + run.stderr).not.toContain("issues/new");
+    expect(fake.calls()).toEqual([]);
   });
 
-  it("refuses a report too long for a link, naming the limit", async () => {
-    const f = host();
-    const run = await runCli(
-      ["feedback", "--agent", "Codex", "--report", reportFile("word ".repeat(2_000)), "--json"],
-      f.env,
-    );
-    expect(run.exitCode).toBe(1);
-    const data = JSON.parse(run.stdout) as Record<string, unknown>;
-    expect(data).toMatchObject({ code: "REPORT_TOO_LONG", limit: 8_000 });
-    expect(data.error).toContain("8,000-character limit");
-    expect((data.help as string[]).join("\n")).toContain("from the report");
-    expect(run.stdout).not.toContain("https://");
-    expect(f.calls()).toEqual([]);
+  it("rejects the removed --report flag", async () => {
+    const run = await runCli(["feedback", "--report", "x"], process.env);
+    expect(run.exitCode).not.toBe(0);
+    expect(run.stdout).toContain("unknown flag --report");
   });
 });

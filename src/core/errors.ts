@@ -44,7 +44,6 @@ export const ERROR_CATALOGUE = {
   NODE_TOO_OLD: "This Node.js is older than the command needs; the required version is named",
   NOT_IMPLEMENTED: "The command is registered but not available in this build",
   UPDATE_ERROR: "The self-update could not complete",
-  REPORT_TOO_LONG: "The feedback report does not fit in a prefilled issue link",
   INTERNAL_ERROR: "adb-axi hit an unexpected internal failure",
 } as const;
 
