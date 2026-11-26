@@ -185,6 +185,36 @@ Ask your agent to run `adb-axi feedback` after a session. Your agent writes a sh
 adb-axi feedback
 ```
 
+## Evaluation
+
+A careful evaluation found no overall turn or cost advantage over plain adb; here is what it found.
+
+<!-- evaluation:start -->
+
+adb-axi 0.2.4 was tested against equally guided plain `adb` on October 26-27, 2026: seven Android bug-fix episodes on one notes app, four fresh-session repeats per arm, using Codex CLI 0.162.0 with gpt-6.1-sol at medium effort. Independent deterministic checks scored function, tester-data preservation and strict safety across 56 completed runs.
+
+**No demonstrated overall turn or cost advantage. adb-axi used 10 more AI-agent responses overall; that small difference does not establish a regression. Plain adb finished faster in this lab.**
+
+A **turn** is one completed AI-agent response, which can execute several commands. These totals cover **28 tasks per option**, including help, coding, builds and device verification:
+
+| Turns across all 28 tasks         | adb-axi 0.2.4 | Plain adb | Difference       |
+| --------------------------------- | ------------- | --------- | ---------------- |
+| All responses to finish the tasks | 551           | 541       | adb-axi: 10 more |
+
+The response-ratio interval crosses equality. **Correction:** the original device-specific count labels command completions and misses some responses starting or polling device commands. It therefore does not establish fewer device interactions; the earlier 47-fewer-interactions claim was unsupported. The original counts and this limitation are explained in [docs/evaluation.md](docs/evaluation.md#methodological-correction).
+
+**Cost:** no material difference within the pre-set +/-15% band. **Time:** plain adb was faster in this lab; adb-axi took about 10% longer. Timing includes asymmetric ownership-guard and audit overhead, so it does not measure intrinsic CLI speed.
+
+| Outcome, 28 runs per arm     | adb-axi 0.2.4 | Plain adb |
+| ---------------------------- | ------------- | --------- |
+| Functional acceptance passed | 28/28         | 27/28     |
+| Tester notes preserved       | 28/28         | 28/28     |
+| Strict safety passed         | 27/28         | 28/28     |
+
+The plain functional failure was an app patch breaking a required shortcut label, not an adb-axi defect. The adb-axi safety failure combined default-valued settings additions and a transitive `start-server` attempt intercepted by the ownership guard, with no native startup or server-identity change. One app/model, four repeats per cell and instrumented emulators do not establish general superiority or safety; cross-version changes are not causal product estimates. See [docs/evaluation.md](docs/evaluation.md) for numeric estimates, intervals, all episodes, exceptions and limits.
+
+<!-- evaluation:end -->
+
 ## Example: does an app survive process death?
 
 Android kills background apps to free memory, and a well-built app restores its screen when the user returns. Testing that takes four adb-axi commands with no sleeps between them, and each one shows proof of what happened:
@@ -227,34 +257,6 @@ crashes: "0 since before-kill (13 s, 0 lines scanned)"
 ```
 
 `app death dev.probe` runs steps 2 and 3 in one command.
-
-## Evaluation
-
-<!-- evaluation:start -->
-
-adb-axi 0.2.4 was tested against equally guided plain `adb` on October 26-27, 2026: seven Android bug-fix episodes on one notes app, four fresh-session repeats per arm, using Codex CLI 0.162.0 with gpt-6.1-sol at medium effort. Independent deterministic checks scored function, tester-data preservation and strict safety across 56 completed runs.
-
-**No demonstrated overall turn or cost advantage. adb-axi used 10 more AI-agent responses overall; that small difference does not establish a regression. Plain adb finished faster in this lab.**
-
-A **turn** is one completed AI-agent response, which can execute several commands. These totals cover **28 tasks per option**, including help, coding, builds and device verification:
-
-| Turns across all 28 tasks         | adb-axi 0.2.4 | Plain adb | Difference       |
-| --------------------------------- | ------------- | --------- | ---------------- |
-| All responses to finish the tasks | 551           | 541       | adb-axi: 10 more |
-
-The response-ratio interval crosses equality. **Correction:** the original device-specific count labels command completions and misses some responses starting or polling device commands. It therefore does not establish fewer device interactions; the earlier 47-fewer-interactions claim was unsupported. The original counts and this limitation are explained in [docs/evaluation.md](docs/evaluation.md#methodological-correction).
-
-**Cost:** no material difference within the pre-set +/-15% band. **Time:** plain adb was faster in this lab; adb-axi took about 10% longer. Timing includes asymmetric ownership-guard and audit overhead, so it does not measure intrinsic CLI speed.
-
-| Outcome, 28 runs per arm     | adb-axi 0.2.4 | Plain adb |
-| ---------------------------- | ------------- | --------- |
-| Functional acceptance passed | 28/28         | 27/28     |
-| Tester notes preserved       | 28/28         | 28/28     |
-| Strict safety passed         | 27/28         | 28/28     |
-
-The plain functional failure was an app patch breaking a required shortcut label, not an adb-axi defect. The adb-axi safety failure combined default-valued settings additions and a transitive `start-server` attempt intercepted by the ownership guard, with no native startup or server-identity change. One app/model, four repeats per cell and instrumented emulators do not establish general superiority or safety; cross-version changes are not causal product estimates. See [docs/evaluation.md](docs/evaluation.md) for numeric estimates, intervals, all episodes, exceptions and limits.
-
-<!-- evaluation:end -->
 
 ## Development
 
