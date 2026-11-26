@@ -30,6 +30,8 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: npm
       - run: npm ci
+      - run: npm run build
+      - run: pass=0; fail=0; for i in $(seq 1 20); do if npx vitest run test/cli/data-db.test.ts -t 'spills a large sort'; then pass=$((pass+1)); else fail=$((fail+1)); fi; done; echo "SPILL-LOOP pass=$pass fail=$fail"
       - run: npm run check
       - run: npm pack --dry-run
 
