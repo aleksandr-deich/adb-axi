@@ -147,7 +147,9 @@ describe("command registry", () => {
         }
         for (const arg of command.positionals) expect(row?.usage).toContain(`<${arg.name}>`);
       }
-      expect(help.global_flags).toHaveLength(7);
+      expect(help.global_flags).toMatch(
+        /^--device, --server, --server-start, --timeout(?: \(default: \d+(?:ms|s|m)\))?, --json, --debug, --help; see `adb-axi --help`$/,
+      );
       if (entry.defaultCommand?.shipped) {
         expect(help.flags).toHaveLength(entry.defaultCommand.flags.length);
       }

@@ -83,7 +83,7 @@ const HELP_CONTRACTS: Record<string, { fragments: string[]; summary?: string }> 
   },
   "app list": { fragments: ["--grep <re>"] },
   "wait app": { fragments: ["--state <foreground|running|stopped> (required)"] },
-  "wait boot": { fragments: ['"--timeout <dur>",120s'] },
+  "wait boot": { fragments: ["--timeout (default: 120s)"] },
   "data db": { fragments: ["64 MB result limit"] },
   "data prefs": { fragments: ["--file <name>", "--full"] },
   shell: { fragments: ["--full", "adb-axi shell -- 'getprop ro.build.version.sdk'"] },
@@ -258,28 +258,23 @@ describe("conformance sweep", () => {
       expect(toon.exitCode, words).toBe(0);
       expect(data.command).toBe(`adb-axi ${words}`);
       expect(data.usage).toMatch(new RegExp(`^adb-axi ${words}\\b`));
-      const flags = [
-        ...(data.flags as object[]),
-        ...((data.global_flags as object[] | undefined) ?? []),
-      ] as {
+      const flags = data.flags as {
         flag: string;
         default: string;
         description: string;
       }[];
       const flagNames = flags.map((flag) => flag.flag.split(" ")[0]);
       if (words === "update") {
-        expect(flagNames, words).toEqual(
-          expect.arrayContaining(["--json", "--debug", "--help", "--check", "--dry-run"]),
+        expect(flagNames, words).toEqual(expect.arrayContaining(["--check", "--dry-run"]));
+        expect(data.global_flags, words).toBe(
+          "--server, --server-start, --json, --debug, --help; see `adb-axi --help`",
         );
-        expect(flagNames, words).not.toContain("--device");
-        expect(flagNames, words).not.toContain("--timeout");
       } else if (words === "feedback") {
-        expect(flagNames.sort(), words).toEqual(["--help", "--json"]);
-        expect(flagNames, words).not.toContain("--device");
-        expect(flagNames, words).not.toContain("--timeout");
+        expect(flagNames, words).toEqual([]);
+        expect(data.global_flags, words).toBe("--json, --help; see `adb-axi --help`");
       } else {
-        expect(flagNames, words).toEqual(
-          expect.arrayContaining(["--device", "--timeout", "--json", "--debug", "--help"]),
+        expect(data.global_flags, words).toMatch(
+          /^--device, --server, --server-start, --timeout \(default: \d+(?:ms|s|m)\), --json, --debug, --help; see `adb-axi --help`$/,
         );
       }
       for (const flag of flags) {

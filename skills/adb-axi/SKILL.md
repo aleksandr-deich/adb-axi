@@ -14,18 +14,27 @@ Do not use it for UI input (taps, typing, swipes) or for reading what is on scre
 
 Use `adb-axi config get [<key>]` and `config set <key> <value>` for animations, night, font_scale, density and size. Other settings still use `shell`. Consult live `config get --help` and `config set --help` for the output contract, supported values and constraints.
 
-## Current guidance lives in the CLI
+## Install and run
 
-Command and flag details come from the live CLI, not this installed file. Run commands as `adb-axi <command>` from PATH. If `adb-axi` is not installed, run `npx -y adb-axi <command>` instead. Either needs Node.js 24.12 or newer and Android SDK Platform-Tools 35.0.0 or newer. No preliminary availability probe is needed.
+Install once with `npm i -g adb-axi`, then run `adb-axi` from PATH. Fallback: `NPM_CONFIG_LOGLEVEL=warn npx -y adb-axi <command>` suppresses `npm notice` noise. Both routes need Node.js 24.12 or newer and Android SDK Platform-Tools 35.0.0 or newer. No preliminary availability probe is needed.
 
-Output is short and the first line is the verdict. Do not pipe it through `tail` or `head`.
+Output is short and the first line is the verdict. Do not pipe it through `tail` or `head`. Bare `adb-axi` reads live state; it is not a prerequisite for a known operation.
 
-- Know the relevant command? Ask `adb-axi <command> --help` directly. Family help such as `adb-axi app --help` includes compact usages and command-specific flags.
-- Read `adb-axi --help` only when you need the command index to choose a command.
-- Batch independent help requests in one shell turn: `adb-axi app start --help && adb-axi logs crash --help`.
-- `adb-axi` with no command reads live state; it is not a prerequisite for help or a known operation.
+## Quick reference
 
-`adb-axi shell` returns structured output, not raw remote stdout. For a value that another command will use, request `--json` and parse its `stdout` field. Check the command's `exit` status and validate the parsed value before changing state. Do not extract a value with `head`, `tail`, or removal of a printed field label.
+- `adb-axi shell --json -- '<cmd>'` - output is structured, not raw stdout. Parse `stdout`, check `exit`, and validate the value before changing state. Put all CLI flags before `--`.
+- `adb-axi data db <pkg> ['<sql>'] [--db <name>]` - list databases or run one read-only query for a debuggable app.
+- `adb-axi app install <apk> [--clean-data] [--if-changed]` - omit `--clean-data` to preserve data; `--if-changed` skips the same versionCode and signer.
+- `adb-axi app start <pkg> [--fresh]` - `--fresh` force-stops first.
+- `adb-axi app stop <pkg>`
+- `adb-axi app clear <pkg>`
+- `adb-axi app death <pkg>` - kills and restores with before and after evidence. Start with the app in front; do not press HOME or sleep first.
+- `adb-axi doctor ui [--fix]` - inspect first; repair only owned leftovers.
+- `adb-axi logs [--since <mark|dur>] [--pkg <pkg>]`
+- `adb-axi logs mark [<name>]`
+- `adb-axi logs crash [--since <mark|dur>] [--pkg <pkg>]`
+
+Use live `adb-axi <command> --help` for anything not listed. Family help such as `adb-axi app --help` shows compact usages. Batch independent help requests; use `adb-axi --help` for the command index.
 
 For supported settings, `config set` prints `before.value`; install a cleanup trap before mutation and restore that value in the same turn, even if checks fail. Consult live `config get --help` and `config set --help` for restore restrictions and verification limits.
 
@@ -37,17 +46,9 @@ Target a known device with `--device <serial|avd>` after the command, or set `AN
 
 If other tools or agents may share the default adb server, pin your own with `--server tcp:<port>` or a saved selection, and check the `server` field in the output. Consult `adb-axi doctor --help` for saved-selection and server-start policies; this selection routes adb-axi only, not other tools.
 
-## App-build loop
-
-Typical usages (flags go after the command; confirm details with `--help`):
-
-- `adb-axi app install <apk> --clean-data` installs and wipes app data; omit `--clean-data` to keep data.
-- `adb-axi app start <pkg>`, `adb-axi app stop <pkg>` and `adb-axi app clear <pkg>`.
-- `adb-axi app death <pkg>` kills and restores the app in one call, with before and after evidence. It sends HOME itself, so run it with the app in front and do not press HOME or sleep first.
-- `adb-axi data db <pkg> '<sql>'` runs one read-only query on a debuggable app's database.
-- `adb-axi data prefs <pkg>` reads typed SharedPreferences rows; with several XML files, use `--file <name>` from the listed names. Long values are decimal strings; DataStore is not supported.
-
 ## Fewer turns, same checks
+
+`adb-axi data prefs <pkg>` reads typed SharedPreferences rows; with several XML files, use `--file <name>` from the listed names. Long values are decimal strings; DataStore is not supported.
 
 These short examples illustrate patterns; confirm current usage with live help when needed.
 

@@ -37,6 +37,7 @@ export const shell = defineCommand({
     "adb-axi shell -- 'getprop ro.build.version.sdk'",
     "adb-axi shell --device emulator-5556 -- 'ls /data/local/tmp'",
   ],
+  help: ["Use --json to parse stdout and check exit (the remote command's exit code)"],
   run: runShellCommand,
 });
 
