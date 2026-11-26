@@ -1,4 +1,4 @@
-import { appendFileSync, mkdirSync, mkdtempSync } from "node:fs";
+import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import { decode } from "@toon-format/toon";
 import { afterAll, beforeAll, beforeEach, expect, inject } from "vitest";
@@ -52,6 +52,7 @@ export class Axi {
   private readonly home: string;
   private readonly transcript: string;
   private readonly failureLog: string;
+  private readonly bootIdFile: string;
 
   constructor(testFile: string) {
     const device = inject("device");
@@ -64,11 +65,40 @@ export class Axi {
     this.home = home;
     this.transcript = join(device.transcripts, `${name}.txt`);
     this.failureLog = join(device.transcripts, `${name}.logcat.txt`);
+    this.bootIdFile = device.bootIdFile;
+    beforeAll(() => this.checkBoot());
     beforeEach(({ task, onTestFailed }) => {
       this.freshHome();
       appendFileSync(this.transcript, `# test: ${task.name}\n`);
       onTestFailed(() => this.saveDeviceLog(task.name));
     });
+  }
+
+  async waitForBoot(): Promise<void> {
+    // Let the CLI's bounded wait report its last observation before the host deadline.
+    await this.ok(["wait", "boot", "--timeout", "120s"], 150_000);
+  }
+
+  /** Accept the deliberate reboot in 7-reboot before the next file runs. */
+  async acceptCurrentBoot(): Promise<void> {
+    writeFileSync(this.bootIdFile, await this.readBootId());
+  }
+
+  private async readBootId(): Promise<string> {
+    const bootId = (await this.sh("cat /proc/sys/kernel/random/boot_id")).trim();
+    if (bootId === "") throw new Error(`${this.serial}: empty boot ID`);
+    return bootId;
+  }
+
+  private async checkBoot(): Promise<void> {
+    await this.waitForBoot();
+    const bootId = await this.readBootId();
+    if (bootId === readFileSync(this.bootIdFile, "utf8")) return;
+    // Files run in sequence. Fail this file, but let the following ones use the new boot.
+    writeFileSync(this.bootIdFile, bootId);
+    const reason = await this.adb(["shell", "getprop", "sys.boot.reason"]);
+    const bootReason = reason.exitCode === 0 ? reason.stdout.trim() || "unknown" : "unavailable";
+    throw new Error(`device rebooted unexpectedly before this file (boot reason: ${bootReason})`);
   }
 
   /** The `ADB_AXI_HOME` the next call uses. */

@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import type { TestProject } from "vitest/node";
@@ -17,6 +17,8 @@ export interface DeviceContext {
   home: string;
   /** Where each test file writes the transcript of its adb-axi calls. */
   transcripts: string;
+  /** The expected kernel boot ID, shared across Vitest workers. */
+  bootIdFile: string;
 }
 
 declare module "vitest" {
@@ -42,7 +44,7 @@ export default async function setup(project: TestProject): Promise<() => void> {
   const transcripts = resolve(ROOT, "test-results/device");
   rmSync(transcripts, { recursive: true, force: true });
   mkdirSync(transcripts, { recursive: true });
-  project.provide("device", { serial, bin, home, transcripts });
+  const bootIdFile = join(home, "boot-id");
   const cleanup = () => {
     rmSync(home, { recursive: true, force: true });
     if (process.env.ADB_AXI_BIN === undefined) {
@@ -51,6 +53,19 @@ export default async function setup(project: TestProject): Promise<() => void> {
   };
   try {
     await waitForServices(serial);
+    const boot = await exec({
+      file: locateAdb(),
+      args: ["-s", serial, "shell", "cat", "/proc/sys/kernel/random/boot_id"],
+      deadlineMs: 10_000,
+    });
+    const bootId = boot.stdout.toString("utf8").trim();
+    if (boot.kind !== "exited" || boot.exitCode !== 0 || bootId === "") {
+      throw new Error(
+        `${serial}: could not read initial boot ID (${boot.kind})\n${boot.stderr.toString("utf8")}`,
+      );
+    }
+    writeFileSync(bootIdFile, bootId);
+    project.provide("device", { serial, bin, home, transcripts, bootIdFile });
   } catch (error) {
     cleanup();
     throw error;
