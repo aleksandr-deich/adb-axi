@@ -88,8 +88,7 @@ describe("atomic writes", () => {
     }
     expect(reads).toBeGreaterThan(0);
     expect(readdirSync(dir)).toEqual(["state.json"]);
-    // Allow the writers' 30s deadlines to settle even on a busy filesystem.
-  }, 35_000);
+  });
 });
 
 describe("readJson", () => {
