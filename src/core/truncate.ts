@@ -16,6 +16,8 @@ import { adbAxiHome, isErrno } from "./state.js";
 /** Default caps for `logs` and `shell` output. */
 export const MAX_LINES = 50;
 export const MAX_BYTES = 4096;
+/** Lines of a cut `shell` window taken from the start; the rest of the window is the end. */
+export const HEAD_LINES = 20;
 /** Default cap for a single long field, such as a crash message. */
 export const MAX_FIELD_CHARS = 500;
 
@@ -27,12 +29,18 @@ export interface LineWindow {
   truncated: boolean;
   /** Set when a single line longer than the byte cap was cut: its bytes shown and in full. */
   cut?: { shownBytes: number; totalBytes: number };
+  /**
+   * Set when the window keeps the end of the output and leaves lines out before it: the
+   * first `at` of `lines` are the output's first lines, the rest are its last lines, and
+   * `count` lines between them are not shown.
+   */
+  gap?: { at: number; count: number };
 }
 
 export interface LineCaps {
   maxLines?: number;
   maxBytes?: number;
-  /** `head` keeps the first lines (shell output); `tail` keeps the last (log dumps). */
+  /** `head` keeps the first lines; `tail` keeps the last (log dumps). `capEnds` keeps both. */
   keep?: "head" | "tail";
 }
 
@@ -77,11 +85,65 @@ export function capLines(input: string | readonly string[], caps: LineCaps = {})
   return cut === undefined ? window : { ...window, cut };
 }
 
-/** `shown: 5 of 12 lines`, or `1 of 1 lines, cut at 4096 of 20480 bytes` for a cut line. */
+/**
+ * The output's first and last lines inside the caps, for output whose result is often at
+ * its end. Output inside the caps is kept whole. Otherwise up to `HEAD_LINES` lines and their
+ * share of the bytes come from the start, and the rest of both caps goes to the end, so
+ * the last line is always shown. Only the last line can be cut, as `capLines` cuts a line.
+ */
+export function capEnds(input: string | readonly string[], caps: LineCaps = {}): LineWindow {
+  const maxLines = caps.maxLines ?? MAX_LINES;
+  const maxBytes = caps.maxBytes ?? MAX_BYTES;
+  const all = typeof input === "string" ? splitLines(input) : [...input];
+  const whole = capLines(all, { maxLines, maxBytes });
+  if (!whole.truncated) return whole;
+
+  const headLines = Math.min(HEAD_LINES, maxLines - 1);
+  const headBytes = Math.floor((maxBytes * headLines) / maxLines);
+  const head: string[] = [];
+  let bytes = 0;
+  for (const line of all.slice(0, headLines)) {
+    const size = Buffer.byteLength(line, "utf8") + 1;
+    if (bytes + size > headBytes) break;
+    head.push(line);
+    bytes += size;
+  }
+  const tail = capLines(all.slice(head.length), {
+    maxLines: maxLines - head.length,
+    maxBytes: maxBytes - bytes,
+    keep: "tail",
+  });
+  return withGap({ ...tail, lines: [...head, ...tail.lines], total: all.length }, head.length);
+}
+
+/** Mark the lines `window` leaves out of its `total` as a gap after its first `at` lines. */
+export function withGap(window: LineWindow, at: number): LineWindow {
+  const count = window.total - window.lines.length;
+  const truncated = window.truncated || count > 0;
+  return count === 0 ? { ...window, truncated } : { ...window, truncated, gap: { at, count } };
+}
+
+/**
+ * `shown: 5 of 12 lines`, or `1 of 1 lines, cut at 4096 of 20480 bytes` for a cut line.
+ * A window with a gap says which lines it keeps: `50 of 193 lines (first 20 and last 30)`, or
+ * `(last 50)` when it keeps only the end.
+ */
 export function shownLine(window: LineWindow, unit = "lines"): string {
-  const shown = `${window.lines.length} of ${window.total} ${unit}`;
+  let shown = `${window.lines.length} of ${window.total} ${unit}`;
+  if (window.gap !== undefined) {
+    const last = window.lines.length - window.gap.at;
+    shown += window.gap.at === 0 ? ` (last ${last})` : ` (first ${window.gap.at} and last ${last})`;
+  }
   if (window.cut === undefined) return shown;
   return `${shown}, cut at ${window.cut.shownBytes} of ${window.cut.totalBytes} bytes`;
+}
+
+/** The window's lines with a `... 143 lines omitted ...` row where its gap is. */
+export function windowRows(window: LineWindow): string[] {
+  if (window.gap === undefined) return window.lines;
+  const { at, count } = window.gap;
+  const row = `... ${count} ${count === 1 ? "line" : "lines"} omitted ...`;
+  return [...window.lines.slice(0, at), row, ...window.lines.slice(at)];
 }
 
 /** Split text into lines without inventing a trailing empty line. */

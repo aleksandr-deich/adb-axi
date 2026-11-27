@@ -213,6 +213,15 @@ The samples under `synthetic/29/` and `synthetic/30/` were written from the AOSP
 | `date-epoch-zone.txt`                            | `shell date '+%s.%N %z'`                       | device clock with its UTC offset, east (29) and west (30) of UTC                                  | 29, 30 |
 | `logcat-epoch-window.txt`                        | `shell logcat -d -v epoch -T <mark>`           | a window across a crash and restart: three pids of the probe, other processes                     | 30     |
 
+## Instrumentation transcripts
+
+`instrument/` holds two `am instrument -w -r` stdout transcripts. `test/cli/shell.test.ts` replays them to check that the `shell` window shows the result block at the end of long output.
+
+| File                          | What it shows                                                                                                                                                | Source                                                                                                                                                                                          |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `am-instrument-r-3-pass.txt`  | 3 passing tests in one class, 51 lines, one over the 50-line cap; ends with `OK (3 tests)` and `INSTRUMENTATION_CODE: -1`                                    | a run on an emulator, with the package renamed: its first 50 lines as `adb-axi shell` showed them, and the last line, cut from that view, as a complete 2-test run of the same suite printed it |
+| `am-instrument-r-6-1fail.txt` | 6 tests in two classes, one `AssertionError` with its stack, 193 lines; ends with `FAILURES!!!`, `Tests run: 6,  Failures: 1` and `INSTRUMENTATION_CODE: -1` | synthetic: written from AndroidJUnitRunner's `-r` output format, not captured                                                                                                                   |
+
 ## Shared parsers
 
 `src/android/` reads the output above. Capture and synthetic-sample parser coverage is in `test/unit/android.test.ts` and `test/unit/amstart.test.ts`; fake-adb device-read coverage is in `test/unit/android-device.test.ts` and `test/cli/app-lifecycle.test.ts`. The `logs crash` windows that mix captured crash, tombstone and ANR output with extra lines, and the pid-reuse, interleaving and look-alike-package cases, are inline synthetic (`synthetic: true` scenarios). Launcher selection and activity-process metadata scenarios in the lifecycle tests are synthetic, not real-device captures.

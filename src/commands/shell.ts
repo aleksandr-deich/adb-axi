@@ -3,10 +3,14 @@ import { AdbAxiError } from "../core/errors.js";
 import { DEFAULT_MAX_OUTPUT_BYTES } from "../core/exec.js";
 import { runHint, TextBlock, type Output } from "../core/output.js";
 import {
+  capEnds,
   capLines,
   FullOutputFile,
   MAX_BYTES,
   shownLine,
+  splitLines,
+  windowRows,
+  withGap,
   type LineWindow,
 } from "../core/truncate.js";
 import { runShell } from "../adb/shell.js";
@@ -30,7 +34,7 @@ export const shell = defineCommand({
     {
       name: "--full",
       type: "boolean",
-      description: `Write the complete output to a file, however large, instead of stopping at 50 lines or 4 kB; without it a command that prints over ${DEFAULT_MAX_OUTPUT_BYTES / 1024 / 1024} MiB is stopped`,
+      description: `Write the complete output to a file, however large, and show its last 50 lines or 4 kB instead of its first and last lines; without it a command that prints over ${DEFAULT_MAX_OUTPUT_BYTES / 1024 / 1024} MiB is stopped`,
     },
   ],
   examples: [
@@ -70,8 +74,8 @@ async function runShellCommand(context: DeviceContext): Promise<Output> {
               ],
             }
           : {
-              // The spools keep what the window needs; adb's own failure text is short.
-              maxOutputBytes: SPOOL_HEAD_BYTES,
+              // The spools keep the output; adb's own failure text is short.
+              maxOutputBytes: SPOOL_MEMORY_BYTES,
               sink: (stream: Stream, chunk: Buffer) => {
                 spools[stream].add(chunk);
               },
@@ -113,22 +117,23 @@ async function runShellCommand(context: DeviceContext): Promise<Output> {
   }
 }
 
-/** What `--full` keeps of one stream for the screen: enough for the 50-line, 4 kB window. */
-const SPOOL_HEAD_BYTES = 16 * MAX_BYTES;
+/** What `--full` keeps of each stream in memory, besides its file: enough for adb's own errors. */
+const SPOOL_MEMORY_BYTES = 16 * MAX_BYTES;
+/** How much of the end of a `--full` file is read back for its window: plenty for 4 kB. */
+const SPOOL_TAIL_BYTES = 16 * MAX_BYTES;
 
 /**
  * One stream with `--full`: written to its file as it arrives, with its lines counted and
- * only its first bytes kept, so the window and its `shown` note need no more.
+ * the place of its last line break kept, so its window can be read back from the file's end.
  */
 class Spool {
   readonly file: FullOutputFile;
-  private readonly head: Buffer[] = [];
-  private headBytes = 0;
   private bytes = 0;
   private breaks = 0;
   private last: number | undefined;
-  /** Bytes of the first line once its end is seen, as `capLines` counts them. */
-  private firstLineBytes: number | undefined;
+  /** Offsets of the last two line breaks. */
+  private lastBreak: number | undefined;
+  private breakBefore: number | undefined;
 
   constructor(serial: string, stream: Stream) {
     this.file = new FullOutputFile(`shell-${serial}-${clockStamp()}-${stream}`);
@@ -136,16 +141,9 @@ class Spool {
 
   add(chunk: Buffer): void {
     this.file.write(chunk);
-    if (this.headBytes < SPOOL_HEAD_BYTES) {
-      const part = chunk.subarray(0, SPOOL_HEAD_BYTES - this.headBytes);
-      this.head.push(part);
-      this.headBytes += part.length;
-    }
     for (let at = chunk.indexOf(0x0a); at !== -1; at = chunk.indexOf(0x0a, at + 1)) {
-      if (this.firstLineBytes === undefined) {
-        const before = at > 0 ? chunk[at - 1] : this.last;
-        this.firstLineBytes = this.bytes + at - (before === 0x0d ? 1 : 0);
-      }
+      this.breakBefore = this.lastBreak;
+      this.lastBreak = this.bytes + at;
       this.breaks++;
     }
     this.bytes += chunk.length;
@@ -156,20 +154,35 @@ class Spool {
     return this.bytes === 0;
   }
 
-  /** The window `capLines` gives for the whole stream. */
+  /** The stream's last 50 lines or 4 kB, with the lines before them as a gap. */
   window(): LineWindow {
-    const head = capLines(Buffer.concat(this.head).toString("utf8"));
     const total = this.breaks + (this.last === undefined || this.last === 0x0a ? 0 : 1);
-    const cut =
-      head.cut === undefined
-        ? undefined
-        : { shownBytes: head.cut.shownBytes, totalBytes: this.firstLineBytes ?? this.bytes };
-    const window: LineWindow = {
-      lines: head.lines,
-      total,
-      truncated: cut !== undefined || head.lines.length < total,
-    };
-    return cut === undefined ? window : { ...window, cut };
+    if (total === 0) return { lines: [], total: 0, truncated: false };
+    const endsInBreak = this.last === 0x0a;
+    const lastStart = (endsInBreak ? this.breakBefore : this.lastBreak) ?? -1;
+    const start = Math.max(0, this.bytes - SPOOL_TAIL_BYTES);
+    let window: LineWindow;
+    if (lastStart + 1 < start) {
+      // The last line alone is longer than what is read back: read its start, to be cut.
+      const end = endsInBreak ? (this.lastBreak ?? this.bytes) : this.bytes;
+      const line = this.read(lastStart + 1, Math.min(end, lastStart + 1 + SPOOL_TAIL_BYTES));
+      const shown = capLines(splitLines(line.toString("utf8")).slice(0, 1));
+      const crlf = endsInBreak && this.read(end - 1, end)[0] === 0x0d ? 1 : 0;
+      const totalBytes = end - crlf - lastStart - 1;
+      const shownBytes = Buffer.byteLength(shown.lines[0] ?? "", "utf8");
+      window = { lines: shown.lines, total: 1, truncated: true, cut: { shownBytes, totalBytes } };
+    } else {
+      // Read from just before the first whole line: the partial line before it is dropped.
+      const from = Math.max(0, start - 1);
+      let text = this.read(from, this.bytes).toString("utf8");
+      if (from > 0) text = text.slice(text.indexOf("\n") + 1);
+      window = capLines(text, { keep: "tail" });
+    }
+    return withGap({ ...window, total }, 0);
+  }
+
+  private read(from: number, to: number): Buffer {
+    return this.file.readAt(from, to - from);
   }
 }
 
@@ -183,8 +196,10 @@ interface StreamFields {
 /**
  * The output fields of one run: a stream with text, plus `stdout` for a success and
  * `stderr` for a failure even when empty. Each is capped at 50 lines or 4 kB with a
- * `shown` note. With `--full` the complete text of every non-empty stream is kept in a
- * file, and the window comes from its spool.
+ * `shown` note: its first and last lines, since a command's result is often at its end,
+ * with a row that says how many lines are left out between them. With `--full` the
+ * complete text of every non-empty stream is kept in a file, and the window shows its
+ * end, the part the first window left out.
  */
 function streamFields(
   streams: Record<Stream, string>,
@@ -200,10 +215,10 @@ function streamFields(
   for (const name of ["stdout", "stderr"] as const) {
     const spool = options.spools?.[name];
     const empty = spool === undefined ? streams[name] === "" : spool.empty;
-    const window = spool === undefined ? capLines(streams[name]) : spool.window();
+    const window = spool === undefined ? capEnds(streams[name]) : spool.window();
     const always = name === "stdout" ? options.alwaysStdout : options.alwaysStderr;
     if (!empty || always === true) {
-      fields[name] = new TextBlock(window.lines.join("\n"));
+      fields[name] = new TextBlock(windowRows(window).join("\n"));
     }
     if (window.truncated) {
       truncated = true;

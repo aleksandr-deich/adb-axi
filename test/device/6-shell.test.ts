@@ -53,12 +53,16 @@ describe("shell on a real device shell", () => {
     expect(await axi.ok(["shell", "printf 'a\\nb\\n'"])).toEqual({ exit: 0, stdout: "a\nb" });
   });
 
-  test("long output stops at 50 lines or 4 kB, --full writes all of it, and failures keep both streams apart", async () => {
+  test("long output shows its first and last lines inside 50 lines or 4 kB, --full writes all of it and shows its end, and failures keep both streams apart", async () => {
+    const numbers = (from: number, to: number): string[] =>
+      Array.from({ length: to - from + 1 }, (_, i) => String(from + i));
     const seq = await axi.ok(["shell", "seq 1 120", "--timeout", "20s"]);
-    expect((seq.stdout as string).split("\n")).toEqual(
-      Array.from({ length: 50 }, (_, i) => String(i + 1)),
-    );
-    expect(seq.shown).toBe("50 of 120 lines");
+    expect((seq.stdout as string).split("\n")).toEqual([
+      ...numbers(1, 20),
+      "... 70 lines omitted ...",
+      ...numbers(91, 120),
+    ]);
+    expect(seq.shown).toBe("50 of 120 lines (first 20 and last 30)");
     expect(seq.help).toEqual([
       `Run \`adb-axi shell --device ${axi.serial} --timeout 20s --full -- 'seq 1 120'\` to write the complete output to a file`,
     ]);
@@ -82,8 +86,9 @@ describe("shell on a real device shell", () => {
     expect(failed.json).toMatchObject({
       code: "REMOTE_EXIT",
       exit: 7,
-      shown: "50 of 60 lines",
-      stderr_shown: "50 of 70 lines",
+      stdout: ["... 10 lines omitted ...", ...numbers(11, 60)].join("\n"),
+      shown: "50 of 60 lines (last 50)",
+      stderr_shown: "50 of 70 lines (last 50)",
     });
     const written = (path: unknown): string[] =>
       readFileSync(String(path), "utf8").trimEnd().split("\n");
@@ -141,7 +146,7 @@ describe("shell on a real device shell", () => {
     expect(run.durationMs).toBeLessThan(2_000 + 2_000);
 
     const withFull = await axi.run(["shell", "seq 1 80; sleep 30", "--timeout", "2s", "--full"]);
-    expect(withFull.json).toMatchObject({ code: "TIMEOUT", shown: "50 of 80 lines" });
+    expect(withFull.json).toMatchObject({ code: "TIMEOUT", shown: "50 of 80 lines (last 50)" });
     expect(readFileSync(String(withFull.json.full), "utf8").trimEnd().split("\n")).toHaveLength(80);
     expect(String(withFull.json.help)).not.toContain("--full");
 
