@@ -131,9 +131,7 @@ Without `--server`, `--server-start` or a saved selection, adb-axi inherits adb'
 - **Exit codes:** 0 when the requested state is true, including no-ops and reads that find nothing; 1 when it is not; 2 for a usage error.
 - **Errors:** one shape: `error`, a stable `code`, the fields that explain it, then `help`.
 - **Deadlines:** commands share one deadline across their device calls; state waits may finish a final bounded observation just past it to check for a state reached during the last polling interval. `--help` shows each command's default and `--timeout` overrides it.
-- **Long output:** `logs`, `shell`, `data db` and `data prefs` print a bounded view and say how much of it was shown; `--full` writes the complete output to a file.
-
-For `shell`, each stream's view keeps up to 50 source lines or 4096 bytes. Long output normally shows the first 20 and last 30 lines; the byte cap can reduce either portion, prioritizing the last line when both ends cannot fit. An extra `... N lines omitted ...` row marks the gap, and `shown` identifies the portions kept, such as `50 of 193 lines (first 20 and last 30)`. With `--full`, the view instead shows the last 50 lines or 4096 bytes, alongside `full: <path>`. A final line that exceeds the byte cap is shown from its start, with the cut reported in `shown`. Stderr uses `stderr_shown` and `stderr_full`; output within the caps is shown whole in either mode.
+- **Long output:** `logs`, `shell`, `data db` and `data prefs` print a bounded view and say how much of it was shown; long `shell` output keeps its first and last lines with the gap marked; `--full` writes the complete output to a file and `shell --full` shows its end.
 
 `logs`, `logs crash`, `wait log` and the home crash count read log windows incrementally rather than collecting the whole window in memory. See `logs --help` for retained-state limits and temporary-spool cleanup, and `logs crash --help` for summary limits.
 
