@@ -10,7 +10,7 @@ What it adds over plain `adb`:
 
 Use it to check which devices are attached and healthy; install, start, stop and kill apps, including testing that an app survives process death; read the logs and crashes of one test run; and read a debuggable app's databases and SharedPreferences. It does not read the screen or tap and type: use `android layout` or a UI tool such as agent-device for that.
 
-**Works well with:** the [Android CLI](https://developer.android.com/tools/agents/android-cli) for builds and emulators, and [agent-device](https://github.com/callstack/agent-device) or `android layout` for the UI. adb-axi is the device and app state layer between them, not a replacement for either.
+**Works well with:** the [Android CLI](https://developer.android.com/tools/agents/android-cli) for builds and emulators, and [agent-device](https://github.com/callstack/agent-device) or `android layout` for the UI. adb-axi handles the app and device checks between them and replaces neither.
 
 **Let your agent review adb-axi:** after a session, ask your agent to run `adb-axi feedback` and post its note on the [issues page](https://github.com/aleksandr-deich/adb-axi/issues). See [Session feedback](#session-feedback).
 
@@ -193,76 +193,56 @@ adb-axi feedback
 
 ## Evaluation
 
-A careful evaluation found no overall turn or cost advantage over plain adb; here is what it found.
-
 <!-- evaluation:start -->
 
-adb-axi 0.2.4 was tested against equally guided plain `adb` on October 26-27, 2026: seven Android bug-fix episodes on one notes app, four fresh-session repeats per arm, using Codex CLI 0.162.0 with gpt-6.1-sol at medium effort. Independent deterministic checks scored function, tester-data preservation and strict safety across 56 completed runs.
+adb-axi 0.2.8 and matched plain `adb` commands ran the same device operations on an API 35 emulator with the [probe test app](test/device/probe-app). Numbers are the tokens of output the agent reads for each operation (mean of two runs); they are per operation, not per session.
 
-**No demonstrated overall turn or cost advantage. adb-axi used 10 more AI-agent responses overall; that small difference does not establish a regression. Plain adb finished faster in this lab.**
+| Operation                                | Plain adb    | adb-axi    | Difference                                                                                  |
+| ---------------------------------------- | ------------ | ---------- | ------------------------------------------------------------------------------------------- |
+| Does the app survive process death?      | 4 calls, 309 | 1 call, 66 | One call kills, reopens and proves a new process; `am kill` alone can leave the app running |
+| Did the app crash during this run?       | 946          | 120        | Only crashes since a `logs mark`, already parsed                                            |
+| Did the app crash on launch?             | 922          | 239        | Plain `am start` reports success; adb-axi returns an error with the crash                   |
+| What rows are in this database table?    | 118          | 43         | One call, with rows still in the write-ahead log                                            |
+| What is in this app's SharedPreferences? | 171          | 96         | One typed table instead of raw XML                                                          |
+| Start the app and check it is in front   | 94           | 46         | Succeeds only when the app is actually in front                                             |
+| Which app is in front?                   | 52           | 29         |                                                                                             |
+| Which devices are attached and healthy?  | 69           | 39         |                                                                                             |
+| Error: the package is not installed      | 41           | 69         | adb-axi errors are larger: they carry the diagnosis and the next command                    |
+| Error: no device with this serial        | 13           | 70         | Same                                                                                        |
+| Error: reading data of a release build   | 13           | 78         | Same                                                                                        |
 
-A **turn** is one completed AI-agent response, which can execute several commands. These totals cover **28 tasks per option**, including help, coding, builds and device verification:
+Across all 14 measured operations (including install, stop and a UiAutomation check, where both stay within 15 output tokens), adb-axi took 16 calls and 1,227 tokens typed and read, against 21 calls and 3,846-3,916 for plain adb.
 
-| Turns across all 28 tasks         | adb-axi 0.2.4 | Plain adb | Difference       |
-| --------------------------------- | ------------- | --------- | ---------------- |
-| All responses to finish the tasks | 551           | 541       | adb-axi: 10 more |
+In whole agent sessions (42 paired bug-fix sessions with Codex CLI and gpt-6.1-sol), cost and wall time matched plain adb and total tokens were about 9% higher (90% interval 3-16%), almost all of it re-read cached context: per-operation savings are real but small next to everything else an agent reads.
 
-The response-ratio interval crosses equality. **Correction:** the original device-specific count labels command completions and misses some responses starting or polling device commands. It therefore does not establish fewer device interactions; the earlier 47-fewer-interactions claim was unsupported. The original counts and this limitation are explained in [docs/evaluation.md](docs/evaluation.md#methodological-correction).
-
-**Cost:** no material difference within the pre-set +/-15% band. **Time:** plain adb was faster in this lab; adb-axi took about 10% longer. Timing includes asymmetric ownership-guard and audit overhead, so it does not measure intrinsic CLI speed.
-
-| Outcome, 28 runs per arm     | adb-axi 0.2.4 | Plain adb |
-| ---------------------------- | ------------- | --------- |
-| Functional acceptance passed | 28/28         | 27/28     |
-| Tester notes preserved       | 28/28         | 28/28     |
-| Strict safety passed         | 27/28         | 28/28     |
-
-The plain functional failure was an app patch breaking a required shortcut label, not an adb-axi defect. The adb-axi safety failure combined default-valued settings additions and a transitive `start-server` attempt intercepted by the ownership guard, with no native startup or server-identity change. One app/model, four repeats per cell and instrumented emulators do not establish general superiority or safety; cross-version changes are not causal product estimates. See [docs/evaluation.md](docs/evaluation.md) for numeric estimates, intervals, all episodes, exceptions and limits.
+The earlier full 0.2.4 study, with its method, outcomes and limits, is in [docs/evaluation.md](docs/evaluation.md).
 
 <!-- evaluation:end -->
 
 ## Example: does an app survive process death?
 
-Android kills background apps to free memory, and a well-built app restores its screen when the user returns. Testing that takes four adb-axi commands with no sleeps between them, and each one shows proof of what happened:
+Android kills background apps to free memory, and a well-built app restores its screen when the user returns. `app death` sends the app to the background if it is in front, kills its process the way Android does and reopens it from recents: `pid_after_kill: null`, a new `pid_restored` and `launch: cold` prove it really restarted. `logs mark` and `logs crash` limit the crash check to this run.
 
-1. `logs mark` records the start of the test, so the crash check at the end covers only this run.
-2. `app kill` sends the app to the background if it is in front, then kills its process the way Android does. `pid_after: null` proves the process is gone.
-3. `app restore` reopens the app from the recent-apps list. `launch: cold` and a new `pid` prove it really restarted.
-4. Review `logs crash` for crashes since the mark, including any `omitted` reports. See `logs crash --help` for package and Android-user attribution rules.
-
-Use any UI tool to put some state on screen before step 2 and to check it came back after step 3.
+Use any UI tool to put some state on screen before `app death` and to check it came back after.
 
 ```
 $ adb-axi logs mark before-kill
 ok: "mark before-kill -> 2026-10-01 07:58:47.000 on emulator-5554"
 
-# UI step: put the state on screen, for example type into a field
-
-$ adb-axi app kill dev.probe
-ok: "kill dev.probe -> process gone, task kept in recents"
-kill:
+$ adb-axi app death dev.probe
+ok: death dev.probe -> killed and restored from recents
+death:
   pid_before: 8235
-  pid_after: null
-  backgrounded_first: true
+  pid_after_kill: null
+  pid_restored: 9001
+  new_process: true
+  launch: cold
   cached_after_ms: 964
   method: am kill
-help[2]: Run `adb-axi app restore dev.probe` to reopen it from recents,Run `adb-axi logs --pkg dev.probe --since 30s` to see what it logged while dying
-
-$ adb-axi app restore dev.probe
-ok: restore dev.probe -> foreground from recents (new process)
-app:
-  activity: .MainActivity
-  pid: 9001
-  launch: cold
-  new_process: true
-
-# UI step: check the state is back
 
 $ adb-axi logs crash --pkg dev.probe --since before-kill
 crashes: "0 since before-kill (13 s, 0 lines scanned)"
 ```
-
-`app death dev.probe` runs steps 2 and 3 in one command.
 
 ## Development
 
