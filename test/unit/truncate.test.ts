@@ -106,6 +106,29 @@ describe("capEnds", () => {
     expect(shownLine(window)).toMatch(/^20 of 45 lines \(first \d+ and last \d+\)$/);
   });
 
+  it("keeps a first line larger than its normal byte share when both ends fit", () => {
+    const first = "x".repeat(2000);
+    const all = [first, ...lines(60)];
+    const window = capEnds(all);
+    expect(window.lines[0]).toBe(first);
+    expect(window.lines.at(-1)).toBe(all.at(-1));
+    expect(window.lines.length).toBeLessThanOrEqual(50);
+    expect(Buffer.byteLength(window.lines.join("\n"), "utf8")).toBeLessThanOrEqual(4096);
+    expect(
+      windowRows(window).filter((row) => /^\.\.\. \d+ lines omitted \.\.\.$/.test(row)),
+    ).toHaveLength(1);
+    expect(shownLine(window)).toMatch(/^\d+ of 61 lines \(first [1-9]\d* and last [1-9]\d*\)$/);
+  });
+
+  it("reserves the final line before allocating head bytes", () => {
+    const last = "z".repeat(3000);
+    const window = capEnds(["start", ...lines(60, 199), last]);
+    expect(window.lines[0]).toBe("start");
+    expect(window.lines.at(-1)).toBe(last);
+    expect(window.cut).toBeUndefined();
+    expect(Buffer.byteLength(window.lines.join("\n"), "utf8")).toBeLessThanOrEqual(4096);
+  });
+
   it("cuts a single line longer than the byte cap as before", () => {
     expect(capEnds(["x".repeat(10_000)])).toEqual(capLines(["x".repeat(10_000)]));
   });

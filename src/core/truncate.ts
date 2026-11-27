@@ -88,8 +88,10 @@ export function capLines(input: string | readonly string[], caps: LineCaps = {})
 /**
  * The output's first and last lines inside the caps, for output whose result is often at
  * its end. Output inside the caps is kept whole. Otherwise up to `HEAD_LINES` lines and their
- * share of the bytes come from the start, and the rest of both caps goes to the end, so
- * the last line is always shown. Only the last line can be cut, as `capLines` cuts a line.
+ * share of the bytes come from the start, expanding that share to keep the first line
+ * when it fits alongside the last line. The last line's bytes are reserved before the
+ * head is allocated; the rest of both caps goes to the end. Only the last line can be
+ * cut, as `capLines` cuts a line.
  */
 export function capEnds(input: string | readonly string[], caps: LineCaps = {}): LineWindow {
   const maxLines = caps.maxLines ?? MAX_LINES;
@@ -99,7 +101,12 @@ export function capEnds(input: string | readonly string[], caps: LineCaps = {}):
   if (!whole.truncated) return whole;
 
   const headLines = Math.min(HEAD_LINES, maxLines - 1);
-  const headBytes = Math.floor((maxBytes * headLines) / maxLines);
+  const firstBytes = Buffer.byteLength(all[0] ?? "", "utf8") + 1;
+  const lastBytes = Buffer.byteLength(all.at(-1) ?? "", "utf8") + 1;
+  const headBytes = Math.min(
+    Math.max(Math.floor((maxBytes * headLines) / maxLines), firstBytes),
+    Math.max(0, maxBytes - lastBytes),
+  );
   const head: string[] = [];
   let bytes = 0;
   for (const line of all.slice(0, headLines)) {
