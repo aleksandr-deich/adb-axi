@@ -1,4 +1,5 @@
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { decode } from "@toon-format/toon";
 import { afterEach, describe, expect, it } from "vitest";
@@ -14,10 +15,24 @@ const CLOCK = "date '+%s.%N %z'";
 const MARK_CLOCK = "1790834300.000000000 +0200\n";
 const LATER_CLOCK = "1790834340.000000000 +0200\n";
 let fake: FakeAdb | undefined;
+const scratch: string[] = [];
 afterEach(() => {
   fake?.cleanup();
   fake = undefined;
+  for (const dir of scratch.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
+
+/**
+ * An answer that prints `text` from a file. Every fake adb call is a process that parses the
+ * whole scenario, so a window of many MB written inline would be parsed again on each call.
+ */
+function printed(text: string): Response {
+  const dir = mkdtempSync(join(tmpdir(), "adb-axi-crash-test-"));
+  scratch.push(dir);
+  const path = join(dir, "window.txt");
+  writeFileSync(path, text);
+  return { stdoutFile: path };
+}
 
 /** A log line as `logcat -v epoch` prints it. */
 function logLine(
@@ -370,24 +385,23 @@ describe("logs crash", () => {
           .map((message) => logLine(1790834311000, 123, "E", "AndroidRuntime", message))
           .join("\n") + "\n";
       const f = device({
-        window: {
-          stdout:
-            [
-              logLine(1790834310000, 552, "E", "ActivityManager", "ANR in dev.probe"),
-              logLine(1790834310000, 552, "E", "ActivityManager", "PID: 123"),
-              logLine(1790834310000, 552, "E", "ActivityManager", "Reason: blocked"),
-              logLine(
-                1790834310000,
-                552,
-                "E",
-                "ActivityManager",
-                "CPU usage from 100ms to -1ms ago:",
-              ),
-              logLine(1790834310000, 552, "E", "ActivityManager", "Reason: unrelated"),
-            ].join("\n") +
+        window: printed(
+          [
+            logLine(1790834310000, 552, "E", "ActivityManager", "ANR in dev.probe"),
+            logLine(1790834310000, 552, "E", "ActivityManager", "PID: 123"),
+            logLine(1790834310000, 552, "E", "ActivityManager", "Reason: blocked"),
+            logLine(
+              1790834310000,
+              552,
+              "E",
+              "ActivityManager",
+              "CPU usage from 100ms to -1ms ago:",
+            ),
+            logLine(1790834310000, 552, "E", "ActivityManager", "Reason: unrelated"),
+          ].join("\n") +
             "\n" +
             javaWindow.repeat(70),
-        },
+        ),
       });
       await runCli(["logs", "mark", "before-run"], f.env);
       const run = await runCli(
