@@ -133,6 +133,8 @@ Without `--server`, `--server-start` or a saved selection, adb-axi inherits adb'
 - **Deadlines:** commands share one deadline across their device calls; state waits may finish a final bounded observation just past it to check for a state reached during the last polling interval. `--help` shows each command's default and `--timeout` overrides it.
 - **Long output:** `logs`, `shell`, `data db` and `data prefs` print a bounded view and say how much of it was shown; `--full` writes the complete output to a file.
 
+For `shell`, each stream's view keeps up to 50 source lines or 4096 bytes. Long output normally shows the first 20 and last 30 lines; the byte cap can reduce either portion, prioritizing the last line when both ends cannot fit. An extra `... N lines omitted ...` row marks the gap, and `shown` identifies the portions kept, such as `50 of 193 lines (first 20 and last 30)`. With `--full`, the view instead shows the last 50 lines or 4096 bytes, alongside `full: <path>`. A final line that exceeds the byte cap is shown from its start, with the cut reported in `shown`. Stderr uses `stderr_shown` and `stderr_full`; output within the caps is shown whole in either mode.
+
 `logs`, `logs crash`, `wait log` and the home crash count read log windows incrementally rather than collecting the whole window in memory. See `logs --help` for retained-state limits and temporary-spool cleanup, and `logs crash --help` for summary limits.
 
 adb-axi keeps log marks, install records and cached AVD names under `~/.adb-axi/`; set `ADB_AXI_HOME` to use another directory. Output files and temporary log spools live in that directory's `out/` subdirectory.
