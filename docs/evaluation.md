@@ -1,6 +1,6 @@
 # Evaluation
 
-How adb-axi has been measured against plain `adb` when a coding agent does the device work. Each study below compares two arms: an agent with adb-axi and its skill, and the same agent with plain `adb`. Studies are listed newest first.
+Detailed reports of earlier adb-axi studies against plain `adb`, through 0.2.4. See the [README evaluation](../README.md#evaluation) for the current 0.2.8 measurements. Each study below compares two arms: an agent with adb-axi and its skill, and the same agent with plain `adb`. Studies are listed newest first.
 
 ## How to read this
 
@@ -9,7 +9,7 @@ Two kinds of evidence are kept apart:
 - **Realistic task evidence**: an agent does a whole job (fix a reported bug on a device, build an app slice) and independent checks score the result. This is the evidence to use for "does adb-axi help an agent".
 - **Regression signal**: a fixed set of small scripted tasks used in the [retired benchmark](#scripted-benchmark-second-run) to compare releases on turns, tokens or time. Its tasks are too small, and its checks too literal, to rank the two arms.
 
-Every study so far is small: one app or one probe app, one model per study, and one to five repeats per arm. The two newest studies report 90% intervals and use pre-set cost bands: 0.2.4 found no material whole-task cost difference within its +/-15% band; 0.2.2 was inconclusive. Neither establishes general superiority. Version, environment and hosted-runtime differences prevent attributing cross-study changes solely to the product.
+Every study below is small: one app or one probe app, one model per study, and one to five repeats per arm. The two newest studies below report 90% intervals and use pre-set cost bands: 0.2.4 found no material whole-task cost difference within its +/-15% band; 0.2.2 was inconclusive. Neither establishes general superiority. Version, environment and hosted-runtime differences prevent attributing cross-study changes solely to the product.
 
 | Study                                                                          | Kind       | Date             | Version | Agent runs | Verdict                                                                                   |
 | ------------------------------------------------------------------------------ | ---------- | ---------------- | ------- | ---------- | ----------------------------------------------------------------------------------------- |
@@ -409,7 +409,7 @@ When a new study finishes:
 
 1. Add a section at the top of the studies, above the previous newest one, using the same fields in the same order: **Date**, **Tested version**, **Design**, **Agent/model**, **Sample size**, then **Key numbers**, **Verdict** and **Limitations**.
 2. Add a row at the top of the table under [How to read this](#how-to-read-this), and say whether the study is realistic task evidence or a regression signal.
-3. Refresh the summary in the [README](../README.md) between the `<!-- evaluation:start -->` and `<!-- evaluation:end -->` markers. Keep it short: the newest study's adb-axi versus plain-adb table, labelled with the tested version, a few sentences on the verdict, and a link here.
+3. Refresh the [README evaluation](../README.md#evaluation) between the `<!-- evaluation:start -->` and `<!-- evaluation:end -->` markers. Keep the individual-operation comparison labelled with the tested version and one line about whole agent sessions; link here for detailed study reports instead of adding summary tables.
 4. Take every number from the study's final report or analysis file, and report what was tested: the version, the behaviour and the verdict as they were at the time. When a weakness has since been fixed, say so and link the change; do not rewrite the result.
 5. State null results and unfavourable results plainly, and keep the limitations.
 6. Keep the page self-contained. Link only to public sources; leave transcripts, local paths and other private evidence out.

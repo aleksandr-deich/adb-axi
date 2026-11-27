@@ -1,7 +1,7 @@
 {
   "name": "adb-axi",
   "version": "0.2.8",
-  "description": "Device and app state for coding agents on Android: devices, app lifecycle, process death, logs, crashes and app data. Follows the AXI conventions.",
+  "description": "adb for coding agents: launch, kill, crash-check and inspect Android apps. Follows the AXI conventions.",
   "keywords": [
     "adb",
     "android",
