@@ -18,7 +18,7 @@ Use `adb-axi config get [<key>]` and `config set <key> <value>` for animations, 
 
 Install once with `npm i -g adb-axi`, then run `adb-axi` from PATH. Fallback: `NPM_CONFIG_LOGLEVEL=warn npx -y adb-axi <command>` suppresses `npm notice` noise. Both routes need Node.js 24.12 or newer and Android SDK Platform-Tools 35.0.0 or newer. No preliminary availability probe is needed.
 
-Output is short and the first line is the verdict. Do not pipe it through `tail` or `head`. Bare `adb-axi` reads live state; it is not a prerequisite for a known operation.
+Output is short and the first line is the verdict. Do not pipe adb-axi's output through `tail` or `head`. Long `shell` output keeps its first and last lines; for more, filter inside the quoted remote command or rerun with `--full`, which saves all of it to a file and shows its end. A pipe inside the remote command hides that command's exit code: `exit` is the last command's. Bare `adb-axi` reads live state; it is not a prerequisite for a known operation.
 
 ## Quick reference
 
@@ -28,6 +28,10 @@ Output is short and the first line is the verdict. Do not pipe it through `tail`
 - `adb-axi app start <pkg> [--fresh]` - `--fresh` force-stops first.
 - `adb-axi app stop <pkg>`
 - `adb-axi app clear <pkg>`
+- `adb-axi app current` - the foreground package, activity and pid.
+- `adb-axi app kill <pkg>` - process gone, task kept in Recents; an app in front is sent HOME first.
+- `adb-axi app restore <pkg>` - reopens the task from Recents so saved state is restored.
+- `adb-axi app uninstall <pkg> [--keep-data]` - an absent package is a no-op.
 - `adb-axi app death <pkg>` - kills and restores with before and after evidence. Start with the app in front; do not press HOME or sleep first.
 - `adb-axi doctor ui [--fix]` - inspect first; repair only owned leftovers.
 - `adb-axi logs [--since <mark|dur>] [--pkg <pkg>]`

@@ -3,12 +3,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+  capEnds,
   capLines,
   MAX_BYTES,
   MAX_LINES,
   shownLine,
   splitLines,
   truncateField,
+  windowRows,
   writeFullOutput,
 } from "../../src/core/truncate.js";
 
@@ -76,6 +78,59 @@ describe("capLines", () => {
     expect(splitLines("a\r\nb")).toEqual(["a", "b"]);
     expect(splitLines("")).toEqual([]);
     expect(capLines("")).toEqual({ lines: [], total: 0, truncated: false });
+  });
+});
+
+describe("capEnds", () => {
+  it("keeps output inside the caps whole", () => {
+    expect(capEnds(lines(50))).toEqual({ lines: lines(50), total: 50, truncated: false });
+    expect(windowRows(capEnds(lines(50)))).toEqual(lines(50));
+  });
+
+  it("keeps the first 20 and last 30 lines, with a row for the lines between", () => {
+    const window = capEnds(lines(193));
+    expect(window.lines).toEqual([...lines(193).slice(0, 20), ...lines(193).slice(163)]);
+    expect(shownLine(window)).toBe("50 of 193 lines (first 20 and last 30)");
+    expect(windowRows(window)[20]).toBe("... 143 lines omitted ...");
+    expect(windowRows(capEnds(lines(51)))[20]).toBe("... 1 line omitted ...");
+  });
+
+  it("holds the byte cap for long lines and still ends with the last line", () => {
+    const all = lines(45, 199);
+    const window = capEnds(all);
+    const rows = windowRows(window);
+    expect(window.lines.join("\n").length).toBeLessThanOrEqual(4096);
+    expect(window.lines.at(-1)).toBe(all.at(-1));
+    expect(window.lines[0]).toBe(all[0]);
+    expect(rows.filter((row) => row.endsWith("omitted ..."))).toHaveLength(1);
+    expect(shownLine(window)).toMatch(/^20 of 45 lines \(first \d+ and last \d+\)$/);
+  });
+
+  it("keeps a first line larger than its normal byte share when both ends fit", () => {
+    const first = "x".repeat(2000);
+    const all = [first, ...lines(60)];
+    const window = capEnds(all);
+    expect(window.lines[0]).toBe(first);
+    expect(window.lines.at(-1)).toBe(all.at(-1));
+    expect(window.lines.length).toBeLessThanOrEqual(50);
+    expect(Buffer.byteLength(window.lines.join("\n"), "utf8")).toBeLessThanOrEqual(4096);
+    expect(
+      windowRows(window).filter((row) => /^\.\.\. \d+ lines omitted \.\.\.$/.test(row)),
+    ).toHaveLength(1);
+    expect(shownLine(window)).toMatch(/^\d+ of 61 lines \(first [1-9]\d* and last [1-9]\d*\)$/);
+  });
+
+  it("reserves the final line before allocating head bytes", () => {
+    const last = "z".repeat(3000);
+    const window = capEnds(["start", ...lines(60, 199), last]);
+    expect(window.lines[0]).toBe("start");
+    expect(window.lines.at(-1)).toBe(last);
+    expect(window.cut).toBeUndefined();
+    expect(Buffer.byteLength(window.lines.join("\n"), "utf8")).toBeLessThanOrEqual(4096);
+  });
+
+  it("cuts a single line longer than the byte cap as before", () => {
+    expect(capEnds(["x".repeat(10_000)])).toEqual(capLines(["x".repeat(10_000)]));
   });
 });
 
