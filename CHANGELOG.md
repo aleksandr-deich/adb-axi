@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.9](https://github.com/aleksandr-deich/adb-axi/compare/v0.2.8...v0.2.9) (2026-11-27)
+
+
+### Miscellaneous Chores
+
+* release 0.2.9 ([#112](https://github.com/aleksandr-deich/adb-axi/issues/112)) ([bfb61e4](https://github.com/aleksandr-deich/adb-axi/commit/bfb61e4f601e145894adba4ff93df34de78de64a))
+
 ## [0.2.8](https://github.com/aleksandr-deich/adb-axi/compare/v0.2.7...v0.2.8) (2026-11-26)
 
 
