@@ -57,36 +57,57 @@ describe("atomic writes", () => {
   it("never exposes a torn file to concurrent writers and readers", async () => {
     const dir = tempDir();
     const path = join(dir, "state.json");
-    writeJsonAtomic(path, { writer: -1, pad: "" });
+    const stop = join(tempDir(), "stop");
+    writeJsonAtomic(path, { writer: -1, seq: -1, pad: "" });
+    // Writers replace the file until the reader has seen enough replacements. Each durable
+    // write costs one disk cache flush (F_FULLFSYNC on macOS) whose latency follows host I/O
+    // load, so the test asks for a fixed amount of observed overlap, not a fixed write count.
     const script = `
+      import { existsSync } from "node:fs";
       import { writeJsonAtomic } from ${JSON.stringify(new URL("../../src/core/state.ts", import.meta.url).href)};
       const id = Number(process.argv[1]);
-      for (let i = 0; i < 200; i++) writeJsonAtomic(${JSON.stringify(path)}, { writer: id, pad: "x".repeat(20000 + id) });
+      for (let seq = 0; !existsSync(${JSON.stringify(stop)}); seq++) {
+        writeJsonAtomic(${JSON.stringify(path)}, { writer: id, seq, pad: "x".repeat(20000 + id) });
+      }
     `;
-    const writers = Array.from({ length: 4 }, (_, id) =>
+    const writerCount = 4;
+    const versionsWanted = 50;
+    let exited = 0;
+    const writers = Array.from({ length: writerCount }, (_, id) =>
       exec({
         file: process.execPath,
         args: ["--input-type=module", "-e", script, String(id)],
         deadlineMs: 30_000,
-      }),
+      }).finally(() => exited++),
     );
-    let reads = 0;
-    const writing = { done: false };
-    const reader = (async () => {
-      while (!writing.done) {
-        const value = JSON.parse(readFileSync(path, "utf8")) as { writer: number; pad: string };
-        if (value.writer >= 0) expect(value.pad).toHaveLength(20000 + value.writer);
-        reads++;
+    const writersSeen = new Set<number>();
+    const versionsSeen = new Set<string>();
+    try {
+      while (
+        exited === 0 &&
+        (writersSeen.size < writerCount || versionsSeen.size < versionsWanted)
+      ) {
+        const value = JSON.parse(readFileSync(path, "utf8")) as {
+          writer: number;
+          seq: number;
+          pad: string;
+        };
+        if (value.writer >= 0) {
+          expect(value.pad).toHaveLength(20000 + value.writer);
+          writersSeen.add(value.writer);
+          versionsSeen.add(`${value.writer}:${value.seq}`);
+        }
         await new Promise((resolve) => setImmediate(resolve));
       }
-    })();
+    } finally {
+      writeFileSync(stop, "");
+    }
     const results = await Promise.all(writers);
-    writing.done = true;
-    await reader;
     for (const result of results) {
       expect(result.kind === "exited" ? result.exitCode : result.kind).toBe(0);
     }
-    expect(reads).toBeGreaterThan(0);
+    expect(writersSeen.size).toBe(writerCount);
+    expect(versionsSeen.size).toBeGreaterThanOrEqual(versionsWanted);
     expect(readdirSync(dir)).toEqual(["state.json"]);
   });
 });
