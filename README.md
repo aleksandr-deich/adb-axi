@@ -99,7 +99,7 @@ last:
   state: not attached
 ```
 
-These are correctness differences, not a speed or cost claim: the [evaluation](#evaluation) found no overall turn or cost advantage over plain adb.
+These are correctness differences, not a speed or cost claim; see the [evaluation](#evaluation) for per-operation measurements and the whole-session caveat.
 
 ## Start here
 
