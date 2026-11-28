@@ -1,6 +1,6 @@
 {
   "name": "adb-axi",
-  "version": "0.2.9",
+  "version": "0.2.10",
   "description": "adb for coding agents: launch, kill, crash-check and inspect Android apps. Follows the AXI conventions.",
   "keywords": [
     "adb",

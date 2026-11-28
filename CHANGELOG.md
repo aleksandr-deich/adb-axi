@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.10](https://github.com/aleksandr-deich/adb-axi/compare/v0.2.9...v0.2.10) (2026-11-28)
+
+
+### Bug Fixes
+
+* preserve command results in long shell output previews ([#114](https://github.com/aleksandr-deich/adb-axi/issues/114)) ([9e54a29](https://github.com/aleksandr-deich/adb-axi/commit/9e54a298bc510e6e53d66730e81a199024d7c633))
+
 ## [0.2.9](https://github.com/aleksandr-deich/adb-axi/compare/v0.2.8...v0.2.9) (2026-11-27)
 
 
