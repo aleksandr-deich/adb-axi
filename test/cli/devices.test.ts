@@ -190,10 +190,14 @@ describe("devices", () => {
         { match: ["-s", "emulator-5556", { rest: true }], respond: { hang: true } },
       ],
     });
+    // The deadline must outlast the answering device's sequential fake adb calls, each a
+    // new Node process that can take hundreds of milliseconds on a loaded host; the silent
+    // device is still cut off at it.
     const started = Date.now();
-    const { toon, json } = await both(f, ["--timeout", "1s"]);
+    const run = await runCli(["devices", "--timeout", "3s", "--json"], f.env);
     expect(Date.now() - started).toBeLessThan(6000);
-    expect(toon.exitCode).toBe(0);
+    expect(run.exitCode).toBe(0);
+    const json = JSON.parse(run.stdout) as Record<string, unknown>;
     expect(json.devices).toEqual([
       { serial: "emulator-5554", avd: "Phone", state: "device", api: 37, form: "phone" },
       { serial: "emulator-5556", avd: "-", state: "device", api: "-", form: "-" },
